@@ -1,0 +1,32 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+      - name: Set manifest download URL to this tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s#/releases/latest/download/system.zip#/releases/download/${GITHUB_REF_NAME}/system.zip#" system.json
+          sed -i "s#\"version\": \".*\"#\"version\": \"${VERSION}\"#" system.json
+      - name: Zip release package
+        run: zip -r system.zip system.json dist lang packs templates
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          files: |
+            system.json
+            system.zip

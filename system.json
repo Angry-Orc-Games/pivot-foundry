@@ -1,0 +1,20 @@
+{
+  "id": "pivot-fantasy",
+  "title": "Pivot Fantasy",
+  "description": "The free core rules engine for Pivot Fantasy - character sheets, dice, and the Pool. Pivot Fantasy book content sold separately.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "authors": [{ "name": "Angry Orc Games" }],
+  "esmodules": ["dist/pivot.mjs"],
+  "styles": [],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  ],
+  "packs": [],
+  "url": "https://github.com/angry-orc-games/pivot-fantasy-system",
+  "manifest": "https://github.com/angry-orc-games/pivot-fantasy-system/releases/latest/download/system.json",
+  "download": "https://github.com/angry-orc-games/pivot-fantasy-system/releases/latest/download/system.zip"
+}
