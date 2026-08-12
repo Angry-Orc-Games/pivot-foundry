@@ -8,7 +8,7 @@ export default defineConfig({
       fileName: () => "pivot.mjs",
     },
     outDir: "dist",
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true,
   },
 });

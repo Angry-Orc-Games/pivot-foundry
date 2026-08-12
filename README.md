@@ -42,9 +42,7 @@ npm ci
 Run the local verification suite:
 
 ```sh
-npm run typecheck
-npm run test
-npm run build
+npm run verify
 ```
 
 Watch and rebuild during development:
@@ -93,18 +91,39 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 
 - `npm run build`: builds `src/pivot.ts` into `dist/pivot.mjs`
 - `npm run dev`: runs Vite in watch mode
+- `npm run lint`: runs ESLint with zero warnings allowed
+- `npm run format`: formats supported project files with Prettier
+- `npm run format:check`: checks formatting without writing files
+- `npm run audit`: runs `npm audit` at moderate severity or higher
+- `npm run package:system`: builds and validates `system.zip`
+- `npm run verify`: runs lint, formatting, typecheck, tests, build, and audit
 - `npm run test`: runs Vitest once
 - `npm run test:watch`: runs Vitest in watch mode
 - `npm run typecheck`: runs TypeScript without emitting files
+
+## CI/CD
+
+GitHub Actions run on pull requests and pushes to `main`.
+
+The CI workflow:
+
+1. Installs dependencies with `npm ci`
+2. Runs linting, formatting checks, typecheck, Vitest, Vite build, and dependency audit on Node 20 and Node 22
+3. Builds and validates the Foundry release zip
+4. Uploads `system.json` and `system.zip` as a workflow artifact
+
+Dependabot is configured to open weekly update PRs for npm dependencies and GitHub Actions.
 
 ## Release Model
 
 Releases are produced by pushing a version tag that matches `v*`, for example `v0.1.0`. The release workflow:
 
 1. Installs dependencies with `npm ci`
-2. Runs typecheck, tests, and build
-3. Updates the release copy of `system.json` to the tag version
-4. Uploads `system.json` and `system.zip` to the GitHub release
+2. Runs `npm run verify`
+3. Validates the tag as a semantic version prefixed with `v`
+4. Updates the release copy of `system.json` to the tag version
+5. Builds and validates `system.zip`
+6. Uploads `system.json` and `system.zip` to the GitHub release
 
 Foundry installs use the manifest URL in `system.json`:
 

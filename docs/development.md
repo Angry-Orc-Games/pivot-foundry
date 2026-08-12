@@ -33,10 +33,18 @@ Good candidates for Foundry integration modules:
 Run these before handing off changes:
 
 ```sh
-npm run typecheck
-npm run test
-npm run build
+npm run verify
 ```
+
+For faster inner-loop checks, run the narrower script that matches the change:
+
+- `npm run lint` for TypeScript and JavaScript linting
+- `npm run format:check` for Prettier formatting
+- `npm run typecheck` for TypeScript compiler validation
+- `npm run test` for Vitest unit tests
+- `npm run build` for the Foundry runtime bundle
+- `npm run audit` for dependency vulnerability checks
+- `npm run package:system` for release zip validation
 
 `vitest.config.ts` currently uses `passWithNoTests: true` because the repository began as an empty shell. Once the first real rules or runtime tests are added, keep that setting under review so missing tests do not hide regressions.
 

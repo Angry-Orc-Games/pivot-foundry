@@ -8,9 +8,8 @@ Verify the package locally:
 
 ```sh
 npm ci
-npm run typecheck
-npm run test
-npm run build
+npm run verify
+npm run package:system
 ```
 
 Check that `system.json` contains the intended metadata:
@@ -45,6 +44,8 @@ During the workflow, the release copy of `system.json` is updated so:
 
 - `version` matches the tag without the leading `v`
 - `download` points at the tag-specific `system.zip`
+
+The tag must be a semantic version prefixed with `v`, such as `v0.1.0`.
 
 ## Foundry Install Test
 
