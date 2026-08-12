@@ -1,5 +1,11 @@
 /** Ability Modifiers table, rulebook line 761-770. Formula matches floor((score - 10) / 2). */
 export function abilityModifier(score: number): number {
+  if (!Number.isInteger(score) || score < 1 || score > 30) {
+    throw new RangeError(
+      `abilityModifier: score must be an integer between 1 and 30 (got ${score})`,
+    );
+  }
+
   return Math.floor((score - 10) / 2);
 }
 
