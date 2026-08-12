@@ -1,5 +1,15 @@
 # Pivot Fantasy Foundry System
 
+[![CI](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml?query=branch%3Amain)
+[![Release](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml/badge.svg)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml)
+![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v13-blue)
+![Node](https://img.shields.io/badge/Node-%3E%3D20.19.0-339933)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
+![Format](https://img.shields.io/badge/format-Prettier-f7b93e)
+![Security](https://img.shields.io/badge/audit-npm%20audit-2ea44f)
+![Status](https://img.shields.io/badge/status-scaffold-orange)
+
 Pivot Fantasy is a Foundry VTT v13 game system for the free Pivot Fantasy core rules engine. This repository currently contains the first working system shell: a strict TypeScript/Vite build, Foundry manifest, language file, CI, and release packaging.
 
 The goal is to keep the Foundry runtime thin while game rules, dice logic, and character math grow as testable TypeScript modules.
