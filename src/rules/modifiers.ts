@@ -11,6 +11,12 @@ export function abilityModifier(score: number): number {
 
 /** Character Advancement table, Appendix B, rulebook line 12429-12450. */
 export function proficiencyBonusForLevel(level: number): number {
+  if (!Number.isInteger(level) || level < 1) {
+    throw new RangeError(
+      `proficiencyBonusForLevel: level must be a positive integer (got ${level})`,
+    );
+  }
+
   if (level >= 17) return 6;
   if (level >= 13) return 5;
   if (level >= 9) return 4;
