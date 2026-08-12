@@ -52,6 +52,12 @@ export function resolveDicePool(
 
 /** Natural 20/1 rule for attack rolls only, rulebook line 242-246. */
 export function applyAttackCrit(naturalD20Result: number): "hit" | "miss" | null {
+  if (!Number.isInteger(naturalD20Result) || naturalD20Result < 1 || naturalD20Result > 20) {
+    throw new RangeError(
+      `applyAttackCrit: naturalD20Result must be an integer between 1 and 20 (got ${naturalD20Result})`,
+    );
+  }
+
   if (naturalD20Result === 20) return "hit";
   if (naturalD20Result === 1) return "miss";
   return null;
