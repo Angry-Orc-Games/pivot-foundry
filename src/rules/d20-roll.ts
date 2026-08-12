@@ -11,7 +11,19 @@ export function resolveDicePool(
   advantageSources: number,
   disadvantageSources: number,
 ): DicePoolResolution {
-  if (advantageSources <= 0 && disadvantageSources <= 0) {
+  if (!Number.isInteger(advantageSources) || advantageSources < 0) {
+    throw new RangeError(
+      `resolveDicePool: advantageSources must be a non-negative integer (got ${advantageSources})`,
+    );
+  }
+
+  if (!Number.isInteger(disadvantageSources) || disadvantageSources < 0) {
+    throw new RangeError(
+      `resolveDicePool: disadvantageSources must be a non-negative integer (got ${disadvantageSources})`,
+    );
+  }
+
+  if (advantageSources === 0 && disadvantageSources === 0) {
     return { dieCount: 1, pick: "single" };
   }
 
