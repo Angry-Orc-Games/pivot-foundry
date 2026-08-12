@@ -109,7 +109,7 @@ Releases are produced by pushing a version tag that matches `v*`, for example `v
 Foundry installs use the manifest URL in `system.json`:
 
 ```text
-https://github.com/angry-orc-games/pivot-fantasy-system/releases/latest/download/system.json
+https://github.com/angry-orc-games/pivot-foundry/releases/latest/download/system.json
 ```
 
 See [docs/release.md](docs/release.md) for the release checklist.

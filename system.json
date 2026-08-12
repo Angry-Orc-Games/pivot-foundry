@@ -14,7 +14,7 @@
     { "lang": "en", "name": "English", "path": "lang/en.json" }
   ],
   "packs": [],
-  "url": "https://github.com/angry-orc-games/pivot-fantasy-system",
-  "manifest": "https://github.com/angry-orc-games/pivot-fantasy-system/releases/latest/download/system.json",
-  "download": "https://github.com/angry-orc-games/pivot-fantasy-system/releases/latest/download/system.zip"
+  "url": "https://github.com/angry-orc-games/pivot-foundry",
+  "manifest": "https://github.com/angry-orc-games/pivot-foundry/releases/latest/download/system.json",
+  "download": "https://github.com/angry-orc-games/pivot-foundry/releases/latest/download/system.zip"
 }
