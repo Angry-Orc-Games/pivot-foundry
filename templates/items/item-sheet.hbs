@@ -1,0 +1,254 @@
+<section class="pivot-item-sheet">
+  <header class="pivot-sheet-header compact">
+    <div class="pivot-title-block">
+      <label for="{{rootId}}-item-name">{{localize "PIVOT.Fields.ItemName"}}</label>
+      <input
+        id="{{rootId}}-item-name"
+        name="name"
+        type="text"
+        value="{{item.name}}"
+        {{disabledAttr}}
+      />
+    </div>
+    <div class="pivot-item-type">{{item.type}}</div>
+  </header>
+
+  {{#if system.category}}
+    <label class="pivot-wide-field">
+      <span>{{localize "PIVOT.Fields.Category"}}</span>
+      <input name="system.category" type="text" value="{{system.category}}" {{disabledAttr}} />
+    </label>
+  {{/if}}
+
+  {{#if isWeapon}}
+    <section class="pivot-panel">
+      <h2>{{localize "PIVOT.Sections.Attack"}}</h2>
+      <div class="pivot-field-grid">
+        <label><span>{{localize "PIVOT.Fields.AttackAbility"}}</span><input
+            name="system.attack.ability"
+            type="text"
+            value="{{system.attack.ability}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Bonus"}}</span><input
+            name="system.attack.bonus"
+            type="number"
+            step="1"
+            value="{{system.attack.bonus}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Damage"}}</span><input
+            name="system.damage.formula"
+            type="text"
+            value="{{system.damage.formula}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.DamageType"}}</span><input
+            name="system.damage.type"
+            type="text"
+            value="{{system.damage.type}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.DamageAbility"}}</span><input
+            name="system.damage.ability"
+            type="text"
+            value="{{system.damage.ability}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Bonus"}}</span><input
+            name="system.damage.bonus"
+            type="number"
+            step="1"
+            value="{{system.damage.bonus}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.RangeNormal"}}</span><input
+            name="system.range.normal"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.range.normal}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.RangeLong"}}</span><input
+            name="system.range.long"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.range.long}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+    </section>
+  {{/if}}
+
+  {{#if isArmour}}
+    <section class="pivot-panel">
+      <h2>{{localize "PIVOT.Sections.Armour"}}</h2>
+      <div class="pivot-field-grid">
+        <label><span>{{localize "PIVOT.Fields.ACBonus"}}</span><input
+            name="system.acBonus"
+            type="number"
+            step="1"
+            value="{{system.acBonus}}"
+            {{disabledAttr}}
+          /></label>
+        <label class="pivot-check"><input
+            name="system.equipped"
+            type="checkbox"
+            {{checked system.equipped}}
+            {{disabledAttr}}
+          />
+          <span>{{localize "PIVOT.Fields.Equipped"}}</span></label>
+      </div>
+    </section>
+  {{/if}}
+
+  {{#if isEquipment}}
+    <section class="pivot-panel">
+      <h2>{{localize "PIVOT.Sections.Inventory"}}</h2>
+      <div class="pivot-field-grid">
+        <label><span>{{localize "PIVOT.Fields.Quantity"}}</span><input
+            name="system.quantity"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.quantity}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Weight"}}</span><input
+            name="system.weight"
+            type="number"
+            min="0"
+            step="0.1"
+            value="{{system.weight}}"
+            {{disabledAttr}}
+          /></label>
+        <label class="pivot-check"><input
+            name="system.carried"
+            type="checkbox"
+            {{checked system.carried}}
+            {{disabledAttr}}
+          />
+          <span>{{localize "PIVOT.Fields.Carried"}}</span></label>
+      </div>
+    </section>
+  {{/if}}
+
+  {{#if isMagicAbility}}
+    <section class="pivot-panel">
+      <h2>{{localize "PIVOT.Sections.Magic"}}</h2>
+      <div class="pivot-field-grid">
+        <label><span>{{localize "PIVOT.Fields.Stream"}}</span><input
+            name="system.stream"
+            type="text"
+            value="{{system.stream}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Echelon"}}</span><input
+            name="system.echelon"
+            type="number"
+            min="1"
+            max="5"
+            step="1"
+            value="{{system.echelon}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.MPCost"}}</span><input
+            name="system.mpCost"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.mpCost}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.RollFormula"}}</span><input
+            name="system.roll"
+            type="text"
+            value="{{system.roll}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Damage"}}</span><input
+            name="system.damage"
+            type="text"
+            value="{{system.damage}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+    </section>
+  {{/if}}
+
+  {{#if isMagicStream}}
+    <section class="pivot-panel">
+      <h2>{{localize "PIVOT.Sections.MagicStreams"}}</h2>
+      <div class="pivot-field-grid">
+        <label><span>{{localize "PIVOT.Fields.MagicAbility"}}</span><input
+            name="system.ability"
+            type="text"
+            value="{{system.ability}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Echelon"}}</span><input
+            name="system.echelon"
+            type="number"
+            min="1"
+            max="5"
+            step="1"
+            value="{{system.echelon}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+    </section>
+  {{/if}}
+
+  {{#if isFeature}}
+    <section class="pivot-panel">
+      <h2>{{localize "PIVOT.Sections.FeatureUse"}}</h2>
+      <div class="pivot-field-grid">
+        <label><span>{{localize "PIVOT.Fields.Source"}}</span><input
+            name="system.source"
+            type="text"
+            value="{{system.source}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.PoolCost"}}</span><input
+            name="system.cost.pool"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.cost.pool}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.MPCost"}}</span><input
+            name="system.cost.mp"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.cost.mp}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Uses"}}</span><input
+            name="system.uses.value"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.uses.value}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.UsesMax"}}</span><input
+            name="system.uses.max"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.uses.max}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+    </section>
+  {{/if}}
+
+  <label class="pivot-wide-field">
+    <span>{{localize "PIVOT.Fields.Notes"}}</span>
+    <textarea name="system.notes" rows="8" {{disabledAttr}}>{{system.notes}}</textarea>
+  </label>
+</section>

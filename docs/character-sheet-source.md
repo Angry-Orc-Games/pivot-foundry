@@ -33,7 +33,9 @@ Page 2 focuses on inventory, magic, and longer notes:
 
 - The PDF form field names are generic, such as `Text Field0` and `Check Box0`. Do not treat them as durable semantic identifiers.
 - Build Foundry sheet data around domain concepts first, then map those concepts to UI controls.
-- Start with a read-only display/edit sheet for the page 1 essentials before attempting the full two-page layout.
+- The implemented native sheet uses tabs to cover the PDF's two-page workflow rather than reproducing the paper layout pixel-for-pixel.
+- The implemented sheet stores repeatable weapons, armour, equipment, features, magic streams, and magic abilities as embedded Items.
+- Calculated values such as ability modifiers, proficiency bonus, skill totals, passive perception, AC, Pool maximum, MP maximum, carried weight, and weapon BTH/BTD are derived by rules helpers instead of stored as editable source fields.
 - Use the PDF layout as a reference for grouping and terminology, but prefer responsive Foundry HTML/CSS over a pixel-perfect PDF clone.
 
 ## Suggested Sheet Slices

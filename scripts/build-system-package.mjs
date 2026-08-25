@@ -6,7 +6,7 @@ import { basename, join, resolve } from "node:path";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const outputPath = join(root, "system.zip");
-const requiredDirs = ["dist", "lang", "packs", "templates"];
+const requiredDirs = ["dist", "lang", "packs", "styles", "templates"];
 const requiredFiles = ["system.json"];
 
 execFileSync("npm", ["run", "build"], { cwd: root, stdio: "inherit" });
@@ -82,6 +82,10 @@ function validateManifestPaths(stage, manifest) {
 
   for (const language of manifest.languages) {
     assertPackagePath(stage, language.path, "language");
+  }
+
+  for (const stylePath of manifest.styles ?? []) {
+    assertPackagePath(stage, stylePath, "style");
   }
 }
 
