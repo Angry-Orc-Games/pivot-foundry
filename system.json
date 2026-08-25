@@ -1,11 +1,16 @@
 {
   "id": "pivot-fantasy",
   "title": "Pivot Fantasy",
-  "description": "The free core rules engine for Pivot Fantasy - character sheets, dice, and the Pool. Pivot Fantasy book content sold separately.",
+  "description": "Foundry VTT support for the free Pivot Fantasy core rules engine. Character sheets, dice, and Pool features are in active development. Pivot Fantasy book content sold separately.",
   "version": "0.1.0",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
+  },
+  "documentTypes": {
+    "Actor": {
+      "character": {}
+    }
   },
   "authors": [
     {
