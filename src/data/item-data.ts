@@ -63,7 +63,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
   class PivotEquipmentData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
       return {
-        quantity: numberField(fields, { required: true, min: 0, initial: 1 }),
+        quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         weight: numberField(fields, { required: true, min: 0, initial: 0 }),
         carried: booleanField(fields, { required: true, initial: true }),
         equipped: booleanField(fields, { required: true, initial: false }),

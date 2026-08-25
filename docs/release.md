@@ -55,7 +55,7 @@ After the GitHub release finishes:
 2. In Foundry v13, open the system installation screen.
 3. Install from the manifest URL.
 4. Create a test world using `Pivot Fantasy`.
-5. Confirm the browser console logs `Pivot Fantasy | Initializing system`.
+5. Confirm the browser console logs `Pivot Fantasy | Initialized character sheet system`.
 
 If future releases add `packs/`, `templates/`, or styles, verify those assets are present in `system.zip` and load correctly in Foundry before announcing the release.
 

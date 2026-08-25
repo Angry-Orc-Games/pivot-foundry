@@ -2,7 +2,7 @@
 
 Current external character sheet source:
 
-- `/Users/ken/Downloads/Pivot Character Sheet Beta1.pdf`
+- `Pivot Character Sheet Beta1.pdf` from a local, non-committed character sheet source file.
 - Inspected on 2026-08-25
 - PDF metadata: 2 pages, US Letter, AcroForm fillable PDF, 257 form fields, no JavaScript, no extractable text layer
 

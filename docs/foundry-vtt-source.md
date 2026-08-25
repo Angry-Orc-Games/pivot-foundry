@@ -2,7 +2,7 @@
 
 Current external Foundry reference:
 
-- `/Users/ken/Downloads/Foundry VTT AI-Agent Development Guide.md`
+- `Foundry VTT AI-Agent Development Guide.md` from a local, non-committed reference file.
 - Received on 2026-08-25
 - The guide identifies its research baseline as 2026-08-25 and is written primarily from a Foundry VTT v14 perspective.
 

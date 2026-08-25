@@ -209,6 +209,8 @@
                 data-action="adjustResource"
                 data-path="resources.pool.value"
                 data-delta="-1"
+                aria-label="{{localize 'PIVOT.Actions.DecreasePool'}}"
+                title="{{localize 'PIVOT.Actions.DecreasePool'}}"
                 {{disabledAttr}}
               >-</button>
               <span>{{system.resources.pool.value}} / {{derived.pool.max}}</span>
@@ -217,6 +219,8 @@
                 data-action="adjustResource"
                 data-path="resources.pool.value"
                 data-delta="1"
+                aria-label="{{localize 'PIVOT.Actions.IncreasePool'}}"
+                title="{{localize 'PIVOT.Actions.IncreasePool'}}"
                 {{disabledAttr}}
               >+</button>
             </div>
@@ -474,6 +478,8 @@
             type="button"
             data-action="createItem"
             data-type="weapon"
+            aria-label="{{localize 'PIVOT.Actions.CreateWeapon'}}"
+            title="{{localize 'PIVOT.Actions.CreateWeapon'}}"
             {{disabledAttr}}
           >+</button>
         </div>
@@ -504,6 +510,8 @@
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button>
             </div>
@@ -518,6 +526,8 @@
             type="button"
             data-action="createItem"
             data-type="armour"
+            aria-label="{{localize 'PIVOT.Actions.CreateArmour'}}"
+            title="{{localize 'PIVOT.Actions.CreateArmour'}}"
             {{disabledAttr}}
           >+</button>
         </div>
@@ -539,6 +549,8 @@
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button>
             </div>
@@ -556,6 +568,8 @@
             type="button"
             data-action="createItem"
             data-type="equipment"
+            aria-label="{{localize 'PIVOT.Actions.CreateEquipment'}}"
+            title="{{localize 'PIVOT.Actions.CreateEquipment'}}"
             {{disabledAttr}}
           >+</button>
         </div>
@@ -574,6 +588,8 @@
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button>
             </div>
@@ -613,6 +629,8 @@
               data-action="adjustResource"
               data-path="magic.mp.value"
               data-delta="-1"
+              aria-label="{{localize 'PIVOT.Actions.DecreaseMP'}}"
+              title="{{localize 'PIVOT.Actions.DecreaseMP'}}"
               {{disabledAttr}}
             >-</button>
             <span>{{system.magic.mp.value}} / {{derived.magic.mp.max}}</span>
@@ -621,6 +639,8 @@
               data-action="adjustResource"
               data-path="magic.mp.value"
               data-delta="1"
+              aria-label="{{localize 'PIVOT.Actions.IncreaseMP'}}"
+              title="{{localize 'PIVOT.Actions.IncreaseMP'}}"
               {{disabledAttr}}
             >+</button>
           </div>
@@ -632,6 +652,8 @@
               type="button"
               data-action="createItem"
               data-type="magicStream"
+              aria-label="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
+              title="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
               {{disabledAttr}}
             >+</button></div>
           {{#each items.magicStreams}}<div class="pivot-list-item"><span>{{name}}</span><span
@@ -639,6 +661,8 @@
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button></div>{{/each}}
           <div class="pivot-section-header"><h2>{{localize
@@ -647,6 +671,8 @@
               type="button"
               data-action="createItem"
               data-type="magicAbility"
+              aria-label="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
+              title="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
               {{disabledAttr}}
             >+</button></div>
           {{#each items.magicAbilities}}<div class="pivot-list-item"><button
@@ -659,6 +685,8 @@
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button></div>{{/each}}
         </section>
@@ -680,6 +708,8 @@
               type="button"
               data-action="createItem"
               data-type="feature"
+              aria-label="{{localize 'PIVOT.Actions.CreateFeature'}}"
+              title="{{localize 'PIVOT.Actions.CreateFeature'}}"
               {{disabledAttr}}
             >+</button></div>
           {{#each items.features}}<div class="pivot-list-item"><span>{{name}}</span><span
@@ -687,6 +717,8 @@
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button></div>{{/each}}
         </section>

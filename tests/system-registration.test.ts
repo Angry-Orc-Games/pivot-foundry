@@ -105,6 +105,7 @@ describe("Pivot item data models", () => {
   it("defines data models for repeatable sheet entities", () => {
     const { foundry } = createMockFoundry();
     const models = createPivotItemDataModels(foundry);
+    const equipmentSchema = models.equipment.defineSchema() as Record<string, FieldRecord>;
 
     expect(Object.keys(models).sort()).toEqual([
       "armour",
@@ -116,7 +117,8 @@ describe("Pivot item data models", () => {
     ]);
     expect(models.weapon.defineSchema()).toHaveProperty("damage");
     expect(models.armour.defineSchema()).toHaveProperty("equipped");
-    expect(models.equipment.defineSchema()).toHaveProperty("quantity");
+    expect(equipmentSchema).toHaveProperty("quantity");
+    expect(equipmentSchema.quantity?.options).toMatchObject({ integer: true });
   });
 });
 
