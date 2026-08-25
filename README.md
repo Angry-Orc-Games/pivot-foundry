@@ -10,7 +10,7 @@
 ![Security](https://img.shields.io/badge/audit-npm%20audit-2ea44f)
 ![Status](https://img.shields.io/badge/status-scaffold-orange)
 
-Pivot Fantasy is a Foundry VTT v13 game system for the free Pivot Fantasy core rules engine. This repository currently contains the first working system shell: a strict TypeScript/Vite build, Foundry manifest, language file, CI, and release packaging.
+Pivot Fantasy is a Foundry VTT v13 game system for the free Pivot Fantasy core rules engine. This repository currently contains the first working system shell: a strict TypeScript/Vite build, Foundry manifest, language file, CI, release packaging, and the first tested rules modules.
 
 The goal is to keep the Foundry runtime thin while game rules, dice logic, and character math grow as testable TypeScript modules.
 
@@ -22,16 +22,18 @@ Implemented:
 
 - Foundry v13 `system.json` manifest for `pivot-fantasy`
 - TypeScript source entry point at `src/pivot.ts`
+- Character Actor document type declaration and data model registration
 - Vite build output to `dist/pivot.mjs`
-- Vitest test runner configured for future rule tests
+- Vitest coverage for manifest validation and initial rules modules
+- Initial deterministic d20 roll and modifier helpers under `src/rules/`
 - GitHub Actions CI for typecheck, tests, and build
 - Release workflow that publishes `system.json` and `system.zip` for version tags
 
 Not implemented yet:
 
-- Actor, item, or sheet models
+- Playable Actor, item, or sheet models
 - Character sheets and item sheets
-- Dice roller, Pool mechanics, or other rules modules
+- Foundry-facing dice roller, Pool mechanics UI, or complete rules engine
 - Compendium packs, templates, or styles
 - Foundry data migrations
 
@@ -87,6 +89,7 @@ Start Foundry v13 and enable the `Pivot Fantasy` system when creating a world.
 .
 |-- system.json              Foundry system manifest
 |-- src/pivot.ts             Foundry runtime entry point
+|-- src/rules/               Pure TypeScript rules helpers
 |-- lang/en.json             English localization file
 |-- dist/                    Built Foundry runtime output
 |-- vite.config.ts           Build configuration
@@ -95,7 +98,7 @@ Start Foundry v13 and enable the `Pivot Fantasy` system when creating a world.
 `-- docs/                    Development and release notes
 ```
 
-Future gameplay implementation should keep deterministic rules code in `src/rules/` with Vitest coverage, and keep Foundry-specific integration code close to Foundry lifecycle, document, and sheet boundaries.
+Future gameplay implementation should keep deterministic rules code in `src/rules/` with Vitest coverage, and keep Foundry-specific integration code close to Foundry lifecycle, document, and sheet boundaries. See [docs/architecture.md](docs/architecture.md) for the current architecture map.
 
 ## Scripts
 

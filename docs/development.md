@@ -2,6 +2,8 @@
 
 This project is intentionally small at the current stage. The next work should grow the system in narrow, testable slices rather than moving rules, sheets, and Foundry integration forward all at once.
 
+Before starting a brownfield slice, read the current architecture map in [architecture.md](architecture.md), the Foundry reference note in [foundry-vtt-source.md](foundry-vtt-source.md), the rules source note in [rules-source.md](rules-source.md), and the root [AGENTS.md](../AGENTS.md). Treat those files as the durable project setup guide for agent-assisted work. For deploys, read [deployment.md](deployment.md) first.
+
 ## Architecture Boundaries
 
 Use these boundaries when adding code:
@@ -46,7 +48,7 @@ For faster inner-loop checks, run the narrower script that matches the change:
 - `npm run audit` for dependency vulnerability checks
 - `npm run package:system` for release zip validation
 
-`vitest.config.ts` currently uses `passWithNoTests: true` because the repository began as an empty shell. Once the first real rules or runtime tests are added, keep that setting under review so missing tests do not hide regressions.
+Vitest should fail when test files are missing. If a slice temporarily moves or renames tests, keep that behavior intact and update the matching test include patterns instead of allowing empty test runs.
 
 Use fast unit tests for rules behavior first. Add Foundry runtime tests or manual Foundry checks when the change depends on Foundry documents, hooks, sheets, or packaged assets.
 
@@ -59,6 +61,14 @@ Prefer this order for future feature slices:
 3. Implement the rules module.
 4. Add the narrow Foundry integration needed to expose it.
 5. Build and test the packaged system in Foundry v13 when the feature touches runtime behavior.
+
+## Agent Review Loop
+
+Use Codex as the primary implementation environment for normal development. For medium, risky, or cross-boundary changes, use separate read-only review passes for architecture, tests, and security before merge.
+
+Do not run multiple coding agents as writers in the same checkout. If parallel implementation is needed, use separate worktrees and narrow ownership boundaries.
+
+Keep local verification, CI status, and manual Foundry acceptance separate in handoffs. Passing `npm run verify` proves repository checks, not that a Foundry workflow has been manually accepted.
 
 ## Documentation Updates
 

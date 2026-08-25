@@ -58,3 +58,5 @@ After the GitHub release finishes:
 5. Confirm the browser console logs `Pivot Fantasy | Initializing system`.
 
 If future releases add `packs/`, `templates/`, or styles, verify those assets are present in `system.zip` and load correctly in Foundry before announcing the release.
+
+For direct deployment to the Angry Orc Games Foundry servers, use [deployment.md](deployment.md). Releasing GitHub artifacts and deploying to a live Foundry server are separate operations.
