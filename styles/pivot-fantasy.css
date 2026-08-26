@@ -82,8 +82,16 @@
 }
 
 .pivot-header-stats input {
+  background: #fff8ea;
+  border-color: #f8d37d;
   color: var(--pivot-ink);
+  font-weight: 700;
   text-align: center;
+}
+
+.pivot-header-stats input:focus {
+  outline: 2px solid #f8d37d;
+  outline-offset: 1px;
 }
 
 .pivot-tabs {
@@ -259,6 +267,43 @@
   align-items: center;
   display: flex;
   gap: 6px;
+}
+
+.pivot-check input[type="checkbox"] {
+  appearance: none;
+  background: #fff8ea;
+  border: 1px solid var(--pivot-line);
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: grid;
+  flex: 0 0 18px;
+  height: 18px;
+  margin: 0;
+  place-content: center;
+  width: 18px;
+}
+
+.pivot-check input[type="checkbox"]::before {
+  box-shadow: inset 1em 1em var(--pivot-gold);
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 19%, 86% 6%, 36% 70%);
+  content: "";
+  height: 12px;
+  transform: scale(0);
+  transform-origin: center;
+  width: 12px;
+}
+
+.pivot-check input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.pivot-check input[type="checkbox"]:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 2px;
+}
+
+.pivot-check input[type="checkbox"]:disabled {
+  opacity: 0.65;
 }
 
 .pivot-check.compact span {
