@@ -8,6 +8,7 @@
   "PIVOT.Actions.DecreaseMP": "Decrease MP",
   "PIVOT.Actions.DecreasePool": "Decrease Pool",
   "PIVOT.Actions.DeleteItem": "Delete item",
+  "PIVOT.Actions.EditItem": "Edit item",
   "PIVOT.Actions.IncreaseMP": "Increase MP",
   "PIVOT.Actions.IncreasePool": "Increase Pool",
   "PIVOT.Common.No": "No",

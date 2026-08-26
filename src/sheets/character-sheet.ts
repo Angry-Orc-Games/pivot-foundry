@@ -24,9 +24,11 @@ type RecordValue = Record<string, unknown>;
 
 export interface ItemLike {
   id?: string;
+  _id?: string;
   name: string;
   type: string;
   system: RecordValue;
+  sheet?: { render?: (force?: boolean) => unknown };
 }
 
 export interface ActorLike {
@@ -58,6 +60,7 @@ export interface CharacterSheetContext {
     magicAbilities: typeof abilities;
     skills: typeof canonicalSkills;
     hitDice: typeof hitDice;
+    hitDiceChoices: Record<string, string>;
     weaponCategories: typeof weaponCategories;
     armourCategories: typeof armourCategories;
     featureCategories: typeof featureCategories;
@@ -126,9 +129,9 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
-        activateTab: activateTabAction,
         adjustResource: adjustResourceAction,
         createItem: createItemAction,
+        openItem: openItemAction,
         deleteItem: deleteItemAction,
       },
     };
@@ -257,6 +260,7 @@ export function prepareCharacterSheetContext(
       magicAbilities: abilities.filter(({ key }) => ["int", "wis", "cha"].includes(key)),
       skills: canonicalSkills,
       hitDice,
+      hitDiceChoices: Object.fromEntries(hitDice.map((die) => [die, die])),
       weaponCategories,
       armourCategories,
       featureCategories,
@@ -322,6 +326,7 @@ export function prepareCharacterSheetContext(
     items: {
       weapons: weapons.map((item) => ({
         ...item,
+        id: itemDocumentId(item),
         disabledAttr,
         summary: calculateAttackSummary({
           proficiencyBonus: derived.proficiencyBonus,
@@ -432,23 +437,6 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
   return normalized;
 }
 
-function activateTabAction(_event: PointerEvent, target: HTMLElement): void {
-  const tab = target.dataset.tab;
-  const group = target.dataset.group ?? "primary";
-  if (!tab) return;
-
-  const sheet = target.closest(".pivot-character-sheet");
-  if (!sheet) return;
-
-  for (const link of sheet.querySelectorAll<HTMLElement>(`.pivot-tabs [data-group="${group}"]`)) {
-    link.classList.toggle("active", link.dataset.tab === tab);
-  }
-
-  for (const panel of sheet.querySelectorAll<HTMLElement>(`.tab[data-group="${group}"]`)) {
-    panel.classList.toggle("active", panel.dataset.tab === tab);
-  }
-}
-
 async function rollAction(
   this: { document?: ActorLike },
   event: PointerEvent,
@@ -472,7 +460,7 @@ async function rollAction(
     | undefined;
   if (!RollConstructor) return;
   const roll = new RollConstructor(formula);
-  await roll.evaluate({ async: true });
+  await roll.evaluate();
   await roll.toMessage({
     speaker: speakerForActor(context.actor),
     flavor: target.dataset.label ?? "Pivot Roll",
@@ -501,9 +489,25 @@ async function createItemAction(
   event.preventDefault();
   const type = target.dataset.type;
   if (!type) return;
-  await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
-    createEmbeddedItemData(type),
-  ]);
+  const [item] =
+    ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
+      createEmbeddedItemData(type),
+    ])) as ItemLike[] | undefined) ?? [];
+  item?.sheet?.render?.(true);
+}
+
+async function openItemAction(
+  this: { document?: ActorLike },
+  event: PointerEvent,
+  target: HTMLElement,
+): Promise<void> {
+  event.preventDefault();
+  const id = target.dataset.itemId;
+  if (!id) return;
+  const item = getActorItems(this.document ?? getSheetDocument(this)).find(
+    (item) => item.id === id,
+  );
+  item?.sheet?.render?.(true);
 }
 
 async function deleteItemAction(
@@ -632,7 +636,11 @@ function withDisabledAttr<T extends ItemLike>(
   items: T[],
   disabledAttr: "" | "disabled",
 ): Array<T & { disabledAttr: "" | "disabled" }> {
-  return items.map((item) => ({ ...item, disabledAttr }));
+  return items.map((item) => ({ ...item, id: itemDocumentId(item), disabledAttr }));
+}
+
+function itemDocumentId(item: ItemLike): string | undefined {
+  return item.id ?? item._id;
 }
 
 function abilityAt(source: RecordValue, path: string[], fallback: AbilityKey): AbilityKey {
