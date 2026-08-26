@@ -4,7 +4,7 @@ Use this runbook when asked to deploy the Pivot Fantasy Foundry VTT system to An
 
 ## Project Context
 
-- Local repository: `/Users/ken/Developer/aog/pivot-foundry`
+- Local repository: `<local checkout>`
 - Canonical remote: `git@github.com:Angry-Orc-Games/pivot-foundry.git`
 - Foundry system id: `pivot-fantasy`
 - Package artifact: `system.zip`

@@ -8,21 +8,26 @@
 ![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
 ![Format](https://img.shields.io/badge/format-Prettier-f7b93e)
 ![Security](https://img.shields.io/badge/audit-npm%20audit-2ea44f)
-![Status](https://img.shields.io/badge/status-scaffold-orange)
+![Status](https://img.shields.io/badge/status-initial%20sheet-orange)
 
-Pivot Fantasy is a Foundry VTT v13 game system for the free Pivot Fantasy core rules engine. This repository currently contains the first working system shell: a strict TypeScript/Vite build, Foundry manifest, language file, CI, release packaging, and the first tested rules modules.
+Pivot Fantasy is a Foundry VTT v13 game system for the free Pivot Fantasy core rules engine. This repository contains a strict TypeScript/Vite build, Foundry manifest, language file, CI, release packaging, the first tested rules modules, and an initial native character sheet.
 
 The goal is to keep the Foundry runtime thin while game rules, dice logic, and character math grow as testable TypeScript modules.
 
 ## Current Status
 
-This is an early scaffold, not a playable character-sheet implementation yet.
+This is an early playable sheet implementation. It supports native Actor and embedded Item editing for the current character-sheet workflow, while several content-driven automations remain manual until Pivot content packs and effect schemas exist.
 
 Implemented:
 
 - Foundry v13 `system.json` manifest for `pivot-fantasy`
 - TypeScript source entry point at `src/pivot.ts`
 - Character Actor document type declaration and data model registration
+- Native Pivot Fantasy character Actor sheet registration
+- Item document type declarations and data models for weapons, armour, equipment, features, magic streams, and magic abilities
+- Item sheet registration for those Pivot item types
+- Data-backed identity, progression, abilities, HP, Pool, skills, proficiencies, currency, magic, notes, attacks, armour, and inventory fields
+- Derived character math for ability modifiers, proficiency, saves, skills, passive perception, Pool max, MP max, AC, initiative, carried weight, and weapon BTH/BTD
 - Vite build output to `dist/pivot.mjs`
 - Vitest coverage for manifest validation and initial rules modules
 - Initial deterministic d20 roll and modifier helpers under `src/rules/`
@@ -31,10 +36,10 @@ Implemented:
 
 Not implemented yet:
 
-- Playable Actor, item, or sheet models
-- Character sheets and item sheets
-- Foundry-facing dice roller, Pool mechanics UI, or complete rules engine
-- Compendium packs, templates, or styles
+- Full content packs for species, backgrounds, feats, flaws, equipment, spells, or magic streams
+- Full content-driven automation for species/background/feat/flaw effects
+- Foundry combat tracker integration beyond sheet roll buttons
+- Complete exploding damage automation
 - Foundry data migrations
 
 ## Requirements
@@ -89,7 +94,11 @@ Start Foundry v13 and enable the `Pivot Fantasy` system when creating a world.
 .
 |-- system.json              Foundry system manifest
 |-- src/pivot.ts             Foundry runtime entry point
+|-- src/data/                Foundry TypeDataModel schema factories
 |-- src/rules/               Pure TypeScript rules helpers
+|-- src/sheets/              Actor and Item sheet classes/context helpers
+|-- templates/               Handlebars sheet templates
+|-- styles/                  Pivot Fantasy sheet stylesheet
 |-- lang/en.json             English localization file
 |-- dist/                    Built Foundry runtime output
 |-- vite.config.ts           Build configuration

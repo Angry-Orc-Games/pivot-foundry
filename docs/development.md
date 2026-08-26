@@ -30,6 +30,16 @@ Good candidates for Foundry integration modules:
 - Hook registration
 - Data migration entry points
 
+Current Foundry integration modules:
+
+- `src/pivot.ts` registers the `Actor.character` and Pivot Item data models, token resources, and sheet classes.
+- `src/data/character-data.ts` owns the character Actor source schema.
+- `src/data/item-data.ts` owns the `weapon`, `armour`, `equipment`, `feature`, `magicStream`, and `magicAbility` schemas.
+- `src/sheets/character-sheet.ts` owns the native character sheet class and the testable sheet context used by templates and roll/resource actions.
+- `src/sheets/item-sheet.ts` owns the native Item sheet class.
+
+Keep sheet context preparation and deterministic calculations testable outside Foundry. Do not move Foundry globals into rules modules.
+
 ## Testing Expectations
 
 Run these before handing off changes:
@@ -51,6 +61,8 @@ For faster inner-loop checks, run the narrower script that matches the change:
 Vitest should fail when test files are missing. If a slice temporarily moves or renames tests, keep that behavior intact and update the matching test include patterns instead of allowing empty test runs.
 
 Use fast unit tests for rules behavior first. Add Foundry runtime tests or manual Foundry checks when the change depends on Foundry documents, hooks, sheets, or packaged assets.
+
+For the character sheet, automated tests can validate manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. Manual Foundry v13 smoke tests are still required for actual browser rendering, drag/drop, permissions, and chat roll behavior.
 
 ## Implementation Sequence
 

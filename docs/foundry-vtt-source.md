@@ -2,7 +2,7 @@
 
 Current external Foundry reference:
 
-- `/Users/ken/Downloads/Foundry VTT AI-Agent Development Guide.md`
+- `Foundry VTT AI-Agent Development Guide.md` from a local, non-committed reference file.
 - Received on 2026-08-25
 - The guide identifies its research baseline as 2026-08-25 and is written primarily from a Foundry VTT v14 perspective.
 
@@ -17,6 +17,7 @@ This repository is a Foundry game system:
 - Runtime entry point: `src/pivot.ts`
 - Current declared compatibility: Foundry v13
 - Current document subtype: `Actor.character`
+- Current sheet APIs: `foundry.applications.sheets.ActorSheetV2`, `ItemSheetV2`, `foundry.applications.api.HandlebarsApplicationMixin`, and `DocumentSheetConfig.registerSheet`
 
 ## Development Rules To Carry Forward
 
@@ -34,6 +35,7 @@ This repository is a Foundry game system:
 
 - The guide recommends V14 `ApplicationV2` and `DocumentSheetV2` for new UI. Before using those in this v13-targeted project, verify the exact v13 API and local Foundry installation.
 - V14 migration notes are useful for future upgrade planning, but should not be applied as direct changes to this v13 system.
+- The current character and item sheets use the v13 V2 sheet stack and Handlebars mixin rather than deprecated v1 `ActorSheet`/`ItemSheet`.
 - If the project target changes from v13 to v14, update `system.json`, `README.md`, `docs/architecture.md`, and this file in the same change.
 
 ## Required Foundry Handoff Fields

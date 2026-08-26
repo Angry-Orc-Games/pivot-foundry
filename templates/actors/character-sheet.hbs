@@ -1,0 +1,736 @@
+<section class="pivot-character-sheet" data-document-id="{{actor.id}}">
+  <header class="pivot-sheet-header">
+    <div class="pivot-title-block">
+      <label for="{{rootId}}-name">{{localize "PIVOT.Fields.CharacterName"}}</label>
+      <input id="{{rootId}}-name" name="name" type="text" value="{{actor.name}}" {{disabledAttr}} />
+    </div>
+    <div class="pivot-header-stats">
+      <label>
+        <span>{{localize "PIVOT.Fields.Level"}}</span>
+        <input
+          name="system.progression.level"
+          type="number"
+          min="1"
+          step="1"
+          value="{{system.progression.level}}"
+          {{disabledAttr}}
+        />
+      </label>
+      <label>
+        <span>{{localize "PIVOT.Fields.XP"}}</span>
+        <input
+          name="system.progression.xp"
+          type="number"
+          min="0"
+          step="1"
+          value="{{system.progression.xp}}"
+          {{disabledAttr}}
+        />
+      </label>
+    </div>
+  </header>
+
+  <nav
+    class="pivot-tabs"
+    data-group="primary"
+    aria-label="{{localize 'PIVOT.Sheets.Character.Navigation'}}"
+  >
+    <a class="active" data-action="activateTab" data-group="primary" data-tab="core">{{localize
+        "PIVOT.Tabs.Core"
+      }}</a>
+    <a data-action="activateTab" data-group="primary" data-tab="skills">{{localize
+        "PIVOT.Tabs.Skills"
+      }}</a>
+    <a data-action="activateTab" data-group="primary" data-tab="combat">{{localize
+        "PIVOT.Tabs.Combat"
+      }}</a>
+    <a data-action="activateTab" data-group="primary" data-tab="equipment">{{localize
+        "PIVOT.Tabs.Equipment"
+      }}</a>
+    <a data-action="activateTab" data-group="primary" data-tab="magic">{{localize
+        "PIVOT.Tabs.Magic"
+      }}</a>
+    <a data-action="activateTab" data-group="primary" data-tab="features">{{localize
+        "PIVOT.Tabs.Features"
+      }}</a>
+  </nav>
+
+  <main class="pivot-tab-body">
+    <section class="tab active" data-group="primary" data-tab="core">
+      <div class="pivot-grid two">
+        <section class="pivot-panel">
+          <h2>{{localize "PIVOT.Sections.Identity"}}</h2>
+          <div class="pivot-field-grid">
+            <label><span>{{localize "PIVOT.Fields.Player"}}</span><input
+                name="system.identity.player"
+                type="text"
+                value="{{system.identity.player}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Background"}}</span><input
+                name="system.identity.backgroundText"
+                type="text"
+                value="{{system.identity.backgroundText}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Species"}}</span><input
+                name="system.identity.speciesText"
+                type="text"
+                value="{{system.identity.speciesText}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Languages"}}</span><input
+                name="system.identity.languagesText"
+                type="text"
+                value="{{form.languagesText}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Loyalty"}}</span><input
+                name="system.identity.loyalty"
+                type="text"
+                value="{{system.identity.loyalty}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Weight"}}</span><input
+                name="system.identity.weight.value"
+                type="number"
+                min="0"
+                step="0.1"
+                value="{{system.identity.weight.value}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Height"}}</span><input
+                name="system.identity.height"
+                type="text"
+                value="{{system.identity.height}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Age"}}</span><input
+                name="system.identity.age"
+                type="text"
+                value="{{system.identity.age}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Eyes"}}</span><input
+                name="system.identity.eyes"
+                type="text"
+                value="{{system.identity.eyes}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Hair"}}</span><input
+                name="system.identity.hair"
+                type="text"
+                value="{{system.identity.hair}}"
+                {{disabledAttr}}
+              /></label>
+          </div>
+          <div class="pivot-specializations">
+            <label class="pivot-wide-field"><span>{{localize
+                  "PIVOT.Fields.AcademiaSpecializations"
+                }}</span><input
+                name="system.skillSpecializations.academiaText"
+                type="text"
+                value="{{form.academiaText}}"
+                {{disabledAttr}}
+              /></label>
+            <label class="pivot-wide-field"><span>{{localize
+                  "PIVOT.Fields.CraftingSpecializations"
+                }}</span><input
+                name="system.skillSpecializations.craftingText"
+                type="text"
+                value="{{form.craftingText}}"
+                {{disabledAttr}}
+              /></label>
+          </div>
+        </section>
+
+        <section class="pivot-panel">
+          <h2>{{localize "PIVOT.Sections.Resources"}}</h2>
+          <div class="pivot-stat-strip">
+            <div class="pivot-stat"><span>{{localize "PIVOT.Fields.ProfBonus"}}</span><strong
+              >+{{derived.proficiencyBonus}}</strong></div>
+            <div class="pivot-stat" title="{{derived.armourClass.breakdown}}"><span>{{localize
+                  "PIVOT.Fields.ArmourClass"
+                }}</span><strong>{{derived.armourClass.value}}</strong></div>
+            <button
+              type="button"
+              class="pivot-stat rollable"
+              data-action="roll"
+              data-roll-kind="initiative"
+              data-label="{{localize 'PIVOT.Rolls.Initiative'}}"
+            ><span>{{localize "PIVOT.Fields.Initiative"}}</span><strong
+              >{{derived.initiative}}</strong></button>
+            <div class="pivot-stat"><span>{{localize "PIVOT.Fields.Speed"}}</span><input
+                name="system.attributes.speed.value"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.attributes.speed.value}}"
+                {{disabledAttr}}
+              /></div>
+            <div class="pivot-stat"><span>{{localize
+                  "PIVOT.Fields.PassivePerception"
+                }}</span><strong>{{derived.passivePerception}}</strong></div>
+          </div>
+          <div class="pivot-resource-grid">
+            <label><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
+                name="system.attributes.hitDie"
+                {{disabledAttr}}
+              >{{#select system.attributes.hitDie}}{{#each config.hitDice}}<option
+                      value="{{this}}"
+                    >{{this}}</option>{{/each}}{{/select}}</select></label>
+            <label><span>{{localize "PIVOT.Fields.HPMax"}}</span><input
+                name="system.attributes.hp.max"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.attributes.hp.max}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
+                name="system.attributes.hp.value"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.attributes.hp.value}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Pool"}}</span><input
+                name="system.resources.pool.value"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.resources.pool.value}}"
+                {{disabledAttr}}
+              /></label>
+            <div class="pivot-resource-actions">
+              <button
+                type="button"
+                data-action="adjustResource"
+                data-path="resources.pool.value"
+                data-delta="-1"
+                aria-label="{{localize 'PIVOT.Actions.DecreasePool'}}"
+                title="{{localize 'PIVOT.Actions.DecreasePool'}}"
+                {{disabledAttr}}
+              >-</button>
+              <span>{{system.resources.pool.value}} / {{derived.pool.max}}</span>
+              <button
+                type="button"
+                data-action="adjustResource"
+                data-path="resources.pool.value"
+                data-delta="1"
+                aria-label="{{localize 'PIVOT.Actions.IncreasePool'}}"
+                title="{{localize 'PIVOT.Actions.IncreasePool'}}"
+                {{disabledAttr}}
+              >+</button>
+            </div>
+          </div>
+          <fieldset class="pivot-death-saves">
+            <legend>{{localize "PIVOT.Fields.DeathSaves"}}</legend>
+            <label><span>{{localize "PIVOT.Fields.Successes"}}</span><input
+                name="system.attributes.deathSaves.successes"
+                type="number"
+                min="0"
+                max="3"
+                step="1"
+                value="{{system.attributes.deathSaves.successes}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Failures"}}</span><input
+                name="system.attributes.deathSaves.failures"
+                type="number"
+                min="0"
+                max="3"
+                step="1"
+                value="{{system.attributes.deathSaves.failures}}"
+                {{disabledAttr}}
+              /></label>
+          </fieldset>
+        </section>
+      </div>
+
+      <section class="pivot-panel">
+        <h2>{{localize "PIVOT.Sections.Abilities"}}</h2>
+        <div class="pivot-abilities">
+          {{#each abilityRows}}
+            <article class="pivot-ability">
+              <button
+                type="button"
+                data-action="roll"
+                data-roll-kind="ability"
+                data-key="{{key}}"
+                data-label="{{label}}"
+              >{{label}}</button>
+              <label><span>{{localize "PIVOT.Fields.Score"}}</span><input
+                  name="{{scorePath}}"
+                  type="number"
+                  min="1"
+                  max="30"
+                  step="1"
+                  value="{{score}}"
+                  {{disabledAttr}}
+                /></label>
+              <label class="pivot-check"><input
+                  name="{{primaryPath}}"
+                  type="checkbox"
+                  {{checked primary}}
+                  {{disabledAttr}}
+                />
+                <span>{{localize "PIVOT.Fields.Primary"}}</span></label>
+              <button
+                type="button"
+                class="pivot-mod"
+                data-action="roll"
+                data-roll-kind="save"
+                data-key="{{key}}"
+                data-label="{{label}} save"
+              >{{mod}} / {{save}}</button>
+            </article>
+          {{/each}}
+        </div>
+      </section>
+    </section>
+
+    <section class="tab" data-group="primary" data-tab="skills">
+      <div class="pivot-grid two">
+        <section class="pivot-panel">
+          <h2>{{localize "PIVOT.Sections.Skills"}}</h2>
+          <div class="pivot-skill-list">
+            {{#each skillRows}}
+              <div class="pivot-skill-row">
+                <label class="pivot-check"><input
+                    name="{{proficientPath}}"
+                    type="checkbox"
+                    {{checked proficient}}
+                    {{disabledAttr}}
+                  /><span>{{label}}</span></label>
+                <span class="pivot-skill-ability">{{ability}}</span>
+                <input
+                  name="{{deepeningPath}}"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value="{{deepening}}"
+                  title="{{localize 'PIVOT.Fields.Deepening'}}"
+                  {{disabledAttr}}
+                />
+                <input
+                  name="{{bonusPath}}"
+                  type="number"
+                  step="1"
+                  value="{{bonus}}"
+                  title="{{localize 'PIVOT.Fields.Bonus'}}"
+                  {{disabledAttr}}
+                />
+                <label class="pivot-check compact"><input
+                    name="{{expertisePath}}"
+                    type="checkbox"
+                    {{checked expertise}}
+                    {{disabledAttr}}
+                  /><span>{{localize "PIVOT.Fields.Expertise"}}</span></label>
+                <button
+                  type="button"
+                  data-action="roll"
+                  data-roll-kind="skill"
+                  data-key="{{id}}"
+                  data-label="{{label}}"
+                >{{total}}</button>
+              </div>
+            {{/each}}
+          </div>
+        </section>
+
+        <section class="pivot-panel">
+          <h2>{{localize "PIVOT.Sections.Proficiencies"}}</h2>
+          <div class="pivot-check-grid">
+            <label><input
+                name="system.proficiencies.armour.light"
+                type="checkbox"
+                {{checked system.proficiencies.armour.light}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.ArmourLight"}}</label>
+            <label><input
+                name="system.proficiencies.armour.medium"
+                type="checkbox"
+                {{checked system.proficiencies.armour.medium}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.ArmourMedium"}}</label>
+            <label><input
+                name="system.proficiencies.armour.heavy"
+                type="checkbox"
+                {{checked system.proficiencies.armour.heavy}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.ArmourHeavy"}}</label>
+            <label><input
+                name="system.proficiencies.shields"
+                type="checkbox"
+                {{checked system.proficiencies.shields}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.Shields"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.bows"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.bows}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.Bows"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.crossbows"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.crossbows}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.Crossbows"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.thrown"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.thrown}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.Thrown"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.meleeLight"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.meleeLight}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.MeleeLight"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.meleeMedium"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.meleeMedium}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.MeleeMedium"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.meleeHeavy"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.meleeHeavy}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.MeleeHeavy"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.meleeTwoHandedHeavy"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.meleeTwoHandedHeavy}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.MeleeTwoHanded"}}</label>
+            <label><input
+                name="system.proficiencies.weapons.improvised"
+                type="checkbox"
+                {{checked system.proficiencies.weapons.improvised}}
+                {{disabledAttr}}
+              />
+              {{localize "PIVOT.Proficiencies.Improvised"}}</label>
+          </div>
+          <label class="pivot-wide-field"><span>{{localize "PIVOT.Fields.Instruments"}}</span><input
+              name="system.proficiencies.instrumentsText"
+              type="text"
+              value="{{form.instrumentsText}}"
+              {{disabledAttr}}
+            /></label>
+          <div class="pivot-currency">
+            <label><span>GP</span><input
+                name="system.currency.gp"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.currency.gp}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>SP</span><input
+                name="system.currency.sp"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.currency.sp}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>CP</span><input
+                name="system.currency.cp"
+                type="number"
+                min="0"
+                step="1"
+                value="{{system.currency.cp}}"
+                {{disabledAttr}}
+              /></label>
+            <label><span>{{localize "PIVOT.Fields.Other"}}</span><input
+                name="system.currency.other"
+                type="text"
+                value="{{system.currency.other}}"
+                {{disabledAttr}}
+              /></label>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="tab" data-group="primary" data-tab="combat">
+      <section class="pivot-panel">
+        <div class="pivot-section-header">
+          <h2>{{localize "PIVOT.Sections.Weapons"}}</h2>
+          <button
+            type="button"
+            data-action="createItem"
+            data-type="weapon"
+            aria-label="{{localize 'PIVOT.Actions.CreateWeapon'}}"
+            title="{{localize 'PIVOT.Actions.CreateWeapon'}}"
+            {{disabledAttr}}
+          >+</button>
+        </div>
+        <div class="pivot-table">
+          <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Weapon"}}</span><span
+            >BTH</span><span>BTD</span><span>{{localize "PIVOT.Fields.Damage"}}</span><span
+            >{{localize "PIVOT.Fields.Range"}}</span><span></span></div>
+          {{#each items.weapons}}
+            <div class="pivot-table-row" data-item-id="{{id}}">
+              <span>{{name}}</span>
+              <button
+                type="button"
+                data-action="roll"
+                data-roll-kind="weaponAttack"
+                data-key="{{id}}"
+                data-label="{{name}} attack"
+              >{{summary.bth}}</button>
+              <span>{{summary.btd}}</span>
+              <button
+                type="button"
+                data-action="roll"
+                data-roll-kind="weaponDamage"
+                data-key="{{id}}"
+                data-label="{{name}} damage"
+              >{{summary.damageFormula}}</button>
+              <span>{{summary.range.normal}} / {{summary.range.long}}</span>
+              <button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button>
+            </div>
+          {{/each}}
+        </div>
+      </section>
+
+      <section class="pivot-panel">
+        <div class="pivot-section-header">
+          <h2>{{localize "PIVOT.Sections.Armour"}}</h2>
+          <button
+            type="button"
+            data-action="createItem"
+            data-type="armour"
+            aria-label="{{localize 'PIVOT.Actions.CreateArmour'}}"
+            title="{{localize 'PIVOT.Actions.CreateArmour'}}"
+            {{disabledAttr}}
+          >+</button>
+        </div>
+        <p class="pivot-breakdown">{{derived.armourClass.armourWorn}}
+          |
+          {{derived.armourClass.breakdown}}</p>
+        <div class="pivot-table">
+          <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span
+            >{{localize "PIVOT.Fields.Category"}}</span><span>{{localize
+                "PIVOT.Fields.Bonus"
+              }}</span><span>{{localize "PIVOT.Fields.Equipped"}}</span><span></span></div>
+          {{#each items.armour}}
+            <div class="pivot-table-row" data-item-id="{{id}}">
+              <span>{{name}}</span><span>{{system.category}}</span><span
+              >{{system.acBonus}}</span><span>{{#if system.equipped}}{{localize
+                    "PIVOT.Common.Yes"
+                  }}{{else}}{{localize "PIVOT.Common.No"}}{{/if}}</span>
+              <button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button>
+            </div>
+          {{/each}}
+        </div>
+      </section>
+    </section>
+
+    <section class="tab" data-group="primary" data-tab="equipment">
+      <section class="pivot-panel">
+        <div class="pivot-section-header">
+          <h2>{{localize "PIVOT.Sections.Equipment"}}</h2>
+          <strong>{{localize "PIVOT.Fields.WeightTotal"}}: {{derived.totalWeight}}</strong>
+          <button
+            type="button"
+            data-action="createItem"
+            data-type="equipment"
+            aria-label="{{localize 'PIVOT.Actions.CreateEquipment'}}"
+            title="{{localize 'PIVOT.Actions.CreateEquipment'}}"
+            {{disabledAttr}}
+          >+</button>
+        </div>
+        <div class="pivot-table">
+          <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span
+            >{{localize "PIVOT.Fields.Quantity"}}</span><span>{{localize
+                "PIVOT.Fields.Weight"
+              }}</span><span>{{localize "PIVOT.Fields.Carried"}}</span><span></span></div>
+          {{#each items.equipment}}
+            <div class="pivot-table-row" data-item-id="{{id}}">
+              <span>{{name}}</span><span>{{system.quantity}}</span><span
+              >{{system.weight}}</span><span>{{#if system.carried}}{{localize
+                    "PIVOT.Common.Yes"
+                  }}{{else}}{{localize "PIVOT.Common.No"}}{{/if}}</span>
+              <button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button>
+            </div>
+          {{/each}}
+        </div>
+      </section>
+    </section>
+
+    <section class="tab" data-group="primary" data-tab="magic">
+      <div class="pivot-grid two">
+        <section class="pivot-panel">
+          <h2>{{localize "PIVOT.Sections.Magic"}}</h2>
+          <label class="pivot-check"><input
+              name="system.magic.awakened"
+              type="checkbox"
+              {{checked system.magic.awakened}}
+              {{disabledAttr}}
+            />
+            <span>{{localize "PIVOT.Fields.Awakened"}}</span></label>
+          <label><span>{{localize "PIVOT.Fields.MagicAbility"}}</span><select
+              name="system.magic.ability"
+              {{disabledAttr}}
+            >{{#select system.magic.ability}}<option value=""></option>{{#each
+                  config.magicAbilities
+                }}<option value="{{key}}">{{label}}</option>{{/each}}{{/select}}</select></label>
+          <label><span>{{localize "PIVOT.Fields.MPRemaining"}}</span><input
+              name="system.magic.mp.value"
+              type="number"
+              min="0"
+              step="1"
+              value="{{system.magic.mp.value}}"
+              {{disabledAttr}}
+            /></label>
+          <div class="pivot-resource-actions">
+            <button
+              type="button"
+              data-action="adjustResource"
+              data-path="magic.mp.value"
+              data-delta="-1"
+              aria-label="{{localize 'PIVOT.Actions.DecreaseMP'}}"
+              title="{{localize 'PIVOT.Actions.DecreaseMP'}}"
+              {{disabledAttr}}
+            >-</button>
+            <span>{{system.magic.mp.value}} / {{derived.magic.mp.max}}</span>
+            <button
+              type="button"
+              data-action="adjustResource"
+              data-path="magic.mp.value"
+              data-delta="1"
+              aria-label="{{localize 'PIVOT.Actions.IncreaseMP'}}"
+              title="{{localize 'PIVOT.Actions.IncreaseMP'}}"
+              {{disabledAttr}}
+            >+</button>
+          </div>
+        </section>
+        <section class="pivot-panel">
+          <div class="pivot-section-header"><h2>{{localize
+                "PIVOT.Sections.MagicStreams"
+              }}</h2><button
+              type="button"
+              data-action="createItem"
+              data-type="magicStream"
+              aria-label="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
+              title="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
+              {{disabledAttr}}
+            >+</button></div>
+          {{#each items.magicStreams}}<div class="pivot-list-item"><span>{{name}}</span><span
+              >{{localize "PIVOT.Fields.Echelon"}} {{system.echelon}}</span><button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button></div>{{/each}}
+          <div class="pivot-section-header"><h2>{{localize
+                "PIVOT.Sections.MagicAbilities"
+              }}</h2><button
+              type="button"
+              data-action="createItem"
+              data-type="magicAbility"
+              aria-label="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
+              title="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
+              {{disabledAttr}}
+            >+</button></div>
+          {{#each items.magicAbilities}}<div class="pivot-list-item"><button
+                type="button"
+                data-action="roll"
+                data-roll-kind="magicAbility"
+                data-key="{{id}}"
+                data-label="{{name}}"
+              >{{name}}</button><span>{{system.mpCost}} MP</span><button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button></div>{{/each}}
+        </section>
+      </div>
+      <section class="pivot-panel">
+        <h2>{{localize "PIVOT.Sections.Runes"}}</h2>
+        <textarea
+          name="system.notes.runesThaumaturgy"
+          rows="5"
+          {{disabledAttr}}
+        >{{system.notes.runesThaumaturgy}}</textarea>
+      </section>
+    </section>
+
+    <section class="tab" data-group="primary" data-tab="features">
+      <div class="pivot-grid two">
+        <section class="pivot-panel">
+          <div class="pivot-section-header"><h2>{{localize "PIVOT.Sections.Features"}}</h2><button
+              type="button"
+              data-action="createItem"
+              data-type="feature"
+              aria-label="{{localize 'PIVOT.Actions.CreateFeature'}}"
+              title="{{localize 'PIVOT.Actions.CreateFeature'}}"
+              {{disabledAttr}}
+            >+</button></div>
+          {{#each items.features}}<div class="pivot-list-item"><span>{{name}}</span><span
+              >{{system.category}}</span><button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button></div>{{/each}}
+        </section>
+        <section class="pivot-panel">
+          <h2>{{localize "PIVOT.Sections.SpecialNotes"}}</h2>
+          <textarea
+            name="system.notes.special"
+            rows="12"
+            {{disabledAttr}}
+          >{{system.notes.special}}</textarea>
+        </section>
+      </div>
+    </section>
+  </main>
+</section>
