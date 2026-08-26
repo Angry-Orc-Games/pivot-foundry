@@ -401,37 +401,53 @@ async function submitDocumentForm(
 
 export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
   const normalized = { ...data };
-  const languages = readPath(normalized, ["system", "identity", "languagesText"]);
-  const instruments = readPath(normalized, ["system", "proficiencies", "instrumentsText"]);
-  const academia = readPath(normalized, ["system", "skillSpecializations", "academiaText"]);
-  const crafting = readPath(normalized, ["system", "skillSpecializations", "craftingText"]);
+  const languagesPath = ["system", "identity", "languagesText"];
+  const instrumentsPath = ["system", "proficiencies", "instrumentsText"];
+  const academiaPath = ["system", "skillSpecializations", "academiaText"];
+  const craftingPath = ["system", "skillSpecializations", "craftingText"];
+  const languages = readSubmitPath(normalized, languagesPath);
+  const instruments = readSubmitPath(normalized, instrumentsPath);
+  const academia = readSubmitPath(normalized, academiaPath);
+  const crafting = readSubmitPath(normalized, craftingPath);
 
   if (typeof languages === "string") {
-    setPath(normalized, ["system", "identity", "languages"], splitList(languages));
-    deletePath(normalized, ["system", "identity", "languagesText"]);
+    setSubmitPath(
+      normalized,
+      languagesPath,
+      ["system", "identity", "languages"],
+      splitList(languages),
+    );
+    deleteSubmitPath(normalized, languagesPath);
   }
 
   if (typeof instruments === "string") {
-    setPath(normalized, ["system", "proficiencies", "instruments"], splitList(instruments));
-    deletePath(normalized, ["system", "proficiencies", "instrumentsText"]);
+    setSubmitPath(
+      normalized,
+      instrumentsPath,
+      ["system", "proficiencies", "instruments"],
+      splitList(instruments),
+    );
+    deleteSubmitPath(normalized, instrumentsPath);
   }
 
   if (typeof academia === "string") {
-    setPath(
+    setSubmitPath(
       normalized,
+      academiaPath,
       ["system", "skillSpecializations", "academia"],
       specializationEntries(splitList(academia), "int"),
     );
-    deletePath(normalized, ["system", "skillSpecializations", "academiaText"]);
+    deleteSubmitPath(normalized, academiaPath);
   }
 
   if (typeof crafting === "string") {
-    setPath(
+    setSubmitPath(
       normalized,
+      craftingPath,
       ["system", "skillSpecializations", "crafting"],
       specializationEntries(splitList(crafting), "int"),
     );
-    deletePath(normalized, ["system", "skillSpecializations", "craftingText"]);
+    deleteSubmitPath(normalized, craftingPath);
   }
 
   return normalized;
@@ -706,6 +722,27 @@ function readPath(source: Record<string, unknown>, path: string[]): unknown {
   return current;
 }
 
+function readSubmitPath(source: Record<string, unknown>, path: string[]): unknown {
+  const flatPath = path.join(".");
+  if (Object.hasOwn(source, flatPath)) return source[flatPath];
+  return readPath(source, path);
+}
+
+function setSubmitPath(
+  source: Record<string, unknown>,
+  originalPath: string[],
+  targetPath: string[],
+  value: unknown,
+): void {
+  const flatOriginalPath = originalPath.join(".");
+  if (Object.hasOwn(source, flatOriginalPath)) {
+    source[targetPath.join(".")] = value;
+    return;
+  }
+
+  setPath(source, targetPath, value);
+}
+
 function setPath(source: Record<string, unknown>, path: string[], value: unknown): void {
   let current = source;
   for (const part of path.slice(0, -1)) {
@@ -717,6 +754,16 @@ function setPath(source: Record<string, unknown>, path: string[], value: unknown
   }
   const final = path[path.length - 1];
   if (final) current[final] = value;
+}
+
+function deleteSubmitPath(source: Record<string, unknown>, path: string[]): void {
+  const flatPath = path.join(".");
+  if (Object.hasOwn(source, flatPath)) {
+    Reflect.deleteProperty(source, flatPath);
+    return;
+  }
+
+  deletePath(source, path);
 }
 
 function deletePath(source: Record<string, unknown>, path: string[]): void {

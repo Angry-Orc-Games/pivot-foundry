@@ -198,4 +198,16 @@ describe("sheet interaction helpers", () => {
       },
     });
   });
+
+  it("normalizes flattened sheet helper fields into source array update paths", () => {
+    expect(
+      normalizeSheetSubmitData({
+        "system.identity.languagesText": "Common, Giant",
+        "system.proficiencies.instrumentsText": "Drums",
+      }),
+    ).toEqual({
+      "system.identity.languages": ["Common", "Giant"],
+      "system.proficiencies.instruments": ["Drums"],
+    });
+  });
 });
