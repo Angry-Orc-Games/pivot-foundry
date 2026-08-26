@@ -3,3 +3,7 @@ dist/
 coverage/
 system.zip
 *.log
+.env.foundry.local
+foundry-data/
+.playwright-mcp/
+foundry-*.png

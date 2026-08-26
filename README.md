@@ -88,6 +88,22 @@ npm run build
 
 Start Foundry v13 and enable the `Pivot Fantasy` system when creating a world.
 
+## Docker Foundry Sandbox
+
+For browser-based sheet and runtime testing, this repository includes a local Docker Compose sandbox for Foundry v13:
+
+```sh
+cp .env.foundry.local.example .env.foundry.local
+npm run build
+npm run foundry:up
+```
+
+Fill `.env.foundry.local` with a Foundry v13 Node.js timed download URL or account credentials before starting the container. The file is ignored because it can contain license or account material.
+
+Foundry will be available at `http://localhost:30000`, with this checkout mounted as `Data/systems/pivot-fantasy`.
+
+See [docs/foundry-docker-dev.md](docs/foundry-docker-dev.md) for the full workflow.
+
 ## Project Layout
 
 ```text
