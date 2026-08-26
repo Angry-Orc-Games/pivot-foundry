@@ -9,6 +9,10 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
+    "foundry:check-env": "node scripts/check-foundry-env.mjs",
+    "foundry:down": "docker compose -f docker-compose.foundry.yml down",
+    "foundry:logs": "docker compose -f docker-compose.foundry.yml logs -f foundry",
+    "foundry:up": "npm run foundry:check-env && docker compose -f docker-compose.foundry.yml up -d foundry",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
