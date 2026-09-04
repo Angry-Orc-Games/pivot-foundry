@@ -1,0 +1,53 @@
+@startuml
+left to right direction
+actor Player
+actor GM
+
+rectangle "Core rolls and resources" {
+  usecase "UC-001\nRoll d20 test" as UC001
+  usecase "UC-002\nSpend/recover Pool" as UC002
+  usecase "UC-003\nCombat initiative" as UC003
+}
+
+rectangle "Combat automation" {
+  usecase "UC-004\nAttack + exploding damage" as UC004
+  usecase "UC-005\nDamage/healing/temp HP" as UC005
+  usecase "UC-006\nDeath saves" as UC006
+  usecase "UC-007\nCombat state/rests" as UC007
+}
+
+rectangle "Content and progression" {
+  usecase "UC-008\nMigrations/effects/content pipeline" as UC008
+  usecase "UC-009\nCharacter-option compendia" as UC009
+  usecase "UC-010\nGeneration/advancement" as UC010
+  usecase "UC-011\nMagic automation" as UC011
+  usecase "UC-012\nGear rules/content" as UC012
+}
+
+rectangle "GM tools" {
+  usecase "UC-013\nNPC/GM tooling" as UC013
+}
+
+Player --> UC001
+Player --> UC002
+Player --> UC003
+Player --> UC004
+Player --> UC005
+Player --> UC006
+Player --> UC007
+Player --> UC009
+Player --> UC010
+Player --> UC011
+Player --> UC012
+GM --> UC003
+GM --> UC005
+GM --> UC007
+GM --> UC008
+GM --> UC009
+GM --> UC013
+
+UC009 ..> UC008 : requires
+UC010 ..> UC008 : requires
+UC011 ..> UC008 : may consume effects/content
+UC012 ..> UC008 : may consume effects/content
+@enduml
