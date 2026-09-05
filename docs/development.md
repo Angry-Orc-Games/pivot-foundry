@@ -32,14 +32,18 @@ Good candidates for Foundry integration modules:
 
 Current Foundry integration modules:
 
-- `src/pivot.ts` registers the `Actor.character` and Pivot Item data models, token resources, and sheet classes.
+- `src/pivot.ts` registers the `Actor.character` and Pivot Item data models, token resources, sheet classes, and the `ready` migration runner.
 - `src/data/character-data.ts` owns the character Actor source schema.
 - `src/data/item-data.ts` owns the `weapon`, `armour`, `equipment`, `feature`, `magicStream`, and `magicAbility` schemas.
 - `src/sheets/character-sheet.ts` owns the native character sheet class and the testable sheet context used by templates and roll/resource actions.
-- `src/sheets/item-sheet.ts` owns the native Item sheet class.
+- `src/sheets/item-sheet.ts` owns the native Item sheet class and the read-only effects summary.
 - `src/rules/d20-roll.ts` owns dice-pool resolution, roll-mode mapping, kept-die selection, and attack natural 20/1 classification.
 - `src/rules/resources.ts` owns bounded resource spend/recovery and long-rest Pool recovery amounts.
 - `src/rules/combat.ts` owns unique-combatant selection for initiative tracker updates.
+- `src/rules/effects.ts` owns EffectRule validation, stored-effect parsing, and derived contribution aggregation.
+- `src/rules/content.ts` owns content-record validation and deterministic pack-document generation.
+- `src/migrations/m001.ts` owns the schemaVersion 0 → 1 migration plan.
+- `src/migrations/world-migrations.ts` owns the Foundry world Actor/Item migration runner.
 
 Keep sheet context preparation and deterministic calculations testable outside Foundry. Do not move Foundry globals into rules modules.
 
@@ -60,6 +64,7 @@ For faster inner-loop checks, run the narrower script that matches the change:
 - `npm run build` for the Foundry runtime bundle
 - `npm run audit` for dependency vulnerability checks
 - `npm run package:system` for release zip validation
+- `npm run build:content` for JSON content validation and `packs/src` generation
 
 Vitest should fail when test files are missing. If a slice temporarily moves or renames tests, keep that behavior intact and update the matching test include patterns instead of allowing empty test runs.
 

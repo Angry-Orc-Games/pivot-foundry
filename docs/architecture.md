@@ -5,10 +5,12 @@ Pivot Foundry is currently a small Foundry VTT v13 system scaffold. The architec
 ## Current Shape
 
 - `system.json` declares the Foundry system manifest, language file, stylesheet, module entry point, release URLs, the `character` Actor document type, and Pivot Item document types.
-- `src/pivot.ts` is the Foundry runtime entry point. It registers Actor/Item data models, token resource paths, and native sheets during the Foundry `init` hook.
-- `src/data/` contains TypeDataModel schema factories for `Actor.character` and Pivot Item types.
+- `src/pivot.ts` is the Foundry runtime entry point. It registers Actor/Item data models, token resource paths, and native sheets during the Foundry `init` hook, then runs named world migrations on `ready`.
+- `src/data/` contains TypeDataModel schema factories for `Actor.character` and Pivot Item types, including `schemaVersion` and Item `effects`.
 - `src/sheets/` contains the character and item sheet classes plus testable sheet-context helpers.
-- `src/rules/` contains deterministic rules code that does not depend on Foundry globals, including d20 roll modes, Pool resource transactions, and combatant selection for initiative.
+- `src/rules/` contains deterministic rules code that does not depend on Foundry globals, including d20 roll modes, Pool resource transactions, combatant selection, effect aggregation, and content validation.
+- `src/migrations/` contains named document migrations. M001 persists `schemaVersion: 1` from stored source (`document.toObject()` / `_source`), not prepared TypeDataModel defaults.
+- `src/content/` is the canonical JSON content source. `scripts/build-content-packs.mjs` writes generated Foundry document JSON to `packs/src/`. `system.json` `packs` stays `[]` until a real Foundry v13 LevelDB pack exists.
 - `templates/` and `styles/` contain the native Foundry sheet UI.
 - `tests/` contains Vitest coverage for the manifest and rules modules.
 - `scripts/` contains release preparation and Foundry package validation.
@@ -37,11 +39,11 @@ See [foundry-vtt-source.md](foundry-vtt-source.md) for Foundry-specific developm
 
 The current character sheet stores player-editable source data under `Actor.system` and keeps totals derived:
 
-- `identity`, `progression`, `abilities`, `attributes`, `resources`, `skills`, `skillSpecializations`, `proficiencies`, `currency`, `magic`, and `notes` live on `Actor.character`.
-- Weapons, armour, equipment, features/flaws/background/species notes, magic streams, and magic abilities are embedded Items.
-- Ability modifiers, proficiency bonus, saves, skill totals, passive perception, Pool maximum, MP maximum, AC, initiative, carried weight, and weapon BTH/BTD are calculated in `src/rules/character-derived.ts`.
+- `identity`, `progression`, `abilities`, `attributes`, `resources`, `skills`, `skillSpecializations`, `proficiencies`, `currency`, `magic`, `notes`, and `schemaVersion` live on `Actor.character`.
+- Weapons, armour, equipment, features/flaws/background/species notes, magic streams, and magic abilities are embedded Items. Each Item type stores `schemaVersion` and a whitelisted `effects` array.
+- Ability modifiers, proficiency bonus, saves, skill totals, passive perception, Pool maximum, MP maximum, AC, initiative, speed, carried weight, derived proficiencies, and weapon BTH/BTD are calculated in `src/rules/character-derived.ts`. Embedded Item effects are aggregated in `src/rules/effects.ts` and passed into that derived calculation. Source ability scores and manual bonuses are not rewritten.
 
-Existing pre-sheet Actors had empty system data. The TypeDataModel defaults initialize the new schema without repurposing previous fields; no destructive migration is currently required.
+Named migration M001 treats missing/`0` `schemaVersion` as legacy and persists the current version `1`. It does not persist derived totals. Malformed documents fail individually and are logged; they are not repaired silently. Reading stored `schemaVersion` uses public `document.toObject()` with `_source.system` as a fallback so TypeDataModel `initial: 1` defaults cannot hide legacy documents.
 
 ## Review Hotspots
 

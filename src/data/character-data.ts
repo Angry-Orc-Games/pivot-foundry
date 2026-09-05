@@ -1,4 +1,5 @@
 import { abilities, canonicalSkills } from "../config";
+import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 import {
   arrayField,
   booleanField,
@@ -20,6 +21,12 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
   class PivotCharacterData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
       return {
+        schemaVersion: numberField(fields, {
+          required: true,
+          integer: true,
+          min: 0,
+          initial: CURRENT_SCHEMA_VERSION,
+        }),
         identity: schemaField(fields, {
           player: stringField(fields, { required: true, initial: "" }),
           backgroundText: stringField(fields, { required: true, initial: "" }),
