@@ -1,6 +1,6 @@
 # UC-001 — Roll a d20 Test with Pivot Roll Modes
 
-**Status:** READY  
+**Status:** IMPLEMENTED  
 **Primary Actor:** Player  
 **Goal:** Roll an existing Character d20 check using Pivot Normal/Advantage/Disadvantage/Super-Advantage behavior and receive one traceable chat result.  
 **Linked Requirements:** FR-001, FR-002 (attack natural result only where applicable), NFR-001, NFR-002, NFR-003, NFR-004, C-003  

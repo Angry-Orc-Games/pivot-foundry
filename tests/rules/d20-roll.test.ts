@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { applyAttackCrit, resolveDicePool } from "../../src/rules/d20-roll";
+import {
+  applyAttackCrit,
+  d20PoolFormula,
+  dicePoolForRollMode,
+  resolveDicePool,
+  selectKeptD20,
+} from "../../src/rules/d20-roll";
 
 describe("resolveDicePool", () => {
   // Rulebook line 236-263.
@@ -50,5 +56,54 @@ describe("applyAttackCrit", () => {
 
   it("anything else is not a crit/fumble", () => {
     expect(applyAttackCrit(15)).toBe(null);
+  });
+
+  it("classifies attack crits from the kept natural face", () => {
+    expect(applyAttackCrit(20)).toBe("hit");
+    expect(applyAttackCrit(1)).toBe("miss");
+  });
+});
+
+describe("dicePoolForRollMode", () => {
+  it("maps each RollMode to the expected pool resolution", () => {
+    expect(dicePoolForRollMode("normal")).toEqual({ dieCount: 1, pick: "single" });
+    expect(dicePoolForRollMode("advantage")).toEqual({ dieCount: 2, pick: "highest" });
+    expect(dicePoolForRollMode("disadvantage")).toEqual({ dieCount: 2, pick: "lowest" });
+    expect(dicePoolForRollMode("superAdvantage")).toEqual({ dieCount: 2, pick: "highest" });
+  });
+});
+
+describe("selectKeptD20", () => {
+  it("keeps the only die for a single-die pool", () => {
+    expect(selectKeptD20([11], { dieCount: 1, pick: "single" })).toBe(11);
+  });
+
+  it("selects highest for advantage", () => {
+    expect(selectKeptD20([3, 18], { dieCount: 2, pick: "highest" })).toBe(18);
+  });
+
+  it("selects lowest for disadvantage", () => {
+    expect(selectKeptD20([3, 18], { dieCount: 2, pick: "lowest" })).toBe(3);
+  });
+
+  it("selects highest for Super-Advantage with two dice", () => {
+    expect(selectKeptD20([4, 12], dicePoolForRollMode("superAdvantage"))).toBe(12);
+  });
+
+  it("throws for empty arrays, wrong counts, and invalid faces", () => {
+    expect(() => selectKeptD20([], { dieCount: 1, pick: "single" })).toThrow(RangeError);
+    expect(() => selectKeptD20([10, 11], { dieCount: 1, pick: "single" })).toThrow(RangeError);
+    expect(() => selectKeptD20([10], { dieCount: 2, pick: "highest" })).toThrow(RangeError);
+    expect(() => selectKeptD20([0, 10], { dieCount: 2, pick: "highest" })).toThrow(RangeError);
+    expect(() => selectKeptD20([21], { dieCount: 1, pick: "single" })).toThrow(RangeError);
+    expect(() => selectKeptD20([1.5], { dieCount: 1, pick: "single" })).toThrow(RangeError);
+  });
+});
+
+describe("d20PoolFormula", () => {
+  it("builds a Foundry pool formula from the resolved die count", () => {
+    expect(d20PoolFormula(1)).toBe("1d20");
+    expect(d20PoolFormula(2)).toBe("2d20");
+    expect(d20PoolFormula(3)).toBe("3d20");
   });
 });

@@ -28,6 +28,10 @@ Implemented:
 - Item sheet registration for those Pivot item types
 - Data-backed identity, progression, abilities, HP, Pool, skills, proficiencies, currency, magic, notes, attacks, armour, and inventory fields
 - Derived character math for ability modifiers, proficiency, saves, skills, passive perception, Pool max, MP max, AC, initiative, carried weight, and weapon BTH/BTD
+- Pivot d20 roll modes (Normal, Advantage, Disadvantage, Super-Advantage) with kept-die chat results
+- Weapon attack chat that reports automatic hit on a kept natural 20 and automatic miss on a kept natural 1
+- Bounded Pool spend/recovery against derived Pool max, plus Recover Pool (Long Rest)
+- Initiative rolls that update a unique existing Foundry combatant in the active combat
 - Vite build output to `dist/pivot.mjs`
 - Vitest coverage for manifest validation and initial rules modules
 - Initial deterministic d20 roll and modifier helpers under `src/rules/`
@@ -38,7 +42,7 @@ Not implemented yet:
 
 - Full content packs for species, backgrounds, feats, flaws, equipment, spells, or magic streams
 - Full content-driven automation for species/background/feat/flaw effects
-- Foundry combat tracker integration beyond sheet roll buttons
+- Automatic combat or combatant creation for initiative
 - Complete exploding damage automation
 - Foundry data migrations
 

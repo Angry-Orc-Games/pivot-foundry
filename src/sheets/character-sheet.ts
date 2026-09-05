@@ -8,6 +8,7 @@ import {
   weaponCategories,
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
+import { selectInitiativeCombatant } from "../rules/combat";
 import {
   type AbilityKey,
   calculateArmourClass,
@@ -17,6 +18,19 @@ import {
   type PassivePerceptionMode,
   type SkillSourceMap,
 } from "../rules/character-derived";
+import {
+  applyAttackCrit,
+  d20PoolFormula,
+  dicePoolForRollMode,
+  isRollMode,
+  type RollMode,
+  selectKeptD20,
+} from "../rules/d20-roll";
+import {
+  recoverBoundedResource,
+  recoverPoolOnLongRest,
+  spendBoundedResource,
+} from "../rules/resources";
 
 const CHARACTER_TEMPLATE = `systems/${SYSTEM_ID}/templates/actors/character-sheet.hbs`;
 
@@ -32,6 +46,8 @@ export interface ItemLike {
 }
 
 export interface ActorLike {
+  id?: string;
+  _id?: string;
   name: string;
   type: string;
   system: RecordValue;
@@ -42,6 +58,43 @@ export interface ActorLike {
     data: Array<Record<string, unknown>>,
   ) => Promise<unknown>;
   deleteEmbeddedDocuments?: (type: "Item", ids: string[]) => Promise<unknown>;
+}
+
+export const POOL_VALUE_PATH = "resources.pool.value";
+
+export const ROLL_MODE_LABEL_KEYS: Record<RollMode, string> = {
+  normal: "PIVOT.RollMode.Normal",
+  advantage: "PIVOT.RollMode.Advantage",
+  disadvantage: "PIVOT.RollMode.Disadvantage",
+  superAdvantage: "PIVOT.RollMode.SuperAdvantage",
+};
+
+export type D20RollKind = "ability" | "save" | "skill" | "initiative" | "weaponAttack";
+export type FormulaRollKind = "weaponDamage" | "magicAbility";
+
+export type SheetRollRequest =
+  | {
+      kind: "d20";
+      rollKind: D20RollKind;
+      label: string;
+      modifier: number;
+      applyAttackCrit: boolean;
+    }
+  | {
+      kind: "formula";
+      rollKind: FormulaRollKind;
+      label: string;
+      formula: string;
+    };
+
+export interface CombatantLike {
+  id?: string;
+  actorId?: string | null;
+  update?: (data: Record<string, unknown>) => Promise<unknown>;
+}
+
+export interface CombatLike {
+  combatants?: Iterable<CombatantLike> | { contents: CombatantLike[] };
 }
 
 export interface CharacterSheetContext {
@@ -130,6 +183,7 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       actions: {
         roll: rollAction,
         adjustResource: adjustResourceAction,
+        recoverPoolLongRest: recoverPoolLongRestAction,
         createItem: createItemAction,
         openItem: openItemAction,
         deleteItem: deleteItemAction,
@@ -361,9 +415,200 @@ export function prepareCharacterSheetContext(
   };
 }
 
-export function buildRollFormula(kind: string, value: number): string {
-  if (kind === "damage") return value === 0 ? "0" : String(value);
-  return `1d20${value >= 0 ? "+" : ""}${value}`;
+export function resolveSheetRoll(
+  target: { dataset: { rollKind?: string; key?: string; label?: string } },
+  context: CharacterSheetContext,
+): SheetRollRequest | null {
+  const kind = target.dataset.rollKind;
+  const key = target.dataset.key;
+  const label = target.dataset.label ?? "Pivot Roll";
+
+  if (kind === "ability" && isAbilityKey(key)) {
+    return {
+      kind: "d20",
+      rollKind: "ability",
+      label,
+      modifier: context.derived.abilities[key].mod,
+      applyAttackCrit: false,
+    };
+  }
+  if (kind === "save" && isAbilityKey(key)) {
+    return {
+      kind: "d20",
+      rollKind: "save",
+      label,
+      modifier: context.derived.saves[key],
+      applyAttackCrit: false,
+    };
+  }
+  if (kind === "skill" && key) {
+    return {
+      kind: "d20",
+      rollKind: "skill",
+      label,
+      modifier: context.derived.skills[key]?.total ?? 0,
+      applyAttackCrit: false,
+    };
+  }
+  if (kind === "initiative") {
+    return {
+      kind: "d20",
+      rollKind: "initiative",
+      label,
+      modifier: context.derived.initiative,
+      applyAttackCrit: false,
+    };
+  }
+  if (kind === "weaponAttack" && key) {
+    const weapon = context.items.weapons.find((item) => item.id === key);
+    return {
+      kind: "d20",
+      rollKind: "weaponAttack",
+      label,
+      modifier: weapon?.summary.bth ?? 0,
+      applyAttackCrit: true,
+    };
+  }
+  if (kind === "weaponDamage" && key) {
+    const weapon = context.items.weapons.find((item) => item.id === key);
+    if (!weapon) return null;
+    const bonus = weapon.summary.btd;
+    return {
+      kind: "formula",
+      rollKind: "weaponDamage",
+      label,
+      formula: `${weapon.summary.damageFormula}${bonus >= 0 ? "+" : ""}${bonus}`,
+    };
+  }
+  if (kind === "magicAbility" && key) {
+    const ability = context.items.magicAbilities.find((item) => item.id === key);
+    const formula = stringAt(ability?.system ?? {}, ["roll"], "");
+    if (!formula) return null;
+    return {
+      kind: "formula",
+      rollKind: "magicAbility",
+      label,
+      formula,
+    };
+  }
+
+  return null;
+}
+
+export function buildRollModeDialogContent(localize: (key: string) => string): string {
+  const options = (["normal", "advantage", "disadvantage", "superAdvantage"] as const)
+    .map((mode, index) => {
+      const checked = index === 0 ? " checked" : "";
+      return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
+        localize(ROLL_MODE_LABEL_KEYS[mode]),
+      )}</label>`;
+    })
+    .join("");
+  return `<fieldset class="pivot-roll-mode-dialog"><legend>${escapeHtml(
+    localize("PIVOT.RollDialog.Title"),
+  )}</legend>${options}</fieldset>`;
+}
+
+export function buildD20ChatFlavor(input: {
+  label: string;
+  mode: RollMode;
+  kept: number;
+  modifier: number;
+  total: number;
+  attackCrit: "hit" | "miss" | null;
+  localize: (key: string) => string;
+}): string {
+  const parts = [
+    `${escapeHtml(input.label)} (${escapeHtml(input.localize(ROLL_MODE_LABEL_KEYS[input.mode]))})`,
+    `${escapeHtml(input.localize("PIVOT.Chat.KeptD20"))}: ${input.kept}`,
+    `${escapeHtml(input.localize("PIVOT.Chat.Modifier"))}: ${formatSigned(input.modifier)}`,
+    `${escapeHtml(input.localize("PIVOT.Chat.Total"))}: ${input.total}`,
+  ];
+  if (input.attackCrit === "hit") {
+    parts.push(escapeHtml(input.localize("PIVOT.Chat.AutoHit")));
+  }
+  if (input.attackCrit === "miss") {
+    parts.push(escapeHtml(input.localize("PIVOT.Chat.AutoMiss")));
+  }
+  return parts.join(" — ");
+}
+
+export function naturalResultsFromRoll(roll: {
+  dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+  terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+}): number[] {
+  const pools = roll.dice?.length ? roll.dice : (roll.terms ?? []);
+  const results: number[] = [];
+  for (const die of pools) {
+    if (die.faces !== 20) continue;
+    for (const entry of die.results ?? []) {
+      if (typeof entry.result === "number") results.push(entry.result);
+    }
+  }
+  return results;
+}
+
+export function nextResourceValue(
+  path: string,
+  current: number,
+  delta: number,
+  poolMax: number,
+): number {
+  if (path === POOL_VALUE_PATH) {
+    if (delta < 0) return spendBoundedResource(current, Math.abs(delta));
+    return recoverBoundedResource(current, poolMax, delta);
+  }
+  if (!Number.isFinite(delta)) return current;
+  return Math.max(0, current + delta);
+}
+
+export async function applyInitiativeRollToCombat(options: {
+  actorId: string | undefined;
+  total: number;
+  combat: CombatLike | null | undefined;
+  notify: (level: "warn" | "error", message: string) => void;
+  localize: (key: string) => string;
+}): Promise<"updated" | "skipped"> {
+  const { actorId, total, combat, notify, localize } = options;
+  if (!combat) {
+    notify("warn", localize("PIVOT.Combat.NoActiveCombat"));
+    return "skipped";
+  }
+  if (!actorId) {
+    notify("warn", localize("PIVOT.Combat.NoCombatant"));
+    return "skipped";
+  }
+
+  const combatants = getCombatants(combat);
+  const selection = selectInitiativeCombatant(
+    actorId,
+    combatants.map((combatant) => ({
+      id: combatant.id ?? "",
+      actorId: combatant.actorId ?? null,
+    })),
+  );
+
+  if (selection.kind === "none") {
+    notify("warn", localize("PIVOT.Combat.NoCombatant"));
+    return "skipped";
+  }
+  if (selection.kind === "ambiguous") {
+    notify("warn", localize("PIVOT.Combat.MultipleCombatants"));
+    return "skipped";
+  }
+
+  const combatant = combatants.find((candidate) => candidate.id === selection.combatantId);
+  try {
+    if (!combatant?.update) {
+      notify("error", localize("PIVOT.Combat.InitiativeUpdateFailed"));
+      return "skipped";
+    }
+    await combatant.update({ initiative: total });
+  } catch {
+    notify("error", localize("PIVOT.Combat.InitiativeUpdateFailed"));
+    return "skipped";
+  }
+  return "updated";
 }
 
 export function createEmbeddedItemData(type: string): Record<string, unknown> {
@@ -459,28 +704,58 @@ async function rollAction(
   target: HTMLElement,
 ): Promise<void> {
   event.preventDefault();
-  const context = prepareCharacterSheetContext(this.document ?? getSheetDocument(this));
-  const formula = rollFormulaFromTarget(target, context);
-  if (!formula) return;
-  const globals = globalThis as typeof globalThis & {
-    Roll?: new (formula: string) => {
-      evaluate(options?: Record<string, unknown>): Promise<unknown>;
-      toMessage(message?: Record<string, unknown>): Promise<unknown>;
-    };
-  };
-  const RollConstructor = globals.Roll as
-    | (new (formula: string) => {
-        evaluate(options?: Record<string, unknown>): Promise<unknown>;
-        toMessage(message?: Record<string, unknown>): Promise<unknown>;
-      })
-    | undefined;
+  const actor = this.document ?? getSheetDocument(this);
+  const context = prepareCharacterSheetContext(actor);
+  const request = resolveSheetRoll(target, context);
+  if (!request) return;
+  const RollConstructor = getRollConstructor();
   if (!RollConstructor) return;
-  const roll = new RollConstructor(formula);
-  await roll.evaluate();
-  await roll.toMessage({
-    speaker: speakerForActor(context.actor),
-    flavor: target.dataset.label ?? "Pivot Roll",
+
+  if (request.kind === "formula") {
+    const roll = new RollConstructor(request.formula);
+    await roll.evaluate();
+    await roll.toMessage({
+      speaker: speakerForActor(context.actor),
+      flavor: request.label,
+    });
+    return;
+  }
+
+  const mode = await promptRollMode();
+  if (!mode) return;
+
+  const resolution = dicePoolForRollMode(mode);
+  const poolRoll = new RollConstructor(d20PoolFormula(resolution.dieCount));
+  await poolRoll.evaluate();
+  const kept = selectKeptD20(naturalResultsFromRoll(poolRoll), resolution);
+  const total = kept + request.modifier;
+  const attackCrit = request.applyAttackCrit ? applyAttackCrit(kept) : null;
+  const flavor = buildD20ChatFlavor({
+    label: request.label,
+    mode,
+    kept,
+    modifier: request.modifier,
+    total,
+    attackCrit,
+    localize: localizeText,
   });
+
+  const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
+  await resultRoll.evaluate();
+  await resultRoll.toMessage({
+    speaker: speakerForActor(context.actor),
+    flavor,
+  });
+
+  if (request.rollKind === "initiative") {
+    await applyInitiativeRollToCombat({
+      actorId: actorDocumentId(actor),
+      total,
+      combat: getActiveCombat(),
+      notify: notifyUser,
+      localize: localizeText,
+    });
+  }
 }
 
 async function adjustResourceAction(
@@ -494,7 +769,26 @@ async function adjustResourceAction(
   const delta = Number(target.dataset.delta ?? 0);
   if (!path || !Number.isFinite(delta)) return;
   const current = numberAt(actor.system, path.split("."), 0);
-  await actor.update?.({ [`system.${path}`]: Math.max(0, current + delta) });
+  const poolMax = prepareCharacterSheetContext(actor).derived.pool.max;
+  await actor.update?.({
+    [`system.${path}`]: nextResourceValue(path, current, delta, poolMax),
+  });
+}
+
+async function recoverPoolLongRestAction(
+  this: { document?: ActorLike },
+  event: PointerEvent,
+): Promise<void> {
+  event.preventDefault();
+  const actor = this.document ?? getSheetDocument(this);
+  const current = numberAt(actor.system, ["resources", "pool", "value"], 0);
+  const poolMax = prepareCharacterSheetContext(actor).derived.pool.max;
+  const next = recoverPoolOnLongRest(current, poolMax);
+  if (next === current) {
+    notifyUser("info", localizeText("PIVOT.Notifications.PoolAlreadyFull"));
+    return;
+  }
+  await actor.update?.({ "system.resources.pool.value": next });
 }
 
 async function createItemAction(
@@ -535,35 +829,6 @@ async function deleteItemAction(
   const id = target.dataset.itemId;
   if (!id) return;
   await (this.document ?? getSheetDocument(this)).deleteEmbeddedDocuments?.("Item", [id]);
-}
-
-function rollFormulaFromTarget(target: HTMLElement, context: CharacterSheetContext): string | null {
-  const kind = target.dataset.rollKind;
-  const key = target.dataset.key;
-
-  if (kind === "ability" && isAbilityKey(key))
-    return buildRollFormula(kind, context.derived.abilities[key].mod);
-  if (kind === "save" && isAbilityKey(key))
-    return buildRollFormula(kind, context.derived.saves[key]);
-  if (kind === "skill" && key)
-    return buildRollFormula(kind, context.derived.skills[key]?.total ?? 0);
-  if (kind === "initiative") return buildRollFormula(kind, context.derived.initiative);
-  if (kind === "weaponAttack" && key) {
-    const weapon = context.items.weapons.find((item) => item.id === key);
-    return buildRollFormula(kind, weapon?.summary.bth ?? 0);
-  }
-  if (kind === "weaponDamage" && key) {
-    const weapon = context.items.weapons.find((item) => item.id === key);
-    if (!weapon) return null;
-    const bonus = weapon.summary.btd;
-    return `${weapon.summary.damageFormula}${bonus >= 0 ? "+" : ""}${bonus}`;
-  }
-  if (kind === "magicAbility" && key) {
-    const ability = context.items.magicAbilities.find((item) => item.id === key);
-    return stringAt(ability?.system ?? {}, ["roll"], "");
-  }
-
-  return null;
 }
 
 function getActorItems(actor: ActorLike): ItemLike[] {
@@ -695,6 +960,116 @@ function isAbilityKey(value: unknown): value is AbilityKey {
 
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === "object" && value !== null;
+}
+
+function actorDocumentId(actor: ActorLike): string | undefined {
+  return actor.id ?? actor._id;
+}
+
+function getCombatants(combat: CombatLike): CombatantLike[] {
+  const combatants = combat.combatants;
+  if (!combatants) return [];
+  if ("contents" in combatants) return combatants.contents;
+  return Array.from(combatants);
+}
+
+function getActiveCombat(): CombatLike | null {
+  const game = globalThis as typeof globalThis & { game?: { combat?: CombatLike | null } };
+  return game.game?.combat ?? null;
+}
+
+function getRollConstructor():
+  | (new (formula: string) => {
+      evaluate(options?: Record<string, unknown>): Promise<unknown>;
+      toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+      terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+    })
+  | undefined {
+  const globals = globalThis as typeof globalThis & {
+    Roll?: new (formula: string) => {
+      evaluate(options?: Record<string, unknown>): Promise<unknown>;
+      toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+      terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+    };
+  };
+  return globals.Roll;
+}
+
+async function promptRollMode(): Promise<RollMode | null> {
+  const foundry = globalThis as typeof globalThis & {
+    foundry?: {
+      applications?: {
+        api?: {
+          DialogV2?: {
+            prompt: (config: Record<string, unknown>) => Promise<unknown>;
+          };
+        };
+      };
+    };
+  };
+  const DialogV2 = foundry.foundry?.applications?.api?.DialogV2;
+  if (!DialogV2) return null;
+
+  try {
+    const result = await DialogV2.prompt({
+      window: { title: localizeText("PIVOT.RollDialog.Title") },
+      content: buildRollModeDialogContent(localizeText),
+      ok: {
+        label: localizeText("PIVOT.RollDialog.Roll"),
+        callback: (_event: unknown, button: { form?: HTMLFormElement }) => {
+          const selected = button.form?.querySelector("input[name='mode']:checked");
+          const value = selected && "value" in selected ? String(selected.value) : "normal";
+          return isRollMode(value) ? value : "normal";
+        },
+      },
+      buttons: [
+        {
+          action: "cancel",
+          label: localizeText("PIVOT.RollDialog.Cancel"),
+          callback: () => null,
+        },
+      ],
+      rejectClose: false,
+    });
+    return isRollMode(result) ? result : null;
+  } catch {
+    return null;
+  }
+}
+
+function localizeText(key: string): string {
+  const game = globalThis as typeof globalThis & {
+    game?: { i18n?: { localize?: (path: string) => string } };
+  };
+  return game.game?.i18n?.localize?.(key) || key;
+}
+
+function notifyUser(level: "info" | "warn" | "error", message: string): void {
+  const ui = globalThis as typeof globalThis & {
+    ui?: {
+      notifications?: {
+        info?: (text: string) => void;
+        warn?: (text: string) => void;
+        error?: (text: string) => void;
+      };
+    };
+  };
+  ui.ui?.notifications?.[level]?.(message);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatSigned(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
 }
 
 function speakerForActor(actor: ActorLike): Record<string, unknown> {

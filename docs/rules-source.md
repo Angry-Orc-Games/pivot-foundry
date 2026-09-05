@@ -47,8 +47,11 @@ Prefer implementing rules in this order unless a user-facing slice says otherwis
 ## Existing Implemented Slices
 
 - `src/rules/modifiers.ts`: ability modifiers and proficiency bonus by level.
-- `src/rules/d20-roll.ts`: d20 advantage/disadvantage resolution and natural 20/1 attack result handling.
-- `src/pivot.ts`: initial Foundry character Actor data model registration.
+- `src/rules/d20-roll.ts`: d20 advantage/disadvantage resolution, roll-mode mapping, kept-die selection, and natural 20/1 attack result handling.
+- `src/rules/resources.ts`: bounded Pool spend/recovery and long-rest Pool recovery.
+- `src/rules/combat.ts`: unique combatant selection for initiative tracker updates.
+- Character sheet roll buttons prompt for Pivot roll modes and post kept-die chat results.
+- `src/pivot.ts`: Foundry character Actor and Item data model registration.
 
 ## Review Notes
 
