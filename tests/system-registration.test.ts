@@ -154,5 +154,9 @@ describe("registerPivotFantasySystem", () => {
       },
     });
     expect(registeredSheets).toHaveLength(2);
+    const actorSheetClass = (registeredSheets[0] as unknown[])[2] as {
+      DEFAULT_OPTIONS?: { actions?: Record<string, unknown> };
+    };
+    expect(actorSheetClass.DEFAULT_OPTIONS?.actions).toHaveProperty("openItem");
   });
 });

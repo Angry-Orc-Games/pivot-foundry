@@ -24,9 +24,11 @@ type RecordValue = Record<string, unknown>;
 
 export interface ItemLike {
   id?: string;
+  _id?: string;
   name: string;
   type: string;
   system: RecordValue;
+  sheet?: { render?: (force?: boolean) => unknown };
 }
 
 export interface ActorLike {
@@ -58,6 +60,7 @@ export interface CharacterSheetContext {
     magicAbilities: typeof abilities;
     skills: typeof canonicalSkills;
     hitDice: typeof hitDice;
+    hitDiceChoices: Record<string, string>;
     weaponCategories: typeof weaponCategories;
     armourCategories: typeof armourCategories;
     featureCategories: typeof featureCategories;
@@ -126,9 +129,9 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
-        activateTab: activateTabAction,
         adjustResource: adjustResourceAction,
         createItem: createItemAction,
+        openItem: openItemAction,
         deleteItem: deleteItemAction,
       },
     };
@@ -257,6 +260,7 @@ export function prepareCharacterSheetContext(
       magicAbilities: abilities.filter(({ key }) => ["int", "wis", "cha"].includes(key)),
       skills: canonicalSkills,
       hitDice,
+      hitDiceChoices: Object.fromEntries(hitDice.map((die) => [die, die])),
       weaponCategories,
       armourCategories,
       featureCategories,
@@ -322,6 +326,7 @@ export function prepareCharacterSheetContext(
     items: {
       weapons: weapons.map((item) => ({
         ...item,
+        id: itemDocumentId(item),
         disabledAttr,
         summary: calculateAttackSummary({
           proficiencyBonus: derived.proficiencyBonus,
@@ -396,57 +401,56 @@ async function submitDocumentForm(
 
 export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
   const normalized = { ...data };
-  const languages = readPath(normalized, ["system", "identity", "languagesText"]);
-  const instruments = readPath(normalized, ["system", "proficiencies", "instrumentsText"]);
-  const academia = readPath(normalized, ["system", "skillSpecializations", "academiaText"]);
-  const crafting = readPath(normalized, ["system", "skillSpecializations", "craftingText"]);
+  const languagesPath = ["system", "identity", "languagesText"];
+  const instrumentsPath = ["system", "proficiencies", "instrumentsText"];
+  const academiaPath = ["system", "skillSpecializations", "academiaText"];
+  const craftingPath = ["system", "skillSpecializations", "craftingText"];
+  const languages = readSubmitPath(normalized, languagesPath);
+  const instruments = readSubmitPath(normalized, instrumentsPath);
+  const academia = readSubmitPath(normalized, academiaPath);
+  const crafting = readSubmitPath(normalized, craftingPath);
 
   if (typeof languages === "string") {
-    setPath(normalized, ["system", "identity", "languages"], splitList(languages));
-    deletePath(normalized, ["system", "identity", "languagesText"]);
+    setSubmitPath(
+      normalized,
+      languagesPath,
+      ["system", "identity", "languages"],
+      splitList(languages),
+    );
+    deleteSubmitPath(normalized, languagesPath);
   }
 
   if (typeof instruments === "string") {
-    setPath(normalized, ["system", "proficiencies", "instruments"], splitList(instruments));
-    deletePath(normalized, ["system", "proficiencies", "instrumentsText"]);
+    setSubmitPath(
+      normalized,
+      instrumentsPath,
+      ["system", "proficiencies", "instruments"],
+      splitList(instruments),
+    );
+    deleteSubmitPath(normalized, instrumentsPath);
   }
 
   if (typeof academia === "string") {
-    setPath(
+    setSubmitPath(
       normalized,
+      academiaPath,
       ["system", "skillSpecializations", "academia"],
       specializationEntries(splitList(academia), "int"),
     );
-    deletePath(normalized, ["system", "skillSpecializations", "academiaText"]);
+    deleteSubmitPath(normalized, academiaPath);
   }
 
   if (typeof crafting === "string") {
-    setPath(
+    setSubmitPath(
       normalized,
+      craftingPath,
       ["system", "skillSpecializations", "crafting"],
       specializationEntries(splitList(crafting), "int"),
     );
-    deletePath(normalized, ["system", "skillSpecializations", "craftingText"]);
+    deleteSubmitPath(normalized, craftingPath);
   }
 
   return normalized;
-}
-
-function activateTabAction(_event: PointerEvent, target: HTMLElement): void {
-  const tab = target.dataset.tab;
-  const group = target.dataset.group ?? "primary";
-  if (!tab) return;
-
-  const sheet = target.closest(".pivot-character-sheet");
-  if (!sheet) return;
-
-  for (const link of sheet.querySelectorAll<HTMLElement>(`.pivot-tabs [data-group="${group}"]`)) {
-    link.classList.toggle("active", link.dataset.tab === tab);
-  }
-
-  for (const panel of sheet.querySelectorAll<HTMLElement>(`.tab[data-group="${group}"]`)) {
-    panel.classList.toggle("active", panel.dataset.tab === tab);
-  }
 }
 
 async function rollAction(
@@ -472,7 +476,7 @@ async function rollAction(
     | undefined;
   if (!RollConstructor) return;
   const roll = new RollConstructor(formula);
-  await roll.evaluate({ async: true });
+  await roll.evaluate();
   await roll.toMessage({
     speaker: speakerForActor(context.actor),
     flavor: target.dataset.label ?? "Pivot Roll",
@@ -501,9 +505,25 @@ async function createItemAction(
   event.preventDefault();
   const type = target.dataset.type;
   if (!type) return;
-  await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
-    createEmbeddedItemData(type),
-  ]);
+  const [item] =
+    ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
+      createEmbeddedItemData(type),
+    ])) as ItemLike[] | undefined) ?? [];
+  item?.sheet?.render?.(true);
+}
+
+async function openItemAction(
+  this: { document?: ActorLike },
+  event: PointerEvent,
+  target: HTMLElement,
+): Promise<void> {
+  event.preventDefault();
+  const id = target.dataset.itemId;
+  if (!id) return;
+  const item = getActorItems(this.document ?? getSheetDocument(this)).find(
+    (item) => item.id === id,
+  );
+  item?.sheet?.render?.(true);
 }
 
 async function deleteItemAction(
@@ -632,7 +652,11 @@ function withDisabledAttr<T extends ItemLike>(
   items: T[],
   disabledAttr: "" | "disabled",
 ): Array<T & { disabledAttr: "" | "disabled" }> {
-  return items.map((item) => ({ ...item, disabledAttr }));
+  return items.map((item) => ({ ...item, id: itemDocumentId(item), disabledAttr }));
+}
+
+function itemDocumentId(item: ItemLike): string | undefined {
+  return item.id ?? item._id;
 }
 
 function abilityAt(source: RecordValue, path: string[], fallback: AbilityKey): AbilityKey {
@@ -698,6 +722,27 @@ function readPath(source: Record<string, unknown>, path: string[]): unknown {
   return current;
 }
 
+function readSubmitPath(source: Record<string, unknown>, path: string[]): unknown {
+  const flatPath = path.join(".");
+  if (Object.hasOwn(source, flatPath)) return source[flatPath];
+  return readPath(source, path);
+}
+
+function setSubmitPath(
+  source: Record<string, unknown>,
+  originalPath: string[],
+  targetPath: string[],
+  value: unknown,
+): void {
+  const flatOriginalPath = originalPath.join(".");
+  if (Object.hasOwn(source, flatOriginalPath)) {
+    source[targetPath.join(".")] = value;
+    return;
+  }
+
+  setPath(source, targetPath, value);
+}
+
 function setPath(source: Record<string, unknown>, path: string[], value: unknown): void {
   let current = source;
   for (const part of path.slice(0, -1)) {
@@ -709,6 +754,16 @@ function setPath(source: Record<string, unknown>, path: string[], value: unknown
   }
   const final = path[path.length - 1];
   if (final) current[final] = value;
+}
+
+function deleteSubmitPath(source: Record<string, unknown>, path: string[]): void {
+  const flatPath = path.join(".");
+  if (Object.hasOwn(source, flatPath)) {
+    Reflect.deleteProperty(source, flatPath);
+    return;
+  }
+
+  deletePath(source, path);
 }
 
 function deletePath(source: Record<string, unknown>, path: string[]): void {
