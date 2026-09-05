@@ -1017,7 +1017,7 @@ async function promptRollMode(): Promise<RollMode | null> {
       window: { title: localizeText("PIVOT.RollDialog.Title") },
       content: buildRollModeDialogContent(localizeText),
       ok: {
-        label: "PIVOT.RollDialog.Roll",
+        label: localizeText("PIVOT.RollDialog.Roll"),
         callback: (_event: unknown, button: { form?: HTMLFormElement }) => {
           const selected = button.form?.querySelector("input[name='mode']:checked");
           const value = selected && "value" in selected ? String(selected.value) : "normal";
@@ -1027,7 +1027,7 @@ async function promptRollMode(): Promise<RollMode | null> {
       buttons: [
         {
           action: "cancel",
-          label: "PIVOT.RollDialog.Cancel",
+          label: localizeText("PIVOT.RollDialog.Cancel"),
           callback: () => null,
         },
       ],
