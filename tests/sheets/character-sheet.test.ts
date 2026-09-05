@@ -107,6 +107,32 @@ describe("prepareCharacterSheetContext", () => {
       proficient: true,
     });
   });
+
+  it("keeps non-enumerable Foundry document ids available for item row actions", () => {
+    const weapon = {
+      name: "Hidden Id Axe",
+      type: "weapon",
+      system: {
+        category: "meleeLight",
+        attack: { ability: "str", bonus: 0 },
+        damage: { formula: "1d6", ability: "str", bonus: 0 },
+        range: { normal: 0, long: 0 },
+      },
+    };
+    Object.defineProperty(weapon, "id", {
+      enumerable: false,
+      value: "hidden-id-axe",
+    });
+
+    const context = prepareCharacterSheetContext({
+      name: "Foundry Shape",
+      type: "character",
+      system: {},
+      items: [weapon],
+    });
+
+    expect(context.items.weapons[0]?.id).toBe("hidden-id-axe");
+  });
 });
 
 describe("sheet interaction helpers", () => {
@@ -170,6 +196,18 @@ describe("sheet interaction helpers", () => {
           ],
         },
       },
+    });
+  });
+
+  it("normalizes flattened sheet helper fields into source array update paths", () => {
+    expect(
+      normalizeSheetSubmitData({
+        "system.identity.languagesText": "Common, Giant",
+        "system.proficiencies.instrumentsText": "Drums",
+      }),
+    ).toEqual({
+      "system.identity.languages": ["Common", "Giant"],
+      "system.proficiencies.instruments": ["Drums"],
     });
   });
 });

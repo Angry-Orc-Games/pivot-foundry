@@ -31,32 +31,50 @@
   </header>
 
   <nav
-    class="pivot-tabs"
+    class="tabs pivot-tabs"
     data-group="primary"
     aria-label="{{localize 'PIVOT.Sheets.Character.Navigation'}}"
   >
-    <a class="active" data-action="activateTab" data-group="primary" data-tab="core">{{localize
-        "PIVOT.Tabs.Core"
-      }}</a>
-    <a data-action="activateTab" data-group="primary" data-tab="skills">{{localize
-        "PIVOT.Tabs.Skills"
-      }}</a>
-    <a data-action="activateTab" data-group="primary" data-tab="combat">{{localize
-        "PIVOT.Tabs.Combat"
-      }}</a>
-    <a data-action="activateTab" data-group="primary" data-tab="equipment">{{localize
-        "PIVOT.Tabs.Equipment"
-      }}</a>
-    <a data-action="activateTab" data-group="primary" data-tab="magic">{{localize
-        "PIVOT.Tabs.Magic"
-      }}</a>
-    <a data-action="activateTab" data-group="primary" data-tab="features">{{localize
-        "PIVOT.Tabs.Features"
-      }}</a>
+    <a
+      class="{{tabs.core.cssClass}}"
+      data-action="tab"
+      data-group="primary"
+      data-tab="core"
+    >{{localize "PIVOT.Tabs.Core"}}</a>
+    <a
+      class="{{tabs.skills.cssClass}}"
+      data-action="tab"
+      data-group="primary"
+      data-tab="skills"
+    >{{localize "PIVOT.Tabs.Skills"}}</a>
+    <a
+      class="{{tabs.combat.cssClass}}"
+      data-action="tab"
+      data-group="primary"
+      data-tab="combat"
+    >{{localize "PIVOT.Tabs.Combat"}}</a>
+    <a
+      class="{{tabs.equipment.cssClass}}"
+      data-action="tab"
+      data-group="primary"
+      data-tab="equipment"
+    >{{localize "PIVOT.Tabs.Equipment"}}</a>
+    <a
+      class="{{tabs.magic.cssClass}}"
+      data-action="tab"
+      data-group="primary"
+      data-tab="magic"
+    >{{localize "PIVOT.Tabs.Magic"}}</a>
+    <a
+      class="{{tabs.features.cssClass}}"
+      data-action="tab"
+      data-group="primary"
+      data-tab="features"
+    >{{localize "PIVOT.Tabs.Features"}}</a>
   </nav>
 
   <main class="pivot-tab-body">
-    <section class="tab active" data-group="primary" data-tab="core">
+    <section class="tab {{tabs.core.cssClass}}" data-group="primary" data-tab="core">
       <div class="pivot-grid two">
         <section class="pivot-panel">
           <h2>{{localize "PIVOT.Sections.Identity"}}</h2>
@@ -176,9 +194,10 @@
             <label><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
                 name="system.attributes.hitDie"
                 {{disabledAttr}}
-              >{{#select system.attributes.hitDie}}{{#each config.hitDice}}<option
-                      value="{{this}}"
-                    >{{this}}</option>{{/each}}{{/select}}</select></label>
+              >{{selectOptions
+                  config.hitDiceChoices
+                  selected=system.attributes.hitDie
+                }}</select></label>
             <label><span>{{localize "PIVOT.Fields.HPMax"}}</span><input
                 name="system.attributes.hp.max"
                 type="number"
@@ -291,7 +310,7 @@
       </section>
     </section>
 
-    <section class="tab" data-group="primary" data-tab="skills">
+    <section class="tab {{tabs.skills.cssClass}}" data-group="primary" data-tab="skills">
       <div class="pivot-grid two">
         <section class="pivot-panel">
           <h2>{{localize "PIVOT.Sections.Skills"}}</h2>
@@ -470,7 +489,7 @@
       </div>
     </section>
 
-    <section class="tab" data-group="primary" data-tab="combat">
+    <section class="tab {{tabs.combat.cssClass}}" data-group="primary" data-tab="combat">
       <section class="pivot-panel">
         <div class="pivot-section-header">
           <h2>{{localize "PIVOT.Sections.Weapons"}}</h2>
@@ -483,13 +502,18 @@
             {{disabledAttr}}
           >+</button>
         </div>
-        <div class="pivot-table">
+        <div class="pivot-table pivot-weapon-table">
           <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Weapon"}}</span><span
             >BTH</span><span>BTD</span><span>{{localize "PIVOT.Fields.Damage"}}</span><span
             >{{localize "PIVOT.Fields.Range"}}</span><span></span></div>
           {{#each items.weapons}}
             <div class="pivot-table-row" data-item-id="{{id}}">
-              <span>{{name}}</span>
+              <button
+                type="button"
+                class="pivot-item-name"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button>
               <button
                 type="button"
                 data-action="roll"
@@ -534,17 +558,22 @@
         <p class="pivot-breakdown">{{derived.armourClass.armourWorn}}
           |
           {{derived.armourClass.breakdown}}</p>
-        <div class="pivot-table">
+        <div class="pivot-table pivot-armour-table">
           <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span
             >{{localize "PIVOT.Fields.Category"}}</span><span>{{localize
                 "PIVOT.Fields.Bonus"
               }}</span><span>{{localize "PIVOT.Fields.Equipped"}}</span><span></span></div>
           {{#each items.armour}}
             <div class="pivot-table-row" data-item-id="{{id}}">
-              <span>{{name}}</span><span>{{system.category}}</span><span
-              >{{system.acBonus}}</span><span>{{#if system.equipped}}{{localize
-                    "PIVOT.Common.Yes"
-                  }}{{else}}{{localize "PIVOT.Common.No"}}{{/if}}</span>
+              <button
+                type="button"
+                class="pivot-item-name"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button><span>{{system.category}}</span><span>{{system.acBonus}}</span><span
+              >{{#if system.equipped}}{{localize "PIVOT.Common.Yes"}}{{else}}{{localize
+                    "PIVOT.Common.No"
+                  }}{{/if}}</span>
               <button
                 type="button"
                 data-action="deleteItem"
@@ -559,7 +588,7 @@
       </section>
     </section>
 
-    <section class="tab" data-group="primary" data-tab="equipment">
+    <section class="tab {{tabs.equipment.cssClass}}" data-group="primary" data-tab="equipment">
       <section class="pivot-panel">
         <div class="pivot-section-header">
           <h2>{{localize "PIVOT.Sections.Equipment"}}</h2>
@@ -573,17 +602,22 @@
             {{disabledAttr}}
           >+</button>
         </div>
-        <div class="pivot-table">
+        <div class="pivot-table pivot-equipment-table">
           <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span
             >{{localize "PIVOT.Fields.Quantity"}}</span><span>{{localize
                 "PIVOT.Fields.Weight"
               }}</span><span>{{localize "PIVOT.Fields.Carried"}}</span><span></span></div>
           {{#each items.equipment}}
             <div class="pivot-table-row" data-item-id="{{id}}">
-              <span>{{name}}</span><span>{{system.quantity}}</span><span
-              >{{system.weight}}</span><span>{{#if system.carried}}{{localize
-                    "PIVOT.Common.Yes"
-                  }}{{else}}{{localize "PIVOT.Common.No"}}{{/if}}</span>
+              <button
+                type="button"
+                class="pivot-item-name"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button><span>{{system.quantity}}</span><span>{{system.weight}}</span><span
+              >{{#if system.carried}}{{localize "PIVOT.Common.Yes"}}{{else}}{{localize
+                    "PIVOT.Common.No"
+                  }}{{/if}}</span>
               <button
                 type="button"
                 data-action="deleteItem"
@@ -598,7 +632,7 @@
       </section>
     </section>
 
-    <section class="tab" data-group="primary" data-tab="magic">
+    <section class="tab {{tabs.magic.cssClass}}" data-group="primary" data-tab="magic">
       <div class="pivot-grid two">
         <section class="pivot-panel">
           <h2>{{localize "PIVOT.Sections.Magic"}}</h2>
@@ -612,9 +646,13 @@
           <label><span>{{localize "PIVOT.Fields.MagicAbility"}}</span><select
               name="system.magic.ability"
               {{disabledAttr}}
-            >{{#select system.magic.ability}}<option value=""></option>{{#each
-                  config.magicAbilities
-                }}<option value="{{key}}">{{label}}</option>{{/each}}{{/select}}</select></label>
+            >{{selectOptions
+                config.magicAbilities
+                selected=system.magic.ability
+                blank=""
+                valueAttr="key"
+                labelAttr="label"
+              }}</select></label>
           <label><span>{{localize "PIVOT.Fields.MPRemaining"}}</span><input
               name="system.magic.mp.value"
               type="number"
@@ -656,8 +694,13 @@
               title="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
               {{disabledAttr}}
             >+</button></div>
-          {{#each items.magicStreams}}<div class="pivot-list-item"><span>{{name}}</span><span
-              >{{localize "PIVOT.Fields.Echelon"}} {{system.echelon}}</span><button
+          {{#each items.magicStreams}}<div class="pivot-list-item"><button
+                type="button"
+                class="pivot-item-name"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button><span>{{localize "PIVOT.Fields.Echelon"}}
+                {{system.echelon}}</span><button
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
@@ -683,6 +726,13 @@
                 data-label="{{name}}"
               >{{name}}</button><span>{{system.mpCost}} MP</span><button
                 type="button"
+                data-action="openItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.EditItem'}}"
+                title="{{localize 'PIVOT.Actions.EditItem'}}"
+                {{disabledAttr}}
+              >...</button><button
+                type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
                 aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
@@ -701,7 +751,7 @@
       </section>
     </section>
 
-    <section class="tab" data-group="primary" data-tab="features">
+    <section class="tab {{tabs.features.cssClass}}" data-group="primary" data-tab="features">
       <div class="pivot-grid two">
         <section class="pivot-panel">
           <div class="pivot-section-header"><h2>{{localize "PIVOT.Sections.Features"}}</h2><button
@@ -712,8 +762,12 @@
               title="{{localize 'PIVOT.Actions.CreateFeature'}}"
               {{disabledAttr}}
             >+</button></div>
-          {{#each items.features}}<div class="pivot-list-item"><span>{{name}}</span><span
-              >{{system.category}}</span><button
+          {{#each items.features}}<div class="pivot-list-item"><button
+                type="button"
+                class="pivot-item-name"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button><span>{{system.category}}</span><button
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
