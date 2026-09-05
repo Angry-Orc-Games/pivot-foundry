@@ -36,23 +36,13 @@ Migration impact: none.
 ## 4. Pure rules API
 
 ```ts
-export function spendBoundedResource(
-  current: number,
-  amount: number,
-): number;
+export function spendBoundedResource(current: number, amount: number): number;
 
-export function recoverBoundedResource(
-  current: number,
-  max: number,
-  amount: number,
-): number;
+export function recoverBoundedResource(current: number, max: number, amount: number): number;
 
 export function poolRecoveryForLongRest(poolMax: number): number;
 
-export function recoverPoolOnLongRest(
-  current: number,
-  poolMax: number,
-): number;
+export function recoverPoolOnLongRest(current: number, poolMax: number): number;
 ```
 
 Rules:

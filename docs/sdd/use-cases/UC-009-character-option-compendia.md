@@ -27,6 +27,7 @@ GM sees the same content catalogs and may create/edit world copies according to 
 No new Actor arrays.
 
 Prefer existing Item types:
+
 - species/background/feat/flaw/body modification -> `feature` with existing category;
 - magic stream -> `magicStream`;
 - spells/magic abilities -> `magicAbility`;
@@ -74,6 +75,7 @@ Accessibility follows existing item controls; drag/drop must have an alternate c
 - no duplicated Actor array/source mutation.
 
 Manual Foundry v13:
+
 - packs load;
 - browse/open;
 - drag/drop representative Item;

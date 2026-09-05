@@ -32,8 +32,8 @@ GM/maintainer:
 Add to all six Item DataModels, or to their shared schema construction if one exists:
 
 ```ts
-effects: ArrayField<EffectRule> // default []
-schemaVersion: integer          // default current schema version
+effects: ArrayField<EffectRule>; // default []
+schemaVersion: integer; // default current schema version
 ```
 
 Add `schemaVersion` to Character DataModel as migration metadata.
@@ -66,9 +66,7 @@ export interface CharacterEffectInput {
   effects: readonly EffectRule[];
 }
 
-export function aggregateCharacterEffects(
-  effects: readonly EffectRule[],
-): CharacterEffectSummary;
+export function aggregateCharacterEffects(effects: readonly EffectRule[]): CharacterEffectSummary;
 
 export function validateEffectRule(value: unknown): EffectRule;
 ```

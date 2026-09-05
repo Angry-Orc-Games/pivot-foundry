@@ -44,10 +44,7 @@ export interface DeathSaveResolution {
   outcome: "continue" | "stabilized" | "dead" | string;
 }
 
-export function resolveDeathSave(
-  state: DeathSaveState,
-  naturalD20: number,
-): DeathSaveResolution;
+export function resolveDeathSave(state: DeathSaveState, naturalD20: number): DeathSaveResolution;
 ```
 
 The `outcome` union must be narrowed to verified canonical states before implementation.

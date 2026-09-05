@@ -13,21 +13,21 @@ Target state is reached incrementally: finish core roll/resource/combat primitiv
 
 ## Sequence
 
-| Slice | Use Case | Status | Dependency / reason |
-|---|---|---|---|
-| 1 | UC-001 Roll a d20 test with Pivot roll modes | **READY** | Next implementable increment; no schema change. |
-| 2 | UC-002 Spend and recover Pool | **READY** | Uses existing Pool source/max derivation. |
-| 3 | UC-003 Roll initiative into Foundry combat | **READY WITH PROPOSED UX DECISION** | Requires Foundry v13 smoke; no game-rule ambiguity. |
-| 4 | UC-004 Resolve attack natural results and exploding damage | **PARTIAL / NOT READY for exploding damage** | Natural 20/1 is ready; exploding algorithm must be verified. |
-| 5 | UC-005 Apply damage, healing, and temporary HP | **NOT READY** | Damage order/temporary-HP interaction requires rules confirmation. |
-| 6 | UC-006 Resolve death saves | **NOT READY** | Exact thresholds/consequences are an explicit open rule question. |
-| 7 | UC-007 Enforce combat state, cover, movement, and rests | **NOT READY** | Exact action/cover/movement/rest rules must be extracted. |
-| 8 | UC-008 Add migrations, effect schema, and content pipeline | **READY FOR DESIGN APPROVAL** | Infrastructure; intentionally precedes automated content effects. |
-| 9 | UC-009 Ship character-option compendia and effect application | **NOT READY** | Requires UC-008 and licensed content extraction/approval. |
-| 10 | UC-010 Automate character generation and advancement | **NOT READY** | Build-point and advancement algorithms must be verified. |
-| 11 | UC-011 Automate magic use | **NOT READY** | Stream/echelon gates, MGP, MP recovery, Control Magic details must be verified. |
-| 12 | UC-012 Enforce gear rules and ship inventory content | **NOT READY** | Strength/proficiency/rest/currency-weight rules must be verified. |
-| 13 | UC-013 Add GM/NPC tooling | **NOT READY** | Dedicated later scope; must not leak into character slices. |
+| Slice | Use Case                                                      | Status                                       | Dependency / reason                                                             |
+| ----- | ------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1     | UC-001 Roll a d20 test with Pivot roll modes                  | **READY**                                    | Next implementable increment; no schema change.                                 |
+| 2     | UC-002 Spend and recover Pool                                 | **READY**                                    | Uses existing Pool source/max derivation.                                       |
+| 3     | UC-003 Roll initiative into Foundry combat                    | **READY WITH PROPOSED UX DECISION**          | Requires Foundry v13 smoke; no game-rule ambiguity.                             |
+| 4     | UC-004 Resolve attack natural results and exploding damage    | **PARTIAL / NOT READY for exploding damage** | Natural 20/1 is ready; exploding algorithm must be verified.                    |
+| 5     | UC-005 Apply damage, healing, and temporary HP                | **NOT READY**                                | Damage order/temporary-HP interaction requires rules confirmation.              |
+| 6     | UC-006 Resolve death saves                                    | **NOT READY**                                | Exact thresholds/consequences are an explicit open rule question.               |
+| 7     | UC-007 Enforce combat state, cover, movement, and rests       | **NOT READY**                                | Exact action/cover/movement/rest rules must be extracted.                       |
+| 8     | UC-008 Add migrations, effect schema, and content pipeline    | **READY FOR DESIGN APPROVAL**                | Infrastructure; intentionally precedes automated content effects.               |
+| 9     | UC-009 Ship character-option compendia and effect application | **NOT READY**                                | Requires UC-008 and licensed content extraction/approval.                       |
+| 10    | UC-010 Automate character generation and advancement          | **NOT READY**                                | Build-point and advancement algorithms must be verified.                        |
+| 11    | UC-011 Automate magic use                                     | **NOT READY**                                | Stream/echelon gates, MGP, MP recovery, Control Magic details must be verified. |
+| 12    | UC-012 Enforce gear rules and ship inventory content          | **NOT READY**                                | Strength/proficiency/rest/currency-weight rules must be verified.               |
+| 13    | UC-013 Add GM/NPC tooling                                     | **NOT READY**                                | Dedicated later scope; must not leak into character slices.                     |
 
 The recommended delivery plan is to implement UC-001 and UC-002 first, then UC-003 after the proposed tracker UX is accepted. UC-004 may ship as a smaller natural-result sub-slice before exploding damage if desired.
 

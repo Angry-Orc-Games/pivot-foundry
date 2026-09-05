@@ -40,7 +40,11 @@ Migration impact: additive default only if DataModel default is sufficient. If l
 Boundary only; exact behavior blocked:
 
 ```ts
-export interface HpState { value: number; max: number; temp: number; }
+export interface HpState {
+  value: number;
+  max: number;
+  temp: number;
+}
 
 export function applyDamage(state: HpState, amount: number): HpState;
 export function applyHealing(state: HpState, amount: number): HpState;
