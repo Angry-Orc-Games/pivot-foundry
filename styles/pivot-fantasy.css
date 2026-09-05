@@ -1,3 +1,14 @@
+.pivot-roll-mode-dialog {
+  display: grid;
+  gap: 8px;
+}
+
+.pivot-roll-mode-dialog label {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
 .pivot-fantasy.sheet {
   --pivot-ink: #19202a;
   --pivot-blue: #073858;
@@ -214,7 +225,12 @@
   align-items: center;
   display: grid;
   gap: 6px;
+  grid-column: 1 / -1;
   grid-template-columns: 32px 1fr 32px;
+}
+
+.pivot-recover-pool {
+  grid-column: 1 / -1;
 }
 
 .pivot-resource-actions button,

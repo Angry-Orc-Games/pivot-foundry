@@ -1,6 +1,6 @@
 # UC-003 — Roll Initiative into Foundry Combat
 
-**Status:** READY WITH PROPOSED UX DECISION  
+**Status:** IMPLEMENTED  
 **Primary Actor:** Player  
 **Goal:** Use the existing derived initiative roll and place its total on the Character's existing Foundry combatant.  
 **Linked Requirements:** FR-004, NFR-002, NFR-003, NFR-004, C-003  

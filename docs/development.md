@@ -37,6 +37,9 @@ Current Foundry integration modules:
 - `src/data/item-data.ts` owns the `weapon`, `armour`, `equipment`, `feature`, `magicStream`, and `magicAbility` schemas.
 - `src/sheets/character-sheet.ts` owns the native character sheet class and the testable sheet context used by templates and roll/resource actions.
 - `src/sheets/item-sheet.ts` owns the native Item sheet class.
+- `src/rules/d20-roll.ts` owns dice-pool resolution, roll-mode mapping, kept-die selection, and attack natural 20/1 classification.
+- `src/rules/resources.ts` owns bounded resource spend/recovery and long-rest Pool recovery amounts.
+- `src/rules/combat.ts` owns unique-combatant selection for initiative tracker updates.
 
 Keep sheet context preparation and deterministic calculations testable outside Foundry. Do not move Foundry globals into rules modules.
 

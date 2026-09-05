@@ -8,7 +8,7 @@ Pivot Foundry is currently a small Foundry VTT v13 system scaffold. The architec
 - `src/pivot.ts` is the Foundry runtime entry point. It registers Actor/Item data models, token resource paths, and native sheets during the Foundry `init` hook.
 - `src/data/` contains TypeDataModel schema factories for `Actor.character` and Pivot Item types.
 - `src/sheets/` contains the character and item sheet classes plus testable sheet-context helpers.
-- `src/rules/` contains deterministic rules code that does not depend on Foundry globals.
+- `src/rules/` contains deterministic rules code that does not depend on Foundry globals, including d20 roll modes, Pool resource transactions, and combatant selection for initiative.
 - `templates/` and `styles/` contain the native Foundry sheet UI.
 - `tests/` contains Vitest coverage for the manifest and rules modules.
 - `scripts/` contains release preparation and Foundry package validation.

@@ -1,6 +1,6 @@
 # UC-004 — Resolve Attack Natural Results and Exploding Damage
 
-**Status:** PARTIAL — attack natural result READY; exploding damage NOT READY  
+**Status:** PARTIAL — attack natural result IMPLEMENTED with UC-001; exploding damage NOT READY  
 **Primary Actor:** Player  
 **Goal:** Complete Pivot attack-result presentation and, once verified, damage explosion behavior.  
 **Linked Requirements:** FR-002, FR-005, NFR-001, NFR-002, NFR-003, NFR-005  

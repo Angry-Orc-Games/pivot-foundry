@@ -1,6 +1,6 @@
 # UC-002 — Spend and Recover Pool
 
-**Status:** READY  
+**Status:** IMPLEMENTED  
 **Primary Actor:** Player  
 **Goal:** Change current Pool through bounded spend/recovery operations and apply the confirmed long-rest Pool recovery amount without changing derived Pool max.  
 **Linked Requirements:** FR-003, NFR-001, NFR-002, NFR-004, C-003  
