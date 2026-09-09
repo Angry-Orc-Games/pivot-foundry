@@ -1,4 +1,5 @@
 import {
+  arrayField,
   booleanField,
   type DataField,
   type FoundryRuntime,
@@ -7,6 +8,7 @@ import {
   stringField,
   type TypeDataModelConstructor,
 } from "../foundry-runtime";
+import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 
 type TypeDataModelWithSchema = TypeDataModelConstructor & {
   defineSchema(): Record<string, DataField>;
@@ -22,7 +24,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
 
   class PivotWeaponData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
-      return {
+      return withItemInfrastructure(fields, {
         category: stringField(fields, { required: true, initial: "meleeLight" }),
         attack: schemaField(fields, {
           ability: stringField(fields, { required: true, initial: "str" }),
@@ -42,13 +44,13 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         carried: booleanField(fields, { required: true, initial: true }),
         notes: stringField(fields, { required: true, initial: "" }),
-      };
+      });
     }
   }
 
   class PivotArmourData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
-      return {
+      return withItemInfrastructure(fields, {
         category: stringField(fields, { required: true, initial: "light" }),
         acBonus: numberField(fields, { required: true, integer: true, initial: 1 }),
         equipped: booleanField(fields, { required: true, initial: false }),
@@ -56,25 +58,25 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         carried: booleanField(fields, { required: true, initial: true }),
         notes: stringField(fields, { required: true, initial: "" }),
-      };
+      });
     }
   }
 
   class PivotEquipmentData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
-      return {
+      return withItemInfrastructure(fields, {
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         weight: numberField(fields, { required: true, min: 0, initial: 0 }),
         carried: booleanField(fields, { required: true, initial: true }),
         equipped: booleanField(fields, { required: true, initial: false }),
         notes: stringField(fields, { required: true, initial: "" }),
-      };
+      });
     }
   }
 
   class PivotFeatureData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
-      return {
+      return withItemInfrastructure(fields, {
         category: stringField(fields, { required: true, initial: "feat" }),
         source: stringField(fields, { required: true, initial: "" }),
         cost: schemaField(fields, {
@@ -86,30 +88,30 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
           max: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
         }),
         notes: stringField(fields, { required: true, initial: "" }),
-      };
+      });
     }
   }
 
   class PivotMagicStreamData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
-      return {
+      return withItemInfrastructure(fields, {
         ability: stringField(fields, { required: true, initial: "int" }),
         echelon: numberField(fields, { required: true, integer: true, min: 1, max: 5, initial: 1 }),
         notes: stringField(fields, { required: true, initial: "" }),
-      };
+      });
     }
   }
 
   class PivotMagicAbilityData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
-      return {
+      return withItemInfrastructure(fields, {
         stream: stringField(fields, { required: true, initial: "" }),
         echelon: numberField(fields, { required: true, integer: true, min: 1, max: 5, initial: 1 }),
         mpCost: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         roll: stringField(fields, { required: true, initial: "" }),
         damage: stringField(fields, { required: true, initial: "" }),
         notes: stringField(fields, { required: true, initial: "" }),
-      };
+      });
     }
   }
 
@@ -121,4 +123,35 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     magicStream: PivotMagicStreamData,
     magicAbility: PivotMagicAbilityData,
   };
+}
+
+function withItemInfrastructure(
+  fields: FoundryRuntime["data"]["fields"],
+  schema: Record<string, DataField>,
+): Record<string, DataField> {
+  return {
+    schemaVersion: numberField(fields, {
+      required: true,
+      integer: true,
+      min: 0,
+      initial: CURRENT_SCHEMA_VERSION,
+    }),
+    effects: arrayField(fields, effectRuleField(fields)),
+    ...schema,
+  };
+}
+
+function effectRuleField(fields: FoundryRuntime["data"]["fields"]): DataField {
+  return schemaField(fields, {
+    type: stringField(fields, { required: true, initial: "acBonus" }),
+    ability: stringField(fields, { required: true, nullable: true, initial: null }),
+    skill: stringField(fields, { required: true, nullable: true, initial: null }),
+    category: stringField(fields, { required: true, nullable: true, initial: null }),
+    amount: numberField(fields, {
+      required: true,
+      nullable: true,
+      integer: true,
+      initial: null,
+    }),
+  });
 }

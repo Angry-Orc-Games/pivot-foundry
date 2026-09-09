@@ -1,6 +1,6 @@
 # UC-008 — Add Migration, Effect, and Content Infrastructure
 
-**Status:** READY FOR DESIGN APPROVAL  
+**Status:** IMPLEMENTED  
 **Primary Actor:** GM / System Maintainer  
 **Goal:** Establish the smallest safe foundation for future compendium content and automatic item effects without mutating Character source totals.  
 **Linked Requirements:** FR-009, FR-010, FR-015, NFR-001, NFR-002, NFR-005, C-004, C-006, C-009  
@@ -178,11 +178,13 @@ Open design decision: approve JSON-as-canonical + generated packs. If rejected, 
 
 ## SDD Readiness
 
-**Status: READY FOR DESIGN APPROVAL**
+**Status: IMPLEMENTED**
+
+JSON-as-canonical content plus generated pack-source JSON is the approved approach. EffectRule v1 is the closed operation list in `src/rules/effects.ts`. `system.json` `packs` remains empty until a real Foundry v13 pack database is generated.
 
 ### Unresolved Decisions
 
-Approve canonical JSON/generated-pack approach and the exact v1 effect operation list.
+None for this infrastructure slice. Published catalog contents remain UC-009.
 
 ### Traceability
 

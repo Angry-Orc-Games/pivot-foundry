@@ -88,6 +88,7 @@ describe("PivotCharacterData", () => {
     const CharacterData = createPivotCharacterDataModel(foundry);
     const schema = CharacterData.defineSchema();
 
+    expect(schema).toHaveProperty("schemaVersion");
     expect(schema).toHaveProperty("identity");
     expect(schema).toHaveProperty("progression");
     expect(schema).toHaveProperty("abilities");
@@ -106,6 +107,7 @@ describe("Pivot item data models", () => {
     const { foundry } = createMockFoundry();
     const models = createPivotItemDataModels(foundry);
     const equipmentSchema = models.equipment.defineSchema() as Record<string, FieldRecord>;
+    const featureSchema = models.feature.defineSchema() as Record<string, FieldRecord>;
 
     expect(Object.keys(models).sort()).toEqual([
       "armour",
@@ -116,16 +118,20 @@ describe("Pivot item data models", () => {
       "weapon",
     ]);
     expect(models.weapon.defineSchema()).toHaveProperty("damage");
+    expect(models.weapon.defineSchema()).toHaveProperty("schemaVersion");
+    expect(models.weapon.defineSchema()).toHaveProperty("effects");
     expect(models.armour.defineSchema()).toHaveProperty("equipped");
     expect(equipmentSchema).toHaveProperty("quantity");
     expect(equipmentSchema.quantity?.options).toMatchObject({ integer: true });
+    expect(featureSchema).toHaveProperty("effects");
+    expect(featureSchema.effects?.kind).toBe("array");
   });
 });
 
 describe("registerPivotFantasySystem", () => {
   it("registers data models, token resources, and v13 document sheets during init", () => {
     const { foundry, registeredSheets } = createMockFoundry();
-    const callbacks: Array<() => void> = [];
+    const hooks = new Map<string, () => void>();
     const CONFIG = {
       Actor: { dataModels: {}, trackableAttributes: {} },
       Item: { dataModels: {} },
@@ -134,15 +140,16 @@ describe("registerPivotFantasySystem", () => {
     registerPivotFantasySystem({
       Hooks: {
         once(event, callback) {
-          expect(event).toBe("init");
-          callbacks.push(callback);
+          hooks.set(event, callback);
         },
       },
       CONFIG,
       foundry,
     });
 
-    callbacks[0]?.();
+    expect(hooks.has("init")).toBe(true);
+    expect(hooks.has("ready")).toBe(true);
+    hooks.get("init")?.();
 
     expect(CONFIG.Actor.dataModels).toHaveProperty("character");
     expect(CONFIG.Item.dataModels).toHaveProperty("weapon");

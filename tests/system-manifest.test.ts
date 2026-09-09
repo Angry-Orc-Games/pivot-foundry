@@ -48,4 +48,15 @@ describe("english localization", () => {
       "PIVOT.RollMode.SuperAdvantage": "Super-Advantage",
     });
   });
+
+  it("defines effect and migration keys used by UC-008", () => {
+    expect(en).toMatchObject({
+      "PIVOT.Effects.None": "This item has no automatic effects.",
+      "PIVOT.Effects.SkillBonus": "Skill bonus",
+      "PIVOT.Migration.Complete":
+        "Pivot Fantasy migration {id} finished ({updated} updated, {failed} failed).",
+      "PIVOT.Migration.DocumentFailed": "Pivot Fantasy migration {id} failed for {name}: {error}",
+      "PIVOT.Sections.Effects": "Effects",
+    });
+  });
 });

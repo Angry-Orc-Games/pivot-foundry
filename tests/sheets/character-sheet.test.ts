@@ -122,6 +122,48 @@ describe("prepareCharacterSheetContext", () => {
     });
   });
 
+  it("applies embedded item effects to derived values and reverts when the item is removed", () => {
+    const actor = sampleActor();
+    const withFeature = {
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "feature-1",
+          name: "Example Keen Senses",
+          type: "feature",
+          system: {
+            effects: [{ type: "skillBonus", skill: "perception", amount: 2 }],
+          },
+        },
+        {
+          id: "feature-2",
+          name: "Bow Training",
+          type: "feature",
+          system: {
+            effects: [
+              { type: "weaponProficiency", category: "bows" },
+              { type: "abilityScoreBonus", ability: "dex", amount: 2 },
+            ],
+          },
+        },
+      ],
+    };
+
+    const boosted = prepareCharacterSheetContext(withFeature);
+    const baseline = prepareCharacterSheetContext(actor);
+
+    expect(baseline.abilityRows.find((row) => row.key === "dex")?.score).toBe(14);
+    expect(boosted.abilityRows.find((row) => row.key === "dex")?.score).toBe(14);
+    expect(baseline.abilityRows.find((row) => row.key === "dex")?.mod).toBe(2);
+    expect(boosted.abilityRows.find((row) => row.key === "dex")?.mod).toBe(3);
+    expect(baseline.skillRows.find((row) => row.id === "perception")?.total).toBe(4);
+    expect(boosted.skillRows.find((row) => row.id === "perception")?.total).toBe(6);
+    expect(boosted.derived.proficiencies.weapons.bows).toBe(true);
+    expect(baseline.derived.initiative).toBe(4);
+    expect(boosted.derived.initiative).toBe(5);
+  });
+
   it("keeps non-enumerable Foundry document ids available for item row actions", () => {
     const weapon = {
       name: "Hidden Id Axe",

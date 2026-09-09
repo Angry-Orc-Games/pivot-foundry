@@ -37,6 +37,33 @@ describe("calculateCharacterDerived", () => {
     expect(derived.passivePerception).toBe(16);
     expect(derived.pool.max).toBe(7);
     expect(derived.magic.mp.max).toBe(0);
+    expect(derived.speed).toBe(0);
+  });
+
+  it("combines manual bonuses with effect contributions", () => {
+    const derived = calculateCharacterDerived(
+      {
+        level: 5,
+        abilities: {
+          str: { score: 10, primary: false },
+          dex: { score: 10, primary: false },
+          con: { score: 10, primary: false },
+          int: { score: 10, primary: false },
+          wis: { score: 10, primary: false },
+          cha: { score: 10, primary: false },
+        },
+        skills: {},
+        magic: { awakened: false, ability: null },
+        equipment: [],
+        poolBonus: 2,
+        speed: { value: 10, bonus: 0 },
+      },
+      { poolMaxBonus: 3, speedBonus: 2, acBonus: 1 },
+    );
+
+    expect(derived.pool.max).toBe(10);
+    expect(derived.speed).toBe(12);
+    expect(derived.armourClass.value).toBe(11);
   });
 });
 
