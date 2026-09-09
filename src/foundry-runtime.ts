@@ -39,7 +39,7 @@ export interface FoundryRuntime {
 }
 
 export interface FoundryHooks {
-  once(event: "init", callback: () => void): void;
+  once(event: "init" | "ready", callback: () => void): void;
 }
 
 export interface FoundryConfig {

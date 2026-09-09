@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "a168c2f4e8f2dd29",
+    "name": "Example Keen Senses",
+    "type": "feature",
+    "img": "icons/svg/eye.svg",
+    "system": {
+      "schemaVersion": 1,
+      "effects": [
+        {
+          "type": "skillBonus",
+          "skill": "perception",
+          "amount": 2
+        }
+      ],
+      "notes": "Example content fixture for the UC-008 pipeline. Not published Pivot catalog content.",
+      "category": "feat",
+      "source": "UC-008 fixture"
+    },
+    "flags": {
+      "pivot-fantasy": {
+        "contentId": "example-keen-senses"
+      }
+    }
+  }
+]

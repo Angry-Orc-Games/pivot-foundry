@@ -11,13 +11,13 @@ import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtim
 import { selectInitiativeCombatant } from "../rules/combat";
 import {
   type AbilityKey,
-  calculateArmourClass,
   calculateAttackSummary,
   calculateCharacterDerived,
-  calculateTotalWeight,
   type PassivePerceptionMode,
   type SkillSourceMap,
+  type WeaponProficiencyMap,
 } from "../rules/character-derived";
+import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
 import {
   applyAttackCrit,
   d20PoolFormula,
@@ -269,30 +269,48 @@ export function prepareCharacterSheetContext(
     }),
   ) as SkillSourceMap;
 
-  const derived = calculateCharacterDerived({
-    level: numberAt(system, ["progression", "level"], 1),
-    abilities: abilitySources,
-    skills: skillSources,
-    magic: {
-      awakened: booleanAt(system, ["magic", "awakened"], false),
-      ability: nullableAbilityAt(system, ["magic", "ability"]),
+  const effectSummary = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
+  const derived = calculateCharacterDerived(
+    {
+      level: numberAt(system, ["progression", "level"], 1),
+      abilities: abilitySources,
+      skills: skillSources,
+      magic: {
+        awakened: booleanAt(system, ["magic", "awakened"], false),
+        ability: nullableAbilityAt(system, ["magic", "ability"]),
+      },
+      equipment: equipment.map((item) => ({
+        weight: numberAt(item.system, ["weight"], 0),
+        quantity: numberAt(item.system, ["quantity"], 1),
+        carried: booleanAt(item.system, ["carried"], true),
+      })),
+      armour: armour.map((item) => ({
+        name: item.name,
+        category: armourCategoryAt(item.system, ["category"]),
+        acBonus: numberAt(item.system, ["acBonus"], 0),
+        equipped: booleanAt(item.system, ["equipped"], false),
+      })),
+      manualArmourBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
+      initiativeBonus: numberAt(system, ["attributes", "initiative", "bonus"], 0),
+      passivePerceptionMode: passiveModeAt(system, ["attributes", "passivePerception", "mode"]),
+      poolBonus: numberAt(system, ["resources", "pool", "maxBonus"], 0),
+      mpBonus: numberAt(system, ["magic", "mp", "maxBonus"], 0),
+      speed: {
+        value: numberAt(system, ["attributes", "speed", "value"], 10),
+        bonus: numberAt(system, ["attributes", "speed", "bonus"], 0),
+      },
+      proficiencies: {
+        armour: {
+          light: booleanAt(system, ["proficiencies", "armour", "light"], false),
+          medium: booleanAt(system, ["proficiencies", "armour", "medium"], false),
+          heavy: booleanAt(system, ["proficiencies", "armour", "heavy"], false),
+        },
+        shields: booleanAt(system, ["proficiencies", "shields"], false),
+        weapons: objectAt(system, ["proficiencies", "weapons"]) as WeaponProficiencyMap,
+      },
     },
-    equipment: equipment.map((item) => ({
-      weight: numberAt(item.system, ["weight"], 0),
-      quantity: numberAt(item.system, ["quantity"], 1),
-      carried: booleanAt(item.system, ["carried"], true),
-    })),
-    armour: armour.map((item) => ({
-      name: item.name,
-      category: armourCategoryAt(item.system, ["category"]),
-      acBonus: numberAt(item.system, ["acBonus"], 0),
-      equipped: booleanAt(item.system, ["equipped"], false),
-    })),
-    manualArmourBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
-    initiativeBonus: numberAt(system, ["attributes", "initiative", "bonus"], 0),
-    passivePerceptionMode: passiveModeAt(system, ["attributes", "passivePerception", "mode"]),
-    poolBonus: numberAt(system, ["resources", "pool", "maxBonus"], 0),
-  });
+    effectSummary,
+  );
 
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
@@ -319,26 +337,7 @@ export function prepareCharacterSheetContext(
       armourCategories,
       featureCategories,
     },
-    derived: {
-      ...derived,
-      armourClass: calculateArmourClass({
-        dexterityModifier: derived.abilities.dex.mod,
-        armour: armour.map((item) => ({
-          name: item.name,
-          category: armourCategoryAt(item.system, ["category"]),
-          acBonus: numberAt(item.system, ["acBonus"], 0),
-          equipped: booleanAt(item.system, ["equipped"], false),
-        })),
-        manualBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
-      }),
-      totalWeight: calculateTotalWeight(
-        equipment.map((item) => ({
-          weight: numberAt(item.system, ["weight"], 0),
-          quantity: numberAt(item.system, ["quantity"], 1),
-          carried: booleanAt(item.system, ["carried"], true),
-        })),
-      ),
-    },
+    derived,
     abilityRows: abilities.map(({ key, label, short }) => ({
       key,
       label,
@@ -385,10 +384,7 @@ export function prepareCharacterSheetContext(
         summary: calculateAttackSummary({
           proficiencyBonus: derived.proficiencyBonus,
           abilityModifiers: abilityMods,
-          weaponProficiencies: objectAt(system, ["proficiencies", "weapons"]) as Record<
-            string,
-            boolean
-          >,
+          weaponProficiencies: derived.proficiencies.weapons,
           weapon: {
             category: stringAt(item.system, ["category"], "meleeLight"),
             attackAbility: abilityAt(item.system, ["attack", "ability"], "str"),

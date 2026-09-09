@@ -1,7 +1,32 @@
 import { armourCategories, featureCategories, SYSTEM_ID, weaponCategories } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
+import { describeEffectRule, parseStoredEffect, type EffectRule } from "../rules/effects";
 
 const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
+
+export interface ItemSheetEffectRow {
+  type: EffectRule["type"];
+  typeLabelKey: string;
+  detail: string;
+}
+
+export interface ItemSheetContext {
+  item: { name: string; type: string; system: Record<string, unknown> };
+  system: Record<string, unknown>;
+  disabledAttr: "" | "disabled";
+  isWeapon: boolean;
+  isArmour: boolean;
+  isEquipment: boolean;
+  isFeature: boolean;
+  isMagicStream: boolean;
+  isMagicAbility: boolean;
+  effects: ItemSheetEffectRow[];
+  config: {
+    weaponCategories: typeof weaponCategories;
+    armourCategories: typeof armourCategories;
+    featureCategories: typeof featureCategories;
+  };
+}
 
 export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataModelConstructor {
   const BaseSheet = foundry.applications.api.HandlebarsApplicationMixin(
@@ -34,25 +59,54 @@ export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataMode
       const document = getSheetDocument(this);
       return {
         ...parentContext,
-        item: document,
-        system: document.system ?? {},
-        disabledAttr: parentContext.editable === false ? "disabled" : "",
-        isWeapon: document.type === "weapon",
-        isArmour: document.type === "armour",
-        isEquipment: document.type === "equipment",
-        isFeature: document.type === "feature",
-        isMagicStream: document.type === "magicStream",
-        isMagicAbility: document.type === "magicAbility",
-        config: {
-          weaponCategories,
-          armourCategories,
-          featureCategories,
-        },
+        ...prepareItemSheetContext(document, parentContext.editable !== false),
       };
     }
   }
 
   return PivotItemSheet;
+}
+
+export function prepareItemSheetContext(
+  document: { name: string; type: string; system: Record<string, unknown> },
+  editable = true,
+): ItemSheetContext {
+  const disabledAttr = editable ? "" : "disabled";
+  return {
+    item: document,
+    system: document.system ?? {},
+    disabledAttr,
+    isWeapon: document.type === "weapon",
+    isArmour: document.type === "armour",
+    isEquipment: document.type === "equipment",
+    isFeature: document.type === "feature",
+    isMagicStream: document.type === "magicStream",
+    isMagicAbility: document.type === "magicAbility",
+    effects: readOnlyEffectRows(document.system),
+    config: {
+      weaponCategories,
+      armourCategories,
+      featureCategories,
+    },
+  };
+}
+
+function readOnlyEffectRows(system: Record<string, unknown>): ItemSheetEffectRow[] {
+  const raw = system.effects;
+  if (!Array.isArray(raw)) return [];
+
+  const rows: ItemSheetEffectRow[] = [];
+  for (const entry of raw) {
+    const parsed = parseStoredEffect(entry);
+    if (!parsed) continue;
+    const described = describeEffectRule(parsed);
+    rows.push({
+      type: parsed.type,
+      typeLabelKey: described.typeLabelKey,
+      detail: described.detail,
+    });
+  }
+  return rows;
 }
 
 async function submitDocumentForm(

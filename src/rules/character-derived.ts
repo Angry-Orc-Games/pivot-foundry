@@ -65,6 +65,29 @@ export interface CharacterDerivedInput {
   initiativeBonus?: number;
   passivePerceptionMode?: PassivePerceptionMode;
   poolBonus?: number;
+  mpBonus?: number;
+  speed?: {
+    value: number;
+    bonus: number;
+  };
+  proficiencies?: {
+    armour?: { light?: boolean; medium?: boolean; heavy?: boolean };
+    shields?: boolean;
+    weapons?: WeaponProficiencyMap;
+  };
+}
+
+export interface DerivedEffectBonuses {
+  abilityScoreBonuses?: Partial<Record<AbilityKey, number>>;
+  skillBonuses?: Partial<Record<string, number>>;
+  armourProficiencies?: { light?: boolean; medium?: boolean; heavy?: boolean };
+  shieldProficiency?: boolean;
+  weaponProficiencies?: WeaponProficiencyMap;
+  acBonus?: number;
+  initiativeBonus?: number;
+  speedBonus?: number;
+  poolMaxBonus?: number;
+  mpMaxBonus?: number;
 }
 
 export interface AbilityDerived extends AbilitySource {
@@ -108,15 +131,33 @@ export interface CharacterDerived {
   };
   armourClass: ArmourClassDerived;
   initiative: number;
+  speed: number;
   totalWeight: number;
+  proficiencies: {
+    armour: { light: boolean; medium: boolean; heavy: boolean };
+    shields: boolean;
+    weapons: WeaponProficiencyMap;
+  };
 }
 
-export function calculateCharacterDerived(input: CharacterDerivedInput): CharacterDerived {
+export function calculateCharacterDerived(
+  input: CharacterDerivedInput,
+  effects: DerivedEffectBonuses = {},
+): CharacterDerived {
   const proficiencyBonus = proficiencyBonusForLevel(input.level);
+  const effectiveScores = abilityKeys.reduce<Record<AbilityKey, number>>(
+    (scores, key) => {
+      const source = input.abilities[key];
+      const bonus = effects.abilityScoreBonuses?.[key] ?? 0;
+      scores[key] = clampAbilityScore(source.score + bonus);
+      return scores;
+    },
+    {} as Record<AbilityKey, number>,
+  );
   const abilities = abilityKeys.reduce<Record<AbilityKey, AbilityDerived>>(
     (derived, key) => {
       const source = input.abilities[key];
-      derived[key] = { ...source, mod: abilityModifier(source.score) };
+      derived[key] = { ...source, mod: abilityModifier(effectiveScores[key]) };
       return derived;
     },
     {} as Record<AbilityKey, AbilityDerived>,
@@ -142,7 +183,7 @@ export function calculateCharacterDerived(input: CharacterDerivedInput): Charact
           proficient: skill.proficient,
           deepening: skill.deepening,
           expertise: skill.expertise,
-          bonus: skill.bonus,
+          bonus: (skill.bonus ?? 0) + (effects.skillBonuses?.[id] ?? 0),
           excludesDeepening: id === "controlMagic",
         }),
       },
@@ -150,7 +191,17 @@ export function calculateCharacterDerived(input: CharacterDerivedInput): Charact
   );
 
   const perceptionTotal = skills.perception?.total ?? abilities.wis.mod;
-  const magicAbility = input.magic.ability ? abilities[input.magic.ability] : null;
+  const magicAbilityKey = input.magic.ability;
+  const magicAbilityScore = magicAbilityKey ? effectiveScores[magicAbilityKey] : 0;
+  const proficiencies = {
+    armour: {
+      light: Boolean(input.proficiencies?.armour?.light || effects.armourProficiencies?.light),
+      medium: Boolean(input.proficiencies?.armour?.medium || effects.armourProficiencies?.medium),
+      heavy: Boolean(input.proficiencies?.armour?.heavy || effects.armourProficiencies?.heavy),
+    },
+    shields: Boolean(input.proficiencies?.shields || effects.shieldProficiency),
+    weapons: mergeWeaponProficiencies(input.proficiencies?.weapons, effects.weaponProficiencies),
+  };
 
   return {
     abilities,
@@ -162,24 +213,35 @@ export function calculateCharacterDerived(input: CharacterDerivedInput): Charact
       mode: input.passivePerceptionMode,
     }),
     pool: {
-      max: Math.max(1, input.level + (input.poolBonus ?? 0)),
+      max: Math.max(1, input.level + (input.poolBonus ?? 0) + (effects.poolMaxBonus ?? 0)),
     },
     magic: {
       mp: {
-        max: calculateManaMaximum({
-          awakened: input.magic.awakened,
-          level: input.level,
-          abilityScore: magicAbility?.score ?? 0,
-        }),
+        max: Math.max(
+          0,
+          calculateManaMaximum({
+            awakened: input.magic.awakened,
+            level: input.level,
+            abilityScore: magicAbilityScore,
+          }) +
+            (input.mpBonus ?? 0) +
+            (effects.mpMaxBonus ?? 0),
+        ),
       },
     },
     armourClass: calculateArmourClass({
       dexterityModifier: abilities.dex.mod,
       armour: input.armour ?? [],
       manualBonus: input.manualArmourBonus ?? 0,
+      effectBonus: effects.acBonus ?? 0,
     }),
-    initiative: abilities.dex.mod + (input.initiativeBonus ?? 0),
+    initiative: abilities.dex.mod + (input.initiativeBonus ?? 0) + (effects.initiativeBonus ?? 0),
+    speed: Math.max(
+      0,
+      (input.speed?.value ?? 0) + (input.speed?.bonus ?? 0) + (effects.speedBonus ?? 0),
+    ),
     totalWeight: calculateTotalWeight(input.equipment),
+    proficiencies,
   };
 }
 
@@ -235,10 +297,12 @@ export function calculateArmourClass({
   dexterityModifier,
   armour,
   manualBonus = 0,
+  effectBonus = 0,
 }: {
   dexterityModifier: number;
   armour: ArmourSource[];
   manualBonus?: number;
+  effectBonus?: number;
 }): ArmourClassDerived {
   const equipped = armour.filter((item) => item.equipped);
   const wornArmour = equipped.find((item) => ["light", "medium", "heavy"].includes(item.category));
@@ -254,6 +318,11 @@ export function calculateArmourClass({
   if (manualBonus !== 0) {
     value += manualBonus;
     breakdown.push(formatSigned("Manual", manualBonus));
+  }
+
+  if (effectBonus !== 0) {
+    value += effectBonus;
+    breakdown.push(formatSigned("Effects", effectBonus));
   }
 
   return {
@@ -292,6 +361,21 @@ export function calculateAttackSummary({
     range: weapon.range,
     proficient,
   };
+}
+
+function mergeWeaponProficiencies(
+  source: WeaponProficiencyMap | undefined,
+  granted: WeaponProficiencyMap | undefined,
+): WeaponProficiencyMap {
+  const merged: WeaponProficiencyMap = { ...source };
+  for (const [category, value] of Object.entries(granted ?? {})) {
+    if (value) merged[category] = true;
+  }
+  return merged;
+}
+
+function clampAbilityScore(score: number): number {
+  return Math.min(30, Math.max(1, score));
 }
 
 function dexterityModifierForArmour(

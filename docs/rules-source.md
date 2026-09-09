@@ -50,11 +50,13 @@ Prefer implementing rules in this order unless a user-facing slice says otherwis
 - `src/rules/d20-roll.ts`: d20 advantage/disadvantage resolution, roll-mode mapping, kept-die selection, and natural 20/1 attack result handling.
 - `src/rules/resources.ts`: bounded Pool spend/recovery and long-rest Pool recovery.
 - `src/rules/combat.ts`: unique combatant selection for initiative tracker updates.
+- `src/rules/effects.ts`: whitelisted Item effect rules and derived contribution aggregation.
+- `src/rules/content.ts`: canonical JSON content validation and pack-document generation.
 - Character sheet roll buttons prompt for Pivot roll modes and post kept-die chat results.
-- `src/pivot.ts`: Foundry character Actor and Item data model registration.
+- `src/pivot.ts`: Foundry character Actor and Item data model registration, plus M001 world migrations on `ready`.
 
 ## Review Notes
 
-- The DOCX is table-heavy. Before implementing content-backed options, decide whether to store rules content as TypeScript constants, JSON fixtures, Foundry compendium packs, or a generated data pipeline.
+- Canonical content is version-controlled JSON under `src/content/`, validated by `src/rules/content.ts`, and generated into `packs/src/` document JSON. `system.json` does not declare Foundry LevelDB packs until a later slice produces them.
 - For user-entered formulas, imports, HTML descriptions, file paths, URLs, or compendium conversion tooling, include a security review before merging.
 - For all Foundry-facing behavior, report repository verification separately from manual Foundry v13 acceptance.

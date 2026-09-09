@@ -16,7 +16,7 @@ The goal is to keep the Foundry runtime thin while game rules, dice logic, and c
 
 ## Current Status
 
-This is an early playable sheet implementation. It supports native Actor and embedded Item editing for the current character-sheet workflow, while several content-driven automations remain manual until Pivot content packs and effect schemas exist.
+This is an early playable sheet implementation. It supports native Actor and embedded Item editing for the current character-sheet workflow. Item effect rules can contribute to derived values, and a JSON content pipeline exists, but published Pivot catalog packs are not shipped yet.
 
 Implemented:
 
@@ -32,6 +32,9 @@ Implemented:
 - Weapon attack chat that reports automatic hit on a kept natural 20 and automatic miss on a kept natural 1
 - Bounded Pool spend/recovery against derived Pool max, plus Recover Pool (Long Rest)
 - Initiative rolls that update a unique existing Foundry combatant in the active combat
+- Named document migration M001 (`schemaVersion` 0/missing → 1) on the Foundry v13 `ready` hook
+- Whitelisted Item `effects` that contribute to derived character totals without rewriting source scores
+- JSON content source under `src/content/` with generated pack document JSON under `packs/src/`
 - Vite build output to `dist/pivot.mjs`
 - Vitest coverage for manifest validation and initial rules modules
 - Initial deterministic d20 roll and modifier helpers under `src/rules/`
@@ -41,10 +44,10 @@ Implemented:
 Not implemented yet:
 
 - Full content packs for species, backgrounds, feats, flaws, equipment, spells, or magic streams
-- Full content-driven automation for species/background/feat/flaw effects
+- Full published-content automation for species/background/feat/flaw catalogs
 - Automatic combat or combatant creation for initiative
 - Complete exploding damage automation
-- Foundry data migrations
+- Foundry LevelDB/NeDB compendium packs declared in `system.json`
 
 ## Requirements
 
@@ -116,10 +119,13 @@ See [docs/foundry-docker-dev.md](docs/foundry-docker-dev.md) for the full workfl
 |-- src/pivot.ts             Foundry runtime entry point
 |-- src/data/                Foundry TypeDataModel schema factories
 |-- src/rules/               Pure TypeScript rules helpers
+|-- src/migrations/          Named document migrations
+|-- src/content/             Canonical JSON content source
 |-- src/sheets/              Actor and Item sheet classes/context helpers
 |-- templates/               Handlebars sheet templates
 |-- styles/                  Pivot Fantasy sheet stylesheet
 |-- lang/en.json             English localization file
+|-- packs/src/               Generated Foundry document JSON (not LevelDB packs)
 |-- dist/                    Built Foundry runtime output
 |-- vite.config.ts           Build configuration
 |-- vitest.config.ts         Test configuration
@@ -131,7 +137,8 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 
 ## Scripts
 
-- `npm run build`: builds `src/pivot.ts` into `dist/pivot.mjs`
+- `npm run build`: builds `src/pivot.ts` into `dist/pivot.mjs` and regenerates content pack source JSON
+- `npm run build:content`: validates `src/content/` and writes `packs/src/items.json`
 - `npm run dev`: runs Vite in watch mode
 - `npm run lint`: runs ESLint with zero warnings allowed
 - `npm run format`: formats supported project files with Prettier
