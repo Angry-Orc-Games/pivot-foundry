@@ -1,6 +1,7 @@
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotItemDataModels } from "./data/item-data";
 import type { PivotRegistrationRuntime } from "./foundry-runtime";
+import { runWorldMigrations, type WorldMigrationGame } from "./migrations/world-migrations";
 import { SYSTEM_ID } from "./config";
 import { createPivotCharacterSheetClass } from "./sheets/character-sheet";
 import { createPivotItemSheetClass } from "./sheets/item-sheet";
@@ -49,6 +50,29 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
     );
 
     console.log("Pivot Fantasy | Initialized character sheet system");
+  });
+
+  runtime.Hooks.once("ready", () => {
+    const globals = globalThis as typeof globalThis & {
+      game?: WorldMigrationGame;
+      ui?: {
+        notifications?: {
+          info?: (text: string) => void;
+          warn?: (text: string) => void;
+          error?: (text: string) => void;
+        };
+      };
+    };
+
+    void runWorldMigrations({
+      game: globals.game,
+      notify: (level, message) => {
+        globals.ui?.notifications?.[level]?.(message);
+      },
+      log: (message, ...details) => {
+        console.warn(message, ...details);
+      },
+    });
   });
 }
 

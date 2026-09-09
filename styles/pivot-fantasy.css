@@ -474,6 +474,27 @@
   min-width: 0;
 }
 
+.pivot-effects-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.pivot-effects-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pivot-effect-type {
+  font-weight: 700;
+}
+
+.pivot-effects-empty {
+  margin: 0;
+}
+
 @media (max-width: 820px) {
   .pivot-character-sheet,
   .pivot-item-sheet {

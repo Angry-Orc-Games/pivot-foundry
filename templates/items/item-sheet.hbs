@@ -247,6 +247,22 @@
     </section>
   {{/if}}
 
+  <section class="pivot-panel">
+    <h2>{{localize "PIVOT.Sections.Effects"}}</h2>
+    {{#if effects.length}}
+      <ul class="pivot-effects-list">
+        {{#each effects}}
+          <li>
+            <span class="pivot-effect-type">{{localize typeLabelKey}}</span>
+            <span class="pivot-effect-detail">{{detail}}</span>
+          </li>
+        {{/each}}
+      </ul>
+    {{else}}
+      <p class="pivot-effects-empty">{{localize "PIVOT.Effects.None"}}</p>
+    {{/if}}
+  </section>
+
   <label class="pivot-wide-field">
     <span>{{localize "PIVOT.Fields.Notes"}}</span>
     <textarea name="system.notes" rows="8" {{disabledAttr}}>{{system.notes}}</textarea>
