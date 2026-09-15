@@ -61,3 +61,18 @@ it("blocks overlapping applications before asynchronous update returns", async (
   await first;
   expect(a.update).toHaveBeenCalledTimes(1);
 });
+it("blocks concurrent different operations on the same actor", async () => {
+  const a = actor("Actor.lock");
+  let release: () => void = () => {};
+  a.update = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const tx = new HealthTransactions();
+  const first = tx.apply("one", [a], "damage", 1);
+  expect((await tx.apply("two", [a], "damage", 1))[0]?.outcome).toBe("duplicate");
+  release();
+  await first;
+});

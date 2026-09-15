@@ -53,6 +53,7 @@ export function uniqueHealthTargets(actors: HealthActor[]): HealthActor[] {
   });
 }
 /** A write rejection can mean the server committed; never retry this operation/target automatically. */
+export const busyHealthActors = new Set<string>();
 export class HealthTransactions {
   private attempted = new Set<string>();
   async apply(
@@ -72,7 +73,7 @@ export class HealthTransactions {
     }> = [];
     for (const actor of uniqueHealthTargets(actors)) {
       const key = JSON.stringify([operation, actor.uuid]);
-      if (this.attempted.has(key)) {
+      if (this.attempted.has(key) || busyHealthActors.has(actor.uuid ?? "")) {
         results.push({ actor, outcome: "duplicate" });
         continue;
       }
@@ -89,11 +90,14 @@ export class HealthTransactions {
           results.push({ actor, outcome: "denied" });
           continue;
         }
+        busyHealthActors.add(actor.uuid ?? "");
         this.attempted.add(key);
         await actor.update(update);
         results.push({ actor, outcome: "updated" });
       } catch {
         results.push({ actor, outcome: "failed" });
+      } finally {
+        busyHealthActors.delete(actor.uuid ?? "");
       }
     }
     return results;

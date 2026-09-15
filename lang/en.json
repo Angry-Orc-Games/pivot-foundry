@@ -185,5 +185,15 @@
   "PIVOT.Survival.updated": "Updated",
   "PIVOT.Survival.denied": "Permission denied",
   "PIVOT.Survival.duplicate": "Already attempted in this client \u2014 inspect state before another action",
-  "PIVOT.Survival.failed": "Failed or uncertain \u2014 inspect state before another action"
+  "PIVOT.Survival.failed": "Failed or uncertain \u2014 inspect state before another action",
+  "PIVOT.Survival.DeathSave": "Roll Death Save",
+  "PIVOT.Survival.DeathFailed": "Death save unavailable or update uncertain. Check HP and survival state before rolling again.",
+  "PIVOT.Survival.StateChanged": "Character state changed while rolling. No death save was applied.",
+  "PIVOT.Survival.Correction": "GM Survival Correction / Stabilize",
+  "PIVOT.Survival.CorrectionHelp": "Confirm legacy state, stabilize at zero HP, or correct an error. Choose Conscious only with positive HP. Stabilization and restored HP reset counters.",
+  "PIVOT.Survival.Successes": "Successes",
+  "PIVOT.Survival.Failures": "Failures",
+  "PIVOT.Survival.Status": "Survival State",
+  "PIVOT.Survival.ClearTemp": "Clear Temporary HP (Manual Long Rest)",
+  "PIVOT.Survival.ClearTempHelp": "Clear temporary HP after manually resolving a long rest. This does not restore HP or perform a full rest."
 }

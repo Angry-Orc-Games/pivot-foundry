@@ -44,7 +44,7 @@ export function applyHealth(
   const s = { ...source };
   if (kind === "temp") {
     if (s.temp > 0 && !tempChoice) throw new RangeError("Choose Keep Existing or Replace");
-    if (tempChoice !== "keep") s.temp = amount;
+    if (tempChoice !== "keep" || s.temp === 0) s.temp = amount;
     return s;
   }
   if (kind === "healing") {
@@ -62,7 +62,6 @@ export function applyHealth(
   s.temp = Math.max(0, s.temp - amount);
   if (s.hp === 0) {
     s.status = "dying";
-    s.successes = 0;
     s.failures = Math.min(3, s.failures + (critical ? 2 : 1));
     if (s.failures === 3 || (s.max > 0 && damage >= s.max)) s.status = "dead";
     return s;
@@ -79,6 +78,7 @@ export function applyHealth(
 export function resolveDeathSave(source: SurvivalState, natural: number): SurvivalState {
   validateSurvival(source);
   if (
+    source.max < 1 ||
     source.hp !== 0 ||
     source.status !== "dying" ||
     !Number.isInteger(natural) ||

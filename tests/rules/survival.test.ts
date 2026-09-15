@@ -64,3 +64,11 @@ describe("HP and survival", () => {
       expect(() => resolveDeathSave(state({ status }), 10)).toThrow();
   });
 });
+it("preserves accumulated successes on damage while dying", () => {
+  expect(applyHealth(state({ hp: 0, status: "dying", successes: 2 }), "damage", 1).successes).toBe(
+    2,
+  );
+});
+it("grants first temporary HP even with keep selected", () => {
+  expect(applyHealth(state({ temp: 0 }), "temp", 5, false, "keep").temp).toBe(5);
+});

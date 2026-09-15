@@ -25,10 +25,12 @@ export function readDamagePayload(message: MessageLike): DamagePayload | null {
 function targets(): HealthActor[] {
   const globals = globalThis as unknown as {
     canvas?: { tokens?: { controlled?: Array<{ actor?: HealthActor }> } };
+    game?: { user?: { targets?: Iterable<{ actor?: HealthActor }> } };
   };
-  return (globals.canvas?.tokens?.controlled ?? []).flatMap((token) =>
-    token.actor ? [token.actor] : [],
-  );
+  return [
+    ...(globals.canvas?.tokens?.controlled ?? []),
+    ...Array.from(globals.game?.user?.targets ?? []),
+  ].flatMap((token) => (token.actor ? [token.actor] : []));
 }
 async function resolveActor(uuid: string): Promise<HealthActor | null> {
   const globals = globalThis as unknown as {

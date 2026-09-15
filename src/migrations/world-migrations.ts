@@ -1,3 +1,4 @@
+import { planSurvivalMigration } from "./m002";
 import {
   planActorMigration,
   planItemMigration,
@@ -20,6 +21,13 @@ export interface WorldMigrationGame {
   user?: { isGM?: boolean };
   actors?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
+  scenes?:
+    | Iterable<{ tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }> }>
+    | {
+        contents: Iterable<{
+          tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }>;
+        }>;
+      };
   i18n?: { localize?: (key: string) => string };
 }
 
@@ -56,10 +64,20 @@ export async function runWorldMigrations(
     failed += result.failed;
   }
 
-  for (const actor of listDocuments(game.actors)) {
+  const sceneList = game.scenes
+    ? "contents" in game.scenes
+      ? Array.from(game.scenes.contents)
+      : Array.from(game.scenes)
+    : [];
+  const syntheticActors = sceneList.flatMap((scene) =>
+    Array.from(scene.tokens ?? []).flatMap((token) =>
+      token.actorLink === false && token.actor ? [token.actor] : [],
+    ),
+  );
+  for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
     const actorResult = await persistMigration(
       actor,
-      planActorMigration(readStoredSystem(actor)),
+      planAllActorMigrations(readStoredSystem(actor), actor.type),
       dependencies,
     );
     updated += actorResult.updated;
@@ -80,7 +98,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: SCHEMA_MIGRATION_ID,
+        id: `${SCHEMA_MIGRATION_ID} / M002`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -124,7 +142,8 @@ async function persistMigration(
   if (!plan.changed) return { updated: 0, failed: 0 };
 
   try {
-    await document.update?.(plan.update);
+    if (!document.update) throw new Error("Document cannot be updated");
+    await document.update(plan.update);
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -169,4 +188,17 @@ function formatMessage(
     (text, [token, value]) => text.replaceAll(`{${token}}`, value),
     template,
   );
+}
+
+export function planAllActorMigrations(source: unknown, type?: string): MigrationPlan {
+  const first = planActorMigration(source);
+  if (!first.ok || (type && type !== "character")) return first;
+  const second = planSurvivalMigration(source);
+  if (!second.ok) return second;
+  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: { ...(first.changed ? first.update : {}), ...(second.changed ? second.update : {}) },
+  };
 }
