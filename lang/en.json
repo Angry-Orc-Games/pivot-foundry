@@ -147,5 +147,21 @@
   "PIVOT.Tabs.Equipment": "Equipment",
   "PIVOT.Tabs.Features": "Features",
   "PIVOT.Tabs.Magic": "Magic",
-  "PIVOT.Tabs.Skills": "Skills"
+  "PIVOT.Tabs.Skills": "Skills",
+  "PIVOT.Survival.RollTitle": "Damage / Healing Roll",
+  "PIVOT.Survival.Formula": "Formula",
+  "PIVOT.Survival.Kind": "Kind",
+  "PIVOT.Survival.Damage": "Damage",
+  "PIVOT.Survival.Healing": "Healing",
+  "PIVOT.Survival.Critical": "Critical Damage (double initial dice)",
+  "PIVOT.Survival.Enhanced": "Enhanced Exploding (also explode on 1)",
+  "PIVOT.Survival.Confirm": "Confirm",
+  "PIVOT.Survival.Cancel": "Cancel",
+  "PIVOT.Survival.Roll": "Roll",
+  "PIVOT.Survival.OrdinaryTitle": "Unsupported Pivot Formula",
+  "PIVOT.Survival.OrdinaryWarning": "This formula is unsupported for Pivot exploding rolls. An ordinary Foundry roll preserves it without Pivot explosions or automatic application.",
+  "PIVOT.Survival.OrdinaryRoll": "Roll Ordinary Formula",
+  "PIVOT.Survival.Incomplete": "Incomplete \u2014 cannot apply",
+  "PIVOT.Survival.Apply": "Preview Application",
+  "PIVOT.Survival.RollFailed": "Roll failed. No HP was changed."
 }

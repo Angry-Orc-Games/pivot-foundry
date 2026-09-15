@@ -1,3 +1,4 @@
+import { damageRollDialog } from "../runtime/damage-roll";
 import {
   abilities,
   armourCategories,
@@ -46,6 +47,7 @@ export interface ItemLike {
 }
 
 export interface ActorLike {
+  uuid?: string;
   id?: string;
   _id?: string;
   name: string;
@@ -182,6 +184,9 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
+        survivalRoll: async function (this: { document: ActorLike }) {
+          await damageRollDialog(this.document);
+        },
         adjustResource: adjustResourceAction,
         recoverPoolLongRest: recoverPoolLongRestAction,
         createItem: createItemAction,
@@ -708,6 +713,10 @@ async function rollAction(
   if (!RollConstructor) return;
 
   if (request.kind === "formula") {
+    if (request.rollKind === "weaponDamage") {
+      await damageRollDialog(actor, request.formula);
+      return;
+    }
     const roll = new RollConstructor(request.formula);
     await roll.evaluate();
     await roll.toMessage({
