@@ -21,15 +21,17 @@ Named additive migrations preserve HP/counters/items, flag ambiguous legacy zero
 
 ## Acceptance Gates
 
-- [ ] UC-004 through UC-006 rules updated before code
-- [ ] Exploding damage and healing tests and UI
-- [ ] HP transactions, permissions and partial failures
-- [ ] Death saves and survival transitions
-- [ ] Named migrations and reload persistence
-- [ ] npm run verify and npm run package:system
-- [ ] Independent spec and code/security reviews
-- [ ] CI on branch/PR passes
-- [ ] Foundry v13 GM/player demonstration, fresh and upgrade worlds
-- [ ] Documentation accurately records manual scope and evidence
+- [x] UC-004 through UC-006 rules updated before code
+- [x] Exploding damage and healing tests and UI
+- [x] HP transactions, permissions and partial failures
+- [x] Death saves and survival transitions
+- [x] Named migrations and reload persistence
+- [x] npm run verify and npm run package:system
+- [x] Independent spec and code/security reviews
+- [x] CI on branch/PR passes
+- [x] Foundry v13 GM/player demonstration, fresh and upgrade worlds
+- [x] Documentation accurately records manual scope and evidence
 
 Milestone is complete only with both automated checks and Foundry acceptance. Track limitations honestly. Do not mark roadmap step 1 complete.
+
+Completed development acceptance is recorded in [Milestone 2 acceptance](milestone-2-acceptance.md). Final branch CI is tracked on PR #21.
