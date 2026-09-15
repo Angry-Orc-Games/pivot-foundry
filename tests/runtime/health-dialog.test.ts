@@ -63,3 +63,20 @@ it("never reads or displays unowned target stats", () => {
   expect(row).toContain("disabled");
   expect(row).not.toContain("HP");
 });
+it("snapshots primitive flags so in-place edits invalidate a pending preview", () => {
+  const payload = {
+    version: 1,
+    complete: true,
+    amount: 4,
+    kind: "damage",
+    critical: false,
+    actorUuid: "Actor.a",
+  };
+  const message = { flags: { "pivot-fantasy": { survivalRoll: payload } } };
+  const snapshot = readDamagePayload(message);
+  if (!snapshot) throw Error("Expected valid payload");
+  vi.stubGlobal("game", { messages: { get: () => message } });
+  payload.amount = 99;
+  expect(snapshot.amount).toBe(4);
+  expect(messagePayloadUnchanged("m", snapshot)).toBe(false);
+});

@@ -20,7 +20,14 @@ export function readDamagePayload(message: MessageLike): DamagePayload | null {
     typeof p.actorUuid !== "string"
   )
     return null;
-  return p as DamagePayload;
+  return {
+    version: 1,
+    complete: true,
+    amount: p.amount,
+    kind: p.kind,
+    critical: p.critical,
+    actorUuid: p.actorUuid,
+  };
 }
 function targets(): HealthActor[] {
   const globals = globalThis as unknown as {
