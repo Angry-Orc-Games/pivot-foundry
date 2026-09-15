@@ -8,6 +8,7 @@ import {
 } from "../rules/survival";
 export interface HealthActor {
   uuid?: string;
+  token?: { name?: string };
   name: string;
   type: string;
   isOwner?: boolean;
@@ -105,3 +106,8 @@ export class HealthTransactions {
   }
 }
 export const healthTransactions = new HealthTransactions();
+
+export function healthTargetLabel(actor: HealthActor): string {
+  const tokenName = actor.token?.name;
+  return tokenName && tokenName !== actor.name ? `${tokenName} (${actor.name})` : actor.name;
+}

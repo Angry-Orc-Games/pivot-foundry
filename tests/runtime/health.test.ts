@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import {
   HealthTransactions,
+  healthTargetLabel,
   uniqueHealthTargets,
   type HealthActor,
 } from "../../src/runtime/health";
@@ -94,4 +95,16 @@ it("revalidates the message immediately before each target write", async () => {
   );
   expect(results.map((r) => r.outcome)).toEqual(["updated", "denied"]);
   expect(b.update).not.toHaveBeenCalled();
+});
+
+it("labels synthetic tokens distinctly while preserving actor-only names", () => {
+  const base = { ...actor("Actor.a"), name: "Hero" };
+  expect(healthTargetLabel(base)).toBe("Hero");
+  expect(healthTargetLabel({ ...base, token: { name: "Hero" } })).toBe("Hero");
+  expect(healthTargetLabel({ ...base, token: { name: "Hero Unlinked Zero" } })).toBe(
+    "Hero Unlinked Zero (Hero)",
+  );
+  expect(healthTargetLabel({ ...base, token: { name: "Hero Unlinked Healthy" } })).toBe(
+    "Hero Unlinked Healthy (Hero)",
+  );
 });

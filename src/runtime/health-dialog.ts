@@ -1,6 +1,12 @@
 import { SYSTEM_ID } from "../config";
 import type { DamagePayload } from "./damage-roll";
-import { healthTransactions, readSurvival, uniqueHealthTargets, type HealthActor } from "./health";
+import {
+  healthTargetLabel,
+  healthTransactions,
+  readSurvival,
+  uniqueHealthTargets,
+  type HealthActor,
+} from "./health";
 import { validAmount } from "../rules/survival";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 interface MessageLike {
@@ -131,7 +137,8 @@ export async function previewHealth(
   );
   const content = results
     .map(
-      ({ actor, outcome }) => `<p>${escapeHtml(actor.name)}: ${escapeHtml(localize(outcome))}</p>`,
+      ({ actor, outcome }) =>
+        `<p>${escapeHtml(healthTargetLabel(actor))}: ${escapeHtml(localize(outcome))}</p>`,
     )
     .join("");
   if (!results.length) return;
@@ -176,7 +183,7 @@ export function messagePayloadUnchanged(id: string, expected: DamagePayload): bo
 }
 
 export function targetPreviewRow(actor: HealthActor, index: number, checked: boolean): string {
-  const name = escapeHtml(actor.name);
+  const name = escapeHtml(healthTargetLabel(actor));
   if (actor.isOwner !== true)
     return `<label><input type="checkbox" disabled>${name} — ${escapeHtml(localize("denied"))}</label>`;
   const state = readSurvival(actor);
