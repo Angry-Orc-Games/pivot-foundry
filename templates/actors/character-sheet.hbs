@@ -255,6 +255,10 @@
           <button type="button" data-action="survivalRoll" {{disabledAttr}}>{{localize
               "PIVOT.Survival.RollTitle"
             }}</button>
+          <button type="button" data-action="tempHp" {{disabledAttr}}>{{localize
+              "PIVOT.Survival.Temp"
+            }}</button>
+          <p>{{localize "PIVOT.Survival.Temp"}}: {{system.attributes.hp.temp}}</p>
           <fieldset class="pivot-death-saves">
             <legend>{{localize "PIVOT.Fields.DeathSaves"}}</legend>
             <label><span>{{localize "PIVOT.Fields.Successes"}}</span><input

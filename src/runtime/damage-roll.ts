@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
-import { escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
+import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 
 export interface DamagePayload {
   version: 1;
@@ -11,7 +11,7 @@ export interface DamagePayload {
   actorUuid: string;
 }
 export async function damageRollDialog(
-  actor: { name: string; uuid?: string },
+  actor: { name: string; uuid?: string; getRollData?: () => Record<string, unknown> },
   formula = "1d6",
 ): Promise<void> {
   const input = await prompt(
@@ -40,7 +40,7 @@ export async function damageRollDialog(
         "OrdinaryRoll",
       );
       if (!fallback) return;
-      const ordinary = new Roll(input.formula);
+      const ordinary = new Roll(input.formula, actor.getRollData?.() ?? {});
       await ordinary.evaluate();
       await ordinary.toMessage({
         speaker: { alias: actor.name },
@@ -74,7 +74,7 @@ export async function damageRollDialog(
             actorUuid: actor.uuid ?? "",
           }
         : null;
-    await runtime().ChatMessage?.create({
+    await createChat({
       speaker: { alias: actor.name },
       content,
       flags: { [SYSTEM_ID]: { survivalRoll: payload } },

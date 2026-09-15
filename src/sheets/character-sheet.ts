@@ -1,3 +1,4 @@
+import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import {
   abilities,
@@ -47,6 +48,7 @@ export interface ItemLike {
 }
 
 export interface ActorLike {
+  isOwner?: boolean;
   uuid?: string;
   id?: string;
   _id?: string;
@@ -186,6 +188,9 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
         roll: rollAction,
         survivalRoll: async function (this: { document: ActorLike }) {
           await damageRollDialog(this.document);
+        },
+        tempHp: async function (this: { document: ActorLike }) {
+          await tempHpDialog(this.document);
         },
         adjustResource: adjustResourceAction,
         recoverPoolLongRest: recoverPoolLongRestAction,

@@ -1,3 +1,4 @@
+import { installHealthChatHook } from "./runtime/health-dialog";
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotItemDataModels } from "./data/item-data";
 import type { PivotRegistrationRuntime } from "./foundry-runtime";
@@ -9,6 +10,7 @@ import { createPivotItemSheetClass } from "./sheets/item-sheet";
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
+  installHealthChatHook(runtime.Hooks);
   runtime.Hooks.once("init", () => {
     runtime.CONFIG.Actor.dataModels.character = createPivotCharacterDataModel(runtime.foundry);
 

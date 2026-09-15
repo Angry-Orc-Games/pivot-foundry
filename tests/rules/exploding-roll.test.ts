@@ -39,3 +39,7 @@ describe("exploding damage and healing", () => {
     expect(result.chains[0]?.results).toEqual([6, 6]);
   });
 });
+it("rejects unsafe modifier tokens and intermediate sums", () => {
+  expect(() => parseExplodingFormula("1d6+9007199254740993-9007199254740992")).toThrow();
+  expect(() => parseExplodingFormula("1d6+9007199254740991+1-1")).toThrow();
+});

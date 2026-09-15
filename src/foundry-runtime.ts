@@ -39,6 +39,13 @@ export interface FoundryRuntime {
 }
 
 export interface FoundryHooks {
+  on?(
+    event: string,
+    callback: (
+      message: { id?: string; flags?: Record<string, unknown> },
+      html: HTMLElement,
+    ) => void,
+  ): void;
   once(event: "init" | "ready", callback: () => void): void;
 }
 

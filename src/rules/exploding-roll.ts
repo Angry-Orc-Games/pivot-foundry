@@ -43,7 +43,12 @@ export function parseExplodingFormula(formula: string): ExplodingFormula | null 
       )
         throw new RangeError("Invalid dice");
       dice.push({ count, faces });
-    } else modifier += Number(token);
+    } else {
+      const value = Number(token);
+      if (!Number.isSafeInteger(value) || !Number.isSafeInteger(modifier + value))
+        throw new RangeError("Invalid modifier");
+      modifier += value;
+    }
   }
   if (!Number.isSafeInteger(modifier) || dice.reduce((sum, die) => sum + die.count, 0) > 1000)
     throw new RangeError("Invalid formula size");
