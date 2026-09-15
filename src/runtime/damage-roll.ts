@@ -1,3 +1,4 @@
+import { rollProgress } from "./roll-progress";
 import { SYSTEM_ID } from "../config";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
@@ -48,16 +49,17 @@ export async function damageRollDialog(
       });
       return;
     }
+    const progress = rollProgress();
     const result = await rollExploding(
       input.formula,
       { critical: input.kind === "damage" && input.critical, enhanced: input.enhanced },
       async (faces) => {
         const die = new Roll(`1d${faces}`);
-        await die.evaluate();
+        await progress.wait(die.evaluate());
         if (die.total === undefined) throw new Error("Incomplete");
         return die.total;
       },
-    );
+    ).finally(() => progress.close());
     const content = `<section class="pivot-survival-roll"><h3>${escapeHtml(actor.name)} — ${localize(input.kind === "damage" ? "Damage" : "Healing")}</h3>
       <p>${escapeHtml(input.formula)} ${input.critical && input.kind === "damage" ? localize("Critical") : ""} ${input.enhanced ? localize("Enhanced") : ""}</p>
       <p>${result.chains.map((chain) => `d${chain.faces}: [${chain.results.join(" → ")}]`).join("; ")} ${result.modifier >= 0 ? "+" : ""}${result.modifier}</p>

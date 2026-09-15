@@ -1,3 +1,5 @@
+import { guardHpMaximum } from "./runtime/actor-guards";
+import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotItemDataModels } from "./data/item-data";
@@ -11,6 +13,8 @@ type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
+  runtime.Hooks.on?.("preCreateActor", initializeSurvival);
+  runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
   runtime.Hooks.once("init", () => {
     runtime.CONFIG.Actor.dataModels.character = createPivotCharacterDataModel(runtime.foundry);
 

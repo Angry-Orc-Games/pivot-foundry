@@ -144,3 +144,32 @@ it("does not claim a missing update method persisted migrations", async () => {
     (await runWorldMigrations({ game: { actors: [{ type: "character", system: {} }] } })).failed,
   ).toBe(1);
 });
+it("plans synthetic state before writes and persists it after base changes", async () => {
+  let baseVersion = 0;
+  const order: string[] = [];
+  const base: MigratableDocument = {
+    type: "character",
+    toObject: () => ({ system: { schemaVersion: 1, survivalVersion: baseVersion } }),
+    update: async () => {
+      order.push("base");
+      baseVersion = 1;
+    },
+  };
+  const token: MigratableDocument = {
+    type: "character",
+    toObject: () => ({
+      system: { schemaVersion: 1, survivalVersion: baseVersion, attributes: { hp: { value: 0 } } },
+    }),
+    update: async () => {
+      order.push("token");
+    },
+  };
+  await runWorldMigrations({
+    game: {
+      user: { isGM: true },
+      actors: [base],
+      scenes: [{ tokens: [{ actorLink: false, actor: token }] }],
+    },
+  });
+  expect(order).toEqual(["base", "token"]);
+});

@@ -39,7 +39,10 @@ async function resolveActor(uuid: string): Promise<HealthActor | null> {
   return uuid ? ((await globals.fromUuid?.(uuid)) ?? null) : null;
 }
 export function installHealthChatHook(hooks: {
-  on?: (name: string, callback: (message: MessageLike, html: HTMLElement) => void) => unknown;
+  on?: (
+    name: "renderChatMessageHTML",
+    callback: (message: MessageLike, html: HTMLElement) => void,
+  ) => unknown;
 }): void {
   hooks.on?.("renderChatMessageHTML", (message, html) => {
     const button = html.querySelector<HTMLButtonElement>("[data-pivot-apply]");
@@ -58,7 +61,9 @@ async function applyMessage(message: MessageLike): Promise<void> {
   if (!payload || !message.id) return;
   try {
     const self = await resolveActor(payload.actorUuid);
-    await previewHealth(message.id, payload.kind, payload.amount, payload.critical, self);
+    await previewHealth(message.id, payload.kind, payload.amount, payload.critical, self, () =>
+      messagePayloadUnchanged(message.id ?? "", payload),
+    );
   } catch {
     warn("ApplyFailed");
   }
@@ -69,6 +74,7 @@ export async function previewHealth(
   amount: number,
   critical: boolean,
   self: HealthActor | null,
+  revalidate: () => boolean = () => true,
 ): Promise<void> {
   const actors = uniqueHealthTargets([...(self ? [self] : []), ...targets()]);
   if (!actors.length) {
@@ -81,12 +87,7 @@ export async function previewHealth(
     `<p>${localize("ManualReductions")}</p>
  <label>${localize("Amount")} <input name="amount" type="number" min="0" step="1" value="${amount}" ${gm ? "" : "readonly"}></label>
  <p>${localize(kind === "damage" ? "Damage" : kind === "healing" ? "Healing" : "Temp")}</p>
- ${actors
-   .map((actor, index) => {
-     const state = readSurvival(actor);
-     return `<label><input type="checkbox" name="target" value="${index}" ${actor === self ? "checked" : ""} ${actor.isOwner === true ? "" : "disabled"}>${escapeHtml(actor.name)} — HP ${state.hp}/${state.max}, ${localize("Temp")} ${state.temp} (${escapeHtml(localize(state.status))}) ${actor.isOwner === true ? "" : localize("denied")}</label>`;
-   })
-   .join("")}
+ ${actors.map((actor, index) => targetPreviewRow(actor, index, actor === self)).join("")}
  ${kind === "temp" ? `<label>${localize("TempChoice")} <select name="tempChoice"><option value="keep">${localize("Keep")}</option><option value="replace">${localize("Replace")}</option></select></label>` : ""}`,
     (form) => ({
       amount: Number(field(form, "amount")),
@@ -119,6 +120,7 @@ export async function previewHealth(
     preview.amount,
     critical,
     preview.tempChoice,
+    revalidate,
   );
   const content = results
     .map(
@@ -147,4 +149,29 @@ export async function tempHpDialog(actor: HealthActor): Promise<void> {
     return;
   }
   await previewHealth(crypto.randomUUID(), "temp", amount, false, actor);
+}
+
+export function messagePayloadUnchanged(id: string, expected: DamagePayload): boolean {
+  const globals = globalThis as unknown as {
+    game?: { messages?: { get(id: string): MessageLike | undefined } };
+  };
+  const message = globals.game?.messages?.get(id);
+  const current = message ? readDamagePayload(message) : null;
+  return (
+    current !== null &&
+    current.version === expected.version &&
+    current.complete === expected.complete &&
+    current.amount === expected.amount &&
+    current.kind === expected.kind &&
+    current.critical === expected.critical &&
+    current.actorUuid === expected.actorUuid
+  );
+}
+
+export function targetPreviewRow(actor: HealthActor, index: number, checked: boolean): string {
+  const name = escapeHtml(actor.name);
+  if (actor.isOwner !== true)
+    return `<label><input type="checkbox" disabled>${name} — ${escapeHtml(localize("denied"))}</label>`;
+  const state = readSurvival(actor);
+  return `<label><input type="checkbox" name="target" value="${index}" ${checked ? "checked" : ""}>${name} — HP ${state.hp}/${state.max}, ${localize("Temp")} ${state.temp} (${escapeHtml(localize(state.status))})</label>`;
 }

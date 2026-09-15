@@ -54,16 +54,6 @@ export async function runWorldMigrations(
   let updated = 0;
   let failed = 0;
 
-  for (const item of listDocuments(game.items)) {
-    const result = await persistMigration(
-      item,
-      planItemMigration(readStoredSystem(item)),
-      dependencies,
-    );
-    updated += result.updated;
-    failed += result.failed;
-  }
-
   const sceneList = game.scenes
     ? "contents" in game.scenes
       ? Array.from(game.scenes.contents)
@@ -74,24 +64,22 @@ export async function runWorldMigrations(
       token.actorLink === false && token.actor ? [token.actor] : [],
     ),
   );
+  // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
+  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
+    game.items,
+  ).map((document) => ({ document, plan: planItemMigration(readStoredSystem(document)) }));
   for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
-    const actorResult = await persistMigration(
-      actor,
-      planAllActorMigrations(readStoredSystem(actor), actor.type),
-      dependencies,
-    );
-    updated += actorResult.updated;
-    failed += actorResult.failed;
-
-    for (const item of listDocuments(actor.items)) {
-      const itemResult = await persistMigration(
-        item,
-        planItemMigration(readStoredSystem(item)),
-        dependencies,
-      );
-      updated += itemResult.updated;
-      failed += itemResult.failed;
-    }
+    planned.push({
+      document: actor,
+      plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
+    });
+    for (const item of listDocuments(actor.items))
+      planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
+  }
+  for (const entry of planned) {
+    const result = await persistMigration(entry.document, entry.plan, dependencies);
+    updated += result.updated;
+    failed += result.failed;
   }
 
   if (updated > 0 || failed > 0) {

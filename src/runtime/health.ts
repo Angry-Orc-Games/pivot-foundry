@@ -63,6 +63,7 @@ export class HealthTransactions {
     amount: number,
     critical = false,
     tempChoice?: "keep" | "replace",
+    revalidate: () => boolean = () => true,
   ): Promise<
     Array<{ actor: HealthActor; outcome: "updated" | "denied" | "duplicate" | "failed" }>
   > {
@@ -86,7 +87,7 @@ export class HealthTransactions {
           applyHealth(readSurvival(actor), kind, amount, critical, tempChoice),
         );
         // Recheck immediately before a single combined document write.
-        if (actor.isOwner !== true) {
+        if (actor.isOwner !== true || !revalidate()) {
           results.push({ actor, outcome: "denied" });
           continue;
         }

@@ -195,5 +195,7 @@
   "PIVOT.Survival.Failures": "Failures",
   "PIVOT.Survival.Status": "Survival State",
   "PIVOT.Survival.ClearTemp": "Clear Temporary HP (Manual Long Rest)",
-  "PIVOT.Survival.ClearTempHelp": "Clear temporary HP after manually resolving a long rest. This does not restore HP or perform a full rest."
+  "PIVOT.Survival.ClearTempHelp": "Clear temporary HP after manually resolving a long rest. This does not restore HP or perform a full rest.",
+  "PIVOT.Survival.RollingHelp": "Rolling recursive dice. Cancel stops the roll as incomplete. Rolls that take longer than 60 seconds are also incomplete and cannot be applied.",
+  "PIVOT.Survival.InvalidMaximum": "HP maximum cannot be lower than current HP. Correct current HP first, or update both together."
 }

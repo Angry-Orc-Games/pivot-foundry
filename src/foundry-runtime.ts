@@ -40,11 +40,23 @@ export interface FoundryRuntime {
 
 export interface FoundryHooks {
   on?(
-    event: string,
+    event: "renderChatMessageHTML",
     callback: (
       message: { id?: string; flags?: Record<string, unknown> },
       html: HTMLElement,
     ) => void,
+  ): void;
+  on?(
+    event: "preCreateActor",
+    callback: (actor: {
+      type?: string;
+      system?: unknown;
+      updateSource?: (data: Record<string, unknown>) => unknown;
+    }) => void,
+  ): void;
+  on?(
+    event: "preUpdateActor",
+    callback: (actor: { system?: unknown }, changes: Record<string, unknown>) => false | undefined,
   ): void;
   once(event: "init" | "ready", callback: () => void): void;
 }

@@ -76,3 +76,22 @@ it("blocks concurrent different operations on the same actor", async () => {
   release();
   await first;
 });
+it("revalidates the message immediately before each target write", async () => {
+  const a = actor("Actor.lifecycle-a"),
+    b = actor("Actor.lifecycle-b");
+  let valid = true;
+  a.update = vi.fn(async () => {
+    valid = false;
+  });
+  const results = await new HealthTransactions().apply(
+    "lifecycle",
+    [a, b],
+    "damage",
+    1,
+    false,
+    undefined,
+    () => valid,
+  );
+  expect(results.map((r) => r.outcome)).toEqual(["updated", "denied"]);
+  expect(b.update).not.toHaveBeenCalled();
+});

@@ -27,8 +27,29 @@ export function planSurvivalMigration(source: unknown): MigrationPlan {
     return { ok: false, error: "M002: invalid survival status" };
   const update: Record<string, unknown> = { "system.survivalVersion": SURVIVAL_VERSION };
   if (hp?.temp === undefined) update["system.attributes.hp.temp"] = 0;
-  if (status === undefined)
+  if (status === undefined || status === "unconfirmed")
     update["system.attributes.deathSaves.status"] =
       typeof hp?.value === "number" && hp.value > 0 ? "alive" : "unconfirmed";
   return { ok: true, changed: true, update };
+}
+
+/** Defaults stay legacy-safe; initialize only genuinely new Character documents. */
+export function initializeSurvival(actor: {
+  type?: string;
+  system?: unknown;
+  updateSource?: (data: Record<string, unknown>) => unknown;
+}): void {
+  if (actor.type !== "character" || !actor.updateSource) return;
+  const system = actor.system as
+    | {
+        survivalVersion?: number;
+        attributes?: { hp?: { value?: number }; deathSaves?: { status?: string } };
+      }
+    | undefined;
+  if (system?.survivalVersion === SURVIVAL_VERSION) return;
+  actor.updateSource({
+    "system.survivalVersion": SURVIVAL_VERSION,
+    "system.attributes.deathSaves.status":
+      (system?.attributes?.hp?.value ?? 0) > 0 ? "alive" : "dying",
+  });
 }
