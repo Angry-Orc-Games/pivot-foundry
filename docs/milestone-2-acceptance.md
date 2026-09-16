@@ -4,7 +4,7 @@ Verified 15 September 2026. The approved attacks, damage, and survival slice is 
 
 ## Environment
 
-- Foundry VTT 13.351, system `pivot-fantasy`, code through `45a8007`.
+- Foundry VTT 13.351, system `pivot-fantasy`, code through `11ab347`.
 - Isolated `codex/milestone-2-survival` worktree; [PR #21](https://github.com/Angry-Orc-Games/pivot-foundry/pull/21).
 - Loopback-only port 30001, named container `pivot-foundry-milestone-2-qa`. Existing-world tests used a private copy of stopped sandbox data. Fresh-world tests used a newly created empty world.
 - System assets were extracted from `system.zip`, with no development source mount. Served bundle SHA-256 matched the package build: `b64d7744a6128da028ffd43347c9c53d879c3a8fcc001b9046b33e9a4089fb60`.
@@ -16,11 +16,11 @@ Verified 15 September 2026. The approved attacks, damage, and survival slice is 
 - `npm run package:system`: passes.
 - Tests cover recursive chains, critical/enhanced options, invalid/unsupported formulas, interruption, HP/temp-HP boundaries, massive damage, death-save results 1/9/10/20 and third success/failure, migration preservation/idempotence, stale permissions/chat data, duplicate/overlapping actions, partial failures, and chat failure after a successful write.
 - Independent specification and code/security reviews completed. Findings about privacy, formula validation, migration defaults/token inheritance, stale previews and uncertain writes were addressed with regression coverage.
-- GitHub Verify (Node 20/22) and Package Foundry System passed at `1aa85a2` ([run](https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/34986953696)); consult PR checks for the final documentation/token-label revision.
+- GitHub Verify (Node 20/22) and Package Foundry System passed at `11ab347` ([run](https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/34988509118)); consult PR checks for the final documentation/token-label revision.
 
 ## Foundry Scenarios
 
-The following passed through the actual v13 sheet/chat UI, with Foundry document APIs used to prepare isolated fixtures. Natural 1 and 20 death-save cases used controlled minimum/maximum dice evaluation; exploding-dice examples used ordinary random rolls.
+The following passed through the actual v13 sheet/chat UI, with Foundry document APIs used to prepare isolated fixtures. Natural 1 and 20 death-save cases used controlled minimum/maximum dice evaluation; exploding-dice examples used ordinary random rolls. UI scenario evidence was run against the packaged build from `45a8007`; subsequent commit `11ab347` contains documentation updates only.
 
 - [x] Existing-world migration preserves HP, counters and embedded weapon Items; ambiguous zero HP requests confirmation. Unlinked zero-HP tokens retain their own state despite an alive base Actor. Reload leaves migrated state unchanged.
 - [x] Fresh character creation initializes version 1 and conscious/dying defaults without a legacy-confirmation warning. Set maximum HP before rolling death saves on a blank character.
