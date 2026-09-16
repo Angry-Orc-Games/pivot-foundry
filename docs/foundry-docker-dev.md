@@ -1,6 +1,6 @@
 # Foundry Docker Development
 
-This project can run against a local Foundry VTT v13 Docker sandbox so sheet and runtime changes can be checked in the real Foundry browser UI.
+This project can run against a local Foundry VTT v14 Docker sandbox so sheet and runtime changes can be checked in the real Foundry browser UI.
 
 The Compose stack is for local development only. It bind-mounts the public system assets into Foundry as the `pivot-fantasy` system and keeps Foundry user data in the ignored `foundry-data/` directory.
 
@@ -14,9 +14,9 @@ cp .env.foundry.local.example .env.foundry.local
 
 2. Edit `.env.foundry.local`.
 
-Use either `FOUNDRY_RELEASE_URL` or `FOUNDRY_USERNAME` plus `FOUNDRY_PASSWORD`. A temporary Version 13 Node.js download URL from the Foundry license page is preferred for agent-assisted local testing because it avoids storing account credentials in the checkout.
+Use either `FOUNDRY_RELEASE_URL` or `FOUNDRY_USERNAME` plus `FOUNDRY_PASSWORD`. A temporary Version 14 Node.js download URL from the Foundry license page is preferred for agent-assisted local testing because it avoids storing account credentials in the checkout.
 
-Make sure the timed URL is for Foundry v13 and the `Node.js` operating system option. A Linux, Windows, macOS, or latest v14 URL will not boot in this v13 sandbox.
+Make sure the timed URL is for Foundry v14 and the `Node.js` operating system option. A Linux, Windows, macOS, or incompatible version URL will not boot in this v14 sandbox.
 
 Set `FOUNDRY_ADMIN_KEY` to a local-only admin password.
 
@@ -89,7 +89,7 @@ If Foundry reports that a data directory is locked after an interrupted run, sto
 
 ## Verification Expectations
 
-Use this sandbox for manual Foundry v13 smoke tests when code touches sheets, templates, styles, document schemas, hooks, or runtime behavior.
+Use this sandbox for manual Foundry v14 smoke tests when code touches sheets, templates, styles, document schemas, hooks, or runtime behavior.
 
 Recommended smoke test:
 

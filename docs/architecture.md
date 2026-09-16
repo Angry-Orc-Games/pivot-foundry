@@ -1,6 +1,6 @@
 # Architecture
 
-Pivot Foundry is currently a small Foundry VTT v13 character system. The architecture goal is to keep Foundry integration thin while deterministic Pivot Fantasy rules grow as plain TypeScript modules with unit coverage.
+Pivot Foundry is currently a small Foundry VTT v14 character system. The architecture goal is to keep Foundry integration thin while deterministic Pivot Fantasy rules grow as plain TypeScript modules with unit coverage.
 
 ## Current Shape
 
@@ -10,7 +10,7 @@ Pivot Foundry is currently a small Foundry VTT v13 character system. The archite
 - `src/sheets/` contains the character and item sheet classes plus testable sheet-context helpers.
 - `src/rules/` contains deterministic rules code that does not depend on Foundry globals, including d20 roll modes, Pool resource transactions, combatant selection, effect aggregation, and content validation.
 - `src/migrations/` contains named document migrations. M001 persists `schemaVersion: 1` from stored source (`document.toObject()` / `_source`), not prepared TypeDataModel defaults.
-- `src/content/` is the canonical JSON content source. `scripts/build-content-packs.mjs` writes generated Foundry document JSON to `packs/src/`. `system.json` `packs` stays `[]` until a real Foundry v13 LevelDB pack exists.
+- `src/content/` is the canonical JSON content source. `scripts/build-content-packs.mjs` writes generated Foundry document JSON to `packs/src/`. `system.json` `packs` stays `[]` until a real Foundry v14 LevelDB pack exists.
 - `templates/` and `styles/` contain the native Foundry sheet UI.
 - `tests/` contains Vitest coverage for the manifest and rules modules.
 - `scripts/` contains release preparation and Foundry package validation.
@@ -33,7 +33,7 @@ See [foundry-vtt-source.md](foundry-vtt-source.md) for Foundry-specific developm
 2. Add or update pure rules tests.
 3. Implement the rule behavior in `src/rules/`.
 4. Add the smallest Foundry integration needed to expose that behavior.
-5. Run local verification and, when runtime behavior changes, manually smoke-test in Foundry v13.
+5. Run local verification and, when runtime behavior changes, manually smoke-test in Foundry v14.
 
 ## Character Sheet Data
 

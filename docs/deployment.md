@@ -144,4 +144,4 @@ A deployment handoff must include:
 - Service restarted.
 - Package checksum.
 - Verification commands and results.
-- Any compatibility caveats, especially Foundry v14 information versus this manifest's current Foundry v13 target.
+- Any compatibility caveats, especially notes about Foundry v14 API changes or compatibility requirements for the AOG hosts.

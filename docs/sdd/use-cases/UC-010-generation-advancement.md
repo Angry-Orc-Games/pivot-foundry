@@ -63,7 +63,7 @@ Existing Core/Features tabs. Prefer a summary/dialog rather than new tab. Valida
 
 Pure tests for budget boundaries, invalid choices, primary ability cap if confirmed, advancement thresholds/point grants, and idempotent validation.
 
-Manual v13: preview/cancel/confirm, embedded item changes, reload.
+Manual v14: preview/cancel/confirm, embedded item changes, reload.
 
 ## 8. Files likely to change
 

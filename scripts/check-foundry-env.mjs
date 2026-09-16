@@ -62,17 +62,17 @@ if (releaseUrl) {
 
   const archivePath = decodeURIComponent(url.pathname);
 
-  if (!/\/releases\/13\./.test(archivePath)) {
-    console.error("FOUNDRY_RELEASE_URL must point to a Foundry v13 release.");
+  if (!/\/releases\/14\./.test(archivePath)) {
+    console.error("FOUNDRY_RELEASE_URL must point to a Foundry v14 release.");
     process.exit(1);
   }
 
-  if (!/FoundryVTT-Node-13\./.test(archivePath)) {
-    console.error("FOUNDRY_RELEASE_URL must use the Foundry v13 Node.js archive.");
+  if (!/FoundryVTT-Node-14\./.test(archivePath)) {
+    console.error("FOUNDRY_RELEASE_URL must use the Foundry v14 Node.js archive.");
     process.exit(1);
   }
 
-  console.log("Foundry env check passed: v13 Node.js timed URL configured.");
+  console.log("Foundry env check passed: v14 Node.js timed URL configured.");
   process.exit(0);
 }
 

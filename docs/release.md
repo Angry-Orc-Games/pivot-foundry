@@ -16,8 +16,8 @@ Check that `system.json` contains the intended metadata:
 
 - `id`: `pivot-fantasy`
 - `title`: `Pivot Fantasy`
-- `compatibility.minimum`: `13`
-- `compatibility.verified`: `13`
+- `compatibility.minimum`: `14`
+- `compatibility.verified`: `14.361`
 - `esmodules`: `dist/pivot.mjs`
 - `manifest`: latest release `system.json` URL
 - `download`: latest release `system.zip` URL
@@ -52,7 +52,7 @@ The tag must be a semantic version prefixed with `v`, such as `v0.1.0`.
 After the GitHub release finishes:
 
 1. Copy the release manifest URL from `system.json`.
-2. In Foundry v13, open the system installation screen.
+2. In Foundry v14, open the system installation screen.
 3. Install from the manifest URL.
 4. Create a test world using `Pivot Fantasy`.
 5. Confirm the browser console logs `Pivot Fantasy | Initialized character sheet system`.

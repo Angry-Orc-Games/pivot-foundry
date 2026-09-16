@@ -55,7 +55,7 @@ Rule sources by record: `Character Generation`, `Flaws`, `Backgrounds`, `Skills`
 
 - deterministic build/generation creates packs;
 - `system.json` declares pack metadata;
-- verify drag/drop/import onto current ActorSheetV2; if default drop-to-embed is incomplete, add the smallest v13 sheet drop handler that accepts only Pivot Item documents;
+- verify drag/drop/import onto current ActorSheetV2; if default drop-to-embed is incomplete, add the smallest v14 sheet drop handler that accepts only Pivot Item documents;
 - no automatic replacement of `identity.speciesText` / `backgroundText` in this slice unless separately specified. These existing text fallbacks may coexist until character-build UX is approved.
 
 ## 6. UI and localization
@@ -74,7 +74,7 @@ Accessibility follows existing item controls; drag/drop must have an alternate c
 - invalid cross-reference rejected;
 - no duplicated Actor array/source mutation.
 
-Manual Foundry v13:
+Manual Foundry v14:
 
 - packs load;
 - browse/open;

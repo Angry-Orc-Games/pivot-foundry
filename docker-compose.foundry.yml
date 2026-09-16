@@ -1,8 +1,8 @@
 services:
   foundry:
-    image: ghcr.io/felddy/foundryvtt:13
-    container_name: pivot-foundry-v13
-    hostname: pivot-foundry-v13
+    image: ghcr.io/felddy/foundryvtt:14
+    container_name: pivot-foundry-v14
+    hostname: pivot-foundry-v14
     env_file:
       - path: .env.foundry.local
         required: false
@@ -11,7 +11,7 @@ services:
       FOUNDRY_HOT_RELOAD: "true"
       FOUNDRY_IP_DISCOVERY: "false"
       FOUNDRY_TELEMETRY: "false"
-      FOUNDRY_VERSION: "13.351"
+      FOUNDRY_VERSION: "14.361"
       TZ: America/New_York
     ports:
       - "30000:30000/tcp"

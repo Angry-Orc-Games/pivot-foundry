@@ -32,8 +32,8 @@ This catalog records intent and constraints for work that remains after the nati
 | ID      | Title                          | Requirement                                                                                                                                                       |
 | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | NFR-001 | Pure deterministic rules       | Deterministic game math must live under `src/rules/`, must not depend on Foundry globals, and must have Vitest coverage under `tests/rules/`.                     |
-| NFR-002 | Verification                   | Every shippable slice must pass `npm run verify`; Foundry v13 smoke acceptance is reported separately from repository CI.                                         |
-| NFR-003 | Foundry v13                    | Runtime integration must use public Foundry VTT v13 APIs only and must not assume v14 behavior.                                                                   |
+| NFR-002 | Verification                   | Every shippable slice must pass `npm run verify`; Foundry v14 smoke acceptance is reported separately from repository CI.                                         |
+| NFR-003 | Foundry v14                    | Runtime integration must use public Foundry VTT v14 APIs only and must not assume future version behavior.                                                        |
 | NFR-004 | Localization and accessibility | All user-visible strings must be localized in `lang/en.json`; controls must have textual/accessible labels and state must not be conveyed by color alone.         |
 | NFR-005 | Security                       | User formulas, HTML, file paths, URLs, imports, compendium conversion, and any future rich text must be explicitly validated/sanitized and reviewed for security. |
 | NFR-006 | Small synchronization diffs    | Work must extend the current repository and preserve unrelated sheet behavior; a slice must not regenerate or redesign the character sheet.                       |

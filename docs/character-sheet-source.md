@@ -50,5 +50,5 @@ Page 2 focuses on inventory, magic, and longer notes:
 ## Verification Expectations
 
 - Unit-test deterministic derived values outside Foundry UI code.
-- For sheet UI work, build locally and manually smoke-test in Foundry v13.
+- For sheet UI work, build locally and manually smoke-test in Foundry v14.
 - Keep repository verification, CI, and manual Foundry acceptance separate in handoffs.

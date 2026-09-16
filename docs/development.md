@@ -70,7 +70,7 @@ Vitest should fail when test files are missing. If a slice temporarily moves or 
 
 Use fast unit tests for rules behavior first. Add Foundry runtime tests or manual Foundry checks when the change depends on Foundry documents, hooks, sheets, or packaged assets.
 
-For the character sheet, automated tests can validate manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. Manual Foundry v13 smoke tests are still required for actual browser rendering, drag/drop, permissions, and chat roll behavior.
+For the character sheet, automated tests can validate manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. Manual Foundry v14 smoke tests are still required for actual browser rendering, drag/drop, permissions, and chat roll behavior.
 
 ## Implementation Sequence
 
@@ -80,7 +80,7 @@ Prefer this order for future feature slices:
 2. Write tests for pure rules behavior.
 3. Implement the rules module.
 4. Add the narrow Foundry integration needed to expose it.
-5. Build and test the packaged system in Foundry v13 when the feature touches runtime behavior.
+5. Build and test the packaged system in Foundry v14 when the feature touches runtime behavior.
 
 ## Agent Review Loop
 
