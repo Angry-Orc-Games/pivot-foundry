@@ -1,5 +1,7 @@
 # Character Sheet Feature Specification
 
+**Historical specification**: This document describes the character sheet implementation completed under Foundry v13. The sheet was implemented and accepted under v13 in August-September 2026. As of September 2026, the system now targets Foundry v14, and the implemented sheet APIs (ActorSheetV2, ItemSheetV2) are compatible with both v13 and v14.
+
 ## 1. Summary
 
 Build a native Foundry VTT v13 character sheet for the `pivot-fantasy` system. The sheet should preserve the PDF's workflow: identity and table-play state first, then skills/proficiencies, attacks, equipment, magic, feats, flaws, and notes. It must not embed or display the PDF as a static asset.

@@ -69,4 +69,8 @@ Reference headings: Exploding Dice, Critical Hits, Damage Rolls, Massive Damage,
 
 Damage at zero HP follows the source wording “take any damage”: a positive applied damage amount causes death-save consequences even if temporary HP absorbs it. Damage reductions are resolved by the GM before application. Actual HP recovery resets counters; temporary HP never substitutes for healing. Exhaustion on surviving a zero-HP episode remains a GM responsibility.
 
-Foundry v14 interfaces are expected to be compatible: [DialogV2](https://foundryvtt.com/api/v14/classes/foundry.applications.api.DialogV2.html), [Roll](https://foundryvtt.com/api/v14/classes/foundry.dice.Roll.html), and [renderChatMessageHTML](https://foundryvtt.com/api/v14/functions/hookEvents.renderChatMessageHTML.html). Verify runtime acceptance separately from API-reference review.
+Foundry v13 interfaces checked for this slice: [DialogV2](https://foundryvtt.com/api/v13/classes/foundry.applications.api.DialogV2.html), [Roll](https://foundryvtt.com/api/v13/classes/foundry.dice.Roll.html), and [renderChatMessageHTML](https://foundryvtt.com/api/v13/functions/hookEvents.renderChatMessageHTML.html). Verify runtime acceptance separately from API-reference review.
+
+## Current Foundry Target — September 2026
+
+As of September 2026, the system targets Foundry v14. The V2 sheet APIs used by the implemented character and item sheets are compatible with both v13 and v14.

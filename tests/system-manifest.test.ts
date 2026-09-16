@@ -14,6 +14,11 @@ type SystemManifest = {
 const manifest = manifestJson as SystemManifest;
 
 describe("system manifest", () => {
+  it("declares Foundry v14 compatibility", () => {
+    expect(manifestJson).toHaveProperty("compatibility.minimum", "14");
+    expect(manifestJson).toHaveProperty("compatibility.verified", "14.361");
+  });
+
   it("declares a character Actor subtype for Foundry document validation", () => {
     expect(manifest.documentTypes?.Actor).toHaveProperty("character");
   });
