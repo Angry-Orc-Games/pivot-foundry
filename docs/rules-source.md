@@ -60,3 +60,13 @@ Prefer implementing rules in this order unless a user-facing slice says otherwis
 - Canonical content is version-controlled JSON under `src/content/`, validated by `src/rules/content.ts`, and generated into `packs/src/` document JSON. `system.json` does not declare Foundry LevelDB packs until a later slice produces them.
 - For user-entered formulas, imports, HTML descriptions, file paths, URLs, or compendium conversion tooling, include a security review before merging.
 - For all Foundry-facing behavior, report repository verification separately from manual Foundry v13 acceptance.
+
+## Milestone 2 Rule Verification — 15 September 2026
+
+The Combat passages from `Exploding Dice` through `Temporary Hit Points` were compared across the referenced `Pivot_Fantasy_Beta.docx`, `Pivot_Fantasy_Beta_final.docx`, and `AOG-PF-CR-001 - Pivot Fantasy - Beta Final.docx`. The compared passages are identical. The approved implementation contract and manual exclusions are in [Milestone 2](milestone-2-plan.md). This comparison confirms this slice only; it does not settle the full release scope or every catalog rule.
+
+Reference headings: Exploding Dice, Critical Hits, Damage Rolls, Massive Damage, Healing, Severe Injuries, Falling Unconscious, Death Saving Throws, Stabilizing a Character, and Temporary Hit Points.
+
+Damage at zero HP follows the source wording “take any damage”: a positive applied damage amount causes death-save consequences even if temporary HP absorbs it. Damage reductions are resolved by the GM before application. Actual HP recovery resets counters; temporary HP never substitutes for healing. Exhaustion on surviving a zero-HP episode remains a GM responsibility.
+
+Foundry v13 interfaces checked for this slice: [DialogV2](https://foundryvtt.com/api/v13/classes/foundry.applications.api.DialogV2.html), [Roll](https://foundryvtt.com/api/v13/classes/foundry.dice.Roll.html), and [renderChatMessageHTML](https://foundryvtt.com/api/v13/functions/hookEvents.renderChatMessageHTML.html). Verify runtime acceptance separately from API-reference review.

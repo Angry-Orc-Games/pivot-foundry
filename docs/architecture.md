@@ -1,6 +1,6 @@
 # Architecture
 
-Pivot Foundry is currently a small Foundry VTT v13 system scaffold. The architecture goal is to keep Foundry integration thin while deterministic Pivot Fantasy rules grow as plain TypeScript modules with unit coverage.
+Pivot Foundry is currently a small Foundry VTT v13 character system. The architecture goal is to keep Foundry integration thin while deterministic Pivot Fantasy rules grow as plain TypeScript modules with unit coverage.
 
 ## Current Shape
 
@@ -52,3 +52,11 @@ Named migration M001 treats missing/`0` `schemaVersion` as legacy and persists t
 - Sheet registration and template paths.
 - Data migrations once persisted document schemas exist.
 - Any code that accepts user-entered formulas, HTML, file paths, URLs, imports, or compendium content.
+
+## Survival Loop
+
+Deterministic exploding dice and HP/death-save transitions live in `src/rules/`. The `src/runtime/` adapters own localized dialogs, visible dice chains, chat flags, permission checks, and guarded Actor updates. The existing sheet delegates to these adapters. Current HP/counters are not independently submitted by the sheet.
+
+M002 adds Character-only `survivalVersion`, temporary HP, and survival status alongside the existing shared schemaVersion/M001. Legacy-safe defaults must not masquerade as persisted migration completion. Fresh Actor creation explicitly initializes survival source data. Actor and unlinked-token migration plans are captured before writes to prevent inherited base-Actor defaults from hiding token-specific legacy state.
+
+The loop has no new sockets or external APIs. In-client operation and Actor guards prevent duplicate/overlapping writes; they do not guarantee cross-client transactions. See [Survival controls](survival.md), [approved milestone](milestone-2-plan.md), and [acceptance record](milestone-2-acceptance.md).

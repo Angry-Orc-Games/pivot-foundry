@@ -207,7 +207,8 @@
                 {{disabledAttr}}
               /></label>
             <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
-                name="system.attributes.hp.value"
+                readonly
+                aria-label="Current HP"
                 type="number"
                 min="0"
                 step="1"
@@ -252,10 +253,29 @@
               >{{localize "PIVOT.Actions.RecoverPoolLongRest"}}</button>
             </div>
           </div>
+          <button type="button" data-action="survivalRoll" {{disabledAttr}}>{{localize
+              "PIVOT.Survival.RollTitle"
+            }}</button>
+          <button type="button" data-action="tempHp" {{disabledAttr}}>{{localize
+              "PIVOT.Survival.Temp"
+            }}</button>
+          <p>{{localize "PIVOT.Survival.Temp"}}: {{system.attributes.hp.temp}}</p>
+          <p>{{localize survivalLabel}}</p>
+          <button type="button" data-action="deathSave" {{disabledAttr}}>{{localize
+              "PIVOT.Survival.DeathSave"
+            }}</button>
+          <button type="button" data-action="clearTempHp" {{disabledAttr}}>{{localize
+              "PIVOT.Survival.ClearTemp"
+            }}</button>
+          {{#if isGM}}<button type="button" data-action="correctSurvival">{{localize
+                "PIVOT.Survival.Correction"
+              }}</button>{{/if}}
+          <p>{{localize "PIVOT.Survival.ManualConsequences"}}</p>
           <fieldset class="pivot-death-saves">
             <legend>{{localize "PIVOT.Fields.DeathSaves"}}</legend>
             <label><span>{{localize "PIVOT.Fields.Successes"}}</span><input
-                name="system.attributes.deathSaves.successes"
+                readonly
+                aria-label="Death save successes"
                 type="number"
                 min="0"
                 max="3"
@@ -264,7 +284,8 @@
                 {{disabledAttr}}
               /></label>
             <label><span>{{localize "PIVOT.Fields.Failures"}}</span><input
-                name="system.attributes.deathSaves.failures"
+                readonly
+                aria-label="Death save failures"
                 type="number"
                 min="0"
                 max="3"

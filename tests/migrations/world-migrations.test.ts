@@ -57,7 +57,14 @@ describe("runWorldMigrations", () => {
     expect(worldItem.updates).toEqual([
       { "system.schemaVersion": CURRENT_SCHEMA_VERSION, "system.effects": [] },
     ]);
-    expect(actor.updates).toEqual([{ "system.schemaVersion": CURRENT_SCHEMA_VERSION }]);
+    expect(actor.updates).toEqual([
+      {
+        "system.schemaVersion": CURRENT_SCHEMA_VERSION,
+        "system.survivalVersion": 1,
+        "system.attributes.hp.temp": 0,
+        "system.attributes.deathSaves.status": "unconfirmed",
+      },
+    ]);
     expect(embeddedItem.updates).toEqual([
       { "system.schemaVersion": CURRENT_SCHEMA_VERSION, "system.effects": [] },
     ]);
@@ -104,4 +111,65 @@ describe("runWorldMigrations", () => {
     expect(report).toEqual({ skipped: false, updated: 0, failed: 0 });
     expect(item.updates).toEqual([]);
   });
+});
+it("migrates unlinked scene actors separately and skips linked copies", async () => {
+  const synthetic = createDocument(
+    "Token",
+    { schemaVersion: 1, attributes: { hp: { value: 0, max: 20 }, deathSaves: { failures: 2 } } },
+    { type: "character" },
+  );
+  const linked = createDocument("Linked", { schemaVersion: 1 }, { type: "character" });
+  const report = await runWorldMigrations({
+    game: {
+      user: { isGM: true },
+      scenes: [
+        {
+          tokens: [
+            { actorLink: false, actor: synthetic },
+            { actorLink: true, actor: linked },
+          ],
+        },
+      ],
+    },
+  });
+  expect(report.updated).toBe(1);
+  expect(synthetic.updates[0]).toMatchObject({
+    "system.survivalVersion": 1,
+    "system.attributes.deathSaves.status": "unconfirmed",
+  });
+  expect(linked.updates).toHaveLength(0);
+});
+it("does not claim a missing update method persisted migrations", async () => {
+  expect(
+    (await runWorldMigrations({ game: { actors: [{ type: "character", system: {} }] } })).failed,
+  ).toBe(1);
+});
+it("plans synthetic state before writes and persists it after base changes", async () => {
+  let baseVersion = 0;
+  const order: string[] = [];
+  const base: MigratableDocument = {
+    type: "character",
+    toObject: () => ({ system: { schemaVersion: 1, survivalVersion: baseVersion } }),
+    update: async () => {
+      order.push("base");
+      baseVersion = 1;
+    },
+  };
+  const token: MigratableDocument = {
+    type: "character",
+    toObject: () => ({
+      system: { schemaVersion: 1, survivalVersion: baseVersion, attributes: { hp: { value: 0 } } },
+    }),
+    update: async () => {
+      order.push("token");
+    },
+  };
+  await runWorldMigrations({
+    game: {
+      user: { isGM: true },
+      actors: [base],
+      scenes: [{ tokens: [{ actorLink: false, actor: token }] }],
+    },
+  });
+  expect(order).toEqual(["base", "token"]);
 });

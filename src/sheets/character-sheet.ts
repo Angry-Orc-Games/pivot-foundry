@@ -1,3 +1,7 @@
+import { readSurvival } from "../runtime/health";
+import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
+import { tempHpDialog } from "../runtime/health-dialog";
+import { damageRollDialog } from "../runtime/damage-roll";
 import {
   abilities,
   armourCategories,
@@ -46,6 +50,8 @@ export interface ItemLike {
 }
 
 export interface ActorLike {
+  isOwner?: boolean;
+  uuid?: string;
   id?: string;
   _id?: string;
   name: string;
@@ -99,6 +105,8 @@ export interface CombatLike {
 
 export interface CharacterSheetContext {
   actor: ActorLike;
+  survivalLabel: string;
+  isGM: boolean;
   system: RecordValue;
   form: {
     languagesText: string;
@@ -182,6 +190,21 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
+        survivalRoll: async function (this: { document: ActorLike }) {
+          await damageRollDialog(this.document);
+        },
+        tempHp: async function (this: { document: ActorLike }) {
+          await tempHpDialog(this.document);
+        },
+        deathSave: async function (this: { document: ActorLike }) {
+          await deathSaveDialog(this.document);
+        },
+        correctSurvival: async function (this: { document: ActorLike }) {
+          await correctSurvivalDialog(this.document);
+        },
+        clearTempHp: async function (this: { document: ActorLike }) {
+          await clearTempHpDialog(this.document);
+        },
         adjustResource: adjustResourceAction,
         recoverPoolLongRest: recoverPoolLongRestAction,
         createItem: createItemAction,
@@ -318,6 +341,10 @@ export function prepareCharacterSheetContext(
 
   return {
     actor,
+    survivalLabel: `PIVOT.Survival.${readSurvival(actor).status}`,
+    isGM:
+      (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
+        ?.isGM === true,
     system,
     form: {
       languagesText: stringArrayAt(system, ["identity", "languages"]).join(", "),
@@ -708,6 +735,10 @@ async function rollAction(
   if (!RollConstructor) return;
 
   if (request.kind === "formula") {
+    if (request.rollKind === "weaponDamage") {
+      await damageRollDialog(actor, request.formula);
+      return;
+    }
     const roll = new RollConstructor(request.formula);
     await roll.evaluate();
     await roll.toMessage({
@@ -993,7 +1024,7 @@ function getRollConstructor():
   return globals.Roll;
 }
 
-async function promptRollMode(): Promise<RollMode | null> {
+export async function promptRollMode(): Promise<RollMode | null> {
   const foundry = globalThis as typeof globalThis & {
     foundry?: {
       applications?: {

@@ -32,6 +32,8 @@ Implemented:
 - Weapon attack chat that reports automatic hit on a kept natural 20 and automatic miss on a kept natural 1
 - Bounded Pool spend/recovery against derived Pool max, plus Recover Pool (Long Rest)
 - Initiative rolls that update a unique existing Foundry combatant in the active combat
+- Exploding damage/healing, explicit critical/enhanced rolls, HP/temp-HP application and death saves; see [Survival controls](docs/survival.md) for the manual boundaries
+- Character survival migration M002 with explicit confirmation for legacy zero-HP state
 - Named document migration M001 (`schemaVersion` 0/missing → 1) on the Foundry v13 `ready` hook
 - Whitelisted Item `effects` that contribute to derived character totals without rewriting source scores
 - JSON content source under `src/content/` with generated pack document JSON under `packs/src/`
@@ -46,7 +48,6 @@ Not implemented yet:
 - Full content packs for species, backgrounds, feats, flaws, equipment, spells, or magic streams
 - Full published-content automation for species/background/feat/flaw catalogs
 - Automatic combat or combatant creation for initiative
-- Complete exploding damage automation
 - Foundry LevelDB/NeDB compendium packs declared in `system.json`
 
 ## Requirements

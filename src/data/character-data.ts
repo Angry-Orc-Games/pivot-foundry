@@ -21,6 +21,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
   class PivotCharacterData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
       return {
+        survivalVersion: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
         schemaVersion: numberField(fields, {
           required: true,
           integer: true,
@@ -59,6 +60,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
         ),
         attributes: schemaField(fields, {
           hp: schemaField(fields, {
+            temp: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
             value: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
             max: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
           }),
@@ -77,6 +79,11 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
             mode: stringField(fields, { required: true, initial: "normal" }),
           }),
           deathSaves: schemaField(fields, {
+            status: stringField(fields, {
+              required: true,
+              initial: "unconfirmed",
+              choices: ["alive", "dying", "stable", "dead", "unconfirmed"],
+            }),
             successes: numberField(fields, {
               required: true,
               integer: true,

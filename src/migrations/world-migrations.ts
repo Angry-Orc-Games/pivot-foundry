@@ -1,3 +1,4 @@
+import { planSurvivalMigration } from "./m002";
 import {
   planActorMigration,
   planItemMigration,
@@ -20,6 +21,13 @@ export interface WorldMigrationGame {
   user?: { isGM?: boolean };
   actors?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
+  scenes?:
+    | Iterable<{ tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }> }>
+    | {
+        contents: Iterable<{
+          tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }>;
+        }>;
+      };
   i18n?: { localize?: (key: string) => string };
 }
 
@@ -46,41 +54,39 @@ export async function runWorldMigrations(
   let updated = 0;
   let failed = 0;
 
-  for (const item of listDocuments(game.items)) {
-    const result = await persistMigration(
-      item,
-      planItemMigration(readStoredSystem(item)),
-      dependencies,
-    );
+  const sceneList = game.scenes
+    ? "contents" in game.scenes
+      ? Array.from(game.scenes.contents)
+      : Array.from(game.scenes)
+    : [];
+  const syntheticActors = sceneList.flatMap((scene) =>
+    Array.from(scene.tokens ?? []).flatMap((token) =>
+      token.actorLink === false && token.actor ? [token.actor] : [],
+    ),
+  );
+  // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
+  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
+    game.items,
+  ).map((document) => ({ document, plan: planItemMigration(readStoredSystem(document)) }));
+  for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
+    planned.push({
+      document: actor,
+      plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
+    });
+    for (const item of listDocuments(actor.items))
+      planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
+  }
+  for (const entry of planned) {
+    const result = await persistMigration(entry.document, entry.plan, dependencies);
     updated += result.updated;
     failed += result.failed;
-  }
-
-  for (const actor of listDocuments(game.actors)) {
-    const actorResult = await persistMigration(
-      actor,
-      planActorMigration(readStoredSystem(actor)),
-      dependencies,
-    );
-    updated += actorResult.updated;
-    failed += actorResult.failed;
-
-    for (const item of listDocuments(actor.items)) {
-      const itemResult = await persistMigration(
-        item,
-        planItemMigration(readStoredSystem(item)),
-        dependencies,
-      );
-      updated += itemResult.updated;
-      failed += itemResult.failed;
-    }
   }
 
   if (updated > 0 || failed > 0) {
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: SCHEMA_MIGRATION_ID,
+        id: `${SCHEMA_MIGRATION_ID} / M002`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -124,7 +130,8 @@ async function persistMigration(
   if (!plan.changed) return { updated: 0, failed: 0 };
 
   try {
-    await document.update?.(plan.update);
+    if (!document.update) throw new Error("Document cannot be updated");
+    await document.update(plan.update);
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -169,4 +176,17 @@ function formatMessage(
     (text, [token, value]) => text.replaceAll(`{${token}}`, value),
     template,
   );
+}
+
+export function planAllActorMigrations(source: unknown, type?: string): MigrationPlan {
+  const first = planActorMigration(source);
+  if (!first.ok || (type && type !== "character")) return first;
+  const second = planSurvivalMigration(source);
+  if (!second.ok) return second;
+  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: { ...(first.changed ? first.update : {}), ...(second.changed ? second.update : {}) },
+  };
 }
