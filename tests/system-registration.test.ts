@@ -129,7 +129,7 @@ describe("Pivot item data models", () => {
 });
 
 describe("registerPivotFantasySystem", () => {
-  it("registers data models, token resources, and v13 document sheets during init", () => {
+  it("registers data models, token resources, and v14 document sheets during init", () => {
     const { foundry, registeredSheets } = createMockFoundry();
     const hooks = new Map<string, () => void>();
     const CONFIG = {

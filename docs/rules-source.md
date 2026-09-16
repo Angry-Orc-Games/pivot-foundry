@@ -59,7 +59,7 @@ Prefer implementing rules in this order unless a user-facing slice says otherwis
 
 - Canonical content is version-controlled JSON under `src/content/`, validated by `src/rules/content.ts`, and generated into `packs/src/` document JSON. `system.json` does not declare Foundry LevelDB packs until a later slice produces them.
 - For user-entered formulas, imports, HTML descriptions, file paths, URLs, or compendium conversion tooling, include a security review before merging.
-- For all Foundry-facing behavior, report repository verification separately from manual Foundry v13 acceptance.
+- For all Foundry-facing behavior, report repository verification separately from manual Foundry v14 acceptance.
 
 ## Milestone 2 Rule Verification — 15 September 2026
 
@@ -69,4 +69,4 @@ Reference headings: Exploding Dice, Critical Hits, Damage Rolls, Massive Damage,
 
 Damage at zero HP follows the source wording “take any damage”: a positive applied damage amount causes death-save consequences even if temporary HP absorbs it. Damage reductions are resolved by the GM before application. Actual HP recovery resets counters; temporary HP never substitutes for healing. Exhaustion on surviving a zero-HP episode remains a GM responsibility.
 
-Foundry v13 interfaces checked for this slice: [DialogV2](https://foundryvtt.com/api/v13/classes/foundry.applications.api.DialogV2.html), [Roll](https://foundryvtt.com/api/v13/classes/foundry.dice.Roll.html), and [renderChatMessageHTML](https://foundryvtt.com/api/v13/functions/hookEvents.renderChatMessageHTML.html). Verify runtime acceptance separately from API-reference review.
+Foundry v14 interfaces are expected to be compatible: [DialogV2](https://foundryvtt.com/api/v14/classes/foundry.applications.api.DialogV2.html), [Roll](https://foundryvtt.com/api/v14/classes/foundry.dice.Roll.html), and [renderChatMessageHTML](https://foundryvtt.com/api/v14/functions/hookEvents.renderChatMessageHTML.html). Verify runtime acceptance separately from API-reference review.

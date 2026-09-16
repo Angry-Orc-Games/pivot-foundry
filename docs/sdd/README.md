@@ -2,7 +2,7 @@
 
 Prepared: **2026-09-04**  
 Repository: `Angry-Orc-Games/pivot-foundry` (`main`, inspected 2026-09-04)  
-Foundry target: **v13**  
+Foundry target: **v14**  
 Package id: **pivot-fantasy**
 
 ## Current vs target map

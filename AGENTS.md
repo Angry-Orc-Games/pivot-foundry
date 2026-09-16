@@ -1,6 +1,6 @@
 # Agent Guide
 
-This is a Foundry VTT v13 game system for Pivot Fantasy. Keep changes small, testable, and aligned with the current thin-runtime architecture.
+This is a Foundry VTT v14 game system for Pivot Fantasy. Keep changes small, testable, and aligned with the current thin-runtime architecture.
 
 ## Commands
 
@@ -32,4 +32,4 @@ Run these from the repository root:
 
 ## Verification Bar
 
-Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, build locally and note whether Foundry v13 was manually checked.
+Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, build locally and note whether Foundry v14 was manually checked.

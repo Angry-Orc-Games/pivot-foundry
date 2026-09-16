@@ -53,7 +53,7 @@ Existing Equipment tab. Show requirement/penalty text adjacent to affected Item;
 
 Requirements, proficiency combinations, currency denominations/zero values, carried/equipped distinctions, rest-penalty boundaries.
 
-Manual v13: equip toggle, derived AC/weight, content drag/drop.
+Manual v14: equip toggle, derived AC/weight, content drag/drop.
 
 ## 8. Files likely to change
 

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml?query=branch%3Amain)
 [![Release](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml/badge.svg)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml)
-![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v13-blue)
+![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14-blue)
 ![Node](https://img.shields.io/badge/Node-%3E%3D20.19.0-339933)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
@@ -10,7 +10,7 @@
 ![Security](https://img.shields.io/badge/audit-npm%20audit-2ea44f)
 ![Status](https://img.shields.io/badge/status-initial%20sheet-orange)
 
-Pivot Fantasy is a Foundry VTT v13 game system for the free Pivot Fantasy core rules engine. This repository contains a strict TypeScript/Vite build, Foundry manifest, language file, CI, release packaging, the first tested rules modules, and an initial native character sheet.
+Pivot Fantasy is a Foundry VTT v14 game system for the free Pivot Fantasy core rules engine. This repository contains a strict TypeScript/Vite build, Foundry manifest, language file, CI, release packaging, the first tested rules modules, and an initial native character sheet.
 
 The goal is to keep the Foundry runtime thin while game rules, dice logic, and character math grow as testable TypeScript modules.
 
@@ -20,7 +20,7 @@ This is an early playable sheet implementation. It supports native Actor and emb
 
 Implemented:
 
-- Foundry v13 `system.json` manifest for `pivot-fantasy`
+- Foundry v14 `system.json` manifest for `pivot-fantasy`
 - TypeScript source entry point at `src/pivot.ts`
 - Character Actor document type declaration and data model registration
 - Native Pivot Fantasy character Actor sheet registration
@@ -34,7 +34,7 @@ Implemented:
 - Initiative rolls that update a unique existing Foundry combatant in the active combat
 - Exploding damage/healing, explicit critical/enhanced rolls, HP/temp-HP application and death saves; see [Survival controls](docs/survival.md) for the manual boundaries
 - Character survival migration M002 with explicit confirmation for legacy zero-HP state
-- Named document migration M001 (`schemaVersion` 0/missing → 1) on the Foundry v13 `ready` hook
+- Named document migration M001 (`schemaVersion` 0/missing → 1) on the Foundry v14 `ready` hook
 - Whitelisted Item `effects` that contribute to derived character totals without rewriting source scores
 - JSON content source under `src/content/` with generated pack document JSON under `packs/src/`
 - Vite build output to `dist/pivot.mjs`
@@ -54,7 +54,7 @@ Not implemented yet:
 
 - Node.js 20 or newer
 - npm
-- Foundry Virtual Tabletop v13
+- Foundry Virtual Tabletop v14
 
 ## Setup
 
@@ -94,11 +94,11 @@ Then run:
 npm run build
 ```
 
-Start Foundry v13 and enable the `Pivot Fantasy` system when creating a world.
+Start Foundry v14 and enable the `Pivot Fantasy` system when creating a world.
 
 ## Docker Foundry Sandbox
 
-For browser-based sheet and runtime testing, this repository includes a local Docker Compose sandbox for Foundry v13:
+For browser-based sheet and runtime testing, this repository includes a local Docker Compose sandbox for Foundry v14:
 
 ```sh
 cp .env.foundry.local.example .env.foundry.local
@@ -106,7 +106,7 @@ npm run build
 npm run foundry:up
 ```
 
-Fill `.env.foundry.local` with a Foundry v13 Node.js timed download URL or account credentials before starting the container. The file is ignored because it can contain license or account material.
+Fill `.env.foundry.local` with a Foundry v14 Node.js timed download URL or account credentials before starting the container. The file is ignored because it can contain license or account material.
 
 Foundry will be available at `http://localhost:30000`, with this checkout mounted as `Data/systems/pivot-fantasy`.
 

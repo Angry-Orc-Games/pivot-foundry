@@ -4,8 +4,8 @@
   "description": "Foundry VTT support for the free Pivot Fantasy core rules engine. Character sheets, dice, and Pool features are in active development. Pivot Fantasy book content sold separately.",
   "version": "0.1.0",
   "compatibility": {
-    "minimum": "13",
-    "verified": "13"
+    "minimum": "14",
+    "verified": "14.361"
   },
   "documentTypes": {
     "Actor": {

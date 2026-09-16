@@ -30,7 +30,7 @@ Rule sources: `Pivot_Fantasy_Beta.docx — GM advice`; `Gonks/Bosses/Bad Guys`; 
 
 ## 5. Foundry integration
 
-Later: register dedicated Actor type(s)/sheet(s) with Foundry v13 public APIs. Do not route through deprecated v1 sheets.
+Later: register dedicated Actor type(s)/sheet(s) with Foundry v14 public APIs. Do not route through deprecated v1 sheets.
 
 ## 6. UI and localization
 
@@ -38,7 +38,7 @@ Dedicated GM-facing sheet/tooling only after entity model. Do not alter Characte
 
 ## 7. Tests
 
-Pure construction/budget tests first, sheet-context tests second, Foundry v13 smoke third.
+Pure construction/budget tests first, sheet-context tests second, Foundry v14 smoke third.
 
 ## 8. Files likely to change
 

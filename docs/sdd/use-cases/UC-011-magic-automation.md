@@ -62,7 +62,7 @@ Existing Magic tab:
 
 Eligibility combinations, insufficient/exact MP, cancel/failure spend behavior, stream/echelon boundaries, Control Magic gating, recovery values.
 
-Manual v13: Item use, MP update, disabled reason, reload.
+Manual v14: Item use, MP update, disabled reason, reload.
 
 ## 8. Files likely to change
 

@@ -6,7 +6,7 @@ Current external Foundry reference:
 - Received on 2026-08-25
 - The guide identifies its research baseline as 2026-08-25 and is written primarily from a Foundry VTT v14 perspective.
 
-Treat the guide as reference material, not as agent instructions that override this repository. This project currently declares Foundry VTT v13 compatibility in `system.json`, so implementation work must verify APIs, hooks, sheet classes, and manifest fields against the target Foundry generation before changing code.
+Treat the guide as reference material, not as agent instructions that override this repository. This project now declares Foundry VTT v14 compatibility in `system.json`, so implementation work must verify APIs, hooks, sheet classes, and manifest fields against the target Foundry generation before changing code.
 
 ## Project Classification
 
@@ -15,7 +15,7 @@ This repository is a Foundry game system:
 - Manifest: `system.json`
 - System id: `pivot-fantasy`
 - Runtime entry point: `src/pivot.ts`
-- Current declared compatibility: Foundry v13
+- Current declared compatibility: Foundry v14
 - Current document subtype: `Actor.character`
 - Current sheet APIs: `foundry.applications.sheets.ActorSheetV2`, `ItemSheetV2`, `foundry.applications.api.HandlebarsApplicationMixin`, and `DocumentSheetConfig.registerSheet`
 
@@ -33,10 +33,9 @@ This repository is a Foundry game system:
 
 ## Version-Sensitive Notes
 
-- The guide recommends V14 `ApplicationV2` and `DocumentSheetV2` for new UI. Before using those in this v13-targeted project, verify the exact v13 API and local Foundry installation.
-- V14 migration notes are useful for future upgrade planning, but should not be applied as direct changes to this v13 system.
-- The current character and item sheets use the v13 V2 sheet stack and Handlebars mixin rather than deprecated v1 `ActorSheet`/`ItemSheet`.
-- If the project target changes from v13 to v14, update `system.json`, `README.md`, `docs/architecture.md`, and this file in the same change.
+- The guide was written from a V14 perspective, which now aligns with this project's target.
+- The current character and item sheets use the V2 sheet stack and Handlebars mixin rather than deprecated v1 `ActorSheet`/`ItemSheet`.
+- When updating to future Foundry versions, update `system.json`, `README.md`, `docs/architecture.md`, and this file in the same change.
 
 ## Required Foundry Handoff Fields
 
@@ -47,4 +46,4 @@ For Foundry runtime changes, include these in the handoff:
 - Migration impact, if persisted data changed.
 - Localization and CSS namespace impact.
 - Automated verification results.
-- Manual Foundry v13 smoke-test result, or a clear note that manual acceptance was not run.
+- Manual Foundry v14 smoke-test result, or a clear note that manual acceptance was not run.

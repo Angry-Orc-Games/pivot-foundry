@@ -6,7 +6,7 @@ Prepared 9 September 2026. Follow these steps in order and check each off only a
 
 **Original 9 September planning estimate (not re-estimated after step 2): 230–370 working hours remaining, including roughly 25% contingency.** Allow about **6–10 weeks at 40 hours/week**, or **12–19 weeks at 20 hours/week**, plus customer response time.
 
-These are preliminary estimates for one developer using AI for implementation, tests, documentation, and fixes. Hours include developer oversight and practical testing; they are not AI generation time alone. Assume the existing Foundry v13 architecture and hosting approach, available rules/content rights, and a fixed release scope. Confirm the estimate after step 1, especially catalog size and GM tooling.
+These are preliminary estimates for one developer using AI for implementation, tests, documentation, and fixes. Hours include developer oversight and practical testing; they are not AI generation time alone. Assume the existing Foundry v14 architecture and hosting approach, available rules/content rights, and a fixed release scope. Confirm the estimate after step 1, especially catalog size and GM tooling.
 
 - [ ] **1. Agree exactly what “finished” includes — 8–12 hours.** Confirm the rules version, every required content category and entry count, outstanding combat/magic/advancement rules, customer hosting destination, Foundry version/license, and who accepts delivery. Explicitly decide the treatment of crafting, magic items, runes, and thaumaturgy. **Done when:** the customer agrees to one feature/content checklist, including any manual workflows or exclusions.
 
@@ -24,7 +24,7 @@ These are preliminary estimates for one developer using AI for implementation, t
 
 - [ ] **8. Build the agreed GM tools and bestiary — 24–40 hours.** Define and implement NPC/creature sheets, bosses, tiers/overlays, encounters, bestiary entries, and rewards in small slices. **Done when:** the GM can prepare and run a representative encounter, then award its rewards. This is the least-defined scope and needs re-estimation after discovery. Reference: UC-013.
 
-- [ ] **9. Prove the whole product and fix defects — 24–40 hours.** Test as both GM and player, including permissions, simultaneous resource actions, save/reload, drag/drop, readable layouts, and large agreed content sets. Review input/import security. Test a fresh package install, an existing-world upgrade, and backup restoration. **Done when:** repository checks, CI, packaging, and Foundry v13 acceptance pass separately, with no unresolved delivery-blocking defects.
+- [ ] **9. Prove the whole product and fix defects — 24–40 hours.** Test as both GM and player, including permissions, simultaneous resource actions, save/reload, drag/drop, readable layouts, and large agreed content sets. Review input/import security. Test a fresh package install, an existing-world upgrade, and backup restoration. **Done when:** repository checks, CI, packaging, and Foundry v14 acceptance pass separately, with no unresolved delivery-blocking defects.
 
 - [ ] **10. Get customer acceptance on the test server — 8–12 hours.** Deploy the release candidate to the agreed test environment and run a customer session covering creation, combat, magic, rests, advancement, and GM preparation. Fix acceptance defects and retest. **Done when:** the customer accepts the agreed checklist and approves the exact release for production.
 
@@ -32,7 +32,7 @@ These are preliminary estimates for one developer using AI for implementation, t
 
 **Base total: 184–292 hours.** With approximately 25% contingency: 230–365 hours, rounded to a planning range of 230–370 hours. Larger catalogs, extensive special-case automation, custom artwork/adventures, new hosting infrastructure, or a Foundry version change require re-estimation.
 
-**For every development step:** have AI implement one small slice, add meaningful tests, run `npm run verify`, build/package when affected, and demonstrate the changed workflow in Foundry v13 before marking it complete. Feature estimates include these routine checks; step 9 covers integrated release testing.
+**For every development step:** have AI implement one small slice, add meaningful tests, run `npm run verify`, build/package when affected, and demonstrate the changed workflow in Foundry v14 before marking it complete. Feature estimates include these routine checks; step 9 covers integrated release testing.
 
 **Start here:** ask AI to extract the unresolved decisions from UC-004 through UC-013, propose source-backed answers, and produce the step 1 checklist for customer review. Do not invent missing rules.
 

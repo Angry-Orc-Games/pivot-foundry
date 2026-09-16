@@ -20,7 +20,7 @@ For each sub-slice, Player sees only confirmed counters/statuses and GM can obse
 
 ## 3. Data model changes
 
-Unknown. Prefer Foundry token/combat state for turn/movement/conditions where public v13 APIs provide appropriate durable state. Add Actor source only for Pivot-specific state that must survive independently and cannot be derived.
+Unknown. Prefer Foundry token/combat state for turn/movement/conditions where public v14 APIs provide appropriate durable state. Add Actor source only for Pivot-specific state that must survive independently and cannot be derived.
 
 Migration impact must be assessed per new field.
 
@@ -41,7 +41,7 @@ Rule sources: `Pivot_Fantasy_Beta.docx — Combat`; `Core Rules`; relevant rest 
 
 ## 5. Foundry integration
 
-Prefer thin combat/token hooks only after pure rules exist. Do not listen to broad hooks just to mirror Foundry state onto Actor. Public v13 APIs only.
+Prefer thin combat/token hooks only after pure rules exist. Do not listen to broad hooks just to mirror Foundry state onto Actor. Public v14 APIs only.
 
 ## 6. UI and localization
 
@@ -49,7 +49,7 @@ Modify existing Combat/Core tabs only where an observable player decision exists
 
 ## 7. Tests
 
-Each extracted rule gets pure cases before Foundry wiring. Foundry v13 smoke covers turn changes, token movement, condition display, and rest actions where applicable.
+Each extracted rule gets pure cases before Foundry wiring. Foundry v14 smoke covers turn changes, token movement, condition display, and rest actions where applicable.
 
 ## 8. Files likely to change
 
