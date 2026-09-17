@@ -3,37 +3,11 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { FoundryRuntime } from "../../src/foundry-runtime";
-import { createPivotItemSheetClass, prepareItemSheetContext } from "../../src/sheets/item-sheet";
-
-function createMockFoundry(): FoundryRuntime {
-  return {
-    abstract: { TypeDataModel: class {} },
-    data: {
-      fields: {
-        NumberField: class {},
-        StringField: class {},
-        BooleanField: class {},
-        SchemaField: class {},
-        ArrayField: class {},
-      },
-    },
-    applications: {
-      api: {
-        HandlebarsApplicationMixin: (base) => base,
-      },
-      apps: {
-        DocumentSheetConfig: {
-          registerSheet: () => undefined,
-        },
-      },
-      sheets: {
-        ActorSheetV2: class {},
-        ItemSheetV2: class {},
-      },
-    },
-  };
-}
+import {
+  ITEM_SHEET_POSITION,
+  ITEM_SHEET_WINDOW,
+  prepareItemSheetContext,
+} from "../../src/sheets/item-sheet";
 
 describe("prepareItemSheetContext", () => {
   it("shows a read-only summary of valid stored effects", () => {
@@ -79,15 +53,8 @@ describe("prepareItemSheetContext", () => {
 
 describe("PivotItemSheet window", () => {
   it("fits content height and stays resizable so the form is not clipped", () => {
-    const ItemSheet = createPivotItemSheetClass(createMockFoundry()) as {
-      DEFAULT_OPTIONS: {
-        position: { width: number; height: number | string };
-        window: { resizable?: boolean };
-      };
-    };
-
-    expect(ItemSheet.DEFAULT_OPTIONS.position).toEqual({ width: 560, height: "auto" });
-    expect(ItemSheet.DEFAULT_OPTIONS.window.resizable).toBe(true);
+    expect(ITEM_SHEET_POSITION).toEqual({ width: 560, height: "auto" });
+    expect(ITEM_SHEET_WINDOW.resizable).toBe(true);
   });
 });
 
