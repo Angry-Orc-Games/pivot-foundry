@@ -105,12 +105,15 @@ describe("PivotCharacterData", () => {
 });
 
 describe("PivotNpcData", () => {
-  it("defines source fields for NPC sheet including HP, AC, Speed, combat bonuses, CR, and biography", () => {
+  it("defines source fields for NPC sheet including tier, creature type, overlay, HP, AC, Speed, combat bonuses, CR, and biography", () => {
     const { foundry } = createMockFoundry();
     const NpcData = createPivotNpcDataModel(foundry);
     const schema = NpcData.defineSchema() as Record<string, FieldRecord>;
 
     expect(schema).toHaveProperty("schemaVersion");
+    expect(schema).toHaveProperty("tier");
+    expect(schema).toHaveProperty("creatureType");
+    expect(schema).toHaveProperty("overlay");
     expect(schema).toHaveProperty("attributes");
     expect(schema).toHaveProperty("combatBonuses");
     expect(schema).toHaveProperty("cr");

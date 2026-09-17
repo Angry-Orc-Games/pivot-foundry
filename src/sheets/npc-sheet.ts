@@ -12,6 +12,9 @@ export interface NpcActorLike {
   type: string;
   system: {
     schemaVersion?: number;
+    tier: string;
+    creatureType: string;
+    overlay: string;
     attributes: {
       hp: {
         value: number;

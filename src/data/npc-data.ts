@@ -24,6 +24,21 @@ export function createPivotNpcDataModel(foundry: FoundryRuntime): TypeDataModelW
           min: 0,
           initial: CURRENT_SCHEMA_VERSION,
         }),
+        tier: stringField(fields, {
+          required: true,
+          initial: "gonk",
+          choices: ["gonk", "alphaGonk", "boss", "bbeg"],
+        }),
+        creatureType: stringField(fields, {
+          required: true,
+          initial: "monster",
+          choices: ["beast", "humanoid", "monster", "undead"],
+        }),
+        overlay: stringField(fields, {
+          required: true,
+          initial: "none",
+          choices: ["none", "alpha", "giant", "dire", "undead"],
+        }),
         attributes: schemaField(fields, {
           hp: schemaField(fields, {
             value: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),

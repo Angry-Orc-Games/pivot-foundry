@@ -8,6 +8,9 @@ function sampleNpc(): NpcActorLike {
     type: "npc",
     system: {
       schemaVersion: 1,
+      tier: "gonk",
+      creatureType: "humanoid",
+      overlay: "none",
       attributes: {
         hp: {
           value: 25,
@@ -99,6 +102,9 @@ describe("prepareNpcSheetContext", () => {
     const npc = sampleNpc();
     const context = prepareNpcSheetContext(npc);
 
+    expect(context.system.tier).toBe("gonk");
+    expect(context.system.creatureType).toBe("humanoid");
+    expect(context.system.overlay).toBe("none");
     expect(context.system.attributes.hp.value).toBe(25);
     expect(context.system.attributes.hp.max).toBe(30);
     expect(context.system.attributes.ac).toBe(14);
