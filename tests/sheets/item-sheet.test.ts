@@ -1,6 +1,39 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { prepareItemSheetContext } from "../../src/sheets/item-sheet";
+import type { FoundryRuntime } from "../../src/foundry-runtime";
+import { createPivotItemSheetClass, prepareItemSheetContext } from "../../src/sheets/item-sheet";
+
+function createMockFoundry(): FoundryRuntime {
+  return {
+    abstract: { TypeDataModel: class {} },
+    data: {
+      fields: {
+        NumberField: class {},
+        StringField: class {},
+        BooleanField: class {},
+        SchemaField: class {},
+        ArrayField: class {},
+      },
+    },
+    applications: {
+      api: {
+        HandlebarsApplicationMixin: (base) => base,
+      },
+      apps: {
+        DocumentSheetConfig: {
+          registerSheet: () => undefined,
+        },
+      },
+      sheets: {
+        ActorSheetV2: class {},
+        ItemSheetV2: class {},
+      },
+    },
+  };
+}
 
 describe("prepareItemSheetContext", () => {
   it("shows a read-only summary of valid stored effects", () => {
@@ -41,5 +74,38 @@ describe("prepareItemSheetContext", () => {
 
     expect(context.effects).toEqual([]);
     expect(context.isEquipment).toBe(true);
+  });
+});
+
+describe("PivotItemSheet window", () => {
+  it("fits content height and stays resizable so the form is not clipped", () => {
+    const ItemSheet = createPivotItemSheetClass(createMockFoundry()) as {
+      DEFAULT_OPTIONS: {
+        position: { width: number; height: number | string };
+        window: { resizable?: boolean };
+      };
+    };
+
+    expect(ItemSheet.DEFAULT_OPTIONS.position).toEqual({ width: 560, height: "auto" });
+    expect(ItemSheet.DEFAULT_OPTIONS.window.resizable).toBe(true);
+  });
+});
+
+describe("item sheet layout CSS", () => {
+  const css = readFileSync(resolve("styles/pivot-fantasy.css"), "utf8").replace(/\s+/g, " ");
+
+  it("scrolls item windows instead of clipping them", () => {
+    expect(css).toContain(".pivot-fantasy.sheet.actor .window-content { overflow: hidden; }");
+    expect(css).toContain(
+      ".pivot-fantasy.sheet.item .window-content { overflow-x: hidden; overflow-y: auto; }",
+    );
+    expect(css).not.toContain(".pivot-fantasy.sheet .window-content { overflow: hidden; }");
+  });
+
+  it("does not force item forms wider than the Foundry window", () => {
+    expect(css).not.toMatch(/\.pivot-character-sheet, \.pivot-item-sheet \{[^}]*min-width: 620px/);
+    expect(css).toContain(
+      ".pivot-item-sheet { box-sizing: border-box; min-width: 0; width: 100%; }",
+    );
   });
 });

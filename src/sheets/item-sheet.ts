@@ -36,9 +36,10 @@ export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataMode
   class PivotItemSheet extends BaseSheet {
     static DEFAULT_OPTIONS = {
       classes: [SYSTEM_ID, "sheet", "item"],
-      position: { width: 560, height: 520 },
+      position: { width: 560, height: "auto" },
       tag: "form",
       window: {
+        resizable: true,
         title: "PIVOT.Sheets.Item.Title",
       },
       form: {
