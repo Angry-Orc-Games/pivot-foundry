@@ -189,6 +189,29 @@ describe("prepareCharacterSheetContext", () => {
 
     expect(context.items.weapons[0]?.id).toBe("hidden-id-axe");
   });
+
+  it("exposes resource meters and death-save pips for the resources panel", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 8, max: 16, temp: 3 },
+          deathSaves: { status: "dying", successes: 2, failures: 1 },
+        },
+        resources: { pool: { value: 1, maxBonus: 0 } },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("dying");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.dying");
+    expect(context.hpPercent).toBe(50);
+    expect(context.poolPercent).toBe(20);
+    expect(context.deathSaveSuccessPips).toEqual([true, true, false]);
+    expect(context.deathSaveFailurePips).toEqual([true, false, false]);
+  });
 });
 
 describe("sheet interaction helpers", () => {

@@ -106,6 +106,11 @@ export interface CombatLike {
 export interface CharacterSheetContext {
   actor: ActorLike;
   survivalLabel: string;
+  survivalStatus: string;
+  hpPercent: number;
+  poolPercent: number;
+  deathSaveSuccessPips: boolean[];
+  deathSaveFailurePips: boolean[];
   isGM: boolean;
   system: RecordValue;
   form: {
@@ -338,10 +343,16 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
+  const survival = readSurvival(actor);
 
   return {
     actor,
-    survivalLabel: `PIVOT.Survival.${readSurvival(actor).status}`,
+    survivalLabel: `PIVOT.Survival.${survival.status}`,
+    survivalStatus: survival.status,
+    hpPercent: fillPercent(survival.hp, survival.max),
+    poolPercent: fillPercent(numberAt(system, ["resources", "pool", "value"], 0), derived.pool.max),
+    deathSaveSuccessPips: deathSavePips(survival.successes),
+    deathSaveFailurePips: deathSavePips(survival.failures),
     isGM:
       (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
         ?.isGM === true,
@@ -1166,6 +1177,16 @@ function deleteSubmitPath(source: Record<string, unknown>, path: string[]): void
   }
 
   deletePath(source, path);
+}
+
+function fillPercent(value: number, max: number): number {
+  if (!(max > 0)) return 0;
+  return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
+}
+
+function deathSavePips(filled: number): boolean[] {
+  const count = Math.max(0, Math.min(3, Math.trunc(filled)));
+  return [count > 0, count > 1, count > 2];
 }
 
 function deletePath(source: Record<string, unknown>, path: string[]): void {
