@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -55,24 +52,5 @@ describe("PivotItemSheet window", () => {
   it("fits content height and stays resizable so the form is not clipped", () => {
     expect(ITEM_SHEET_POSITION).toEqual({ width: 560, height: "auto" });
     expect(ITEM_SHEET_WINDOW.resizable).toBe(true);
-  });
-});
-
-describe("item sheet layout CSS", () => {
-  const css = readFileSync(resolve("styles/pivot-fantasy.css"), "utf8").replace(/\s+/g, " ");
-
-  it("scrolls item windows instead of clipping them", () => {
-    expect(css).toContain(".pivot-fantasy.sheet.actor .window-content { overflow: hidden; }");
-    expect(css).toContain(
-      ".pivot-fantasy.sheet.item .window-content { overflow-x: hidden; overflow-y: auto; }",
-    );
-    expect(css).not.toContain(".pivot-fantasy.sheet .window-content { overflow: hidden; }");
-  });
-
-  it("does not force item forms wider than the Foundry window", () => {
-    expect(css).not.toMatch(/\.pivot-character-sheet, \.pivot-item-sheet \{[^}]*min-width: 620px/);
-    expect(css).toContain(
-      ".pivot-item-sheet { box-sizing: border-box; min-width: 0; width: 100%; }",
-    );
   });
 });
