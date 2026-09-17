@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import manifestJson from "../system.json";
 import { createPivotCharacterDataModel } from "../src/data/character-data";
+import { createPivotNpcDataModel } from "../src/data/npc-data";
 import { createPivotItemDataModels } from "../src/data/item-data";
 import { registerPivotFantasySystem } from "../src/pivot";
 
@@ -70,6 +71,7 @@ function createMockFoundry() {
 describe("system manifest", () => {
   it("declares Pivot Fantasy character and item document types", () => {
     expect(manifestJson.documentTypes?.Actor).toHaveProperty("character");
+    expect(manifestJson.documentTypes?.Actor).toHaveProperty("npc");
     expect(manifestJson.documentTypes?.Item).toMatchObject({
       weapon: {},
       armour: {},
@@ -99,6 +101,29 @@ describe("PivotCharacterData", () => {
     expect(schema).toHaveProperty("currency");
     expect(schema).toHaveProperty("magic");
     expect(schema).toHaveProperty("notes");
+  });
+});
+
+describe("PivotNpcData", () => {
+  it("defines source fields for NPC sheet including HP, AC, Speed, combat bonuses, CR, and biography", () => {
+    const { foundry } = createMockFoundry();
+    const NpcData = createPivotNpcDataModel(foundry);
+    const schema = NpcData.defineSchema() as Record<string, FieldRecord>;
+
+    expect(schema).toHaveProperty("schemaVersion");
+    expect(schema).toHaveProperty("attributes");
+    expect(schema).toHaveProperty("combatBonuses");
+    expect(schema).toHaveProperty("cr");
+    expect(schema).toHaveProperty("biography");
+
+    const attributes = schema.attributes as FieldRecord;
+    expect(attributes.fields).toHaveProperty("hp");
+    expect(attributes.fields).toHaveProperty("ac");
+    expect(attributes.fields).toHaveProperty("speed");
+
+    const combatBonuses = schema.combatBonuses as FieldRecord;
+    expect(combatBonuses.fields).toHaveProperty("physical");
+    expect(combatBonuses.fields).toHaveProperty("intellectual");
   });
 });
 
@@ -159,11 +184,20 @@ describe("registerPivotFantasySystem", () => {
         bar: ["attributes.hp", "resources.pool", "magic.mp"],
         value: ["progression.xp", "progression.level"],
       },
+      npc: {
+        bar: ["attributes.hp"],
+        value: [],
+      },
     });
-    expect(registeredSheets).toHaveLength(2);
-    const actorSheetClass = (registeredSheets[0] as unknown[])[2] as {
+    expect(registeredSheets).toHaveLength(3);
+    const characterSheetClass = (registeredSheets[0] as unknown[])[2] as {
       DEFAULT_OPTIONS?: { actions?: Record<string, unknown> };
     };
-    expect(actorSheetClass.DEFAULT_OPTIONS?.actions).toHaveProperty("openItem");
+    expect(characterSheetClass.DEFAULT_OPTIONS?.actions).toHaveProperty("openItem");
+
+    const npcSheetClass = (registeredSheets[1] as unknown[])[2] as {
+      DEFAULT_OPTIONS?: { actions?: Record<string, unknown> };
+    };
+    expect(npcSheetClass.DEFAULT_OPTIONS?.actions).toHaveProperty("editItem");
   });
 });
