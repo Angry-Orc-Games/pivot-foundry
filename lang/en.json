@@ -202,11 +202,11 @@
   "PIVOT.Survival.InvalidMaximum": "HP maximum cannot be lower than current HP. Correct current HP first, or update both together.",
   "PIVOT.Rest.ShortRest": "Short Rest",
   "PIVOT.Rest.LongRest": "Long Rest",
-  "PIVOT.Rest.ShortRestPrompt": "Spend any number of Pool dice. Each die rolls an exploding Hit Die + Constitution modifier to heal HP. Awakened characters recover magic ability modifier MP if not in danger.",
+  "PIVOT.Rest.ShortRestPrompt": "Spend Pool dice for healing. Each die rolls exploding Hit Die + Constitution modifier → HP (applied automatically).",
   "PIVOT.Rest.PoolDiceToSpend": "Pool dice to spend",
   "PIVOT.Rest.Max": "Max",
-  "PIVOT.Rest.ShortRestPoolInfo": "Each die: {die} (exploding) + {conMod} → HP",
-  "PIVOT.Rest.ShortRestMpInfo": "You will recover {amount} MP (not in immediate danger)",
+  "PIVOT.Rest.ShortRestPoolInfo": "Each die: exploding {die} + Con mod → HP",
+  "PIVOT.Rest.ShortRestMpInfo": "Awakened MP recovery (not in danger): {amount} MP",
   "PIVOT.Rest.ShortRestMpDanger": "No MP recovery: you are in immediate danger",
   "PIVOT.Rest.ShortRestNotAwakened": "No MP recovery: not awakened",
   "PIVOT.Rest.LongRestPrompt": "Recover all HP and half Pool max (floor, min 1). Awakened characters recover all MP if safe/comfortable, or half otherwise unless Control Magic DC 15 succeeds.",
@@ -225,5 +225,5 @@
   "PIVOT.Rest.MpRecovered": "MP recovered",
   "PIVOT.Rest.RestFailed": "Rest action failed. Check character state and try again.",
   "PIVOT.Rest.InsufficientPool": "Short rest requires at least 1 Pool.",
-  "PIVOT.Rest.ShortRestRollNote": "Roll Hit Dice manually for each Pool spent: exploding HD + Con mod → HP"
+  "PIVOT.Rest.RollIncomplete": "Rest roll was incomplete or cancelled."
 }

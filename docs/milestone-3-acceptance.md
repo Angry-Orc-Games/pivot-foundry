@@ -78,7 +78,7 @@ This document describes the acceptance test procedures for Milestone 3 (Initiati
 ### Test Case: Spend Pool Dice with MP Recovery
 
 1. **Setup:**
-   - Character: Pool 3, HP 5/10, MP 2/5, awakened, Int 16 (+3)
+   - Character: Pool 3, HP 5/10, MP 2/5, awakened, Int 16 (+3), Con 14 (+2), Hit Die d8
 
 2. **Action:**
    - Click "Short Rest" button on Core tab
@@ -86,19 +86,27 @@ This document describes the acceptance test procedures for Milestone 3 (Initiati
    - Confirm
 
 3. **Expected:**
+   - System rolls 2× exploding d8 + 2 (Con mod)
+   - Progress dialog shows dice rolling
    - Pool reduced to 1 (spent 2)
+   - HP increased by sum of dice results (capped at max 10)
    - MP increased to 5 (recovered +3, capped at max)
-   - Chat posts: "Short Rest Complete • Pool spent: 2 • MP recovered: 3"
-   - Note in chat: "Roll Hit Dice manually for each Pool spent: exploding HD + Con mod → HP"
-   - **Player manually rolls 2×(d8 exploding + 2) and updates HP**
+   - Chat posts:
+     - Summary: "Short Rest Complete • Pool spent: 2 • HP healed: [total] • MP recovered: 3"
+     - Dice detail: "d8: [rolls] +2 = [subtotal]; d8: [rolls] +2 = [subtotal]"
+   - No console errors
+
+**Success criteria:** HP, Pool, MP updated correctly; exploding dice visible in chat; no uncaught errors.
 
 ### Test Case: Not Awakened → No MP
 
-1. **Setup:** Character awakened = false, Pool 2
+1. **Setup:** Character awakened = false, Pool 2, HP 6/10, Con +2, Hit Die d8
 
 2. **Action:** Short Rest, spend 1 Pool
 
 3. **Expected:**
+   - System rolls 1× exploding d8 + 2
+   - HP increased by roll result (capped)
    - Pool spent
    - MP unchanged (not awakened)
    - Chat summary omits "MP recovered"
@@ -195,7 +203,7 @@ This document describes the acceptance test procedures for Milestone 3 (Initiati
 ## Notes for Manual Tester (Modi)
 
 - Initiative combatant selection (AC-1) already implemented in Milestone 2 PR #16, merged to main. This milestone adds rest mechanics (AC-2, AC-3).
-- Short Rest does **not** auto-roll Hit Dice in this version; player manually rolls exploding HD + Con mod and updates HP.
+- **Short Rest now system-applied:** Hit Dice roll exploding HD + Con mod in-system, HP applied automatically. Dice chains visible in chat.
 - Long Rest "Recover Pool" button (old) still exists on the sheet; it recovers half Pool only. New "Long Rest" button does full HP + Pool + MP.
 - Control Magic DC 15 is a d20 roll player makes externally, entering the total in the dialog.
 - Existing console noise from Foundry core is tolerated; pivot-fantasy errors are not.

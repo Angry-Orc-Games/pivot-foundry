@@ -8,7 +8,9 @@ import {
   calculateMagicAbilityModifier,
 } from "../rules/rest";
 import { abilityModifier } from "../rules/modifiers";
-import { createChat, escapeHtml, field, localize, prompt, warn } from "./ui";
+import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
+import { rollProgress } from "./roll-progress";
+import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 
 interface RestContext {
   actor: ActorLike;
@@ -97,18 +99,69 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
 
   if (!inputs) return;
 
+  const Roll = runtime().Roll;
+  if (!Roll) {
+    warn("Rest.RestFailed");
+    return;
+  }
+
   let poolRemaining = ctx.poolCurrent;
+  let totalHealed = 0;
+  const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
 
-  for (let i = 0; i < inputs.poolSpends; i++) {
-    if (poolRemaining < 1) break;
+  try {
+    const progress = rollProgress();
 
-    const spendResult = applyShortRestPoolSpend({
-      die: ctx.hitDie,
-      poolCurrent: poolRemaining,
-      conMod: ctx.conMod,
-    });
+    for (let i = 0; i < inputs.poolSpends; i++) {
+      if (poolRemaining < 1) break;
 
-    poolRemaining = spendResult.poolRemaining;
+      const spendResult = applyShortRestPoolSpend({
+        die: ctx.hitDie,
+        poolCurrent: poolRemaining,
+        conMod: ctx.conMod,
+      });
+
+      poolRemaining = spendResult.poolRemaining;
+
+      const dieFormula = ctx.hitDie;
+      if (!parseExplodingFormula(dieFormula)) {
+        progress.close();
+        warn("Rest.RestFailed");
+        return;
+      }
+
+      const rollResult = await rollExploding(
+        dieFormula,
+        { critical: false, enhanced: false },
+        async (faces) => {
+          const die = new Roll(`1d${faces}`);
+          await progress.wait(die.evaluate());
+          if (die.total === undefined) throw new Error("Incomplete");
+          return die.total;
+        },
+      );
+
+      if (!rollResult.complete || rollResult.total === null) {
+        progress.close();
+        warn("Rest.RollIncomplete");
+        return;
+      }
+
+      const dieTotal = rollResult.total;
+      const healedForThisDie = Math.max(0, dieTotal + ctx.conMod);
+      totalHealed += healedForThisDie;
+
+      diceResults.push({
+        faces: Number(ctx.hitDie.replace(/^d/, "")),
+        results: rollResult.chains[0]?.results ?? [],
+        total: healedForThisDie,
+      });
+    }
+
+    progress.close();
+  } catch {
+    warn("Rest.RestFailed");
+    return;
   }
 
   const mpResult = applyShortRestMpRecovery({
@@ -119,7 +172,9 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     inDanger: false,
   });
 
+  const newHp = Math.min(ctx.hpMax, ctx.hpCurrent + totalHealed);
   const update: Record<string, unknown> = {
+    "system.attributes.hp.value": newHp,
     "system.resources.pool.value": poolRemaining,
     "system.magic.mp.value": mpResult.mpFinal,
   };
@@ -131,9 +186,14 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     return;
   }
 
+  const diceChains = diceResults
+    .map((d) => `d${d.faces}: [${d.results.join(" → ")}] ${formatSigned(ctx.conMod)} = ${d.total}`)
+    .join("; ");
+
   const summary = [
     `${escapeHtml(localize("Rest.ShortRestComplete"))}`,
     `${escapeHtml(localize("Rest.PoolSpent"))}: ${inputs.poolSpends}`,
+    `${escapeHtml(localize("Rest.HpHealed"))}: ${totalHealed}`,
     mpResult.mpRecovered > 0
       ? `${escapeHtml(localize("Rest.MpRecovered"))}: ${mpResult.mpRecovered}`
       : "",
@@ -142,7 +202,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     .join(" • ");
 
   await createChat({
-    content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(localize("Rest.ShortRestRollNote"))}</em></p>`,
+    content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
   });
 }
 
