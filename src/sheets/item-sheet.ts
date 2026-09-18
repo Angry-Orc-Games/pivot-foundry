@@ -7,7 +7,6 @@ const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 export const ITEM_SHEET_POSITION = { width: 560, height: "auto" as const };
 export const ITEM_SHEET_WINDOW = {
   resizable: true,
-  title: "PIVOT.Sheets.Item.Title",
 };
 
 export interface ItemSheetEffectRow {
