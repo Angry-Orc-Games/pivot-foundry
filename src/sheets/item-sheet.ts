@@ -4,6 +4,12 @@ import { describeEffectRule, parseStoredEffect, type EffectRule } from "../rules
 
 const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 
+export const ITEM_SHEET_POSITION = { width: 560, height: "auto" as const };
+export const ITEM_SHEET_WINDOW = {
+  resizable: true,
+  title: "PIVOT.Sheets.Item.Title",
+};
+
 export interface ItemSheetEffectRow {
   type: EffectRule["type"];
   typeLabelKey: string;
@@ -36,11 +42,9 @@ export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataMode
   class PivotItemSheet extends BaseSheet {
     static DEFAULT_OPTIONS = {
       classes: [SYSTEM_ID, "sheet", "item"],
-      position: { width: 560, height: 520 },
+      position: ITEM_SHEET_POSITION,
       tag: "form",
-      window: {
-        title: "PIVOT.Sheets.Item.Title",
-      },
+      window: ITEM_SHEET_WINDOW,
       form: {
         closeOnSubmit: false,
         submitOnChange: true,

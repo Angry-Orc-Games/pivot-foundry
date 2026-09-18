@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { prepareItemSheetContext } from "../../src/sheets/item-sheet";
+import {
+  ITEM_SHEET_POSITION,
+  ITEM_SHEET_WINDOW,
+  prepareItemSheetContext,
+} from "../../src/sheets/item-sheet";
 
 describe("prepareItemSheetContext", () => {
   it("shows a read-only summary of valid stored effects", () => {
@@ -41,5 +45,12 @@ describe("prepareItemSheetContext", () => {
 
     expect(context.effects).toEqual([]);
     expect(context.isEquipment).toBe(true);
+  });
+});
+
+describe("PivotItemSheet window", () => {
+  it("fits content height and stays resizable so the form is not clipped", () => {
+    expect(ITEM_SHEET_POSITION).toEqual({ width: 560, height: "auto" });
+    expect(ITEM_SHEET_WINDOW.resizable).toBe(true);
   });
 });
