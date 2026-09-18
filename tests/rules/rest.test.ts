@@ -7,6 +7,7 @@ import {
   applyShortRestMpRecovery,
   applyShortRestPoolSpend,
   calculateMagicAbilityModifier,
+  parsePoolSpends,
 } from "../../src/rules/rest";
 
 describe("applyShortRestPoolSpend", () => {
@@ -235,5 +236,40 @@ describe("calculateMagicAbilityModifier", () => {
 
   it("returns 0 when magic ability is null", () => {
     expect(calculateMagicAbilityModifier(true, null)).toBe(0);
+  });
+});
+
+describe("parsePoolSpends", () => {
+  it("returns null for empty string", () => {
+    expect(parsePoolSpends("", 3)).toBe(null);
+  });
+
+  it("returns null for whitespace", () => {
+    expect(parsePoolSpends("   ", 3)).toBe(null);
+  });
+
+  it("returns null for non-integer", () => {
+    expect(parsePoolSpends("1.5", 3)).toBe(null);
+  });
+
+  it("returns null for zero", () => {
+    expect(parsePoolSpends("0", 3)).toBe(null);
+  });
+
+  it("returns null for negative", () => {
+    expect(parsePoolSpends("-1", 3)).toBe(null);
+  });
+
+  it("returns parsed value when valid and below max", () => {
+    expect(parsePoolSpends("2", 3)).toBe(2);
+  });
+
+  it("caps value at max", () => {
+    expect(parsePoolSpends("9", 3)).toBe(3);
+  });
+
+  it("returns null for non-finite", () => {
+    expect(parsePoolSpends("Infinity", 3)).toBe(null);
+    expect(parsePoolSpends("NaN", 3)).toBe(null);
   });
 });

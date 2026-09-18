@@ -181,3 +181,20 @@ export function calculateMagicAbilityModifier(
   }
   return abilityModifier(magicAbilityScore);
 }
+
+/**
+ * Parse and validate Pool spend input from a form field.
+ * Returns null for empty, whitespace, non-finite, non-integer, or spend below 1.
+ * Caps valid spend at current Pool max.
+ */
+export function parsePoolSpends(raw: string, max: number): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return null;
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed < 1) return null;
+
+  return Math.min(parsed, max);
+}
