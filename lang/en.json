@@ -255,5 +255,6 @@
   "PIVOT.Rest.InsufficientPool": "Short rest requires at least 1 Pool.",
   "PIVOT.Rest.RollIncomplete": "Rest roll was incomplete or cancelled.",
   "PIVOT.Rest.Confirm": "Confirm",
+  "PIVOT.Rest.Cancel": "Cancel",
   "PIVOT.Rest.ChatFailed": "Rest completed but chat notification failed. Check character state directly."
 }

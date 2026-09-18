@@ -6,6 +6,7 @@ import {
   applyShortRestMpRecovery,
   applyShortRestPoolSpend,
   calculateMagicAbilityModifier,
+  parsePoolSpends,
 } from "../rules/rest";
 import { abilityModifier } from "../rules/modifiers";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
@@ -105,21 +106,22 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
       }
     </div>`,
     (form) => {
-      const poolSpends = Number(field(form, "poolSpends"));
+      const poolSpendsRaw = field(form, "poolSpends");
       const inDanger = field(form, "inDanger") === "yes";
-      return { poolSpends, inDanger };
+      return { poolSpendsRaw, inDanger };
     },
     localizeRest("Confirm"),
+    { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
   );
 
   if (!inputs) return;
 
-  if (!Number.isInteger(inputs.poolSpends) || inputs.poolSpends < 0) {
+  const poolSpends = parsePoolSpends(inputs.poolSpendsRaw, maxSpends);
+
+  if (poolSpends === null) {
     warnRest("RestFailed");
     return;
   }
-
-  const poolSpends = Math.min(maxSpends, inputs.poolSpends);
 
   const Roll = runtime().Roll;
   if (!Roll) {
@@ -253,6 +255,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
       safeAndComfortable: field(form, "safeAndComfortable") === "yes",
     }),
     localizeRest("Confirm"),
+    { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
   );
 
   if (!safeInput) return;
@@ -283,6 +286,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
         roll: Number(field(form, "roll")),
       }),
       localizeRest("Confirm"),
+      { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
     );
 
     if (!rollInput) return;

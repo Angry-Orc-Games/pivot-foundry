@@ -35,24 +35,36 @@ export function runtime(): RuntimeGlobals {
 export function warn(key: string): void {
   runtime().ui?.notifications?.warn(localize(key));
 }
+export interface PromptOptions {
+  localizeTitlesAndButtons?: boolean;
+  cancelLabel?: string;
+}
+
 export async function prompt<T>(
   title: string,
   content: string,
   read: (form: HTMLFormElement) => T,
   label = "Confirm",
+  options: PromptOptions = {},
 ): Promise<T | null> {
   const dialog = runtime().foundry?.applications?.api?.DialogV2;
   if (!dialog) return null;
+
+  const shouldLocalize = options.localizeTitlesAndButtons ?? true;
+  const windowTitle = shouldLocalize ? localize(title) : title;
+  const okLabel = shouldLocalize ? localize(label) : label;
+  const cancelLabel = options.cancelLabel ?? (shouldLocalize ? localize("Cancel") : "Cancel");
+
   try {
     return (await dialog.prompt({
-      window: { title: localize(title) },
+      window: { title: windowTitle },
       content,
       ok: {
-        label: localize(label),
+        label: okLabel,
         callback: (_event: unknown, button: { form?: HTMLFormElement }) =>
           button.form ? read(button.form) : null,
       },
-      buttons: [{ action: "cancel", label: localize("Cancel"), callback: () => null }],
+      buttons: [{ action: "cancel", label: cancelLabel, callback: () => null }],
       rejectClose: false,
     })) as T | null;
   } catch {
