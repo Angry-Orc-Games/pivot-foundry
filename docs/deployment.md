@@ -25,13 +25,13 @@ If release preparation changes `system.json`, the new zip must pass E2E (and sta
 
 ## Implemented GitHub workflows
 
-| Workflow                                                                | Trigger                               | Secrets                              | Purpose                                                  |
-| ----------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ | -------------------------------------------------------- |
-| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                   | None                                 | Lint, format, types, Vitest, build, audit, package       |
-| [`e2e.yml`](../.github/workflows/e2e.yml)                               | Same-repo PRs and `workflow_dispatch` | `foundry-e2e`                        | Isolated Foundry E2E                                     |
-| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Successful CI on `main`               | `staging`                            | Deploy tested zip, smoke https://build.angryorcgames.com |
-| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval          | `production`                         | Promote the exact staging-accepted zip                   |
-| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                             | `foundry-e2e` then `contents: write` | Test the prepared zip, then publish                      |
+| Workflow                                                                | Trigger                               | Secrets                              | Purpose                                                                                                                                                           |
+| ----------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                   | None                                 | Lint, format, types, Vitest, build, audit, package                                                                                                                |
+| [`e2e.yml`](../.github/workflows/e2e.yml)                               | Same-repo PRs and `workflow_dispatch` | `foundry-e2e`                        | Isolated Foundry E2E. If those secrets are missing, the job is visibly not run and does not fail the PR. Release publication still requires a successful E2E job. |
+| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Successful CI on `main`               | `staging`                            | Deploy tested zip, smoke https://build.angryorcgames.com                                                                                                          |
+| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval          | `production`                         | Promote the exact staging-accepted zip                                                                                                                            |
+| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                             | `foundry-e2e` then `contents: write` | Test the prepared zip, then publish                                                                                                                               |
 
 Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Staging uses `concurrency: foundry-staging` with `cancel-in-progress: false` so one run cannot deploy while another is testing.
 

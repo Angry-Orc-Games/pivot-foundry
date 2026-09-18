@@ -30,19 +30,38 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
 
+      - name: Check Foundry secrets
+        id: creds
+        env:
+          HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
+          HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
+          HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
+          HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
+        run: |
+          if [ "$HAVE_ADMIN" = "true" ] && [ "$HAVE_LICENSE" = "true" ] && [ "$HAVE_CACHE" = "true" ] && [ "$HAVE_SHA" = "true" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Foundry E2E not run. Configure GitHub Environment foundry-e2e secrets: FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, FOUNDRY_RELEASE_CACHE_URL, FOUNDRY_RELEASE_SHA256."
+          fi
+
       - name: Setup Node
+        if: steps.creds.outputs.available == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: steps.creds.outputs.available == 'true'
         run: npm ci
 
       - name: Install Playwright browser
+        if: steps.creds.outputs.available == 'true'
         run: npx playwright install chromium --with-deps
 
       - name: Run packaged Foundry E2E
+        if: steps.creds.outputs.available == 'true'
         env:
           FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
           FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
@@ -53,11 +72,11 @@ jobs:
         run: npm run foundry:e2e
 
       - name: Record E2E acceptance
-        if: success()
+        if: steps.creds.outputs.available == 'true' && success()
         run: node scripts/record-acceptance.mjs e2e
 
       - name: Upload tested artifact
-        if: success()
+        if: steps.creds.outputs.available == 'true' && success()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-e2e
@@ -69,7 +88,7 @@ jobs:
           retention-days: 14
 
       - name: Upload sanitized diagnostics
-        if: failure()
+        if: steps.creds.outputs.available == 'true' && failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-e2e-diagnostics

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ITEM_SHEET_POSITION,
   ITEM_SHEET_WINDOW,
+  itemWindowTitle,
   prepareItemSheetContext,
 } from "../../src/sheets/item-sheet";
 
@@ -52,5 +53,11 @@ describe("PivotItemSheet window", () => {
   it("fits content height and stays resizable so the form is not clipped", () => {
     expect(ITEM_SHEET_POSITION).toEqual({ width: 560, height: "auto" });
     expect(ITEM_SHEET_WINDOW.resizable).toBe(true);
+  });
+
+  it("uses the item name as the window title without a type prefix", () => {
+    expect(itemWindowTitle({ document: { name: "New Armour" } })).toBe("New Armour");
+    expect(itemWindowTitle({ item: { name: "  Rope  " } })).toBe("Rope");
+    expect(itemWindowTitle({})).toBe("");
   });
 });
