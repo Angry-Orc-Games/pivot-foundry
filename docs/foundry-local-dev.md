@@ -4,7 +4,7 @@ This project can run against a local Foundry VTT v14 Node.js server so sheet and
 
 The host process is for local development only. It installs the official Foundry v14 Node.js zip into ignored `foundry-app/`, keeps user data in ignored `foundry-data/`, and symlinks this checkout's public system assets into `foundry-data/Data/systems/pivot-fantasy`.
 
-Do not commit Foundry binaries, timed download URLs, or license keys. Do not bake `foundry-app/` into a Cloud Agent snapshot.
+Do not commit Foundry binaries, timed download URLs, or license keys. Do not bake `foundry-app/` or a Foundry zip into a Cloud Agent snapshot. Secret names and the Cloud paste-URL workflow are in [foundry-secrets.md](foundry-secrets.md).
 
 ## One-Time Setup
 
@@ -28,9 +28,7 @@ For unattended testing beyond the first activation screen, also set `FOUNDRY_LIC
 
 Keep `.env.foundry.local` out of commits. It can contain a license key or a temporary signed download URL.
 
-## Cloud Agent secrets
-
-`foundry:up` reads `.env.foundry.local`, not process environment variables. On a Cloud Agent, put the same keys in **Cursor Dashboard → Cloud Agents → Secrets** as **Runtime Secrets** (`FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`; a fresh `FOUNDRY_RELEASE_URL` only at kick). Cursor injects them as env vars. Write the gitignored file from those vars, then run `foundry:up`. Do not save a timed URL on the environment (about 5 minutes). Do not bake `foundry-app/` or `.env.foundry.local` into a snapshot. Node 24 is still required for the host process.
+On a daily laptop, prefer `FOUNDRY_RELEASE_ARCHIVE` pointed at a local `FoundryVTT-Node-14.*.zip` (pin **14.368**). Do not commit the zip.
 
 3. Build the system once:
 
@@ -57,6 +55,25 @@ Stop the server when you are done:
 ```sh
 npm run foundry:down
 ```
+
+## Cloud Agent test environment
+
+Verified on current `main` (host Node 14, pin **14.368**): the operator pastes a fresh timed URL into the agent chat, the agent writes `.env.foundry.local`, and `foundry:up` brings Foundry up at http://127.0.0.1:30000/join with world **Pivot Fantasy Test**.
+
+`foundry:up` reads `.env.foundry.local`, not process environment variables. Persist only `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` as environment **Runtime Secrets**. Do not save `FOUNDRY_RELEASE_URL` on the environment. Full secret rules: [foundry-secrets.md](foundry-secrets.md).
+
+Checklist for each **new** Cloud VM:
+
+1. Confirm the environment has Runtime Secrets `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only.
+2. Generate a Foundry **14 Node** timed URL (`FoundryVTT-Node-14.*`, pin **14.368**) at https://foundryvtt.com/me/licenses and paste it into **this agent chat** (~5 minute TTL).
+3. Write gitignored `.env.foundry.local` (`umask 077`) from those two secrets plus the chat paste. Do not `cat` the file.
+4. Install Node 24 (`nvm install 24` if needed).
+5. `npm ci`, `npm run build`, `npm run foundry:check-env`, `npm run foundry:up`.
+6. First launch: apply license + admin in Foundry setup.
+7. Create world **Pivot Fantasy Test** using the Pivot Fantasy system.
+8. In the **Agents Window for that agent**, forward port **30000** to http://127.0.0.1:30000/join.
+
+A new VM has an empty disk. Do not expect `foundry-app/` from a previous agent. Do not bake `foundry-app/`, `foundry-data/`, the zip, or `.env.foundry.local` into a snapshot.
 
 ## Development Loop
 

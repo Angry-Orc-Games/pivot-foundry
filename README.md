@@ -114,7 +114,17 @@ npm run foundry:logs
 npm run foundry:down
 ```
 
-See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full loop, smoke test, and Cloud Agent secrets.
+See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full loop and smoke test, and [docs/foundry-secrets.md](docs/foundry-secrets.md) for what to persist versus paste.
+
+### Cloud Agent test environment
+
+Persist only `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` as environment **Runtime Secrets**. Each new Cloud VM, paste a fresh Foundry **14 Node** timed URL (`FoundryVTT-Node-14.*`, pin **14.368**) from https://foundryvtt.com/me/licenses into **that agent chat** (~5 minute TTL). The agent writes gitignored `.env.foundry.local` (`foundry:up` reads the file, not `process.env`), installs Node 24, runs `npm ci` / `npm run build` / `npm run foundry:up`, applies license + admin, and creates world **Pivot Fantasy Test**. In the **Agents Window for that agent**, forward port **30000** to http://127.0.0.1:30000/join.
+
+Do not save the timed URL on the environment. Do not commit the zip or bake `foundry-app/` into a snapshot.
+
+### Daily laptop
+
+Set `FOUNDRY_RELEASE_ARCHIVE` to a local `FoundryVTT-Node-14.*.zip` (not git). Later starts reuse ignored `foundry-app/`.
 
 ## Project Layout
 

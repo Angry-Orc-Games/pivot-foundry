@@ -101,3 +101,4 @@ Update documentation in the same change when behavior or workflow changes:
 - Update `docs/release.md` for packaging, tag, or manifest changes.
 - Keep claims aligned with implemented behavior. Do not describe a playable feature until the code and verification exist.
 - Update `docs/foundry-local-dev.md` when the local Foundry host, env keys, or smoke-test loop changes.
+- Update `docs/foundry-secrets.md` when persisted Cloud secrets, the timed-URL paste workflow, or snapshot rules change.

@@ -35,8 +35,14 @@ Run these from the repository root:
 
 Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, build locally and note whether Foundry v14 was manually checked.
 
-Hosting Foundry locally uses Node 24 and a licensed Node zip in ignored `foundry-app/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Repository `npm run verify` stays on Node 20/22.
+Hosting Foundry locally uses Node 24 and a licensed Node zip in ignored `foundry-app/`. Do not commit Foundry binaries, `.env.foundry.local`, license keys, or a Foundry zip. Do not bake `foundry-app/` into a snapshot. Repository `npm run verify` stays on Node 20/22.
 
 ## Cursor Cloud specific instructions
 
-Cloud secrets belong in the Cursor Secrets tab (Runtime Secret), not in git or an environment snapshot. `npm run foundry:up` only reads `.env.foundry.local`; write that file from the injected `FOUNDRY_*` env vars before starting Foundry. Do not store a timed `FOUNDRY_RELEASE_URL` on a saved environment. See [docs/foundry-local-dev.md](docs/foundry-local-dev.md).
+Persist environment **Runtime Secrets** `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only. Do not save a timed `FOUNDRY_RELEASE_URL` on the environment.
+
+Each new Cloud VM: the operator pastes a fresh Foundry **14 Node** timed URL (`FoundryVTT-Node-14.*`, pin **14.368**) from https://foundryvtt.com/me/licenses into **this chat** (~5 minute TTL). Write gitignored `.env.foundry.local` from the persisted secrets plus that paste (`foundry:up` reads the file, not `process.env`). Do not `cat` the file. Install Node 24, run `npm ci`, `npm run build`, `npm run foundry:up`, apply license + admin, and create world **Pivot Fantasy Test**. Forward Agents Window port **30000** → http://127.0.0.1:30000/join (must be this agent).
+
+Daily laptop: `FOUNDRY_RELEASE_ARCHIVE` to a local zip (not git).
+
+See [docs/foundry-secrets.md](docs/foundry-secrets.md) and [docs/foundry-local-dev.md](docs/foundry-local-dev.md).
