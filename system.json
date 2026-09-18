@@ -5,11 +5,12 @@
   "version": "0.1.0",
   "compatibility": {
     "minimum": "14",
-    "verified": "14.361"
+    "verified": "14.368"
   },
   "documentTypes": {
     "Actor": {
-      "character": {}
+      "character": {},
+      "npc": {}
     },
     "Item": {
       "weapon": {},
