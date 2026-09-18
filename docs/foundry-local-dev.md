@@ -20,7 +20,7 @@ The Foundry host process needs **Node 24**. Repository checks such as `npm run v
 
 For a first install into `foundry-app/`, set either `FOUNDRY_RELEASE_URL` or `FOUNDRY_RELEASE_ARCHIVE`. A temporary Version 14 Node.js download URL from the Foundry license page is preferred for agent-assisted local testing because it avoids storing a zip in the checkout. Later starts reuse the ignored install and do not need a fresh URL.
 
-Make sure the timed URL or zip is for Foundry v14 and the `Node.js` operating system option (`FoundryVTT-Node-14.*`). A Linux, Windows, macOS, or incompatible version archive will not boot this sandbox. The verified pin for this repository is **14.361**.
+Make sure the timed URL or zip is for Foundry v14 and the `Node.js` operating system option (`FoundryVTT-Node-14.*`). A Linux, Windows, macOS, or incompatible version archive will not boot this sandbox. The verified pin for this repository is **14.368**.
 
 Set `FOUNDRY_ADMIN_KEY` to a local-only admin password.
 

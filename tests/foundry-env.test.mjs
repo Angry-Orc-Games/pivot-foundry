@@ -49,7 +49,7 @@ describe("foundry env check", () => {
     const result = await runCheck(
       [
         "FOUNDRY_ADMIN_KEY=change-me-local-only",
-        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.361/FoundryVTT-Node-14.361.zip",
+        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.368/FoundryVTT-Node-14.368.zip",
         "",
       ].join("\n"),
     );
@@ -62,7 +62,7 @@ describe("foundry env check", () => {
     const result = await runCheck(
       [
         "FOUNDRY_ADMIN_KEY=local-admin",
-        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.361/FoundryVTT-Node-14.361.zip",
+        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.368/FoundryVTT-Node-14.368.zip",
         "",
       ].join("\n"),
     );
@@ -82,7 +82,7 @@ describe("foundry env check", () => {
     const wrongOs = await runCheck(
       [
         "FOUNDRY_ADMIN_KEY=local-admin",
-        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.361/FoundryVTT-Linux-14.361.zip",
+        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.368/FoundryVTT-Linux-14.368.zip",
         "",
       ].join("\n"),
     );
@@ -95,7 +95,7 @@ describe("foundry env check", () => {
 
   it("accepts an operator-supplied v14 Node.js zip", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pivot-foundry-zip-"));
-    const archive = join(dir, "FoundryVTT-Node-14.361.zip");
+    const archive = join(dir, "FoundryVTT-Node-14.368.zip");
     await writeFile(archive, "");
 
     const result = await runCheck(

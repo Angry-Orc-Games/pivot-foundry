@@ -17,7 +17,7 @@ Check that `system.json` contains the intended metadata:
 - `id`: `pivot-fantasy`
 - `title`: `Pivot Fantasy`
 - `compatibility.minimum`: `14`
-- `compatibility.verified`: `14.361`
+- `compatibility.verified`: `14.368`
 - `esmodules`: `dist/pivot.mjs`
 - `manifest`: latest release `system.json` URL
 - `download`: latest release `system.zip` URL

@@ -55,7 +55,7 @@ Not implemented yet:
 - Node.js 20 or newer for repository checks (`npm run verify`)
 - Node.js 24 to host the local Foundry v14 process (`nvm` is fine)
 - npm
-- Foundry Virtual Tabletop v14 Node.js zip (verified 14.361)
+- Foundry Virtual Tabletop v14 Node.js zip (verified 14.368)
 
 ## Setup
 
