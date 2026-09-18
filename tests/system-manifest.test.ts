@@ -57,6 +57,9 @@ describe("english localization", () => {
         "Pivot Fantasy migration {id} finished ({updated} updated, {failed} failed).",
       "PIVOT.Migration.DocumentFailed": "Pivot Fantasy migration {id} failed for {name}: {error}",
       "PIVOT.Sections.Effects": "Effects",
+      "PIVOT.Fields.Speed": "Speed",
+      "PIVOT.Sections.Survival": "Survival",
+      "PIVOT.Sections.Vitality": "Vitality",
     });
   });
 });

@@ -162,7 +162,7 @@
           </div>
         </section>
 
-        <section class="pivot-panel">
+        <section class="pivot-panel pivot-resources-panel">
           <h2>{{localize "PIVOT.Sections.Resources"}}</h2>
           <div class="pivot-stat-strip">
             <div class="pivot-stat"><span>{{localize "PIVOT.Fields.ProfBonus"}}</span><strong
@@ -190,118 +190,189 @@
                   "PIVOT.Fields.PassivePerception"
                 }}</span><strong>{{derived.passivePerception}}</strong></div>
           </div>
-          <div class="pivot-resource-grid">
-            <label><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
-                name="system.attributes.hitDie"
-                {{disabledAttr}}
-              >{{selectOptions
-                  config.hitDiceChoices
-                  selected=system.attributes.hitDie
-                }}</select></label>
-            <label><span>{{localize "PIVOT.Fields.HPMax"}}</span><input
-                name="system.attributes.hp.max"
-                type="number"
-                min="0"
-                step="1"
-                value="{{system.attributes.hp.max}}"
-                {{disabledAttr}}
-              /></label>
-            <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
-                readonly
-                aria-label="Current HP"
-                type="number"
-                min="0"
-                step="1"
-                value="{{system.attributes.hp.value}}"
-                {{disabledAttr}}
-              /></label>
-            <label><span>{{localize "PIVOT.Fields.Pool"}}</span><input
-                name="system.resources.pool.value"
-                type="number"
-                min="0"
-                step="1"
-                value="{{system.resources.pool.value}}"
-                {{disabledAttr}}
-              /></label>
-            <div class="pivot-resource-actions">
-              <button
-                type="button"
-                data-action="adjustResource"
-                data-path="resources.pool.value"
-                data-delta="-1"
-                aria-label="{{localize 'PIVOT.Actions.DecreasePool'}}"
-                title="{{localize 'PIVOT.Actions.DecreasePool'}}"
-                {{disabledAttr}}
-              >-</button>
-              <span>{{system.resources.pool.value}} / {{derived.pool.max}}</span>
-              <button
-                type="button"
-                data-action="adjustResource"
-                data-path="resources.pool.value"
-                data-delta="1"
-                aria-label="{{localize 'PIVOT.Actions.IncreasePool'}}"
-                title="{{localize 'PIVOT.Actions.IncreasePool'}}"
-                {{disabledAttr}}
-              >+</button>
-              <button
-                type="button"
-                class="pivot-recover-pool"
-                data-action="recoverPoolLongRest"
-                aria-label="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
-                title="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
-                {{disabledAttr}}
-              >{{localize "PIVOT.Actions.RecoverPoolLongRest"}}</button>
+
+          <section class="pivot-vitality">
+            <h3>{{localize "PIVOT.Sections.Vitality"}}</h3>
+            <div class="pivot-vitality-grid">
+              <div class="pivot-meter-block">
+                <div class="pivot-meter-heading">
+                  <span>{{localize "PIVOT.Fields.HPMax"}}</span>
+                  <strong>{{system.attributes.hp.value}} / {{system.attributes.hp.max}}</strong>
+                </div>
+                <div class="pivot-meter" aria-hidden="true">
+                  <div class="pivot-meter-fill hp" style="width: {{hpPercent}}%;"></div>
+                </div>
+                <div class="pivot-meter-fields">
+                  <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
+                      readonly
+                      aria-label="Current HP"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value="{{system.attributes.hp.value}}"
+                      {{disabledAttr}}
+                    /></label>
+                  <label><span>{{localize "PIVOT.Fields.HPMax"}}</span><input
+                      name="system.attributes.hp.max"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value="{{system.attributes.hp.max}}"
+                      {{disabledAttr}}
+                    /></label>
+                </div>
+              </div>
+              <div class="pivot-meter-block">
+                <div class="pivot-meter-heading">
+                  <span>{{localize "PIVOT.Fields.Pool"}}</span>
+                  <strong>{{system.resources.pool.value}} / {{derived.pool.max}}</strong>
+                </div>
+                <div class="pivot-meter" aria-hidden="true">
+                  <div class="pivot-meter-fill pool" style="width: {{poolPercent}}%;"></div>
+                </div>
+                <div class="pivot-resource-actions">
+                  <button
+                    type="button"
+                    data-action="adjustResource"
+                    data-path="resources.pool.value"
+                    data-delta="-1"
+                    aria-label="{{localize 'PIVOT.Actions.DecreasePool'}}"
+                    title="{{localize 'PIVOT.Actions.DecreasePool'}}"
+                    {{disabledAttr}}
+                  >-</button>
+                  <input
+                    class="pivot-pool-value"
+                    name="system.resources.pool.value"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="{{system.resources.pool.value}}"
+                    aria-label="{{localize 'PIVOT.Fields.Pool'}}"
+                    {{disabledAttr}}
+                  />
+                  <button
+                    type="button"
+                    data-action="adjustResource"
+                    data-path="resources.pool.value"
+                    data-delta="1"
+                    aria-label="{{localize 'PIVOT.Actions.IncreasePool'}}"
+                    title="{{localize 'PIVOT.Actions.IncreasePool'}}"
+                    {{disabledAttr}}
+                  >+</button>
+                </div>
+                <button
+                  type="button"
+                  class="pivot-sheet-button"
+                  data-action="recoverPoolLongRest"
+                  aria-label="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
+                  title="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
+                  {{disabledAttr}}
+                >{{localize "PIVOT.Actions.RecoverPoolLongRest"}}</button>
+              </div>
+              <label class="pivot-hit-die"><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
+                  name="system.attributes.hitDie"
+                  {{disabledAttr}}
+                >{{selectOptions
+                    config.hitDiceChoices
+                    selected=system.attributes.hitDie
+                  }}</select></label>
             </div>
-          </div>
+          </section>
           <div class="pivot-rest-actions">
-            <button type="button" data-action="shortRest" {{disabledAttr}}>{{localize
-                "PIVOT.Actions.ShortRest"
-              }}</button>
-            <button type="button" data-action="longRest" {{disabledAttr}}>{{localize
-                "PIVOT.Actions.LongRest"
-              }}</button>
+            <button
+              type="button"
+              class="pivot-sheet-button"
+              data-action="shortRest"
+              {{disabledAttr}}
+            >{{localize "PIVOT.Actions.ShortRest"}}</button>
+            <button
+              type="button"
+              class="pivot-sheet-button"
+              data-action="longRest"
+              {{disabledAttr}}
+            >{{localize "PIVOT.Actions.LongRest"}}</button>
           </div>
-          <button type="button" data-action="survivalRoll" {{disabledAttr}}>{{localize
-              "PIVOT.Survival.RollTitle"
-            }}</button>
-          <button type="button" data-action="tempHp" {{disabledAttr}}>{{localize
-              "PIVOT.Survival.Temp"
-            }}</button>
-          <p>{{localize "PIVOT.Survival.Temp"}}: {{system.attributes.hp.temp}}</p>
-          <p>{{localize survivalLabel}}</p>
-          <button type="button" data-action="deathSave" {{disabledAttr}}>{{localize
-              "PIVOT.Survival.DeathSave"
-            }}</button>
-          <button type="button" data-action="clearTempHp" {{disabledAttr}}>{{localize
-              "PIVOT.Survival.ClearTemp"
-            }}</button>
-          {{#if isGM}}<button type="button" data-action="correctSurvival">{{localize
-                "PIVOT.Survival.Correction"
-              }}</button>{{/if}}
-          <p>{{localize "PIVOT.Survival.ManualConsequences"}}</p>
-          <fieldset class="pivot-death-saves">
-            <legend>{{localize "PIVOT.Fields.DeathSaves"}}</legend>
-            <label><span>{{localize "PIVOT.Fields.Successes"}}</span><input
-                readonly
-                aria-label="Death save successes"
-                type="number"
-                min="0"
-                max="3"
-                step="1"
-                value="{{system.attributes.deathSaves.successes}}"
+
+          <section class="pivot-survival">
+            <div class="pivot-survival-header">
+              <h3>{{localize "PIVOT.Sections.Survival"}}</h3>
+              <span class="pivot-status {{survivalStatus}}">{{localize survivalLabel}}</span>
+            </div>
+            <div class="pivot-temp-hp">
+              <span>{{localize "PIVOT.Survival.Temp"}}</span>
+              <strong>{{system.attributes.hp.temp}}</strong>
+            </div>
+            <div class="pivot-survival-actions">
+              <button
+                type="button"
+                class="pivot-sheet-button primary"
+                data-action="survivalRoll"
                 {{disabledAttr}}
-              /></label>
-            <label><span>{{localize "PIVOT.Fields.Failures"}}</span><input
-                readonly
-                aria-label="Death save failures"
-                type="number"
-                min="0"
-                max="3"
-                step="1"
-                value="{{system.attributes.deathSaves.failures}}"
+              >{{localize "PIVOT.Survival.RollTitle"}}</button>
+              <button
+                type="button"
+                class="pivot-sheet-button"
+                data-action="tempHp"
                 {{disabledAttr}}
-              /></label>
-          </fieldset>
+              >{{localize "PIVOT.Survival.Temp"}}</button>
+              <button
+                type="button"
+                class="pivot-sheet-button"
+                data-action="deathSave"
+                {{disabledAttr}}
+              >{{localize "PIVOT.Survival.DeathSave"}}</button>
+              <button
+                type="button"
+                class="pivot-sheet-button"
+                data-action="clearTempHp"
+                {{disabledAttr}}
+              >{{localize "PIVOT.Survival.ClearTemp"}}</button>
+              {{#if isGM}}<button
+                  type="button"
+                  class="pivot-sheet-button"
+                  data-action="correctSurvival"
+                >{{localize "PIVOT.Survival.Correction"}}</button>{{/if}}
+            </div>
+            <div class="pivot-death-saves">
+              <div class="pivot-death-track">
+                <span>{{localize "PIVOT.Fields.Successes"}}</span>
+                <div
+                  class="pivot-pips"
+                  role="img"
+                  aria-label="{{localize
+                    'PIVOT.Fields.Successes'
+                  }}: {{system.attributes.deathSaves.successes}}"
+                >
+                  {{#each deathSaveSuccessPips}}
+                    {{#if this}}
+                      <span class="pivot-pip success filled"></span>
+                    {{else}}
+                      <span class="pivot-pip success"></span>
+                    {{/if}}
+                  {{/each}}
+                </div>
+              </div>
+              <div class="pivot-death-track">
+                <span>{{localize "PIVOT.Fields.Failures"}}</span>
+                <div
+                  class="pivot-pips"
+                  role="img"
+                  aria-label="{{localize
+                    'PIVOT.Fields.Failures'
+                  }}: {{system.attributes.deathSaves.failures}}"
+                >
+                  {{#each deathSaveFailurePips}}
+                    {{#if this}}
+                      <span class="pivot-pip failure filled"></span>
+                    {{else}}
+                      <span class="pivot-pip failure"></span>
+                    {{/if}}
+                  {{/each}}
+                </div>
+              </div>
+            </div>
+            <p class="pivot-survival-note">{{localize "PIVOT.Survival.ManualConsequences"}}</p>
+          </section>
         </section>
       </div>
 

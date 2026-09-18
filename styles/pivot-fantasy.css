@@ -239,7 +239,232 @@
   grid-column: 1 / -1;
 }
 
+.pivot-vitality,
+.pivot-survival {
+  border-top: 1px solid var(--pivot-paper-deep);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.pivot-vitality h3,
+.pivot-survival h3 {
+  color: var(--pivot-blue);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.pivot-vitality-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.pivot-meter-block {
+  background: #fff8ea;
+  border: 1px solid var(--pivot-line);
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.pivot-meter-heading {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pivot-meter-heading span,
+.pivot-hit-die span,
+.pivot-temp-hp span,
+.pivot-death-track span {
+  color: var(--pivot-blue);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pivot-meter-heading strong,
+.pivot-temp-hp strong {
+  font-size: 18px;
+}
+
+.pivot-meter {
+  background: var(--pivot-paper-deep);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.pivot-meter-fill {
+  height: 100%;
+  min-width: 0;
+}
+
+.pivot-meter-fill.hp {
+  background: #8a2a2a;
+}
+
+.pivot-meter-fill.pool {
+  background: var(--pivot-gold);
+}
+
+.pivot-meter-fields {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pivot-meter-fields label,
+.pivot-hit-die {
+  display: grid;
+  gap: 4px;
+}
+
+.pivot-pool-value {
+  min-height: 32px;
+  text-align: center;
+}
+
+.pivot-resource-actions button {
+  background: var(--pivot-blue);
+  border: 1px solid var(--pivot-gold);
+  border-radius: 4px;
+  color: #fff8ea;
+  font-weight: 700;
+  min-height: 32px;
+}
+
+.pivot-sheet-button {
+  background: #fff8ea;
+  border: 1px solid var(--pivot-line);
+  border-radius: 4px;
+  color: var(--pivot-blue);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 6px 10px;
+  text-align: center;
+}
+
+.pivot-sheet-button.primary {
+  background: var(--pivot-blue);
+  border-color: var(--pivot-gold);
+  color: #fff8ea;
+}
+
+.pivot-survival-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pivot-survival-header h3 {
+  margin: 0;
+}
+
+.pivot-status {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  text-transform: uppercase;
+}
+
+.pivot-status.alive {
+  background: #d7ead0;
+  color: #215c2a;
+}
+
+.pivot-status.dying {
+  background: #f3d0c8;
+  color: #7a1f14;
+}
+
+.pivot-status.stable {
+  background: #efe3c4;
+  color: #6a4a12;
+}
+
+.pivot-status.dead,
+.pivot-status.unconfirmed {
+  background: #d9d4ce;
+  color: #3a3330;
+}
+
+.pivot-temp-hp {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.pivot-rest-actions,
+.pivot-survival-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.pivot-survival-note {
+  color: var(--pivot-line);
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+
+.pivot-death-saves {
+  align-items: stretch;
+  background: #fff8ea;
+  border: 1px solid var(--pivot-line);
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.pivot-death-track {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.pivot-pips {
+  display: flex;
+  gap: 6px;
+}
+
+.pivot-pip {
+  background: transparent;
+  border: 2px solid var(--pivot-blue);
+  border-radius: 50%;
+  box-sizing: border-box;
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+}
+
+.pivot-pip.success.filled {
+  background: var(--pivot-gold);
+  border-color: var(--pivot-gold);
+}
+
+.pivot-pip.failure.filled {
+  background: #8a2a2a;
+  border-color: #8a2a2a;
+}
+
 .pivot-resource-actions button,
+.pivot-sheet-button,
 .pivot-section-header button,
 .pivot-table-row button,
 .pivot-mod,
@@ -251,14 +476,6 @@
 
 .pivot-resource-actions span {
   text-align: center;
-}
-
-.pivot-death-saves {
-  align-items: center;
-  border: 1px solid var(--pivot-paper-deep);
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
 }
 
 .pivot-abilities {
@@ -476,8 +693,10 @@
 .pivot-item-sheet input,
 .pivot-item-sheet select,
 .pivot-item-sheet textarea {
+  background: #fff8ea;
   border: 1px solid var(--pivot-line);
   border-radius: 4px;
+  color: var(--pivot-ink);
   min-width: 0;
 }
 
@@ -512,7 +731,11 @@
   .pivot-grid.two,
   .pivot-field-grid,
   .pivot-resource-grid,
-  .pivot-currency {
+  .pivot-currency,
+  .pivot-rest-actions,
+  .pivot-survival-actions,
+  .pivot-death-saves,
+  .pivot-meter-fields {
     grid-template-columns: 1fr;
   }
 
