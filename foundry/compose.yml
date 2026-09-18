@@ -1,0 +1,41 @@
+name: ${PIVOT_COMPOSE_PROJECT}
+
+services:
+  foundry:
+    image: ${PIVOT_FOUNDRY_IMAGE}
+    container_name: ${PIVOT_FOUNDRY_CONTAINER}
+    hostname: ${PIVOT_FOUNDRY_HOSTNAME}
+    restart: "no"
+    init: true
+    ports:
+      - target: 30000
+        published: ${PIVOT_FOUNDRY_PORT}
+        host_ip: 127.0.0.1
+        protocol: tcp
+    environment:
+      FOUNDRY_VERSION: ${PIVOT_FOUNDRY_VERSION}
+      FOUNDRY_ADMIN_KEY: ${FOUNDRY_ADMIN_KEY}
+      FOUNDRY_LICENSE_KEY: ${FOUNDRY_LICENSE_KEY:-}
+      CONTAINER_CACHE: /opt/foundry-dist
+      CONTAINER_PRESERVE_CONFIG: ${PIVOT_PRESERVE_CONFIG:-false}
+      FOUNDRY_HOT_RELOAD: ${PIVOT_HOT_RELOAD:-false}
+      FOUNDRY_IP_DISCOVERY: "false"
+      FOUNDRY_UPNP: "false"
+      FOUNDRY_TELEMETRY: "false"
+      FOUNDRY_WORLD: ${PIVOT_FOUNDRY_WORLD:-}
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - type: bind
+        source: ${PIVOT_FOUNDRY_DATA_DIR}
+        target: /data
+      - type: bind
+        source: ${PIVOT_FOUNDRY_DIST_DIR}
+        target: /opt/foundry-dist
+        read_only: true
+    labels:
+      com.angryorcgames.pivot.owned: "true"
+      com.angryorcgames.pivot.role: ${PIVOT_FOUNDRY_ROLE}
+      com.angryorcgames.pivot.instance: ${PIVOT_FOUNDRY_INSTANCE}
+      com.angryorcgames.pivot.system: pivot-fantasy
+      com.angryorcgames.pivot.workdir: ${PIVOT_REPO_ROOT}
+      com.angryorcgames.pivot.version: ${PIVOT_FOUNDRY_VERSION}

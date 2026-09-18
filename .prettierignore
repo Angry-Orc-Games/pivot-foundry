@@ -2,3 +2,11 @@ node_modules
 dist
 coverage
 system.zip
+artifact-identity.json
+foundry-app
+foundry-data
+foundry-data-v14
+foundry-dist
+.foundry
+playwright-report
+test-results

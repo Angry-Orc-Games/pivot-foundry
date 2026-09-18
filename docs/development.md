@@ -68,11 +68,11 @@ For faster inner-loop checks, run the narrower script that matches the change:
 
 Vitest should fail when test files are missing. If a slice temporarily moves or renames tests, keep that behavior intact and update the matching test include patterns instead of allowing empty test runs.
 
-Use fast unit tests for rules behavior first. Add Foundry runtime tests or manual Foundry checks when the change depends on Foundry documents, hooks, sheets, or packaged assets.
+Use fast unit tests for rules behavior first. Add Playwright Foundry E2E when the change depends on Foundry documents, hooks, sheets, packaged assets, or browser behavior.
 
-For the character sheet, automated tests can validate manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. Manual Foundry v14 smoke tests are still required for actual browser rendering, drag/drop, permissions, and chat roll behavior.
+For the character sheet, Vitest covers manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. `npm run foundry:e2e` covers packaged-asset loading, sheet rendering, persistence, permissions, rolls, and sync when credentials are available.
 
-The local Foundry sandbox is a host Node.js v14 process (`npm run foundry:up`), not Docker. It needs Node 24 for the Foundry process only; repository verify stays on Node 20 or 22. See [foundry-local-dev.md](foundry-local-dev.md).
+The local Foundry sandbox is Docker Compose + Felddy (`npm run foundry:up`). Foundry 14.368 runs on Node 24 inside the pinned container. Repository verify stays on Node 20 or 22. Browser acceptance is `npm run foundry:e2e` against `system.zip`. See [foundry-local-dev.md](foundry-local-dev.md) and [foundry-testing.md](foundry-testing.md).
 
 ## Implementation Sequence
 

@@ -1,0 +1,112 @@
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: foundry-staging
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: Build server deploy and smoke
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: staging
+    env:
+      PIVOT_FOUNDRY_TARGET: staging
+      PIVOT_FOUNDRY_BASE_URL: https://build.angryorcgames.com
+      PIVOT_E2E_DESTRUCTIVE: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download CI package artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pivot-foundry-system
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+
+      - name: Verify artifact identity
+        run: node scripts/artifact-identity.mjs && node -e '
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const identity = JSON.parse(fs.readFileSync("artifact-identity.json","utf8"));
+          const sha = crypto.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex");
+          if (identity.artifact.sha256 !== sha) { console.error("Checksum mismatch"); process.exit(6); }
+          console.log("Staging will deploy", identity.commit, sha);
+          '
+
+      - name: Run isolated Foundry E2E against the CI artifact
+        env:
+          FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+          FOUNDRY_RELEASE_CACHE_URL: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL }}
+          FOUNDRY_RELEASE_SHA256: ${{ secrets.FOUNDRY_RELEASE_SHA256 }}
+          PIVOT_REQUIRE_RELEASE_SHA256: "1"
+        run: |
+          # foundry:e2e rebuilds the zip; restore the exact CI bytes afterward if needed.
+          CI_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
+          npm run foundry:e2e -- --skip-package
+          NOW_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
+          test "$CI_SHA" = "$NOW_SHA"
+
+      - name: Deploy exact artifact to the build server
+        env:
+          FOUNDRY_DEPLOY_SSH_HOST: ${{ secrets.FOUNDRY_DEPLOY_SSH_HOST }}
+          FOUNDRY_DEPLOY_SSH_USER: ${{ secrets.FOUNDRY_DEPLOY_SSH_USER }}
+          FOUNDRY_DEPLOY_SSH_KEY: ${{ secrets.FOUNDRY_DEPLOY_SSH_KEY }}
+          FOUNDRY_DEPLOY_TARGET_DIR: ${{ secrets.FOUNDRY_DEPLOY_TARGET_DIR }}
+          FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR }}
+          FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE }}
+          PIVOT_DEPLOY_PUBLIC_URL: https://build.angryorcgames.com
+        run: node scripts/deploy-package.mjs staging
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: External staging smoke
+        env:
+          PIVOT_STAGING_GM_USER: ${{ secrets.PIVOT_STAGING_GM_USER }}
+          PIVOT_STAGING_GM_PASSWORD: ${{ secrets.PIVOT_STAGING_GM_PASSWORD }}
+          PIVOT_STAGING_PLAYER_USER: ${{ secrets.PIVOT_STAGING_PLAYER_USER }}
+          PIVOT_STAGING_PLAYER_PASSWORD: ${{ secrets.PIVOT_STAGING_PLAYER_PASSWORD }}
+          PIVOT_PACKAGE_VERSION: ${{ secrets.PIVOT_PACKAGE_VERSION }}
+        run: npm run test:e2e:staging
+
+      - name: Record staging acceptance
+        run: node scripts/record-acceptance.mjs staging
+
+      - name: Upload staging-accepted artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pivot-foundry-staging-accepted
+          path: |
+            system.json
+            system.zip
+            artifact-identity.json
+          if-no-files-found: error
+          retention-days: 30

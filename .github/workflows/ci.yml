@@ -16,16 +16,17 @@ jobs:
   verify:
     name: Verify / Node ${{ matrix.node-version }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         node-version: [20, 22]
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -54,13 +55,14 @@ jobs:
   package:
     name: Package Foundry System
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: verify
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
@@ -71,11 +73,16 @@ jobs:
       - name: Build and validate release zip
         run: npm run package:system
 
+      - name: Record artifact identity
+        run: npm run artifact:identity
+
       - name: Upload package artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-system
           path: |
             system.json
             system.zip
+            artifact-identity.json
           if-no-files-found: error
+          retention-days: 14

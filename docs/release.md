@@ -1,62 +1,48 @@
 # Release Checklist
 
-The repository publishes Foundry install artifacts from GitHub Actions when a tag matching `v*` is pushed.
+GitHub Release publication and Angry Orc Games deployment are separate. A tag publishes install artifacts. Staging/production promotion uses the tested zip and an approval environment.
 
-## Before Tagging
-
-Verify the package locally:
+## Before tagging
 
 ```sh
 npm ci
 npm run verify
 npm run package:system
+npm run foundry:e2e
 ```
 
-Check that `system.json` contains the intended metadata:
+Check `system.json`:
 
 - `id`: `pivot-fantasy`
 - `title`: `Pivot Fantasy`
 - `compatibility.minimum`: `14`
 - `compatibility.verified`: `14.368`
 - `esmodules`: `dist/pivot.mjs`
-- `manifest`: latest release `system.json` URL
-- `download`: latest release `system.zip` URL
+- `manifest` / `download`: GitHub release URLs
 
 ## Tagging
-
-Create and push a version tag:
 
 ```sh
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Use the actual version number for the release being published.
+## Workflow
 
-## Workflow Output
+[`release.yml`](../.github/workflows/release.yml):
 
-The release workflow uploads:
+1. `npm run verify`
+2. `npm run prepare:release` (rewrites version/download on the release copy of `system.json`)
+3. Builds that exact `system.zip` and `artifact-identity.json`
+4. Runs Foundry E2E against those bytes (`--skip-package`)
+5. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only if E2E succeeded
 
-- `system.json`
-- `system.zip`
+If step 2 changes artifact bytes, step 4 is what makes the new zip eligible. Skipped E2E cannot publish.
 
-During the workflow, the release copy of `system.json` is updated so:
+Foundry installs use:
 
-- `version` matches the tag without the leading `v`
-- `download` points at the tag-specific `system.zip`
+```text
+https://github.com/angry-orc-games/pivot-foundry/releases/latest/download/system.json
+```
 
-The tag must be a semantic version prefixed with `v`, such as `v0.1.0`.
-
-## Foundry Install Test
-
-After the GitHub release finishes:
-
-1. Copy the release manifest URL from `system.json`.
-2. In Foundry v14, open the system installation screen.
-3. Install from the manifest URL.
-4. Create a test world using `Pivot Fantasy`.
-5. Confirm the browser console logs `Pivot Fantasy | Initialized character sheet system`.
-
-If future releases add `packs/`, `templates/`, or styles, verify those assets are present in `system.zip` and load correctly in Foundry before announcing the release.
-
-For direct deployment to the Angry Orc Games Foundry servers, use [deployment.md](deployment.md). Releasing GitHub artifacts and deploying to a live Foundry server are separate operations.
+To put the same zip on https://build.angryorcgames.com or https://foundry.angryorcgames.com, use [deployment.md](deployment.md).

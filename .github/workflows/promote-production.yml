@@ -1,0 +1,101 @@
+name: Promote production
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_run_id:
+        description: GitHub run id of the staging-accepted artifact
+        required: true
+      maintenance_window:
+        description: Confirmed maintenance window note
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: foundry-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote exact staging artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      PIVOT_FOUNDRY_TARGET: production
+      PIVOT_FOUNDRY_BASE_URL: https://foundry.angryorcgames.com
+      PIVOT_E2E_DESTRUCTIVE: "0"
+      PIVOT_ALLOW_PRODUCTION_DEPLOY: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download staging-accepted artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pivot-foundry-staging-accepted
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.staging_run_id }}
+
+      - name: Verify staging acceptance and checksum
+        run: node -e '
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const identity = JSON.parse(fs.readFileSync("artifact-identity.json","utf8"));
+          const sha = crypto.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex");
+          if (identity.artifact.sha256 !== sha) { console.error("Artifact bytes changed"); process.exit(6); }
+          if (identity.staging?.result !== "passed" || identity.staging?.sha256 !== sha) {
+          console.error("Missing staging acceptance for this exact artifact");
+          process.exit(6);
+          }
+          console.log("Promoting", identity.commit, identity.packageVersion, sha);
+          '
+
+      - name: Confirm production runtime compatibility
+        env:
+          PIVOT_PRODUCTION_MANIFEST_URL: ${{ secrets.PIVOT_PRODUCTION_MANIFEST_URL }}
+        run: |
+          URL="${PIVOT_PRODUCTION_MANIFEST_URL:-https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json}"
+          curl -fsS "$URL" | node -e '
+            let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => {
+              const current = JSON.parse(data || "{}");
+              const next = JSON.parse(require("fs").readFileSync("system.json","utf8"));
+              if (next.compatibility?.minimum && Number(next.compatibility.minimum) > 14) {
+                console.error("Refusing to promote a package that requires Foundry newer than 14 without a separate runtime upgrade.");
+                process.exit(4);
+              }
+              console.log("Current production package", current.version || "unknown", "->", next.version);
+            });
+          '
+
+      - name: Deploy exact artifact to production
+        env:
+          FOUNDRY_DEPLOY_SSH_HOST: ${{ secrets.FOUNDRY_DEPLOY_SSH_HOST }}
+          FOUNDRY_DEPLOY_SSH_USER: ${{ secrets.FOUNDRY_DEPLOY_SSH_USER }}
+          FOUNDRY_DEPLOY_SSH_KEY: ${{ secrets.FOUNDRY_DEPLOY_SSH_KEY }}
+          FOUNDRY_DEPLOY_TARGET_DIR: ${{ secrets.FOUNDRY_DEPLOY_TARGET_DIR }}
+          FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR }}
+          FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE }}
+          PIVOT_DEPLOY_PUBLIC_URL: https://foundry.angryorcgames.com
+        run: node scripts/deploy-package.mjs production
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Non-destructive production health check
+        run: npm run test:e2e:production
+
+      - name: Record production acceptance
+        run: node scripts/record-acceptance.mjs production
