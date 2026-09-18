@@ -13,7 +13,7 @@ Pivot Foundry is currently a small Foundry VTT v14 character system. The archite
 - `src/content/` is the canonical JSON content source. `scripts/build-content-packs.mjs` writes generated Foundry document JSON to `packs/src/`. `system.json` `packs` stays `[]` until a real Foundry v14 LevelDB pack exists.
 - `templates/` and `styles/` contain the native Foundry sheet UI.
 - `tests/` contains Vitest coverage for the manifest and rules modules.
-- `scripts/` contains release preparation and Foundry package validation.
+- `scripts/` contains release preparation, Foundry package validation, and the local Node Foundry host.
 - `dist/` and `system.zip` are generated outputs.
 
 See [foundry-vtt-source.md](foundry-vtt-source.md) for Foundry-specific development constraints and version-sensitive guidance.

@@ -72,6 +72,8 @@ Use fast unit tests for rules behavior first. Add Foundry runtime tests or manua
 
 For the character sheet, automated tests can validate manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. Manual Foundry v14 smoke tests are still required for actual browser rendering, drag/drop, permissions, and chat roll behavior.
 
+The local Foundry sandbox is a host Node.js v14 process (`npm run foundry:up`), not Docker. It needs Node 24 for the Foundry process only; repository verify stays on Node 20 or 22. See [foundry-local-dev.md](foundry-local-dev.md).
+
 ## Implementation Sequence
 
 Prefer this order for future feature slices:
@@ -98,3 +100,4 @@ Update documentation in the same change when behavior or workflow changes:
 - Update this file for development workflow, testing, or architecture changes.
 - Update `docs/release.md` for packaging, tag, or manifest changes.
 - Keep claims aligned with implemented behavior. Do not describe a playable feature until the code and verification exist.
+- Update `docs/foundry-local-dev.md` when the local Foundry host, env keys, or smoke-test loop changes.
