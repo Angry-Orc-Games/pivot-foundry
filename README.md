@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml?query=branch%3Amain)
 [![Release](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml/badge.svg)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml)
-![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14-blue)
-![Node](https://img.shields.io/badge/Node-%3E%3D20.19.0-339933)
+![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14.368-blue)
+![Node](https://img.shields.io/badge/Node-20%2F22%20verify%20%7C%2024%20Foundry%20host-339933)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
 ![Format](https://img.shields.io/badge/format-Prettier-f7b93e)
@@ -79,41 +79,42 @@ npm run dev
 
 The build writes the Foundry module entry file to `dist/pivot.mjs`.
 
-## Local Foundry Install
+## Local Foundry
 
-For local testing, Foundry needs to see this repository as a system directory named `pivot-fantasy`.
-
-On macOS, a typical symlink looks like this:
+Local browser testing uses a **host Node.js Foundry 14** process. Docker Compose and the felddy image are gone. `npm run foundry:up` installs the official Node zip into ignored `foundry-app/` if needed, then runs:
 
 ```sh
-ln -s "$PWD" "$HOME/Library/Application Support/FoundryVTT/Data/systems/pivot-fantasy"
+node main.js --dataPath=<repo>/foundry-data --port=30000 --adminPassword=<FOUNDRY_ADMIN_KEY> --hotReload --noupnp --noipdiscovery
 ```
 
-Then run:
-
-```sh
-npm run build
-```
-
-Start Foundry v14 and enable the `Pivot Fantasy` system when creating a world.
-
-## Local Foundry Host
-
-For browser-based sheet and runtime testing, this repository can launch Foundry v14 as a host Node.js process:
+One-time setup:
 
 ```sh
 cp .env.foundry.local.example .env.foundry.local
+```
+
+Edit `.env.foundry.local` (gitignored):
+
+- `FOUNDRY_ADMIN_KEY` — local-only admin password (not `change-me-local-only`)
+- First install, pick one: `FOUNDRY_RELEASE_URL` (fresh timed **Foundry 14 Node.js** URL, `FoundryVTT-Node-14.*`) or `FOUNDRY_RELEASE_ARCHIVE` (absolute path to that zip)
+- Optional: `FOUNDRY_LICENSE_KEY` for the first-run setup UI; `FOUNDRY_NODE` if Node 24 is not already on `node` / `nvm`
+
+The verified pin is **14.368**. Linux, Windows, macOS, or non-Node archives will not boot. Timed URLs expire in about five minutes; later starts reuse `foundry-app/`. The host process needs **Node 24**. `npm run verify` stays on Node 20 or 22.
+
+```sh
 npm run build
+npm run foundry:check-env
 npm run foundry:up
 ```
 
-Fill `.env.foundry.local` with `FOUNDRY_ADMIN_KEY` and, for a first install, a Foundry v14 Node.js timed download URL or a local `FoundryVTT-Node-14.*` zip path. The file is ignored because it can contain license or download material. Foundry binaries stay in ignored `foundry-app/` and must not be committed.
+Foundry is at `http://127.0.0.1:30000`. Public system assets are symlinked as `foundry-data/Data/systems/pivot-fantasy` (`system.json`, `dist/`, `lang/`, `packs/`, `styles/`, `templates/`). Do not symlink the whole checkout into `Data/` — `.env.foundry.local` must stay out of that tree. Do not commit Foundry binaries, the zip, or `.env.foundry.local`.
 
-The host process needs Node 24. Repository `npm` scripts can stay on Node 20 or 22.
+```sh
+npm run foundry:logs
+npm run foundry:down
+```
 
-Foundry will be available at `http://127.0.0.1:30000`, with this checkout's public system assets symlinked as `foundry-data/Data/systems/pivot-fantasy`.
-
-See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full workflow, including Cloud Agent secrets (Cursor Secrets tab → write `.env.foundry.local` → `foundry:up`).
+See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full loop, smoke test, and Cloud Agent secrets.
 
 ## Project Layout
 
@@ -154,7 +155,7 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 - `npm run test:watch`: runs Vitest in watch mode
 - `npm run typecheck`: runs TypeScript without emitting files
 - `npm run foundry:check-env`: validates `.env.foundry.local` without printing secrets
-- `npm run foundry:up`: installs Foundry v14 into `foundry-app/` if needed and starts `node main.js`
+- `npm run foundry:up`: installs Foundry 14 into `foundry-app/` if needed and starts host `node main.js --dataPath=<repo>/foundry-data`
 - `npm run foundry:logs`: follows the local Foundry host log
 - `npm run foundry:down`: stops the local Foundry host process
 
