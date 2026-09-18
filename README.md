@@ -3,7 +3,7 @@
 [![CI](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml?query=branch%3Amain)
 [![Release](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml/badge.svg)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml)
 ![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14.368-blue)
-![Node](https://img.shields.io/badge/Node-20%2F22%20verify%20%7C%2024%20Foundry%20host-339933)
+![Node](https://img.shields.io/badge/Node-20%2F22%20verify%20%7C%2024%20Foundry%20container-339933)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
 ![Format](https://img.shields.io/badge/format-Prettier-f7b93e)
@@ -52,10 +52,13 @@ Not implemented yet:
 
 ## Requirements
 
-- Node.js 20 or newer for repository checks (`npm run verify`)
-- Node.js 24 to host the local Foundry v14 process (`nvm` is fine)
+- Node.js 20 or 22 for repository checks (`npm run verify`)
+- Docker Engine + Compose v2 for the Foundry v14 runtime
 - npm
-- Foundry Virtual Tabletop v14 Node.js zip (verified 14.368)
+- A licensed Foundry Virtual Tabletop **14.368** Node.js zip (cached privately; never committed)
+- Playwright Chromium for browser acceptance tests (`npx playwright install chromium`)
+
+Version pins live in [`foundry/versions.json`](foundry/versions.json). The Foundry process uses Node 24 inside the pinned Felddy container.
 
 ## Setup
 
@@ -81,40 +84,37 @@ The build writes the Foundry module entry file to `dist/pivot.mjs`.
 
 ## Local Foundry
 
-Local browser testing uses a **host Node.js Foundry 14** process. Docker Compose and the felddy image are gone. `npm run foundry:up` installs the official Node zip into ignored `foundry-app/` if needed, then runs:
+One command starts the persistent development world after first-time setup:
 
 ```sh
-node main.js --dataPath=<repo>/foundry-data --port=30000 --adminPassword=<FOUNDRY_ADMIN_KEY> --hotReload --noupnp --noipdiscovery
+npm run foundry:up
 ```
 
-One-time setup:
+First-time setup (repository root):
 
 ```sh
 cp .env.foundry.local.example .env.foundry.local
-```
-
-Edit `.env.foundry.local` (gitignored):
-
-- `FOUNDRY_ADMIN_KEY` — local-only admin password (not `change-me-local-only`)
-- First install, pick one: `FOUNDRY_RELEASE_URL` (fresh timed **Foundry 14 Node.js** URL, `FoundryVTT-Node-14.*`) or `FOUNDRY_RELEASE_ARCHIVE` (absolute path to that zip)
-- Optional: `FOUNDRY_LICENSE_KEY` for the first-run setup UI; `FOUNDRY_NODE` if Node 24 is not already on `node` / `nvm`
-
-The verified pin is **14.368**. Linux, Windows, macOS, or non-Node archives will not boot. Timed URLs expire in about five minutes; later starts reuse `foundry-app/`. The host process needs **Node 24**. `npm run verify` stays on Node 20 or 22.
-
-```sh
+# set FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, and a 14.368 Node.js zip source
 npm run build
 npm run foundry:check-env
 npm run foundry:up
 ```
 
-Foundry is at `http://127.0.0.1:30000`. Public system assets are symlinked as `foundry-data/Data/systems/pivot-fantasy` (`system.json`, `dist/`, `lang/`, `packs/`, `styles/`, `templates/`). Do not symlink the whole checkout into `Data/` — `.env.foundry.local` must stay out of that tree. Do not commit Foundry binaries, the zip, or `.env.foundry.local`.
+Foundry is at <http://127.0.0.1:30000> on loopback only. Put the licensed zip in `foundry-dist/` as `foundryvtt-14.368.zip` (preferred) or use `FOUNDRY_RELEASE_ARCHIVE` / a private cache URL. A Foundry timed URL works once and expires in about five minutes.
 
 ```sh
+npm run foundry:status
 npm run foundry:logs
 npm run foundry:down
+npm run foundry:e2e
 ```
 
-See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full loop, smoke test, and Cloud Agent secrets.
+See:
+
+- [Local Foundry](docs/foundry-local-dev.md)
+- [Testing](docs/foundry-testing.md)
+- [Cursor Cloud Agents](docs/foundry-cloud.md)
+- [Deployment](docs/deployment.md) — https://build.angryorcgames.com and https://foundry.angryorcgames.com
 
 ## Project Layout
 
@@ -154,23 +154,30 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 - `npm run test`: runs Vitest once
 - `npm run test:watch`: runs Vitest in watch mode
 - `npm run typecheck`: runs TypeScript without emitting files
-- `npm run foundry:check-env`: validates `.env.foundry.local` without printing secrets
-- `npm run foundry:up`: installs Foundry 14 into `foundry-app/` if needed and starts host `node main.js --dataPath=<repo>/foundry-data`
-- `npm run foundry:logs`: follows the local Foundry host log
-- `npm run foundry:down`: stops the local Foundry host process
+- `npm run foundry:check-env`: validates Foundry credentials and version pins without printing secrets
+- `npm run foundry:doctor`: prints instance, Docker, cache, and retired-data diagnostics
+- `npm run foundry:provision`: verifies the licensed archive checksum and pulls the pinned image
+- `npm run foundry:up`: starts the owned persistent Compose development world
+- `npm run foundry:status`: shows owned-instance status
+- `npm run foundry:logs`: follows owned-instance logs
+- `npm run foundry:down`: stops the owned development instance
+- `npm run foundry:reset`: resets disposable E2E data only
+- `npm run foundry:e2e`: packages `system.zip`, starts a disposable Foundry, runs Playwright, and cleans up
 
 ## CI/CD
 
-GitHub Actions run on pull requests and pushes to `main`.
+```text
+PR CI (no Foundry secrets) → trusted Foundry E2E → merge to main
+  → build-server deploy + smoke (https://build.angryorcgames.com)
+  → approved production promotion (https://foundry.angryorcgames.com)
+```
 
-The CI workflow:
+- Every PR: lint, format, types, unit tests, build, package validation
+- Same-repository PRs: isolated Foundry E2E with narrowly scoped secrets
+- External forks: CI only; review the exact commit, then `workflow_dispatch` Foundry E2E
+- Release tags: prepare the versioned manifest, test that exact zip, publish only after E2E
 
-1. Installs dependencies with `npm ci`
-2. Runs linting, formatting checks, typecheck, Vitest, Vite build, and dependency audit on Node 20 and Node 22
-3. Builds and validates the Foundry release zip
-4. Uploads `system.json` and `system.zip` as a workflow artifact
-
-Dependabot is configured to open weekly update PRs for npm dependencies and GitHub Actions.
+See [docs/deployment.md](docs/deployment.md) for Environments, required checks, and remaining GitHub settings. Dependabot still opens weekly npm and Actions update PRs.
 
 ## Release Model
 

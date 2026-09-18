@@ -1,0 +1,37 @@
+{
+  "foundryVersion": "14.368",
+  "foundryNodeMajor": 24,
+  "systemId": "pivot-fantasy",
+  "systemTitle": "Pivot Fantasy",
+  "e2eWorldId": "pivot-e2e",
+  "e2eWorldTitle": "Pivot Fantasy E2E",
+  "archiveFileName": "FoundryVTT-Node-14.368.zip",
+  "cacheFileName": "foundryvtt-14.368.zip",
+  "releaseSha256": "",
+  "container": {
+    "image": "ghcr.io/felddy/foundryvtt",
+    "tag": "14.367",
+    "digest": "sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac",
+    "supportsFoundryVersion": "14.368",
+    "notes": "Checked 2026-09-18: ghcr.io/felddy/foundryvtt had no 14.368 tag. :14 and :14.367 both resolved to this digest. The wrapper installs Foundry 14.368 from CONTAINER_CACHE as foundryvtt-14.368.zip."
+  },
+  "node": {
+    "verify": ["20", "22"],
+    "cloud": "22.22.2",
+    "cloudTarball": "node-v22.22.2-linux-x64.tar.xz",
+    "cloudTarballSha256": "88fd1ce767091fd8d4a99fdb2356e98c819f93f3b1f8663853a2dee9b438068a"
+  },
+  "playwright": {
+    "package": "@playwright/test",
+    "version": "1.63.0",
+    "browser": "chromium"
+  },
+  "docker": {
+    "enginePackage": "5:28.5.2-1~ubuntu.24.04~noble"
+  },
+  "ports": {
+    "default": 30000,
+    "min": 30000,
+    "max": 30032
+  }
+}

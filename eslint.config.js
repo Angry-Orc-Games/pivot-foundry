@@ -3,7 +3,16 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "coverage/**", "node_modules/**", "system.zip"],
+    ignores: [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      "system.zip",
+      "playwright-report/**",
+      "test-results/**",
+      ".foundry/**",
+      "foundry-dist/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,

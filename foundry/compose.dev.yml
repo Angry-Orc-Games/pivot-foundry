@@ -1,0 +1,23 @@
+services:
+  foundry:
+    environment:
+      FOUNDRY_HOT_RELOAD: "true"
+    volumes:
+      - type: bind
+        source: ${PIVOT_REPO_ROOT}/system.json
+        target: /data/Data/systems/pivot-fantasy/system.json
+      - type: bind
+        source: ${PIVOT_REPO_ROOT}/dist
+        target: /data/Data/systems/pivot-fantasy/dist
+      - type: bind
+        source: ${PIVOT_REPO_ROOT}/lang
+        target: /data/Data/systems/pivot-fantasy/lang
+      - type: bind
+        source: ${PIVOT_REPO_ROOT}/packs
+        target: /data/Data/systems/pivot-fantasy/packs
+      - type: bind
+        source: ${PIVOT_REPO_ROOT}/styles
+        target: /data/Data/systems/pivot-fantasy/styles
+      - type: bind
+        source: ${PIVOT_REPO_ROOT}/templates
+        target: /data/Data/systems/pivot-fantasy/templates

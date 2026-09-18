@@ -2,10 +2,17 @@ node_modules/
 dist/
 coverage/
 system.zip
+artifact-identity.json
 *.log
 .env.foundry.local
 foundry-app/
 foundry-data/
+foundry-data-v14/
+foundry-dist/
+.foundry/
 FoundryVTT*.zip
 .playwright-mcp/
+playwright-report/
+test-results/
+blob-report/
 foundry-*.png
