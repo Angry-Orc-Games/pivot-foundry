@@ -39,10 +39,10 @@ Hosting Foundry locally uses Node 24 and a licensed Node zip in ignored `foundry
 
 ## Cursor Cloud specific instructions
 
-Persist environment **Runtime Secrets** `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only. Do not save a timed `FOUNDRY_RELEASE_URL` on the environment.
+Daily Foundry is the zip on **odin** (`FOUNDRY_RELEASE_ARCHIVE`). Persist Cursor Secrets `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only. Do not save a timed `FOUNDRY_RELEASE_URL` on the environment.
 
-Each new Cloud VM: the operator pastes a fresh Foundry **14 Node** timed URL (`FoundryVTT-Node-14.*`, pin **14.368**) from https://foundryvtt.com/me/licenses into **this chat** (~5 minute TTL). Write gitignored `.env.foundry.local` from the persisted secrets plus that paste (`foundry:up` reads the file, not `process.env`). Do not `cat` the file. Install Node 24, run `npm ci`, `npm run build`, `npm run foundry:up`, apply license + admin, and create world **Pivot Fantasy Test**. Forward Agents Window port **30000** → http://127.0.0.1:30000/join (must be this agent).
+Cloud Agents without Foundry: `npm ci`, `npm run verify`, and `npm run package:system` on `main`. Do not boot Foundry unless asked.
 
-Daily laptop: `FOUNDRY_RELEASE_ARCHIVE` to a local zip (not git).
+Cloud Foundry only when needed: the operator pastes a fresh Foundry **14 Node** timed URL (`FoundryVTT-Node-14.*`, pin **14.368**) from https://foundryvtt.com/me/licenses into **this chat** (~5 minute TTL). Write gitignored `.env.foundry.local` from the persisted secrets plus that paste (`foundry:up` reads the file, not `process.env`). Do not `cat` the file. Install Node 24, run `npm ci`, `npm run build`, `npm run foundry:up`, apply license + admin, and create world **Pivot Fantasy Test**. Forward Agents Window port **30000** → http://127.0.0.1:30000/join (must be this agent).
 
 See [docs/foundry-secrets.md](docs/foundry-secrets.md) and [docs/foundry-local-dev.md](docs/foundry-local-dev.md).

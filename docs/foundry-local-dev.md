@@ -28,7 +28,7 @@ For unattended testing beyond the first activation screen, also set `FOUNDRY_LIC
 
 Keep `.env.foundry.local` out of commits. It can contain a license key or a temporary signed download URL.
 
-On a daily laptop, prefer `FOUNDRY_RELEASE_ARCHIVE` pointed at a local `FoundryVTT-Node-14.*.zip` (pin **14.368**). Do not commit the zip.
+Daily Foundry is on **odin**: set `FOUNDRY_RELEASE_ARCHIVE` to a local `FoundryVTT-Node-14.*.zip` (pin **14.368**). Do not commit the zip.
 
 3. Build the system once:
 
@@ -56,15 +56,17 @@ Stop the server when you are done:
 npm run foundry:down
 ```
 
-## Cloud Agent test environment
+## Cloud Agents
 
-Verified on current `main` (host Node 14, pin **14.368**): the operator pastes a fresh timed URL into the agent chat, the agent writes `.env.foundry.local`, and `foundry:up` brings Foundry up at http://127.0.0.1:30000/join with world **Pivot Fantasy Test**.
+Default Cloud work does **not** boot Foundry. On `main`, run `npm ci`, `npm run verify`, and `npm run package:system`. Persist Cursor Secrets `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only. Full secret rules: [foundry-secrets.md](foundry-secrets.md).
 
-`foundry:up` reads `.env.foundry.local`, not process environment variables. Persist only `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` as environment **Runtime Secrets**. Do not save `FOUNDRY_RELEASE_URL` on the environment. Full secret rules: [foundry-secrets.md](foundry-secrets.md).
+### Cloud Foundry only when needed
 
-Checklist for each **new** Cloud VM:
+Use this path only when someone asks to host Foundry on a Cloud Agent. Verified on `main` (host Node 14, pin **14.368**): a pasted timed URL, `.env.foundry.local`, and `foundry:up` bring Foundry up at http://127.0.0.1:30000/join with world **Pivot Fantasy Test**.
 
-1. Confirm the environment has Runtime Secrets `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only.
+`foundry:up` reads `.env.foundry.local`, not process environment variables. Do not save `FOUNDRY_RELEASE_URL` on the environment.
+
+1. Confirm persisted Runtime Secrets are `FOUNDRY_ADMIN_KEY` and `FOUNDRY_LICENSE_KEY` only.
 2. Generate a Foundry **14 Node** timed URL (`FoundryVTT-Node-14.*`, pin **14.368**) at https://foundryvtt.com/me/licenses and paste it into **this agent chat** (~5 minute TTL).
 3. Write gitignored `.env.foundry.local` (`umask 077`) from those two secrets plus the chat paste. Do not `cat` the file.
 4. Install Node 24 (`nvm install 24` if needed).

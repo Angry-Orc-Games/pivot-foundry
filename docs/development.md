@@ -72,7 +72,7 @@ Use fast unit tests for rules behavior first. Add Foundry runtime tests or manua
 
 For the character sheet, automated tests can validate manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. Manual Foundry v14 smoke tests are still required for actual browser rendering, drag/drop, permissions, and chat roll behavior.
 
-The local Foundry sandbox is a host Node.js v14 process (`npm run foundry:up`), not Docker. It needs Node 24 for the Foundry process only; repository verify stays on Node 20 or 22. See [foundry-local-dev.md](foundry-local-dev.md).
+The local Foundry sandbox is a host Node.js v14 process (`npm run foundry:up`), not Docker. Daily Foundry is the zip on odin. Cloud Agents without Foundry run `npm ci` / `npm run verify` / `npm run package:system` on `main`. It needs Node 24 for the Foundry process only; repository verify stays on Node 20 or 22. See [foundry-local-dev.md](foundry-local-dev.md) and [foundry-secrets.md](foundry-secrets.md).
 
 ## Implementation Sequence
 
