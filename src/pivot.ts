@@ -2,11 +2,13 @@ import { guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import { createPivotCharacterDataModel } from "./data/character-data";
+import { createPivotNpcDataModel } from "./data/npc-data";
 import { createPivotItemDataModels } from "./data/item-data";
 import type { PivotRegistrationRuntime } from "./foundry-runtime";
 import { runWorldMigrations, type WorldMigrationGame } from "./migrations/world-migrations";
 import { SYSTEM_ID } from "./config";
 import { createPivotCharacterSheetClass } from "./sheets/character-sheet";
+import { createPivotNpcSheetClass } from "./sheets/npc-sheet";
 import { createPivotItemSheetClass } from "./sheets/item-sheet";
 
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
@@ -17,6 +19,7 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
   runtime.Hooks.once("init", () => {
     runtime.CONFIG.Actor.dataModels.character = createPivotCharacterDataModel(runtime.foundry);
+    runtime.CONFIG.Actor.dataModels.npc = createPivotNpcDataModel(runtime.foundry);
 
     const itemDataModels = createPivotItemDataModels(runtime.foundry);
     runtime.CONFIG.Item.dataModels.weapon = itemDataModels.weapon;
@@ -31,6 +34,10 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
         bar: ["attributes.hp", "resources.pool", "magic.mp"],
         value: ["progression.xp", "progression.level"],
       },
+      npc: {
+        bar: ["attributes.hp"],
+        value: [],
+      },
     };
 
     const documentSheetConfig = runtime.foundry.applications.apps.DocumentSheetConfig;
@@ -42,6 +49,16 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
         types: ["character"],
         makeDefault: true,
         label: "PIVOT.Sheets.Character.Label",
+      },
+    );
+    documentSheetConfig.registerSheet(
+      runtime.ActorDocument,
+      SYSTEM_ID,
+      createPivotNpcSheetClass(runtime.foundry),
+      {
+        types: ["npc"],
+        makeDefault: true,
+        label: "PIVOT.Sheets.NPC.Label",
       },
     );
     documentSheetConfig.registerSheet(

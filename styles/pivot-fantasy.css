@@ -407,6 +407,7 @@
   margin-bottom: 10px;
 }
 
+.pivot-rest-actions,
 .pivot-survival-actions {
   display: grid;
   gap: 8px;
@@ -731,6 +732,7 @@
   .pivot-field-grid,
   .pivot-resource-grid,
   .pivot-currency,
+  .pivot-rest-actions,
   .pivot-survival-actions,
   .pivot-death-saves,
   .pivot-meter-fields {

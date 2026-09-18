@@ -2,6 +2,7 @@ import { readSurvival } from "../runtime/health";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
+import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
 import {
   abilities,
   armourCategories,
@@ -209,6 +210,12 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
         },
         clearTempHp: async function (this: { document: ActorLike }) {
           await clearTempHpDialog(this.document);
+        },
+        shortRest: async function (this: { document: ActorLike }) {
+          await shortRestDialog(this.document);
+        },
+        longRest: async function (this: { document: ActorLike }) {
+          await longRestDialog(this.document);
         },
         adjustResource: adjustResourceAction,
         recoverPoolLongRest: recoverPoolLongRestAction,
