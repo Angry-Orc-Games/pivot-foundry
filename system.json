@@ -9,7 +9,8 @@
   },
   "documentTypes": {
     "Actor": {
-      "character": {}
+      "character": {},
+      "npc": {}
     },
     "Item": {
       "weapon": {},
