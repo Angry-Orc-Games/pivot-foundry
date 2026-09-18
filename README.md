@@ -52,9 +52,10 @@ Not implemented yet:
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 20 or newer for repository checks (`npm run verify`)
+- Node.js 24 to host the local Foundry v14 process (`nvm` is fine)
 - npm
-- Foundry Virtual Tabletop v14
+- Foundry Virtual Tabletop v14 Node.js zip (verified 14.361)
 
 ## Setup
 
@@ -96,9 +97,9 @@ npm run build
 
 Start Foundry v14 and enable the `Pivot Fantasy` system when creating a world.
 
-## Docker Foundry Sandbox
+## Local Foundry Host
 
-For browser-based sheet and runtime testing, this repository includes a local Docker Compose sandbox for Foundry v14:
+For browser-based sheet and runtime testing, this repository can launch Foundry v14 as a host Node.js process:
 
 ```sh
 cp .env.foundry.local.example .env.foundry.local
@@ -106,11 +107,13 @@ npm run build
 npm run foundry:up
 ```
 
-Fill `.env.foundry.local` with a Foundry v14 Node.js timed download URL or account credentials before starting the container. The file is ignored because it can contain license or account material.
+Fill `.env.foundry.local` with `FOUNDRY_ADMIN_KEY` and, for a first install, a Foundry v14 Node.js timed download URL or a local `FoundryVTT-Node-14.*` zip path. The file is ignored because it can contain license or download material. Foundry binaries stay in ignored `foundry-app/` and must not be committed.
 
-Foundry will be available at `http://localhost:30000`, with this checkout mounted as `Data/systems/pivot-fantasy`.
+The host process needs Node 24. Repository `npm` scripts can stay on Node 20 or 22.
 
-See [docs/foundry-docker-dev.md](docs/foundry-docker-dev.md) for the full workflow.
+Foundry will be available at `http://127.0.0.1:30000`, with this checkout's public system assets symlinked as `foundry-data/Data/systems/pivot-fantasy`.
+
+See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full workflow.
 
 ## Project Layout
 
@@ -150,6 +153,10 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 - `npm run test`: runs Vitest once
 - `npm run test:watch`: runs Vitest in watch mode
 - `npm run typecheck`: runs TypeScript without emitting files
+- `npm run foundry:check-env`: validates `.env.foundry.local` without printing secrets
+- `npm run foundry:up`: installs Foundry v14 into `foundry-app/` if needed and starts `node main.js`
+- `npm run foundry:logs`: follows the local Foundry host log
+- `npm run foundry:down`: stops the local Foundry host process
 
 ## CI/CD
 

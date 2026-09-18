@@ -4,6 +4,8 @@ coverage/
 system.zip
 *.log
 .env.foundry.local
+foundry-app/
 foundry-data/
+FoundryVTT*.zip
 .playwright-mcp/
 foundry-*.png

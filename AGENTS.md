@@ -14,6 +14,7 @@ Run these from the repository root:
 - Format check: `npm run format:check`
 - Build Foundry runtime: `npm run build`
 - Validate package: `npm run package:system`
+- Local Foundry v14 host (Node 24): `npm run foundry:up` / `foundry:down` / `foundry:logs`
 
 ## Architecture Boundaries
 
@@ -33,3 +34,5 @@ Run these from the repository root:
 ## Verification Bar
 
 Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, build locally and note whether Foundry v14 was manually checked.
+
+Hosting Foundry locally uses Node 24 and a licensed Node zip in ignored `foundry-app/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Repository `npm run verify` stays on Node 20/22.
