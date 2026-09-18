@@ -1,147 +1,118 @@
-# Deployment Runbook
+# Deployment
 
-Use this runbook when asked to deploy the Pivot Fantasy Foundry VTT system to Angry Orc Games Foundry servers on Hetzner. This file is not standing authorization to deploy.
+Local or Cloud development → pull-request verification → merge to `main` → build-server deploy and external tests → approved production promotion.
 
-## Project Context
+Application endpoints (not SSH destinations):
 
-- Local repository: `<local checkout>`
-- Canonical remote: `git@github.com:Angry-Orc-Games/pivot-foundry.git`
-- Foundry system id: `pivot-fantasy`
-- Package artifact: `system.zip`
-- Required local checks: `npm run verify`, `npm run package:system`, `shasum -a 256 system.zip`, and `unzip -t system.zip`
+- Build/staging: https://build.angryorcgames.com
+- Production: https://foundry.angryorcgames.com
 
-The package must include `documentTypes.Actor.character`, and the runtime must register a matching `TypeDataModel`. Without that pairing, Foundry Actor creation can fail with schema validation errors.
+This file describes **implemented repository workflows** and **account-level setup that still has to be done in GitHub**. It is not authorization to deploy. This change does not perform a live external deployment.
 
-## Safety Rules
+## Artifact flow
 
-- Start every deployment request with read-only local and remote inspection.
-- Do not guess remote paths.
-- Do not overwrite live state without a timestamped backup.
-- Do not print secrets, admin passwords, cookies, license data, or Foundry credential material.
-- Do not mutate worlds, users, actors, or settings as part of a system deployment unless explicitly requested.
-- Never restart both Foundry services unless specifically asked.
-- Preserve unrelated local git changes. If the repo is dirty, show what is dirty before deployment and do not include unrelated files unless they are part of the built package.
-
-## Server Access
-
-- Preferred SSH: `ssh root@foundry.angryorcgames.com`
-- Host: `foundry.angryorcgames.com`
-- Last known IP: `178.104.144.136`
-- Previously observed hostname: `ubuntu-8gb-nbg1-2`
-- Avoid the `hetzner-appflowy` alias for this workflow because it may bind local port 3000.
-
-## Environments
-
-### Dev / Build
-
-- Service: `foundryvttdev.service`
-- Data path: `/opt/foundryvtt-dev/data`
-- System target: `/opt/foundryvtt-dev/data/Data/systems/pivot-fantasy`
-- Backup root: `/opt/foundryvtt-dev/data/Backups/systems`
-- Public URL: `https://build.angryorcgames.com`
-- Public manifest: `https://build.angryorcgames.com/systems/pivot-fantasy/system.json`
-- Nginx proxy: `127.0.0.1:30001`
-- Known Pivot test world: `pivot-test`
-
-### Production
-
-- Service: `foundryvtt.service`
-- Data path: `/opt/foundryvtt/data`
-- System target: `/opt/foundryvtt/data/Data/systems/pivot-fantasy`
-- Backup root: `/opt/foundryvtt/data/Backups/systems`
-- Public URL: `https://foundry.angryorcgames.com`
-- Public manifest: `https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json`
-- Nginx proxy: `127.0.0.1:30000`
-
-## Required Read-Only Checks
-
-Run local checks first:
-
-```sh
-git status --short --branch
-git log -1 --oneline
-git remote -v
+```text
+system.zip + artifact-identity.json
+  commit SHA + package version + SHA-256
+        │
+        ├─ CI package (no Foundry secrets)
+        ├─ trusted Foundry E2E (same bytes, or rebuilt then checksum-compared)
+        ├─ staging deploy + non-destructive smoke
+        └─ production promotion of the exact staging-accepted zip
 ```
 
-Run remote checks before deployment:
+If release preparation changes `system.json`, the new zip must pass E2E (and staging, before production) again. Publication of a GitHub Release is separate from deploying to Angry Orc Games hosts.
 
-```sh
-ssh root@foundry.angryorcgames.com 'systemctl is-active foundryvtt.service foundryvttdev.service nginx.service'
-ssh root@foundry.angryorcgames.com 'systemctl cat foundryvttdev.service'
-ssh root@foundry.angryorcgames.com 'systemctl cat foundryvtt.service'
+## Implemented GitHub workflows
+
+| Workflow                                                                | Trigger                               | Secrets                              | Purpose                                                  |
+| ----------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ | -------------------------------------------------------- |
+| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                   | None                                 | Lint, format, types, Vitest, build, audit, package       |
+| [`e2e.yml`](../.github/workflows/e2e.yml)                               | Same-repo PRs and `workflow_dispatch` | `foundry-e2e`                        | Isolated Foundry E2E                                     |
+| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Successful CI on `main`               | `staging`                            | Deploy tested zip, smoke https://build.angryorcgames.com |
+| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval          | `production`                         | Promote the exact staging-accepted zip                   |
+| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                             | `foundry-e2e` then `contents: write` | Test the prepared zip, then publish                      |
+
+Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Staging uses `concurrency: foundry-staging` with `cancel-in-progress: false` so one run cannot deploy while another is testing.
+
+Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. To test a fork commit: review the exact SHA, then run **Foundry E2E** with `workflow_dispatch` and that ref.
+
+Skipped E2E is visible as a skipped check and cannot satisfy release publication (`needs.e2e.result == success`).
+
+## GitHub settings that cannot be set from files
+
+Create these Environments in the repository settings:
+
+| Environment   | Required reviewers | Secrets                                                                                           |
+| ------------- | ------------------ | ------------------------------------------------------------------------------------------------- |
+| `foundry-e2e` | Optional           | `FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`, `FOUNDRY_RELEASE_CACHE_URL`, `FOUNDRY_RELEASE_SHA256` |
+| `staging`     | Recommended        | Foundry cache/license secrets **plus** deploy and staging user secrets below                      |
+| `production`  | **Required**       | Separate deploy secrets, no Foundry website account password                                      |
+
+Staging / production deploy secrets (placeholders only):
+
+```text
+FOUNDRY_DEPLOY_SSH_HOST=
+FOUNDRY_DEPLOY_SSH_USER=
+FOUNDRY_DEPLOY_SSH_KEY=
+FOUNDRY_DEPLOY_TARGET_DIR=
+FOUNDRY_DEPLOY_BACKUP_DIR=
+FOUNDRY_DEPLOY_SERVICE=
 ```
 
-Inspect only the target service for the requested deployment after the broad service check.
+Staging smoke:
 
-## Required Local Package Checks
-
-```sh
-npm run verify
-npm run package:system
-shasum -a 256 system.zip
-unzip -t system.zip
+```text
+PIVOT_STAGING_GM_USER=
+PIVOT_STAGING_GM_PASSWORD=
+PIVOT_STAGING_PLAYER_USER=
+PIVOT_STAGING_PLAYER_PASSWORD=
 ```
 
-Record the branch, commit, package checksum, and whether the working tree was dirty.
+The public hostnames are **not** assumed to be SSH destinations. Do not invent users, paths, or unit names. A previous operator runbook mentioned systemd units and `/opt/foundryvtt[-dev]/data` on a Hetzner host; confirm the current layout by filling the secrets above.
 
-## Dev Deployment Pattern
+Suggested branch-protection checks on `main`:
 
-Restart only `foundryvttdev.service`.
+- `Verify / Node 20`
+- `Verify / Node 22`
+- `Package Foundry System`
+- `Foundry E2E` (same-repo PRs only; forks stay CI-only)
 
-```sh
-target=/opt/foundryvtt-dev/data/Data/systems/pivot-fantasy
-backup=/opt/foundryvtt-dev/data/Backups/systems/pivot-fantasy-$(date -u +%Y%m%dT%H%M%SZ)
-service=foundryvttdev.service
-public=https://build.angryorcgames.com/systems/pivot-fantasy/system.json
-```
+## Staging
 
-Deployment flow:
+After CI succeeds on `main`, `deploy-staging.yml` downloads that `system.zip`, runs isolated E2E against those bytes, deploys them, then runs `npm run test:e2e:staging` against https://build.angryorcgames.com.
 
-1. Copy `system.zip` to `/tmp` on the server.
-2. Create the backup root if needed.
-3. Move any existing target folder to the UTC timestamped backup path.
-4. Create the target folder.
-5. Unzip `system.zip` into the target folder.
-6. Validate `system.json` in the target folder.
-7. Restart only `foundryvttdev.service`.
+Reset only a designated local/E2E world. The staging job does not wipe other server data. Production promotion reads `artifact-identity.json.staging.sha256`, not “the latest successful staging run” by itself.
 
-If the restart drops the active dev world, report that `/join` is live and the world needs relaunch. Do not use or print the admin password.
+Keep the staging Foundry **runtime** on 14.368 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
 
-## Production Deployment Pattern
+## Production
 
-Restart only `foundryvtt.service`.
+Run **Promote production** and pass the staging workflow run id. The `production` environment must require a human approval. The job:
 
-```sh
-target=/opt/foundryvtt/data/Data/systems/pivot-fantasy
-backup=/opt/foundryvtt/data/Backups/systems/pivot-fantasy-$(date -u +%Y%m%dT%H%M%SZ)
-service=foundryvtt.service
-public=https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json
-```
+1. Downloads `pivot-foundry-staging-accepted`
+2. Verifies commit, version, SHA-256, and staging acceptance
+3. Refuses packages that require a newer Foundry major than 14
+4. Backs up the configured target directory
+5. Replaces the package and restarts only the configured service
+6. Runs non-destructive production health checks
 
-Before production deployment, stop and confirm the exact commit, target path, backup path, and service with the user. Do not restart production from an ambiguous dirty tree or an unconfirmed target.
+It never runs fixture reset/seed tests against https://foundry.angryorcgames.com.
 
-## Post-Deploy Verification
+### Rollback
 
-Run these checks for the target environment only:
+1. Redeploy the previous `system.zip` (same identity file) with the production workflow or the documented backup directory.
+2. If a world migration made package-only rollback insufficient, restore the matching world backup from `FOUNDRY_DEPLOY_BACKUP_DIR` / the server’s Foundry backup location.
+3. Do not roll Foundry itself backward as part of a package rollback unless that runtime pair was tested.
 
-```sh
-ssh root@foundry.angryorcgames.com 'systemctl is-active <service>'
-curl -fsS <public>
-curl -fsS <public> | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const m = JSON.parse(data); if (!m.documentTypes?.Actor?.character) process.exit(1); })'
-curl -fsS <public-dist-pivot-mjs-url>
-ssh root@foundry.angryorcgames.com 'journalctl -u <service> --since "5 minutes ago" --no-pager'
-```
+## Licensing
 
-Also compare the checksum of the public `dist/pivot.mjs` with the remote file in the deployed target. Check journal output for Pivot, system, schema, and TypeDataModel errors without printing secrets.
+Official sources: [EULA](https://foundryvtt.com/article/license/) (2 March 2023, Version 11.293) and [FAQ](https://foundryvtt.com/article/faq/).
 
-## Final Report
+- A purchased license is required to install and activate Foundry, including Docker and Node hosts.
+- You may install the software on more than one computer, but **only one hosted instance may be accessible to users other than the license owner at a time** unless you own matching additional licenses.
+- Private owner-only test servers are allowed; local-only loopback plus a player-accessible staging or production host still needs a concurrency plan.
+- Timed download URLs expire in about five minutes and do not activate the license.
+- Do not distribute Foundry archives, bake them into Cloud snapshots, or upload them as public workflow artifacts.
 
-A deployment handoff must include:
-
-- Branch and commit deployed.
-- Target environment.
-- Target path and backup path.
-- Service restarted.
-- Package checksum.
-- Verification commands and results.
-- Any compatibility caveats, especially notes about Foundry v14 API changes or compatibility requirements for the AOG hosts.
+This repository does not assume one license covers local + Cloud + https://build.angryorcgames.com + https://foundry.angryorcgames.com if those instances are simultaneously player-accessible.

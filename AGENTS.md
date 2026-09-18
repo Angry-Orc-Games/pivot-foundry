@@ -14,7 +14,9 @@ Run these from the repository root:
 - Format check: `npm run format:check`
 - Build Foundry runtime: `npm run build`
 - Validate package: `npm run package:system`
-- Local Foundry v14 host (Node 24): `npm run foundry:up` / `foundry:down` / `foundry:logs`
+- Foundry env diagnostics: `npm run foundry:doctor`
+- Persistent Foundry v14 world: `npm run foundry:up` / `foundry:status` / `foundry:logs` / `foundry:down`
+- Packaged browser E2E: `npm run foundry:e2e`
 
 ## Architecture Boundaries
 
@@ -26,17 +28,21 @@ Run these from the repository root:
 
 ## Brownfield Workflow
 
-- Read `README.md`, `docs/development.md`, `docs/architecture.md`, `docs/foundry-vtt-source.md`, `docs/rules-source.md`, and `docs/character-sheet-source.md` before feature work. Read `docs/deployment.md` before any deployment-related work.
+- Read `README.md`, `docs/development.md`, `docs/architecture.md`, `docs/foundry-vtt-source.md`, `docs/rules-source.md`, and `docs/character-sheet-source.md` before feature work. Read `docs/deployment.md` before any deployment-related work. Read `docs/foundry-local-dev.md`, `docs/foundry-testing.md`, and `docs/foundry-cloud.md` before changing the Foundry runtime.
 - Preserve unrelated dirty work. If files are already modified, inspect and build on the current state rather than reverting it.
 - Prefer one worker for code edits. Use additional agents or reviewers for read-only mapping, testing, security review, and architecture review.
-- For runtime behavior, separate local repo success from Foundry acceptance. Report whether validation was local-only, CI-backed, or manually checked in Foundry.
+- For runtime behavior, separate local repo success from Foundry acceptance. Report whether validation was local-only, CI-backed, or checked in Foundry / Playwright.
 
 ## Verification Bar
 
-Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, build locally and note whether Foundry v14 was manually checked.
+Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, run `npm run foundry:e2e` when Docker and Foundry credentials exist; otherwise say that browser E2E was not run.
 
-Hosting Foundry locally uses Node 24 and a licensed Node zip in ignored `foundry-app/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Repository `npm run verify` stays on Node 20/22.
+The Foundry runtime is Docker Compose + Felddy, pinned in `foundry/versions.json` to Foundry **14.368**. Persistent data is `foundry-data-v14/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Do not delete retired `foundry-app/` or `foundry-data/` directories. Repository `npm run verify` stays on Node 20/22.
+
+Do not claim Cloud execution, GitHub CI, staging, production, or release publication unless that surface was actually observed.
 
 ## Cursor Cloud specific instructions
 
-Cloud secrets belong in the Cursor Secrets tab (Runtime Secret), not in git or an environment snapshot. `npm run foundry:up` only reads `.env.foundry.local`; write that file from the injected `FOUNDRY_*` env vars before starting Foundry. Do not store a timed `FOUNDRY_RELEASE_URL` on a saved environment. See [docs/foundry-local-dev.md](docs/foundry-local-dev.md).
+`.cursor/environment.json` installs Node, Docker/Compose, and Playwright browsers. `install` and `start` do not boot Foundry. After a snapshot, use this checkout’s package (`npm ci`, `npm run build`) before `npm run foundry:up`.
+
+Runtime Secrets: `FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`, and optionally `FOUNDRY_RELEASE_CACHE_URL` + `FOUNDRY_RELEASE_SHA256`. Do not persist a timed `FOUNDRY_RELEASE_URL`. Do not load production deploy credentials onto Cloud Agents. Preview port **30000** through Cursor forwarding and confirm WebSocket connectivity, not just the first HTML page.

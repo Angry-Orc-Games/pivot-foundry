@@ -1,0 +1,16 @@
+{
+  "name": "Pivot Foundry",
+  "user": "ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "./scripts/cloud-agent-install.sh",
+  "start": "./scripts/cloud-agent-start.sh",
+  "ports": [
+    {
+      "name": "Foundry VTT",
+      "port": 30000
+    }
+  ]
+}
