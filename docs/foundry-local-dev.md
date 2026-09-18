@@ -28,6 +28,10 @@ For unattended testing beyond the first activation screen, also set `FOUNDRY_LIC
 
 Keep `.env.foundry.local` out of commits. It can contain a license key or a temporary signed download URL.
 
+## Cloud Agent secrets
+
+`foundry:up` reads `.env.foundry.local`, not process environment variables. On a Cloud Agent, put the same keys in **Cursor Dashboard → Cloud Agents → Secrets** as **Runtime Secrets** (`FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`; a fresh `FOUNDRY_RELEASE_URL` only at kick). Cursor injects them as env vars. Write the gitignored file from those vars, then run `foundry:up`. Do not save a timed URL on the environment (about 5 minutes). Do not bake `foundry-app/` or `.env.foundry.local` into a snapshot. Node 24 is still required for the host process.
+
 3. Build the system once:
 
 ```sh

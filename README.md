@@ -113,7 +113,7 @@ The host process needs Node 24. Repository `npm` scripts can stay on Node 20 or 
 
 Foundry will be available at `http://127.0.0.1:30000`, with this checkout's public system assets symlinked as `foundry-data/Data/systems/pivot-fantasy`.
 
-See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full workflow.
+See [docs/foundry-local-dev.md](docs/foundry-local-dev.md) for the full workflow, including Cloud Agent secrets (Cursor Secrets tab → write `.env.foundry.local` → `foundry:up`).
 
 ## Project Layout
 
