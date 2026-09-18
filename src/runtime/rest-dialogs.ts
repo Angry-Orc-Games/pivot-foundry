@@ -10,7 +10,8 @@ import {
 import { abilityModifier } from "../rules/modifiers";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
 import { rollProgress } from "./roll-progress";
-import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
+import { prepareCharacterSheetContext } from "../sheets/character-sheet";
+import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
 
 interface RestContext {
   actor: ActorLike;
@@ -32,9 +33,7 @@ function extractRestContext(actor: ActorLike): RestContext | null {
   const hpCurrent = numberAt(system, ["attributes", "hp", "value"], 0);
   const hpMax = numberAt(system, ["attributes", "hp", "max"], 0);
   const poolCurrent = numberAt(system, ["resources", "pool", "value"], 0);
-  const poolMax = numberAt(system, ["resources", "pool", "max"], 1);
   const mpCurrent = numberAt(system, ["magic", "mp", "value"], 0);
-  const mpMax = numberAt(system, ["magic", "mp", "max"], 0);
   const awakened = booleanAt(system, ["magic", "awakened"], false);
 
   const magicAbilityKey = stringAtNullable(system, ["magic", "ability"]);
@@ -46,6 +45,10 @@ function extractRestContext(actor: ActorLike): RestContext | null {
   const conMod = abilityModifier(conScore);
 
   const hitDie = stringAt(system, ["attributes", "hitDie"], "d8");
+
+  const sheetContext = prepareCharacterSheetContext(actor, true);
+  const poolMax = sheetContext.derived.pool.max;
+  const mpMax = sheetContext.derived.magic.mp.max;
 
   return {
     actor,
@@ -62,15 +65,23 @@ function extractRestContext(actor: ActorLike): RestContext | null {
   };
 }
 
+function localizeRest(key: string): string {
+  return runtime().game?.i18n?.localize?.(`PIVOT.Rest.${key}`) ?? `PIVOT.Rest.${key}`;
+}
+
+function warnRest(key: string): void {
+  runtime().ui?.notifications?.warn(localizeRest(key));
+}
+
 export async function shortRestDialog(actor: ActorLike): Promise<void> {
   const ctx = extractRestContext(actor);
   if (!ctx) {
-    warn("Rest.RestFailed");
+    warnRest("RestFailed");
     return;
   }
 
   if (ctx.poolCurrent < 1) {
-    warn("Rest.InsufficientPool");
+    warnRest("InsufficientPool");
     return;
   }
 
@@ -79,29 +90,40 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   const maxSpends = ctx.poolCurrent;
 
   const inputs = await prompt(
-    "ShortRest",
+    localizeRest("ShortRest"),
     `<div>
-      <p>${escapeHtml(localize("Rest.ShortRestPrompt"))}</p>
-      <label>${escapeHtml(localize("Rest.PoolDiceToSpend"))} (${escapeHtml(localize("Rest.Max"))}: ${maxSpends})<br>
+      <p>${escapeHtml(localizeRest("ShortRestPrompt"))}</p>
+      <label>${escapeHtml(localizeRest("PoolDiceToSpend"))} (${escapeHtml(localizeRest("Max"))}: ${maxSpends})<br>
         <input type="number" name="poolSpends" min="0" max="${maxSpends}" step="1" value="1">
       </label>
-      <p><em>${escapeHtml(localize("Rest.ShortRestPoolInfo"))} (die: ${ctx.hitDie}, Con mod: ${formatSigned(ctx.conMod)})</em></p>
+      <p><em>${escapeHtml(localizeRest("ShortRestPoolInfo"))} (die: ${ctx.hitDie}, Con mod: ${formatSigned(ctx.conMod)})</em></p>
       ${
         ctx.awakened
-          ? `<p>${escapeHtml(localize("Rest.ShortRestMpInfo"))} (${magicAbilityMod} MP)</p>`
-          : `<p><em>${escapeHtml(localize("Rest.ShortRestNotAwakened"))}</em></p>`
+          ? `<label><input type="checkbox" name="inDanger" value="yes"> ${escapeHtml(localizeRest("ShortRestInDanger"))}</label>
+             <p>${escapeHtml(localizeRest("ShortRestMpInfo"))} (${magicAbilityMod} MP)</p>`
+          : `<p><em>${escapeHtml(localizeRest("ShortRestNotAwakened"))}</em></p>`
       }
     </div>`,
-    (form) => ({
-      poolSpends: Math.max(0, Math.min(maxSpends, Number(field(form, "poolSpends")))),
-    }),
+    (form) => {
+      const poolSpends = Number(field(form, "poolSpends"));
+      const inDanger = field(form, "inDanger") === "yes";
+      return { poolSpends, inDanger };
+    },
+    localizeRest("Confirm"),
   );
 
   if (!inputs) return;
 
+  if (!Number.isInteger(inputs.poolSpends) || inputs.poolSpends < 0) {
+    warnRest("RestFailed");
+    return;
+  }
+
+  const poolSpends = Math.min(maxSpends, inputs.poolSpends);
+
   const Roll = runtime().Roll;
   if (!Roll) {
-    warn("Rest.RestFailed");
+    warnRest("RestFailed");
     return;
   }
 
@@ -112,7 +134,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   try {
     const progress = rollProgress();
 
-    for (let i = 0; i < inputs.poolSpends; i++) {
+    for (let i = 0; i < poolSpends; i++) {
       if (poolRemaining < 1) break;
 
       const spendResult = applyShortRestPoolSpend({
@@ -126,7 +148,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
       const dieFormula = ctx.hitDie;
       if (!parseExplodingFormula(dieFormula)) {
         progress.close();
-        warn("Rest.RestFailed");
+        warnRest("RestFailed");
         return;
       }
 
@@ -143,7 +165,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
 
       if (!rollResult.complete || rollResult.total === null) {
         progress.close();
-        warn("Rest.RollIncomplete");
+        warnRest("RollIncomplete");
         return;
       }
 
@@ -160,7 +182,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
 
     progress.close();
   } catch {
-    warn("Rest.RestFailed");
+    warnRest("RestFailed");
     return;
   }
 
@@ -169,7 +191,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     magicAbilityMod,
     mpCurrent: ctx.mpCurrent,
     mpMax: ctx.mpMax,
-    inDanger: false,
+    inDanger: inputs.inDanger,
   });
 
   const newHp = Math.min(ctx.hpMax, ctx.hpCurrent + totalHealed);
@@ -182,7 +204,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   try {
     await actor.update?.(update);
   } catch {
-    warn("Rest.RestFailed");
+    warnRest("RestFailed");
     return;
   }
 
@@ -191,41 +213,46 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     .join("; ");
 
   const summary = [
-    `${escapeHtml(localize("Rest.ShortRestComplete"))}`,
-    `${escapeHtml(localize("Rest.PoolSpent"))}: ${inputs.poolSpends}`,
-    `${escapeHtml(localize("Rest.HpHealed"))}: ${totalHealed}`,
+    `${escapeHtml(localizeRest("ShortRestComplete"))}`,
+    `${escapeHtml(localizeRest("PoolSpent"))}: ${poolSpends}`,
+    `${escapeHtml(localizeRest("HpHealed"))}: ${totalHealed}`,
     mpResult.mpRecovered > 0
-      ? `${escapeHtml(localize("Rest.MpRecovered"))}: ${mpResult.mpRecovered}`
+      ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
       : "",
   ]
     .filter(Boolean)
     .join(" • ");
 
-  await createChat({
-    content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
-  });
+  try {
+    await createChat({
+      content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
+    });
+  } catch {
+    warnRest("ChatFailed");
+  }
 }
 
 export async function longRestDialog(actor: ActorLike): Promise<void> {
   const ctx = extractRestContext(actor);
   if (!ctx) {
-    warn("Rest.RestFailed");
+    warnRest("RestFailed");
     return;
   }
 
   const safeInput = await prompt(
-    "LongRest",
+    localizeRest("LongRest"),
     `<div>
-      <p>${escapeHtml(localize("Rest.LongRestPrompt"))}</p>
+      <p>${escapeHtml(localizeRest("LongRestPrompt"))}</p>
       <label>
         <input type="checkbox" name="safeAndComfortable" value="yes">
-        ${escapeHtml(localize("Rest.LongRestSafeAndComfortable"))}
+        ${escapeHtml(localizeRest("LongRestSafeAndComfortable"))}
       </label>
-      <p><em>${escapeHtml(localize("Rest.LongRestMpInfo"))}</em></p>
+      <p><em>${escapeHtml(localizeRest("LongRestMpInfo"))}</em></p>
     </div>`,
     (form) => ({
       safeAndComfortable: field(form, "safeAndComfortable") === "yes",
     }),
+    localizeRest("Confirm"),
   );
 
   if (!safeInput) return;
@@ -244,20 +271,23 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
 
   if (ctx.awakened && !safeInput.safeAndComfortable) {
     const rollInput = await prompt(
-      "ControlMagic",
+      localizeRest("ControlMagic"),
       `<div>
-        <p>${escapeHtml(localize("Rest.ControlMagicPrompt"))}</p>
-        <label>${escapeHtml(localize("Rest.ControlMagicRollResult"))}<br>
+        <p>${escapeHtml(localizeRest("ControlMagicPrompt"))}</p>
+        <label>${escapeHtml(localizeRest("ControlMagicRollResult"))}<br>
           <input type="number" name="roll" min="1" step="1" value="">
         </label>
-        <p><em>${escapeHtml(localize("Rest.ControlMagicDC15"))}</em></p>
+        <p><em>${escapeHtml(localizeRest("ControlMagicDC15"))}</em></p>
       </div>`,
       (form) => ({
         roll: Number(field(form, "roll")),
       }),
+      localizeRest("Confirm"),
     );
 
-    if (!rollInput || !Number.isFinite(rollInput.roll)) {
+    if (!rollInput) return;
+
+    if (!Number.isFinite(rollInput.roll)) {
       controlMagicRoll = null;
     } else {
       controlMagicRoll = rollInput.roll;
@@ -281,26 +311,30 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
   try {
     await actor.update?.(update);
   } catch {
-    warn("Rest.RestFailed");
+    warnRest("RestFailed");
     return;
   }
 
   const summary = [
-    `${escapeHtml(localize("Rest.LongRestComplete"))}`,
+    `${escapeHtml(localizeRest("LongRestComplete"))}`,
     hpResult.hpRecovered > 0
-      ? `${escapeHtml(localize("Rest.HpRecovered"))}: ${hpResult.hpRecovered}`
+      ? `${escapeHtml(localizeRest("HpRecovered"))}: ${hpResult.hpRecovered}`
       : "",
     poolResult.poolRecovered > 0
-      ? `${escapeHtml(localize("Rest.PoolRecovered"))}: ${poolResult.poolRecovered}`
+      ? `${escapeHtml(localizeRest("PoolRecovered"))}: ${poolResult.poolRecovered}`
       : "",
     mpResult.mpRecovered > 0
-      ? `${escapeHtml(localize("Rest.MpRecovered"))}: ${mpResult.mpRecovered}`
+      ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
       : "",
   ]
     .filter(Boolean)
     .join(" • ");
 
-  await createChat({ content: `<p><strong>${summary}</strong></p>` });
+  try {
+    await createChat({ content: `<p><strong>${summary}</strong></p>` });
+  } catch {
+    warnRest("ChatFailed");
+  }
 }
 
 function numberAt(source: Record<string, unknown>, path: string[], fallback: number): number {
