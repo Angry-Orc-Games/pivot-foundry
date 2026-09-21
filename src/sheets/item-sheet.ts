@@ -7,7 +7,6 @@ const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 export const ITEM_SHEET_POSITION = { width: 560, height: "auto" as const };
 export const ITEM_SHEET_WINDOW = {
   resizable: true,
-  title: "PIVOT.Sheets.Item.Title",
 };
 
 export interface ItemSheetEffectRow {
@@ -58,6 +57,10 @@ export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataMode
       },
     };
 
+    get title(): string {
+      return itemWindowTitle(this);
+    }
+
     async _prepareContext(options: Record<string, unknown>): Promise<Record<string, unknown>> {
       const parentContext = await callOptionalSuper(this, "_prepareContext", options);
       const document = getSheetDocument(this);
@@ -69,6 +72,15 @@ export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataMode
   }
 
   return PivotItemSheet;
+}
+
+export function itemWindowTitle(sheet: object): string {
+  const candidate = sheet as {
+    document?: { name?: unknown };
+    item?: { name?: unknown };
+  };
+  const name = candidate.document?.name ?? candidate.item?.name;
+  return typeof name === "string" ? name.trim() : "";
 }
 
 export function prepareItemSheetContext(
