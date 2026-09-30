@@ -57,6 +57,9 @@ describe("prepareNpcSheetContext", () => {
     expect(context.items).toHaveLength(2);
     expect(context.items[0]?.name).toBe("Greataxe");
     expect(context.items[1]?.name).toBe("Hide Armour");
+    expect(context.config.tierChoices).toBeDefined();
+    expect(context.config.creatureTypeChoices).toBeDefined();
+    expect(context.config.overlayChoices).toBeDefined();
   });
 
   it("sets disabled attribute when actor is not owned", () => {
@@ -113,5 +116,18 @@ describe("prepareNpcSheetContext", () => {
     expect(context.system.combatBonuses.intellectual).toBe(2);
     expect(context.system.cr).toBe("1");
     expect(context.system.biography).toBe("An angry orc warrior.");
+  });
+
+  it("preserves classification fields when updated", () => {
+    const npc = sampleNpc();
+    npc.system.tier = "boss";
+    npc.system.creatureType = "undead";
+    npc.system.overlay = "dire";
+
+    const context = prepareNpcSheetContext(npc);
+
+    expect(context.system.tier).toBe("boss");
+    expect(context.system.creatureType).toBe("undead");
+    expect(context.system.overlay).toBe("dire");
   });
 });

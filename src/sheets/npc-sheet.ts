@@ -48,6 +48,11 @@ export interface NpcSheetContext {
   items: ItemLike[];
   disabledAttr: string;
   rootId: string;
+  config: {
+    tierChoices: Record<string, string>;
+    creatureTypeChoices: Record<string, string>;
+    overlayChoices: Record<string, string>;
+  };
 }
 
 export function prepareNpcSheetContext(actor: NpcActorLike): Omit<NpcSheetContext, "rootId"> {
@@ -63,6 +68,27 @@ export function prepareNpcSheetContext(actor: NpcActorLike): Omit<NpcSheetContex
     system: actor.system,
     items,
     disabledAttr,
+    config: {
+      tierChoices: {
+        gonk: "PIVOT.Tier.Gonk",
+        alphaGonk: "PIVOT.Tier.AlphaGonk",
+        boss: "PIVOT.Tier.Boss",
+        bbeg: "PIVOT.Tier.BBEG",
+      },
+      creatureTypeChoices: {
+        beast: "PIVOT.CreatureType.Beast",
+        humanoid: "PIVOT.CreatureType.Humanoid",
+        monster: "PIVOT.CreatureType.Monster",
+        undead: "PIVOT.CreatureType.Undead",
+      },
+      overlayChoices: {
+        none: "PIVOT.Overlay.None",
+        alpha: "PIVOT.Overlay.Alpha",
+        giant: "PIVOT.Overlay.Giant",
+        dire: "PIVOT.Overlay.Dire",
+        undead: "PIVOT.Overlay.Undead",
+      },
+    },
   };
 }
 
@@ -86,6 +112,7 @@ export function createPivotNpcSheetClass(foundry: FoundryRuntime): TypeDataModel
       },
       form: {
         submitOnChange: true,
+        handler: PivotNpcSheet.onSubmitDocumentForm,
       },
       window: {
         icon: "fa-solid fa-skull",
@@ -148,6 +175,16 @@ export function createPivotNpcSheetClass(foundry: FoundryRuntime): TypeDataModel
       if (actor.deleteEmbeddedDocuments) {
         await actor.deleteEmbeddedDocuments("Item", [itemId]);
       }
+    }
+
+    static async onSubmitDocumentForm(
+      this: PivotNpcSheet,
+      _event: Event,
+      _form: HTMLFormElement,
+      formData: { object?: Record<string, unknown> },
+    ): Promise<unknown> {
+      const data = formData.object ?? {};
+      return this.document.update?.(data);
     }
   }
 
