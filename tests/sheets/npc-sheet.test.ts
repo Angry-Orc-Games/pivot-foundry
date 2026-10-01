@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { prepareNpcSheetContext, type NpcActorLike } from "../../src/sheets/npc-sheet";
+import {
+  prepareNpcSheetContext,
+  type NpcActorLike,
+  createPivotNpcSheetClass,
+} from "../../src/sheets/npc-sheet";
+import type { FoundryRuntime } from "../../src/foundry-runtime";
 
 function sampleNpc(): NpcActorLike {
   return {
@@ -57,6 +62,9 @@ describe("prepareNpcSheetContext", () => {
     expect(context.items).toHaveLength(2);
     expect(context.items[0]?.name).toBe("Greataxe");
     expect(context.items[1]?.name).toBe("Hide Armour");
+    expect(context.config.tierChoices).toBeDefined();
+    expect(context.config.creatureTypeChoices).toBeDefined();
+    expect(context.config.overlayChoices).toBeDefined();
   });
 
   it("sets disabled attribute when actor is not owned", () => {
@@ -114,4 +122,84 @@ describe("prepareNpcSheetContext", () => {
     expect(context.system.cr).toBe("1");
     expect(context.system.biography).toBe("An angry orc warrior.");
   });
+
+  it("preserves classification fields when updated", () => {
+    const npc = sampleNpc();
+    npc.system.tier = "boss";
+    npc.system.creatureType = "undead";
+    npc.system.overlay = "dire";
+
+    const context = prepareNpcSheetContext(npc);
+
+    expect(context.system.tier).toBe("boss");
+    expect(context.system.creatureType).toBe("undead");
+    expect(context.system.overlay).toBe("dire");
+  });
+
+  describe("NPC Sheet class form submission", () => {
+    it("calls actor.update with form data when form is submitted", async () => {
+      const mockFoundry = createMockFoundryRuntime();
+      const SheetClass = createPivotNpcSheetClass(mockFoundry) as unknown as {
+        onSubmitDocumentForm: (
+          event: Event,
+          form: HTMLFormElement,
+          formData: { object?: Record<string, unknown> },
+        ) => Promise<unknown>;
+      };
+      const npc = sampleNpc();
+      const updateSpy = vi.fn().mockResolvedValue(undefined);
+      npc.update = updateSpy;
+
+      const formData = {
+        object: {
+          "system.tier": "boss",
+          "system.creatureType": "undead",
+          "system.overlay": "dire",
+        },
+      };
+
+      await SheetClass.onSubmitDocumentForm.call(
+        { document: npc } as never,
+        {} as Event,
+        {} as HTMLFormElement,
+        formData,
+      );
+
+      expect(updateSpy).toHaveBeenCalledWith({
+        "system.tier": "boss",
+        "system.creatureType": "undead",
+        "system.overlay": "dire",
+      });
+    });
+  });
 });
+
+function createMockFoundryRuntime(): FoundryRuntime {
+  // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+  class MockTypeDataModel {
+    static defineSchema() {
+      return {};
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+  class MockActorSheetV2 {
+    static DEFAULT_OPTIONS = {};
+  }
+
+  return {
+    abstract: {
+      TypeDataModel: MockTypeDataModel,
+    },
+    data: {
+      fields: {},
+    },
+    applications: {
+      sheets: {
+        ActorSheetV2: MockActorSheetV2,
+      },
+      api: {
+        HandlebarsApplicationMixin: (base: never) => base,
+      },
+    },
+  } as never;
+}

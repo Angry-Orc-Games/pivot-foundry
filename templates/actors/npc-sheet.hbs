@@ -20,20 +20,14 @@
         <label>
           <span>{{localize "PIVOT.Fields.Tier"}}</span>
           <select name="system.tier" {{disabledAttr}}>
-            <option value="gonk">{{localize "PIVOT.Tier.Gonk"}}</option>
-            <option value="alphaGonk">{{localize "PIVOT.Tier.AlphaGonk"}}</option>
-            <option value="boss">{{localize "PIVOT.Tier.Boss"}}</option>
-            <option value="bbeg">{{localize "PIVOT.Tier.BBEG"}}</option>
+            {{selectOptions config.tierChoices selected=system.tier}}
           </select>
         </label>
 
         <label>
           <span>{{localize "PIVOT.Fields.CreatureType"}}</span>
           <select name="system.creatureType" {{disabledAttr}}>
-            <option value="beast">{{localize "PIVOT.CreatureType.Beast"}}</option>
-            <option value="humanoid">{{localize "PIVOT.CreatureType.Humanoid"}}</option>
-            <option value="monster">{{localize "PIVOT.CreatureType.Monster"}}</option>
-            <option value="undead">{{localize "PIVOT.CreatureType.Undead"}}</option>
+            {{selectOptions config.creatureTypeChoices selected=system.creatureType}}
           </select>
         </label>
       </div>
@@ -42,11 +36,7 @@
         <label>
           <span>{{localize "PIVOT.Fields.Overlay"}}</span>
           <select name="system.overlay" {{disabledAttr}}>
-            <option value="none">{{localize "PIVOT.Overlay.None"}}</option>
-            <option value="alpha">{{localize "PIVOT.Overlay.Alpha"}}</option>
-            <option value="giant">{{localize "PIVOT.Overlay.Giant"}}</option>
-            <option value="dire">{{localize "PIVOT.Overlay.Dire"}}</option>
-            <option value="undead">{{localize "PIVOT.Overlay.Undead"}}</option>
+            {{selectOptions config.overlayChoices selected=system.overlay}}
           </select>
         </label>
       </div>
