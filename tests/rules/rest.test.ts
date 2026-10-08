@@ -9,6 +9,7 @@ import {
   calculateMagicAbilityModifier,
   parsePoolSpends,
 } from "../../src/rules/rest";
+import { buildLongRestUpdate } from "../../src/runtime/rest-dialogs";
 
 describe("applyShortRestPoolSpend", () => {
   it("spends 1 Pool from current", () => {
@@ -248,22 +249,35 @@ describe("calculateMagicAbilityModifier", () => {
   });
 });
 
-describe("Long Rest temp HP clearing", () => {
-  it("Long Rest clears temporary HP (integration note)", () => {
-    // Long Rest clears temp HP at the runtime layer (src/runtime/rest-dialogs.ts)
-    // by including "system.attributes.hp.temp": 0 in the Actor update.
-    // This test documents the requirement. The actual clearing happens in
-    // longRestDialog() which sets temp to 0 regardless of rest conditions.
+describe("buildLongRestUpdate", () => {
+  it("always clears temp HP to 0", () => {
+    const update = buildLongRestUpdate(10, 3, 5);
+    expect(update["system.attributes.hp.temp"]).toBe(0);
+  });
 
-    // Verify that the runtime sets temp to 0 by checking the update shape
-    const expectedUpdate = {
-      "system.attributes.hp.value": 10, // example
-      "system.resources.pool.value": 3,
-      "system.magic.mp.value": 5,
-      "system.attributes.hp.temp": 0, // always zeroed
-    };
+  it("passes through HP from result", () => {
+    const update = buildLongRestUpdate(25, 4, 8);
+    expect(update["system.attributes.hp.value"]).toBe(25);
+  });
 
-    expect(expectedUpdate["system.attributes.hp.temp"]).toBe(0);
+  it("passes through Pool from result", () => {
+    const update = buildLongRestUpdate(10, 7, 5);
+    expect(update["system.resources.pool.value"]).toBe(7);
+  });
+
+  it("passes through MP from result unchanged", () => {
+    const update = buildLongRestUpdate(10, 3, 12);
+    expect(update["system.magic.mp.value"]).toBe(12);
+  });
+
+  it("builds correct update for typical long rest", () => {
+    const update = buildLongRestUpdate(20, 5, 10);
+    expect(update).toEqual({
+      "system.attributes.hp.value": 20,
+      "system.resources.pool.value": 5,
+      "system.magic.mp.value": 10,
+      "system.attributes.hp.temp": 0,
+    });
   });
 });
 

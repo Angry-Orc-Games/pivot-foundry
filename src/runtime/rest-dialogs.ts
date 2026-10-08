@@ -309,12 +309,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     controlMagicRoll,
   });
 
-  const update: Record<string, unknown> = {
-    "system.attributes.hp.value": hpResult.hpFinal,
-    "system.resources.pool.value": poolResult.poolFinal,
-    "system.magic.mp.value": mpResult.mpFinal,
-    "system.attributes.hp.temp": 0,
-  };
+  const update = buildLongRestUpdate(hpResult.hpFinal, poolResult.poolFinal, mpResult.mpFinal);
 
   try {
     await actor.update?.(update);
@@ -344,6 +339,19 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
   } catch {
     warnRest("ChatFailed");
   }
+}
+
+export function buildLongRestUpdate(
+  hpFinal: number,
+  poolFinal: number,
+  mpFinal: number,
+): Record<string, unknown> {
+  return {
+    "system.attributes.hp.value": hpFinal,
+    "system.resources.pool.value": poolFinal,
+    "system.magic.mp.value": mpFinal,
+    "system.attributes.hp.temp": 0,
+  };
 }
 
 function numberAt(source: Record<string, unknown>, path: string[], fallback: number): number {
