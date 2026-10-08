@@ -95,9 +95,11 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
     };
 
     // Set CONFIG.Combat.initiative formula for Combat Tracker roll buttons
-    // References actor.getRollData().initiative which includes Dex mod + bonus
+    // Formula uses @initiative which resolves from actor.getRollData() -> actor.system.initiative
+    // Character.prepareDerivedData() sets initiative = dex mod + bonus
+    // NPC.initiative defaults to 0 (NPC initiative rules not yet implemented)
     const config = runtime.CONFIG as typeof runtime.CONFIG & {
-      Combat?: { initiative?: { formula?: string } };
+      Combat?: { initiative?: { formula?: string } | string };
     };
     if (!config.Combat) {
       config.Combat = {};

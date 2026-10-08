@@ -19,12 +19,12 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
   const fields = foundry.data.fields;
 
   class PivotCharacterData extends foundry.abstract.TypeDataModel {
-    _derivedInitiative?: number;
+    initiative?: number;
 
     prepareDerivedData(): void {
       // Foundry calls this during data preparation to compute derived values
-      // Store derived initiative for Combat tracker formula evaluation
-      // The TypeDataModel IS the system data, so abilities/attributes are directly on this
+      // Store derived initiative directly on system for Combat tracker formula
+      // Actor.getRollData() returns this.system, so @initiative accesses this field
       const selfAsRecord = this as unknown as Record<string, unknown>;
       const abilities = (selfAsRecord.abilities as Record<string, { score?: number }>) ?? {};
       const dex = abilities.dex ?? {};
@@ -35,16 +35,8 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       const init = (attrs.initiative as { bonus?: number }) ?? {};
       const initiativeBonus = typeof init.bonus === "number" ? init.bonus : 0;
 
-      // Store for getRollData
-      this._derivedInitiative = dexMod + initiativeBonus;
-    }
-
-    getRollData(): Record<string, unknown> {
-      // Provide roll data for formulas like CONFIG.Combat.initiative
-      // Foundry's Actor calls this via actor.system.getRollData()
-      return {
-        initiative: this._derivedInitiative ?? 0,
-      };
+      // Set initiative directly on this for @initiative formula access
+      this.initiative = dexMod + initiativeBonus;
     }
 
     static defineSchema(): Record<string, DataField> {

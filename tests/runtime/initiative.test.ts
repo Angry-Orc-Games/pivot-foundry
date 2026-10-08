@@ -45,7 +45,7 @@ const mockFoundryRuntime: FoundryRuntime = {
 };
 
 describe("Character initiative integration", () => {
-  it("provides initiative in getRollData for combat tracker", () => {
+  it("sets initiative field during prepareDerivedData", () => {
     const CharacterDataModel = createPivotCharacterDataModel(mockFoundryRuntime);
     const model = new CharacterDataModel();
 
@@ -63,12 +63,8 @@ describe("Character initiative integration", () => {
       model.prepareDerivedData();
     }
 
-    // Get roll data
-    const rollData =
-      "getRollData" in model && typeof model.getRollData === "function" ? model.getRollData() : {};
-
-    // Should provide initiative: dex mod (3) + bonus (2) = 5
-    expect(rollData).toHaveProperty("initiative", 5);
+    // Check initiative field directly (actor.getRollData() returns actor.system)
+    expect(model).toHaveProperty("initiative", 5); // dex mod (3) + bonus (2)
   });
 
   it("calculates initiative with negative modifier", () => {
@@ -87,10 +83,7 @@ describe("Character initiative integration", () => {
       model.prepareDerivedData();
     }
 
-    const rollData =
-      "getRollData" in model && typeof model.getRollData === "function" ? model.getRollData() : {};
-
-    expect(rollData).toHaveProperty("initiative", -1);
+    expect(model).toHaveProperty("initiative", -1);
   });
 
   it("handles missing data gracefully", () => {
@@ -103,24 +96,18 @@ describe("Character initiative integration", () => {
       model.prepareDerivedData();
     }
 
-    const rollData =
-      "getRollData" in model && typeof model.getRollData === "function" ? model.getRollData() : {};
-
     // Should default to 0 when data is missing
-    expect(rollData).toHaveProperty("initiative", 0);
+    expect(model).toHaveProperty("initiative", 0);
   });
 });
 
 describe("NPC initiative integration", () => {
-  it("provides zero initiative for NPCs", () => {
+  it("has initiative field set to 0", () => {
     const NpcDataModel = createPivotNpcDataModel(mockFoundryRuntime);
     const model = new NpcDataModel();
 
     // NPC initiative rules not yet implemented (UC-003 non-goal)
-    // Should return 0 to prevent crashes when NPCs are in combat
-    const rollData =
-      "getRollData" in model && typeof model.getRollData === "function" ? model.getRollData() : {};
-
-    expect(rollData).toHaveProperty("initiative", 0);
+    // initiative field defaults to 0 to prevent crashes when NPCs are in combat
+    expect(model).toHaveProperty("initiative", 0);
   });
 });
