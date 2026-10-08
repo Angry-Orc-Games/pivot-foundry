@@ -19,6 +19,37 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
   const fields = foundry.data.fields;
 
   class PivotCharacterData extends foundry.abstract.TypeDataModel {
+    parent?: { system?: PivotCharacterData };
+    _derivedInitiative?: number;
+
+    prepareDerivedData(): void {
+      // Foundry calls this during data preparation to compute derived values
+      // Store derived initiative for Combat tracker formula evaluation
+      if (!this.parent?.system) return;
+
+      // Calculate derived initiative (simplified version for combat tracker)
+      // Full calculation in character-derived.ts; this is a minimal version for getRollData
+      const system = this.parent.system as unknown as Record<string, unknown>;
+      const abilities = (system.abilities as Record<string, { score?: number }>) ?? {};
+      const dex = abilities.dex ?? {};
+      const dexScore = typeof dex.score === "number" ? dex.score : 10;
+      const dexMod = Math.floor((dexScore - 10) / 2);
+
+      const attrs = (system.attributes as Record<string, unknown>) ?? {};
+      const init = (attrs.initiative as { bonus?: number }) ?? {};
+      const initiativeBonus = typeof init.bonus === "number" ? init.bonus : 0;
+
+      // Store in a place accessible to getRollData
+      this._derivedInitiative = dexMod + initiativeBonus;
+    }
+
+    getRollData(): Record<string, unknown> {
+      // Provide roll data for formulas like CONFIG.Combat.initiative
+      return {
+        initiative: this._derivedInitiative ?? 0,
+      };
+    }
+
     static defineSchema(): Record<string, DataField> {
       return {
         survivalVersion: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),

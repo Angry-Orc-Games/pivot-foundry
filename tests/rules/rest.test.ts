@@ -10,6 +10,7 @@ import {
   parsePoolSpends,
 } from "../../src/rules/rest";
 import { buildLongRestUpdate } from "../../src/runtime/rest-dialogs";
+import enJson from "../../lang/en.json";
 
 describe("applyShortRestPoolSpend", () => {
   it("spends 1 Pool from current", () => {
@@ -313,5 +314,13 @@ describe("parsePoolSpends", () => {
   it("returns null for non-finite", () => {
     expect(parsePoolSpends("Infinity", 3)).toBe(null);
     expect(parsePoolSpends("NaN", 3)).toBe(null);
+  });
+});
+
+describe("Short Rest dialog string formatting", () => {
+  it("localization key has placeholder for die", () => {
+    // This test verifies the English localization has the {die} placeholder
+    // The actual formatting test requires a mock Foundry i18n runtime
+    expect(enJson["PIVOT.Rest.ShortRestPoolInfo"]).toContain("{die}");
   });
 });
