@@ -1,5 +1,7 @@
 # Milestone 3 Acceptance Test Notes
 
+**PR Head SHA**: `8b9ebbb6faa3b6ee72e3de3a6039e80c5843c7b5`
+
 ## Manual Testing for Foundry v14
 
 This document describes the acceptance test procedures for Milestone 3 (Initiative and Rest) after installing the `system.zip` package into a Foundry v14 world.
