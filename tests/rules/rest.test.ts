@@ -122,6 +122,15 @@ describe("applyLongRestHpRecovery", () => {
     expect(result.hpRecovered).toBe(0);
     expect(result.hpFinal).toBe(10);
   });
+
+  it("always sets HP to maximum (full recovery)", () => {
+    const result = applyLongRestHpRecovery({
+      hpCurrent: 1,
+      hpMax: 50,
+    });
+    expect(result.hpFinal).toBe(50);
+    expect(result.hpRecovered).toBe(49);
+  });
 });
 
 describe("applyLongRestPoolRecovery", () => {

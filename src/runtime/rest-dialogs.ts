@@ -26,6 +26,7 @@ interface RestContext {
   magicAbilityScore: number | null;
   conMod: number;
   hitDie: string;
+  temp: number;
 }
 
 function extractRestContext(actor: ActorLike): RestContext | null {
@@ -35,6 +36,7 @@ function extractRestContext(actor: ActorLike): RestContext | null {
   const hpMax = numberAt(system, ["attributes", "hp", "max"], 0);
   const poolCurrent = numberAt(system, ["resources", "pool", "value"], 0);
   const mpCurrent = numberAt(system, ["magic", "mp", "value"], 0);
+  const temp = numberAt(system, ["attributes", "hp", "temp"], 0);
   const awakened = booleanAt(system, ["magic", "awakened"], false);
 
   const magicAbilityKey = stringAtNullable(system, ["magic", "ability"]);
@@ -63,6 +65,7 @@ function extractRestContext(actor: ActorLike): RestContext | null {
     magicAbilityScore,
     conMod,
     hitDie,
+    temp,
   };
 }
 
@@ -310,6 +313,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     "system.attributes.hp.value": hpResult.hpFinal,
     "system.resources.pool.value": poolResult.poolFinal,
     "system.magic.mp.value": mpResult.mpFinal,
+    "system.attributes.hp.temp": 0,
   };
 
   try {
@@ -318,6 +322,8 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     warnRest("RestFailed");
     return;
   }
+
+  const tempHpCleared = ctx.hpCurrent > 0 || ctx.poolCurrent > 0 ? ctx.temp : 0;
 
   const summary = [
     `${escapeHtml(localizeRest("LongRestComplete"))}`,
@@ -330,6 +336,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     mpResult.mpRecovered > 0
       ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
       : "",
+    tempHpCleared > 0 ? `${escapeHtml(localizeRest("TempHpCleared"))}: ${tempHpCleared}` : "",
   ]
     .filter(Boolean)
     .join(" • ");
