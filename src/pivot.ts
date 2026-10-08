@@ -1,7 +1,10 @@
 import { guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
-import { updateTokenStatusEffects } from "./runtime/status-effects";
+import {
+  updateTokenStatusEffects,
+  guardSystemManagedEffectDeletion,
+} from "./runtime/status-effects";
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotNpcDataModel } from "./data/npc-data";
 import { createPivotItemDataModels } from "./data/item-data";
@@ -14,18 +17,50 @@ import { createPivotItemSheetClass } from "./sheets/item-sheet";
 
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
+/**
+ * Utility to check if a nested property exists in an object.
+ * Mimics foundry.utils.hasProperty for nested path checking.
+ */
+function hasNestedProperty(obj: unknown, path: string): boolean {
+  if (typeof obj !== "object" || obj === null) return false;
+  const parts = path.split(".");
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (typeof current !== "object" || current === null || !(part in current)) {
+      return false;
+    }
+    current = (current as Record<string, unknown>)[part];
+  }
+  return true;
+}
+
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
+
+  // Sync token status effects after HP or death state changes
+  // Foundry passes nested changes object: {system: {attributes: {hp: {value}}}}
   runtime.Hooks.on?.("updateActor", (actor: unknown, changes: Record<string, unknown>) => {
-    // Sync token status effects after HP or death state changes
-    if (
-      changes["system.attributes.hp.value"] !== undefined ||
-      changes["system.attributes.deathSaves.status"] !== undefined
-    ) {
-      void updateTokenStatusEffects(actor as Parameters<typeof updateTokenStatusEffects>[0]);
+    const hpChanged = hasNestedProperty(changes, "system.attributes.hp.value");
+    const statusChanged = hasNestedProperty(changes, "system.attributes.deathSaves.status");
+
+    if (hpChanged || statusChanged) {
+      const globals = globalThis as { game?: unknown };
+      void updateTokenStatusEffects(
+        actor as Parameters<typeof updateTokenStatusEffects>[0],
+        globals.game as Parameters<typeof updateTokenStatusEffects>[1],
+      );
     }
+  });
+
+  // Block non-GM deletion of system-managed status effects (anti-cheat)
+  runtime.Hooks.on?.("preDeleteActiveEffect", (effect: unknown) => {
+    const globals = globalThis as { game?: unknown };
+    return guardSystemManagedEffectDeletion(
+      effect as Parameters<typeof guardSystemManagedEffectDeletion>[0],
+      globals.game as Parameters<typeof guardSystemManagedEffectDeletion>[1],
+    );
   });
   runtime.Hooks.once("init", () => {
     runtime.CONFIG.Actor.dataModels.character = createPivotCharacterDataModel(runtime.foundry);

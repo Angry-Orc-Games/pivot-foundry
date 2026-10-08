@@ -62,6 +62,7 @@ export interface FoundryHooks {
     event: "updateActor",
     callback: (actor: unknown, changes: Record<string, unknown>) => void,
   ): void;
+  on?(event: "preDeleteActiveEffect", callback: (effect: unknown) => false | undefined): void;
   once(event: "init" | "ready", callback: () => void): void;
 }
 
