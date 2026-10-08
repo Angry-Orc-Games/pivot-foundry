@@ -31,7 +31,6 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       const abilities = (selfAsRecord.abilities as Record<string, { score?: number }>) ?? {};
       const dex = abilities.dex ?? {};
       const dexScore = typeof dex.score === "number" ? dex.score : 10;
-      const dexMod = abilityModifier(dexScore);
 
       const attrs = (selfAsRecord.attributes as Record<string, unknown>) ?? {};
       const init = (attrs.initiative as { bonus?: number }) ?? {};
@@ -40,20 +39,30 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       // Try to include item effects (like the character sheet does)
       // Access parent actor to get items and aggregate their effects
       let effectsInitiativeBonus = 0;
+      let dexScoreBonus = 0;
       try {
         const parent = (this as { parent?: { items?: Iterable<unknown> } }).parent;
         if (parent?.items && Symbol.iterator in Object(parent.items)) {
           const itemList = Array.from(parent.items) as { system?: unknown }[];
           const effects = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
           effectsInitiativeBonus = effects.initiativeBonus ?? 0;
+          // Also collect ability score bonus effects (like the character sheet does)
+          // Character-derived applies these before computing the ability modifier
+          dexScoreBonus = effects.abilityScoreBonuses?.dex ?? 0;
         }
       } catch {
         // If items aren't accessible, fall back to just base + bonus
         // This can happen during actor construction before items are embedded
       }
 
+      // Apply DEX ability score bonuses before computing modifier
+      // This matches how calculateCharacterDerived works in character-derived.ts
+      const effectiveDexScore = Math.min(30, Math.max(1, dexScore + dexScoreBonus));
+      const dexMod = abilityModifier(effectiveDexScore);
+
       // Set initiative directly on this for @initiative formula access
       // Matches character-derived.ts: abilities.dex.mod + initiativeBonus + effects.initiativeBonus
+      // where dex.mod is computed from the effective (base + abilityScoreBonus) score
       this.initiative = dexMod + initiativeBonus + effectsInitiativeBonus;
     }
 
