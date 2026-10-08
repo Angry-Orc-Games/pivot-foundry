@@ -26,8 +26,8 @@ describe("updateTokenStatusEffects", () => {
     await updateTokenStatusEffects(actor);
 
     expect(createdEffects).toHaveLength(1);
-    expect(createdEffects[0].name).toBe("Unconscious");
-    expect(createdEffects[0].statuses).toEqual(["unconscious"]);
+    expect(createdEffects[0]?.name).toBe("Unconscious");
+    expect(createdEffects[0]?.statuses).toEqual(["unconscious"]);
     expect(deletedIds).toHaveLength(0);
   });
 
@@ -56,8 +56,8 @@ describe("updateTokenStatusEffects", () => {
 
     expect(deletedIds).toEqual(["effect1"]);
     expect(createdEffects).toHaveLength(1);
-    expect(createdEffects[0].name).toBe("Dead");
-    expect(createdEffects[0].statuses).toEqual(["dead"]);
+    expect(createdEffects[0]?.name).toBe("Dead");
+    expect(createdEffects[0]?.statuses).toEqual(["dead"]);
   });
 
   it("removes unconscious effect when recovering to conscious", async () => {
@@ -111,8 +111,8 @@ describe("updateTokenStatusEffects", () => {
     await updateTokenStatusEffects(actor);
 
     expect(createdEffects).toHaveLength(1);
-    expect(createdEffects[0].name).toBe("Unconscious");
-    expect(createdEffects[0].statuses).toEqual(["unconscious"]);
+    expect(createdEffects[0]?.name).toBe("Unconscious");
+    expect(createdEffects[0]?.statuses).toEqual(["unconscious"]);
     expect(deletedIds).toHaveLength(0);
   });
 
