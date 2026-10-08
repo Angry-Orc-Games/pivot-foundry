@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPivotCharacterDataModel } from "../../src/data/character-data";
+import { createPivotNpcDataModel } from "../../src/data/npc-data";
 import type { FoundryRuntime } from "../../src/foundry-runtime";
 
 // Mock Foundry field constructors
@@ -48,19 +49,14 @@ describe("Character initiative integration", () => {
     const CharacterDataModel = createPivotCharacterDataModel(mockFoundryRuntime);
     const model = new CharacterDataModel();
 
-    // Set up parent with system data
-    const mockParent = {
-      system: {
-        abilities: {
-          dex: { score: 16 }, // +3 mod
-        },
-        attributes: {
-          initiative: { bonus: 2 },
-        },
-      },
+    // Set up data directly on model (TypeDataModel IS the system data)
+    const modelAsRecord = model as unknown as Record<string, unknown>;
+    modelAsRecord.abilities = {
+      dex: { score: 16 }, // +3 mod
     };
-
-    (model as { parent: unknown }).parent = mockParent;
+    modelAsRecord.attributes = {
+      initiative: { bonus: 2 },
+    };
 
     // Call prepareDerivedData (Foundry calls this during data preparation)
     if ("prepareDerivedData" in model && typeof model.prepareDerivedData === "function") {
@@ -79,18 +75,13 @@ describe("Character initiative integration", () => {
     const CharacterDataModel = createPivotCharacterDataModel(mockFoundryRuntime);
     const model = new CharacterDataModel();
 
-    const mockParent = {
-      system: {
-        abilities: {
-          dex: { score: 8 }, // -1 mod
-        },
-        attributes: {
-          initiative: { bonus: 0 },
-        },
-      },
+    const modelAsRecord = model as unknown as Record<string, unknown>;
+    modelAsRecord.abilities = {
+      dex: { score: 8 }, // -1 mod
     };
-
-    (model as { parent: unknown }).parent = mockParent;
+    modelAsRecord.attributes = {
+      initiative: { bonus: 0 },
+    };
 
     if ("prepareDerivedData" in model && typeof model.prepareDerivedData === "function") {
       model.prepareDerivedData();
@@ -106,11 +97,7 @@ describe("Character initiative integration", () => {
     const CharacterDataModel = createPivotCharacterDataModel(mockFoundryRuntime);
     const model = new CharacterDataModel();
 
-    const mockParent = {
-      system: {},
-    };
-
-    (model as { parent: unknown }).parent = mockParent;
+    // Leave model empty (no abilities/attributes set)
 
     if ("prepareDerivedData" in model && typeof model.prepareDerivedData === "function") {
       model.prepareDerivedData();
@@ -120,6 +107,20 @@ describe("Character initiative integration", () => {
       "getRollData" in model && typeof model.getRollData === "function" ? model.getRollData() : {};
 
     // Should default to 0 when data is missing
+    expect(rollData).toHaveProperty("initiative", 0);
+  });
+});
+
+describe("NPC initiative integration", () => {
+  it("provides zero initiative for NPCs", () => {
+    const NpcDataModel = createPivotNpcDataModel(mockFoundryRuntime);
+    const model = new NpcDataModel();
+
+    // NPC initiative rules not yet implemented (UC-003 non-goal)
+    // Should return 0 to prevent crashes when NPCs are in combat
+    const rollData =
+      "getRollData" in model && typeof model.getRollData === "function" ? model.getRollData() : {};
+
     expect(rollData).toHaveProperty("initiative", 0);
   });
 });

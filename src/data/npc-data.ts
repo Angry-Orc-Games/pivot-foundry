@@ -16,6 +16,15 @@ export function createPivotNpcDataModel(foundry: FoundryRuntime): TypeDataModelW
   const fields = foundry.data.fields;
 
   class PivotNpcData extends foundry.abstract.TypeDataModel {
+    getRollData(): Record<string, unknown> {
+      // Provide roll data for formulas like CONFIG.Combat.initiative
+      // NPC initiative rules are not yet implemented (UC-003 non-goal)
+      // Return 0 to prevent Combat Tracker crashes when NPCs are present
+      return {
+        initiative: 0,
+      };
+    }
+
     static defineSchema(): Record<string, DataField> {
       return {
         schemaVersion: numberField(fields, {
