@@ -35,6 +35,10 @@ describe("updateTokenStatusEffects", () => {
     expect(createdEffects[0]?.name).toBe("Unconscious");
     expect(createdEffects[0]?.statuses).toEqual(["unconscious"]);
     expect(createdEffects[0]?.img).toBe("icons/svg/unconscious.svg");
+    expect(createdEffects[0]?.showIcon).toBe(20); // CONST.ACTIVE_EFFECT_SHOW_ICON.ALWAYS fallback
+    expect(createdEffects[0]?.flags).toEqual({
+      "pivot-fantasy": { systemManaged: true },
+    });
     expect(deletedIds).toHaveLength(0);
   });
 
@@ -50,7 +54,13 @@ describe("updateTokenStatusEffects", () => {
           deathSaves: { status: "dead" },
         },
       },
-      effects: [{ id: "effect1", statuses: new Set(["unconscious"]) }],
+      effects: [
+        {
+          id: "effect1",
+          statuses: new Set(["unconscious"]),
+          flags: { "pivot-fantasy": { systemManaged: true } },
+        },
+      ],
       async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
         createdEffects.push(...data);
       },
@@ -66,6 +76,7 @@ describe("updateTokenStatusEffects", () => {
     expect(createdEffects[0]?.name).toBe("Dead");
     expect(createdEffects[0]?.statuses).toEqual(["dead"]);
     expect(createdEffects[0]?.img).toBe("icons/svg/skull.svg");
+    expect(createdEffects[0]?.showIcon).toBe(20);
   });
 
   it("removes unconscious effect when recovering to conscious", async () => {
@@ -80,7 +91,13 @@ describe("updateTokenStatusEffects", () => {
           deathSaves: { status: "alive" },
         },
       },
-      effects: [{ id: "effect1", statuses: new Set(["unconscious"]) }],
+      effects: [
+        {
+          id: "effect1",
+          statuses: new Set(["unconscious"]),
+          flags: { "pivot-fantasy": { systemManaged: true } },
+        },
+      ],
       async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
         createdEffects.push(...data);
       },
@@ -136,7 +153,13 @@ describe("updateTokenStatusEffects", () => {
           deathSaves: { status: "dying" },
         },
       },
-      effects: [{ id: "effect1", statuses: new Set(["unconscious"]) }],
+      effects: [
+        {
+          id: "effect1",
+          statuses: new Set(["unconscious"]),
+          flags: { "pivot-fantasy": { systemManaged: true } },
+        },
+      ],
       async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
         createdEffects.push(...data);
       },
@@ -222,6 +245,153 @@ describe("updateTokenStatusEffects", () => {
     // Should not apply effects when not active GM
     expect(createdEffects).toHaveLength(0);
     expect(deletedIds).toHaveLength(0);
+  });
+
+  it("only removes system-managed effects, preserves GM/module effects", async () => {
+    const createdEffects: Array<Record<string, unknown>> = [];
+    const deletedIds: string[] = [];
+
+    const actor = {
+      type: "character",
+      system: {
+        attributes: {
+          hp: { value: 5 }, // Conscious, no effects needed
+          deathSaves: { status: "alive" },
+        },
+      },
+      effects: [
+        // System-managed effect - should be removed
+        {
+          id: "system1",
+          statuses: new Set(["unconscious"]),
+          flags: { "pivot-fantasy": { systemManaged: true } },
+        },
+        // GM-created effect - should be preserved
+        {
+          id: "gm1",
+          statuses: new Set(["unconscious"]),
+          flags: {},
+        },
+      ],
+      async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
+        createdEffects.push(...data);
+      },
+      async deleteEmbeddedDocuments(_type: string, ids: string[]) {
+        deletedIds.push(...ids);
+      },
+    };
+
+    await updateTokenStatusEffects(actor, mockGameAsActiveGM);
+
+    // Should only remove system-managed effect, not GM effect
+    expect(deletedIds).toEqual(["system1"]);
+    expect(createdEffects).toHaveLength(0);
+  });
+
+  it("does not create duplicate when non-system-managed effect exists", async () => {
+    const createdEffects: Array<Record<string, unknown>> = [];
+    const deletedIds: string[] = [];
+
+    const actor = {
+      type: "character",
+      system: {
+        attributes: {
+          hp: { value: 0 },
+          deathSaves: { status: "dying" }, // Needs unconscious
+        },
+      },
+      effects: [
+        // GM already created unconscious effect
+        {
+          id: "gm1",
+          statuses: new Set(["unconscious"]),
+          flags: {},
+        },
+      ],
+      async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
+        createdEffects.push(...data);
+      },
+      async deleteEmbeddedDocuments(_type: string, ids: string[]) {
+        deletedIds.push(...ids);
+      },
+    };
+
+    await updateTokenStatusEffects(actor, mockGameAsActiveGM);
+
+    // Should not create duplicate since unconscious already exists (even if not system-managed)
+    expect(createdEffects).toHaveLength(0);
+    expect(deletedIds).toHaveLength(0);
+  });
+
+  it("creates system-managed effect when only needed", async () => {
+    const createdEffects: Array<Record<string, unknown>> = [];
+    const deletedIds: string[] = [];
+
+    const actor = {
+      type: "character",
+      system: {
+        attributes: {
+          hp: { value: 0 },
+          deathSaves: { status: "dying" },
+        },
+      },
+      effects: [
+        // GM created a dead effect (wrong status)
+        {
+          id: "gm1",
+          statuses: new Set(["dead"]),
+          flags: {},
+        },
+      ],
+      async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
+        createdEffects.push(...data);
+      },
+      async deleteEmbeddedDocuments(_type: string, ids: string[]) {
+        deletedIds.push(...ids);
+      },
+    };
+
+    await updateTokenStatusEffects(actor, mockGameAsActiveGM);
+
+    // Should create unconscious (desired) but not remove dead (non-system-managed)
+    expect(createdEffects).toHaveLength(1);
+    expect(createdEffects[0]?.statuses).toEqual(["unconscious"]);
+    expect(deletedIds).toHaveLength(0);
+  });
+
+  it("uses CONST.ACTIVE_EFFECT_SHOW_ICON.ALWAYS when available", async () => {
+    const createdEffects: Array<Record<string, unknown>> = [];
+    const originalCONST = (globalThis as { CONST?: unknown }).CONST;
+
+    // Mock CONST for this test
+    (globalThis as { CONST?: unknown }).CONST = {
+      ACTIVE_EFFECT_SHOW_ICON: { ALWAYS: 42 },
+    };
+
+    const actor = {
+      type: "character",
+      system: {
+        attributes: {
+          hp: { value: 0 },
+          deathSaves: { status: "dying" },
+        },
+      },
+      effects: [],
+      async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
+        createdEffects.push(...data);
+      },
+      async deleteEmbeddedDocuments() {
+        // Not used in this test
+      },
+    };
+
+    await updateTokenStatusEffects(actor, mockGameAsActiveGM);
+
+    expect(createdEffects).toHaveLength(1);
+    expect(createdEffects[0]?.showIcon).toBe(42); // Uses CONST value when available
+
+    // Restore original CONST
+    (globalThis as { CONST?: unknown }).CONST = originalCONST;
   });
 });
 

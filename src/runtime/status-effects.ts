@@ -74,8 +74,13 @@ export async function updateTokenStatusEffects(
 
   const desiredStatuses = new Set(deriveStatusEffects(hp, status));
 
-  // Find existing system-managed status effects
-  const existingEffects: Array<{ id: string; statuses: Set<string> }> = [];
+  // Find existing system-managed status effects ONLY
+  // Never delete GM- or module-created effects that happen to use unconscious/dead status ids
+  const existingEffects: Array<{
+    id: string;
+    statuses: Set<string>;
+    isSystemManaged: boolean;
+  }> = [];
   if (actor.effects && typeof actor.effects[Symbol.iterator] === "function") {
     for (const effect of actor.effects) {
       const statuses = effect.statuses;
@@ -83,11 +88,18 @@ export async function updateTokenStatusEffects(
         statuses &&
         (statuses.has(FOUNDRY_STATUS_UNCONSCIOUS) || statuses.has(FOUNDRY_STATUS_DEAD))
       ) {
-        existingEffects.push({ id: effect.id ?? "", statuses });
+        const flags = (effect as { flags?: Record<string, unknown> }).flags;
+        const pivotFlags = flags?.["pivot-fantasy"];
+        const isSystemManaged =
+          pivotFlags && typeof pivotFlags === "object" && "systemManaged" in pivotFlags
+            ? pivotFlags.systemManaged === true
+            : false;
+        existingEffects.push({ id: effect.id ?? "", statuses, isSystemManaged });
       }
     }
   }
 
+  // Track which statuses exist (system-managed or not) to prevent duplicates
   const existingStatusSet = new Set<string>();
   for (const effect of existingEffects) {
     for (const s of effect.statuses) {
@@ -95,15 +107,18 @@ export async function updateTokenStatusEffects(
     }
   }
 
-  // Determine if we need to make changes
+  // Only remove system-managed effects that no longer match desired state
   const toRemove: string[] = [];
   for (const effect of existingEffects) {
+    if (!effect.isSystemManaged) continue; // Never remove non-system-managed effects
     const hasDesiredStatus = Array.from(effect.statuses).some((s) => desiredStatuses.has(s));
     if (!hasDesiredStatus) {
       toRemove.push(effect.id);
     }
   }
 
+  // Only add if status doesn't already exist (even if non-system-managed)
+  // This prevents duplicates when GM/module creates the same status
   const toAdd: string[] = [];
   for (const desired of desiredStatuses) {
     if (!existingStatusSet.has(desired)) {
@@ -117,10 +132,17 @@ export async function updateTokenStatusEffects(
   }
 
   if (toAdd.length > 0 && actor.createEmbeddedDocuments) {
+    // showIcon: CONST.ACTIVE_EFFECT_SHOW_ICON.ALWAYS ensures permanent effects render on tokens
+    // Foundry v14 defaults to CONDITIONAL which only shows temporary effects
+    // Safe fallback for tests/v13: use numeric 20 (ALWAYS constant value)
+    const globals = globalThis as { CONST?: { ACTIVE_EFFECT_SHOW_ICON?: { ALWAYS?: number } } };
+    const showIconAlways = globals.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 20;
+
     const newEffects = toAdd.map((statusId) => ({
       name: statusId === FOUNDRY_STATUS_DEAD ? "Dead" : "Unconscious",
       statuses: [statusId],
       img: statusId === FOUNDRY_STATUS_DEAD ? "icons/svg/skull.svg" : "icons/svg/unconscious.svg",
+      showIcon: showIconAlways,
       flags: {
         "pivot-fantasy": {
           systemManaged: true,

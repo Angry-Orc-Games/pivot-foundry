@@ -54,6 +54,15 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
     }
   });
 
+  // Sync effects on actor creation so new dying characters show Unconscious immediately
+  runtime.Hooks.on?.("createActor", (actor: unknown) => {
+    const globals = globalThis as { game?: unknown };
+    void updateTokenStatusEffects(
+      actor as Parameters<typeof updateTokenStatusEffects>[0],
+      globals.game as Parameters<typeof updateTokenStatusEffects>[1],
+    );
+  });
+
   // Block non-GM deletion of system-managed status effects (anti-cheat)
   runtime.Hooks.on?.("preDeleteActiveEffect", (effect: unknown) => {
     const globals = globalThis as { game?: unknown };
@@ -141,6 +150,20 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
         console.warn(message, ...details);
       },
     });
+
+    // Sync effects for all existing characters on world load
+    // This ensures dying/dead actors already in the world show the right icons
+    const actors = globals.game?.actors;
+    if (actors && Symbol.iterator in Object(actors)) {
+      for (const actor of actors as Iterable<{ type?: string }>) {
+        if (actor.type === "character") {
+          void updateTokenStatusEffects(
+            actor as Parameters<typeof updateTokenStatusEffects>[0],
+            globals.game as Parameters<typeof updateTokenStatusEffects>[1],
+          );
+        }
+      }
+    }
   });
 }
 
