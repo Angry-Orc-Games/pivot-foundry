@@ -214,6 +214,8 @@
   "PIVOT.Survival.stable": "Stable / Unconscious",
   "PIVOT.Survival.dead": "Dead",
   "PIVOT.Survival.unconfirmed": "Legacy state \u2014 GM confirmation required",
+  "PIVOT.StatusEffects.Unconscious": "Unconscious",
+  "PIVOT.StatusEffects.Dead": "Dead",
   "PIVOT.Survival.updated": "Updated",
   "PIVOT.Survival.denied": "Permission denied",
   "PIVOT.Survival.duplicate": "Already attempted in this client \u2014 inspect state before another action",

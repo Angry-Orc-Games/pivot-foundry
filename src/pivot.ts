@@ -1,6 +1,7 @@
 import { guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
+import { updateTokenStatusEffects } from "./runtime/status-effects";
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotNpcDataModel } from "./data/npc-data";
 import { createPivotItemDataModels } from "./data/item-data";
@@ -17,6 +18,15 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
+  runtime.Hooks.on?.("updateActor", (actor: unknown, changes: Record<string, unknown>) => {
+    // Sync token status effects after HP or death state changes
+    if (
+      changes["system.attributes.hp.value"] !== undefined ||
+      changes["system.attributes.deathSaves.status"] !== undefined
+    ) {
+      void updateTokenStatusEffects(actor as Parameters<typeof updateTokenStatusEffects>[0]);
+    }
+  });
   runtime.Hooks.once("init", () => {
     runtime.CONFIG.Actor.dataModels.character = createPivotCharacterDataModel(runtime.foundry);
     runtime.CONFIG.Actor.dataModels.npc = createPivotNpcDataModel(runtime.foundry);

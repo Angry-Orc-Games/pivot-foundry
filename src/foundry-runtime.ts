@@ -58,6 +58,10 @@ export interface FoundryHooks {
     event: "preUpdateActor",
     callback: (actor: { system?: unknown }, changes: Record<string, unknown>) => false | undefined,
   ): void;
+  on?(
+    event: "updateActor",
+    callback: (actor: unknown, changes: Record<string, unknown>) => void,
+  ): void;
   once(event: "init" | "ready", callback: () => void): void;
 }
 
