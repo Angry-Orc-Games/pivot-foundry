@@ -9,6 +9,7 @@ import {
   calculateMagicAbilityModifier,
   parsePoolSpends,
 } from "../../src/rules/rest";
+import { buildLongRestUpdate } from "../../src/runtime/rest-dialogs";
 
 describe("applyShortRestPoolSpend", () => {
   it("spends 1 Pool from current", () => {
@@ -121,6 +122,15 @@ describe("applyLongRestHpRecovery", () => {
     });
     expect(result.hpRecovered).toBe(0);
     expect(result.hpFinal).toBe(10);
+  });
+
+  it("always sets HP to maximum (full recovery)", () => {
+    const result = applyLongRestHpRecovery({
+      hpCurrent: 1,
+      hpMax: 50,
+    });
+    expect(result.hpFinal).toBe(50);
+    expect(result.hpRecovered).toBe(49);
   });
 });
 
@@ -236,6 +246,38 @@ describe("calculateMagicAbilityModifier", () => {
 
   it("returns 0 when magic ability is null", () => {
     expect(calculateMagicAbilityModifier(true, null)).toBe(0);
+  });
+});
+
+describe("buildLongRestUpdate", () => {
+  it("always clears temp HP to 0", () => {
+    const update = buildLongRestUpdate(10, 3, 5);
+    expect(update["system.attributes.hp.temp"]).toBe(0);
+  });
+
+  it("passes through HP from result", () => {
+    const update = buildLongRestUpdate(25, 4, 8);
+    expect(update["system.attributes.hp.value"]).toBe(25);
+  });
+
+  it("passes through Pool from result", () => {
+    const update = buildLongRestUpdate(10, 7, 5);
+    expect(update["system.resources.pool.value"]).toBe(7);
+  });
+
+  it("passes through MP from result unchanged", () => {
+    const update = buildLongRestUpdate(10, 3, 12);
+    expect(update["system.magic.mp.value"]).toBe(12);
+  });
+
+  it("builds correct update for typical long rest", () => {
+    const update = buildLongRestUpdate(20, 5, 10);
+    expect(update).toEqual({
+      "system.attributes.hp.value": 20,
+      "system.resources.pool.value": 5,
+      "system.magic.mp.value": 10,
+      "system.attributes.hp.temp": 0,
+    });
   });
 });
 

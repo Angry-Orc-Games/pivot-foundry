@@ -82,6 +82,7 @@ export interface LongRestHpRecoveryResult {
 
 /**
  * Long Rest HP: full HP recovery.
+ * Note: Long Rest also clears temporary HP (handled in runtime/rest-dialogs.ts).
  */
 export function applyLongRestHpRecovery(input: LongRestHpRecovery): LongRestHpRecoveryResult {
   assertNonNegativeInteger(input.hpCurrent, "hpCurrent");

@@ -1,5 +1,7 @@
 # Milestone 3 Acceptance Test Notes
 
+**PR Head SHA**: Recorded on merge (PR #43)
+
 ## Manual Testing for Foundry v14
 
 This document describes the acceptance test procedures for Milestone 3 (Initiative and Rest) after installing the `system.zip` package into a Foundry v14 world.
