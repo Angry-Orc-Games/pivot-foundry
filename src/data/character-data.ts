@@ -1,6 +1,7 @@
 import { abilities, canonicalSkills } from "../config";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 import { abilityModifier } from "../rules/modifiers";
+import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
 import {
   arrayField,
   booleanField,
@@ -36,10 +37,24 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       const init = (attrs.initiative as { bonus?: number }) ?? {};
       const initiativeBonus = typeof init.bonus === "number" ? init.bonus : 0;
 
+      // Try to include item effects (like the character sheet does)
+      // Access parent actor to get items and aggregate their effects
+      let effectsInitiativeBonus = 0;
+      try {
+        const parent = (this as { parent?: { items?: Iterable<unknown> } }).parent;
+        if (parent?.items && Symbol.iterator in Object(parent.items)) {
+          const itemList = Array.from(parent.items) as { system?: unknown }[];
+          const effects = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
+          effectsInitiativeBonus = effects.initiativeBonus ?? 0;
+        }
+      } catch {
+        // If items aren't accessible, fall back to just base + bonus
+        // This can happen during actor construction before items are embedded
+      }
+
       // Set initiative directly on this for @initiative formula access
       // Matches character-derived.ts: abilities.dex.mod + initiativeBonus + effects.initiativeBonus
-      // (effects not yet available in prepareDerivedData, so omitted here)
-      this.initiative = dexMod + initiativeBonus;
+      this.initiative = dexMod + initiativeBonus + effectsInitiativeBonus;
     }
 
     static defineSchema(): Record<string, DataField> {
