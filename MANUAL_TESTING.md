@@ -90,6 +90,7 @@ This document describes the manual testing procedure for Milestone 3 token statu
 **Purpose**: Verify Dead replaces Unconscious when Character dies
 
 **Method A - Death Saves:**
+
 1. From Dying state, roll death saves until 3 failures
 2. **Expected**:
    - Character sheet shows Dead status
@@ -97,6 +98,7 @@ This document describes the manual testing procedure for Milestone 3 token statu
    - Unconscious effect is gone (not both effects)
 
 **Method B - Massive Damage:**
+
 1. From full HP (10), apply 20+ damage (>= max HP)
 2. **Expected**: Character dies instantly, Dead effect shown (not Unconscious)
 
@@ -134,6 +136,7 @@ All test cases must pass:
 ## Evidence Collection
 
 For each test case, capture:
+
 1. Screenshot of token showing effect overlay
 2. Screenshot of character sheet showing survival status
 3. Console log excerpt (if applicable)
