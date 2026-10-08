@@ -1,5 +1,6 @@
 import { abilities, canonicalSkills } from "../config";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
+import { abilityModifier } from "../rules/modifiers";
 import {
   arrayField,
   booleanField,
@@ -29,13 +30,15 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       const abilities = (selfAsRecord.abilities as Record<string, { score?: number }>) ?? {};
       const dex = abilities.dex ?? {};
       const dexScore = typeof dex.score === "number" ? dex.score : 10;
-      const dexMod = Math.floor((dexScore - 10) / 2);
+      const dexMod = abilityModifier(dexScore);
 
       const attrs = (selfAsRecord.attributes as Record<string, unknown>) ?? {};
       const init = (attrs.initiative as { bonus?: number }) ?? {};
       const initiativeBonus = typeof init.bonus === "number" ? init.bonus : 0;
 
       // Set initiative directly on this for @initiative formula access
+      // Matches character-derived.ts: abilities.dex.mod + initiativeBonus + effects.initiativeBonus
+      // (effects not yet available in prepareDerivedData, so omitted here)
       this.initiative = dexMod + initiativeBonus;
     }
 

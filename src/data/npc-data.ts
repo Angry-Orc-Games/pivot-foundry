@@ -16,7 +16,17 @@ export function createPivotNpcDataModel(foundry: FoundryRuntime): TypeDataModelW
   const fields = foundry.data.fields;
 
   class PivotNpcData extends foundry.abstract.TypeDataModel {
-    initiative = 0; // NPC initiative rules not yet implemented (UC-003 non-goal)
+    initiative?: number;
+
+    prepareDerivedData(): void {
+      // NPC initiative per rulebook v1007 Combat > Initiative:
+      // "The GM rolls for monsters and adds in their Base Bonus"
+      // Assumption pending Dan: NPC initiative = physical bonus (Base Bonus + traits)
+      // NPC schema has combatBonuses.physical starting at Base Bonus
+      const selfAsRecord = this as unknown as Record<string, unknown>;
+      const bonuses = (selfAsRecord.combatBonuses as { physical?: number }) ?? {};
+      this.initiative = typeof bonuses.physical === "number" ? bonuses.physical : 0;
+    }
 
     static defineSchema(): Record<string, DataField> {
       return {

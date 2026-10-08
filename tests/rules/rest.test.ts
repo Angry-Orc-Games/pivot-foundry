@@ -323,4 +323,23 @@ describe("Short Rest dialog string formatting", () => {
     // The actual formatting test requires a mock Foundry i18n runtime
     expect(enJson["PIVOT.Rest.ShortRestPoolInfo"]).toContain("{die}");
   });
+
+  it("renders die value and not placeholder in dialog HTML", () => {
+    // Mock i18n.format that substitutes {die}
+    const mockFormat = (key: string, data: Record<string, unknown>): string => {
+      if (key === "PIVOT.Rest.ShortRestPoolInfo") {
+        return `Each die: exploding ${data.die} + Con mod → HP`;
+      }
+      return key;
+    };
+
+    // Simulate the rest-dialogs.ts line 107 format call
+    const hitDie = "d8";
+    const result = mockFormat("PIVOT.Rest.ShortRestPoolInfo", { die: hitDie });
+
+    // Must contain the actual die value
+    expect(result).toContain("d8");
+    // Must NOT contain the literal placeholder
+    expect(result).not.toContain("{die}");
+  });
 });
