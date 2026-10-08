@@ -18,9 +18,14 @@ const referencedKeys = new Set();
  * Extract localization keys from Handlebars templates.
  */
 function extractFromTemplate(content) {
-  // Match {{localize "KEY"}}
-  const localizeMatches = content.matchAll(/\{\{localize\s+"([^"]+)"/g);
-  for (const match of localizeMatches) {
+  // Match {{localize "KEY"}} and {{localize 'KEY'}}
+  const doubleQuotedMatches = content.matchAll(/\{\{localize\s+"([^"]+)"/g);
+  for (const match of doubleQuotedMatches) {
+    referencedKeys.add(match[1]);
+  }
+
+  const singleQuotedMatches = content.matchAll(/\{\{localize\s+'([^']+)'/g);
+  for (const match of singleQuotedMatches) {
     referencedKeys.add(match[1]);
   }
 }
