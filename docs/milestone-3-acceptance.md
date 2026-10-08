@@ -1,6 +1,6 @@
 # Milestone 3 Acceptance Test Notes
 
-**PR Head SHA**: `8b9ebbb6faa3b6ee72e3de3a6039e80c5843c7b5`
+**PR Head SHA**: Recorded on merge (PR #43)
 
 ## Manual Testing for Foundry v14
 

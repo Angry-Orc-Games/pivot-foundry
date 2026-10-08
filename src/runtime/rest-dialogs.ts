@@ -323,8 +323,6 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     return;
   }
 
-  const tempHpCleared = ctx.hpCurrent > 0 || ctx.poolCurrent > 0 ? ctx.temp : 0;
-
   const summary = [
     `${escapeHtml(localizeRest("LongRestComplete"))}`,
     hpResult.hpRecovered > 0
@@ -336,7 +334,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     mpResult.mpRecovered > 0
       ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
       : "",
-    tempHpCleared > 0 ? `${escapeHtml(localizeRest("TempHpCleared"))}: ${tempHpCleared}` : "",
+    ctx.temp > 0 ? `${escapeHtml(localizeRest("TempHpCleared"))}: ${ctx.temp}` : "",
   ]
     .filter(Boolean)
     .join(" • ");
