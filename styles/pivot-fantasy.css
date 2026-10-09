@@ -489,6 +489,20 @@
   grid-template-columns: repeat(6, minmax(110px, 1fr));
 }
 
+@container (min-width: 766px) {
+  .pivot-ability > label:has(input[type="number"]) span {
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+}
+
 @container (max-width: 765px) {
   .pivot-abilities {
     grid-template-columns: repeat(3, minmax(110px, 1fr));
@@ -544,7 +558,7 @@
   min-width: 0;
 }
 
-.pivot-ability > button {
+.pivot-ability > button:first-child {
   background: transparent;
   border: 0;
   color: var(--pivot-blue);
