@@ -39,6 +39,7 @@
   "PIVOT.Effects.SkillBonus": "Skill bonus",
   "PIVOT.Effects.SpeedBonus": "Speed bonus",
   "PIVOT.Effects.WeaponProficiency": "Weapon proficiency",
+  "PIVOT.Fields.ACBonus": "AC bonus",
   "PIVOT.Fields.AcademiaSpecializations": "Academia specializations",
   "PIVOT.Fields.ArmourClass": "Armour class",
   "PIVOT.Fields.AttackAbility": "Attack ability",
@@ -261,5 +262,13 @@
   "PIVOT.Rest.RollIncomplete": "Rest roll was incomplete or cancelled.",
   "PIVOT.Rest.Confirm": "Confirm",
   "PIVOT.Rest.Cancel": "Cancel",
-  "PIVOT.Rest.ChatFailed": "Rest completed but chat notification failed. Check character state directly."
+  "PIVOT.Rest.ChatFailed": "Rest completed but chat notification failed. Check character state directly.",
+  "TYPES.Actor.character": "Character",
+  "TYPES.Actor.npc": "NPC",
+  "TYPES.Item.weapon": "Weapon",
+  "TYPES.Item.armour": "Armour",
+  "TYPES.Item.equipment": "Equipment",
+  "TYPES.Item.feature": "Feature",
+  "TYPES.Item.magicStream": "Magic Stream",
+  "TYPES.Item.magicAbility": "Magic Ability"
 }
