@@ -1,5 +1,7 @@
 import { abilities, canonicalSkills } from "../config";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
+import { abilityModifier } from "../rules/modifiers";
+import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
 import {
   arrayField,
   booleanField,
@@ -19,6 +21,51 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
   const fields = foundry.data.fields;
 
   class PivotCharacterData extends foundry.abstract.TypeDataModel {
+    initiative?: number;
+
+    prepareDerivedData(): void {
+      // Foundry calls this during data preparation to compute derived values
+      // Store derived initiative directly on system for Combat tracker formula
+      // Actor.getRollData() returns this.system, so @initiative accesses this field
+      const selfAsRecord = this as unknown as Record<string, unknown>;
+      const abilities = (selfAsRecord.abilities as Record<string, { score?: number }>) ?? {};
+      const dex = abilities.dex ?? {};
+      const dexScore = typeof dex.score === "number" ? dex.score : 10;
+
+      const attrs = (selfAsRecord.attributes as Record<string, unknown>) ?? {};
+      const init = (attrs.initiative as { bonus?: number }) ?? {};
+      const initiativeBonus = typeof init.bonus === "number" ? init.bonus : 0;
+
+      // Try to include item effects (like the character sheet does)
+      // Access parent actor to get items and aggregate their effects
+      let effectsInitiativeBonus = 0;
+      let dexScoreBonus = 0;
+      try {
+        const parent = (this as { parent?: { items?: Iterable<unknown> } }).parent;
+        if (parent?.items && Symbol.iterator in Object(parent.items)) {
+          const itemList = Array.from(parent.items) as { system?: unknown }[];
+          const effects = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
+          effectsInitiativeBonus = effects.initiativeBonus ?? 0;
+          // Also collect ability score bonus effects (like the character sheet does)
+          // Character-derived applies these before computing the ability modifier
+          dexScoreBonus = effects.abilityScoreBonuses?.dex ?? 0;
+        }
+      } catch {
+        // If items aren't accessible, fall back to just base + bonus
+        // This can happen during actor construction before items are embedded
+      }
+
+      // Apply DEX ability score bonuses before computing modifier
+      // This matches how calculateCharacterDerived works in character-derived.ts
+      const effectiveDexScore = Math.min(30, Math.max(1, dexScore + dexScoreBonus));
+      const dexMod = abilityModifier(effectiveDexScore);
+
+      // Set initiative directly on this for @initiative formula access
+      // Matches character-derived.ts: abilities.dex.mod + initiativeBonus + effects.initiativeBonus
+      // where dex.mod is computed from the effective (base + abilityScoreBonus) score
+      this.initiative = dexMod + initiativeBonus + effectsInitiativeBonus;
+    }
+
     static defineSchema(): Record<string, DataField> {
       return {
         survivalVersion: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),

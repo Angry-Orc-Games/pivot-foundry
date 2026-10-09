@@ -16,7 +16,13 @@ export interface RuntimeRoll {
   toMessage(data: Record<string, unknown>): Promise<unknown>;
 }
 export interface RuntimeGlobals {
-  game?: { user?: { id?: string; isGM?: boolean }; i18n?: { localize?: (key: string) => string } };
+  game?: {
+    user?: { id?: string; isGM?: boolean };
+    i18n?: {
+      localize?: (key: string) => string;
+      format?: (key: string, data: Record<string, unknown>) => string;
+    };
+  };
   foundry?: {
     applications?: {
       api?: { DialogV2?: { prompt(config: Record<string, unknown>): Promise<unknown> } };
