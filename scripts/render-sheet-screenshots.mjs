@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import Handlebars from "handlebars";
 import { chromium } from "playwright";
