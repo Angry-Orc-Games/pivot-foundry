@@ -495,6 +495,12 @@
   }
 }
 
+@container (max-width: 520px) {
+  .pivot-abilities {
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
+}
+
 .pivot-ability {
   background: #fff8ea;
   border: 1px solid var(--pivot-line);
@@ -514,6 +520,9 @@
 }
 
 .pivot-ability > label:has(input[type="number"]) {
+  align-items: center;
+  display: flex;
+  gap: 4px;
   grid-area: score;
 }
 
@@ -523,6 +532,7 @@
 
 .pivot-ability .pivot-check {
   grid-area: primary;
+  justify-content: flex-start;
 }
 
 .pivot-ability > button {
@@ -774,8 +784,7 @@
     grid-template-columns: 1fr;
   }
 
-  .pivot-stat-strip,
-  .pivot-abilities {
+  .pivot-stat-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
