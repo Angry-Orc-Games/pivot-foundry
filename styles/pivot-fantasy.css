@@ -529,7 +529,8 @@
 }
 
 .pivot-ability > label:has(input[type="number"]) input {
-  width: 4ch;
+  min-width: 3.5em;
+  width: 3.5em;
 }
 
 .pivot-ability .pivot-mod {
