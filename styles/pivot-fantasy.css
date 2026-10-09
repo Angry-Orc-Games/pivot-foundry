@@ -111,6 +111,11 @@
   outline-offset: 1px;
 }
 
+.pivot-abilities-panel {
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+}
+
 .pivot-tabs {
   border-bottom: 1px solid var(--pivot-line);
   display: flex;
