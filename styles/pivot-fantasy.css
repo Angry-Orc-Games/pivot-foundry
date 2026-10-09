@@ -517,6 +517,7 @@
 
 .pivot-ability > button:first-child {
   grid-area: name;
+  min-width: 0;
 }
 
 .pivot-ability > label:has(input[type="number"]) {
@@ -524,15 +525,22 @@
   display: flex;
   gap: 4px;
   grid-area: score;
+  min-width: 0;
+}
+
+.pivot-ability > label:has(input[type="number"]) input {
+  width: 4ch;
 }
 
 .pivot-ability .pivot-mod {
   grid-area: mod;
+  min-width: 0;
 }
 
 .pivot-ability .pivot-check {
   grid-area: primary;
   justify-content: flex-start;
+  min-width: 0;
 }
 
 .pivot-ability > button {
