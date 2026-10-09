@@ -35,6 +35,7 @@
 }
 
 .pivot-character-sheet {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -109,6 +110,10 @@
 .pivot-header-stats input:focus {
   outline: 2px solid #f8d37d;
   outline-offset: 1px;
+}
+
+.pivot-abilities-panel {
+  flex: 0 0 auto;
 }
 
 .pivot-tabs {
@@ -480,8 +485,48 @@
 
 .pivot-abilities {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(6, minmax(110px, 1fr));
+}
+
+@container (max-width: 700px) {
+  .pivot-ability > label:has(input[type="number"]) span {
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+}
+
+@container (min-width: 766px) {
+  .pivot-ability > label:has(input[type="number"]) span {
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+}
+
+@container (max-width: 765px) {
+  .pivot-abilities {
+    grid-template-columns: repeat(3, minmax(110px, 1fr));
+  }
+}
+
+@container (max-width: 520px) {
+  .pivot-abilities {
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
 }
 
 .pivot-ability {
@@ -489,11 +534,56 @@
   border: 1px solid var(--pivot-line);
   border-radius: 6px;
   display: grid;
-  gap: 8px;
-  padding: 8px;
+  gap: 4px;
+  grid-template-areas:
+    "name name"
+    "score mod"
+    "primary primary";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  padding: 6px;
 }
 
-.pivot-ability > button {
+.pivot-ability > button:first-child {
+  grid-area: name;
+  min-width: 0;
+}
+
+.pivot-ability > label:has(input[type="number"]) {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  grid-area: score;
+  min-width: 0;
+}
+
+.pivot-ability > label:has(input[type="number"]) input {
+  flex: 0 0 auto;
+  min-width: 3.5em;
+  width: 3.5em;
+}
+
+.pivot-ability > label:has(input[type="number"]) input::-webkit-inner-spin-button,
+.pivot-ability > label:has(input[type="number"]) input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.pivot-ability > label:has(input[type="number"]) input[type="number"] {
+  appearance: textfield;
+}
+
+.pivot-ability .pivot-mod {
+  grid-area: mod;
+  min-width: 0;
+}
+
+.pivot-ability .pivot-check {
+  grid-area: primary;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.pivot-ability > button:first-child {
   background: transparent;
   border: 0;
   color: var(--pivot-blue);
@@ -552,8 +642,11 @@
 .pivot-mod {
   border: 2px solid var(--pivot-blue);
   border-radius: 999px;
+  font-size: 12px;
   font-weight: 700;
-  min-height: 34px;
+  min-height: 28px;
+  padding: 2px 4px;
+  white-space: nowrap;
 }
 
 .pivot-skill-list {
@@ -739,8 +832,7 @@
     grid-template-columns: 1fr;
   }
 
-  .pivot-stat-strip,
-  .pivot-abilities {
+  .pivot-stat-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
