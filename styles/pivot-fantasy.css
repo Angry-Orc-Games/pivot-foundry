@@ -153,11 +153,11 @@
   font-size: 12px;
 }
 
-.pivot-sheet-header .pivot-title-block input {
+.pivot-fantasy .pivot-sheet-header .pivot-title-block input {
   background: var(--pf-accent);
   border: 0;
   border-bottom: 1px solid var(--pf-accent-ink);
-  color: var(--pf-accent-ink) !important;
+  color: var(--pf-accent-ink);
   font-family: var(--pf-font-display);
   font-size: 28px;
   font-weight: 700;
@@ -170,11 +170,11 @@
   grid-template-columns: 84px 120px;
 }
 
-.pivot-sheet-header .pivot-header-stats input {
+.pivot-fantasy .pivot-sheet-header .pivot-header-stats input {
   background: var(--pf-accent);
   border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
-  color: var(--pf-accent-ink) !important;
+  color: var(--pf-accent-ink);
   font-weight: 700;
   text-align: center;
 }
@@ -403,9 +403,9 @@
   text-align: center;
 }
 
-.pivot-resource-actions button {
+.pivot-fantasy .pivot-resource-actions button {
   background: var(--pf-accent);
-  border: 1px solid var(--pf-accent);
+  border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
   color: var(--pf-accent-ink);
   font-weight: 700;
@@ -425,10 +425,10 @@
   text-align: center;
 }
 
-.pivot-sheet-button.primary {
+.pivot-fantasy .pivot-sheet-button.primary {
   background: var(--pf-accent);
   border-color: var(--pf-accent);
-  color: var(--pf-accent-ink) !important;
+  color: var(--pf-accent-ink);
 }
 
 .pivot-sheet-button.primary:hover {
