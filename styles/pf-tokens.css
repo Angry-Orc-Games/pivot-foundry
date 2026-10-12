@@ -1,0 +1,33 @@
+/* styles/pf-tokens.css — Pivot Fantasy UI Standard v1.0 §9. Do not add raw hex anywhere else. */
+.pivot-fantasy{
+  --pf-bg:#f3ede0; --pf-panel:#fffdf7; --pf-ink:#2b2620; --pf-muted:#6d6558;
+  --pf-line:#d9cfba; --pf-line-strong:#8f8571;
+  --pf-accent:#8a3b12; --pf-accent-hover:#74310f; --pf-accent-ink:#fff; --pf-accent-soft:#f1dccb;
+  --pf-chip:#ece3cf;
+  --pf-good:#2f6b3a; --pf-good-soft:#dcebdc;
+  --pf-warn:#8a5e00; --pf-warn-soft:#f6ead0;
+  --pf-bad:#a1281e;  --pf-bad-soft:#f5d9d5;
+  --pf-shadow:0 1px 2px rgba(60,40,10,.12),0 4px 14px rgba(60,40,10,.06);
+  --pf-font-display:Georgia,"Iowan Old Style",serif;
+  --pf-font-body:var(--font-primary, system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
+  --pf-space-1:4px; --pf-space-2:8px; --pf-space-3:12px; --pf-space-4:16px;
+  --pf-radius-sm:4px; --pf-radius-md:6px; --pf-radius-pill:999px;
+  --pf-focus-outline:2px solid var(--pf-accent); --pf-focus-offset:2px;
+  --pf-disabled-opacity:.45;
+}
+.theme-dark .pivot-fantasy:not(.theme-light),
+.pivot-fantasy.theme-dark{
+  --pf-bg:#1b1814; --pf-panel:#26221c; --pf-ink:#ede6d6; --pf-muted:#a79d89;
+  --pf-line:#3d362b; --pf-line-strong:#776d5c;
+  --pf-accent:#e08a54; --pf-accent-hover:#cc7a46; --pf-accent-ink:#1b1814; --pf-accent-soft:#3a2a1e;
+  --pf-chip:#332d23;
+  --pf-good:#7fc58b; --pf-good-soft:#1f3324;
+  --pf-warn:#e0b04a; --pf-warn-soft:#38301a;
+  --pf-bad:#ef8b80;  --pf-bad-soft:#3b2220;
+  --pf-shadow:0 1px 2px rgba(0,0,0,.4);
+}
+/* Print sheet: fixed, never themed */
+.pivot-fantasy :is(.pf-print-wrap,.pf-print){
+  --pf-sheet-paper:#fff; --pf-sheet-ink:#1c1a16; --pf-sheet-rule:#ddd; --pf-sheet-muted:#555;
+  --pf-sheet-accent:#8a3b12; --pf-sheet-accent-soft:#f1dccb;
+}
