@@ -156,7 +156,7 @@
 .pivot-title-block input {
   background: transparent;
   border: 0;
-  border-bottom: 1px solid currentColor;
+  border-bottom: 1px solid var(--pf-accent-ink);
   color: var(--pf-accent-ink);
   font-family: var(--pf-font-display);
   font-size: 28px;
@@ -171,10 +171,10 @@
 }
 
 .pivot-header-stats input {
-  background: var(--pf-bg);
-  border: 1px solid var(--pf-line-strong);
+  background: transparent;
+  border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
-  color: var(--pf-ink);
+  color: var(--pf-accent-ink);
   font-weight: 700;
   text-align: center;
 }
