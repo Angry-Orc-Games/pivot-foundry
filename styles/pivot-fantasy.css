@@ -154,7 +154,7 @@
 }
 
 .pivot-sheet-header .pivot-title-block input {
-  background: transparent;
+  background: var(--pf-accent);
   border: 0;
   border-bottom: 1px solid var(--pf-accent-ink);
   color: var(--pf-accent-ink) !important;
@@ -171,7 +171,7 @@
 }
 
 .pivot-sheet-header .pivot-header-stats input {
-  background: transparent;
+  background: var(--pf-accent);
   border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
   color: var(--pf-accent-ink) !important;
