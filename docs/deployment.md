@@ -49,25 +49,46 @@ Create these Environments in the repository settings:
 | `staging`     | Recommended        | Foundry cache/license secrets **plus** deploy and staging user secrets below                      |
 | `production`  | **Required**       | Separate deploy secrets, no Foundry website account password                                      |
 
-Staging / production deploy secrets (placeholders only):
+### Secrets for `foundry-e2e` Environment
 
-```text
-FOUNDRY_DEPLOY_SSH_HOST=
-FOUNDRY_DEPLOY_SSH_USER=
-FOUNDRY_DEPLOY_SSH_KEY=
-FOUNDRY_DEPLOY_TARGET_DIR=
-FOUNDRY_DEPLOY_BACKUP_DIR=
-FOUNDRY_DEPLOY_SERVICE=
-```
+These are required for isolated E2E tests that run in Docker containers:
 
-Staging smoke:
+- `FOUNDRY_ADMIN_KEY` — Admin password for the temporary Foundry instance
+- `FOUNDRY_LICENSE_KEY` — Foundry VTT license key for activation
+- `FOUNDRY_RELEASE_CACHE_URL` — Timed download URL for the Foundry v14 Node.js zip (expires ~5 minutes)
+- `FOUNDRY_RELEASE_SHA256` — SHA-256 checksum of the Foundry release archive for verification
 
-```text
-PIVOT_STAGING_GM_USER=
-PIVOT_STAGING_GM_PASSWORD=
-PIVOT_STAGING_PLAYER_USER=
-PIVOT_STAGING_PLAYER_PASSWORD=
-```
+### Secrets for `staging` Environment
+
+The staging environment requires **all** of the following secrets. The workflow will fail fast with the names of missing secrets:
+
+**Foundry cache and license** (same as `foundry-e2e`):
+
+- `FOUNDRY_ADMIN_KEY` — Admin password for the temporary E2E Foundry instance
+- `FOUNDRY_LICENSE_KEY` — Foundry VTT license key
+- `FOUNDRY_RELEASE_CACHE_URL` — Timed download URL for Foundry v14 Node.js zip
+- `FOUNDRY_RELEASE_SHA256` — SHA-256 checksum of the Foundry release archive
+
+**Deploy SSH credentials and paths:**
+
+- `FOUNDRY_DEPLOY_SSH_HOST` — SSH hostname of the staging server (e.g., `build-server.example.com`)
+- `FOUNDRY_DEPLOY_SSH_USER` — SSH username for deployment
+- `FOUNDRY_DEPLOY_SSH_KEY` — Private SSH key (include the full key with `-----BEGIN` and `-----END` lines)
+- `FOUNDRY_DEPLOY_TARGET_DIR` — Target directory path on the server where the system will be deployed (e.g., `/opt/foundryvtt-dev/data/Data/systems/pivot-fantasy`)
+- `FOUNDRY_DEPLOY_BACKUP_DIR` — Directory path where backups are stored before deployment (e.g., `/opt/foundryvtt-dev/backups`)
+- `FOUNDRY_DEPLOY_SERVICE` — systemd service name to restart after deployment (e.g., `foundryvtt-dev`)
+
+**Staging smoke test user credentials:**
+
+- `PIVOT_STAGING_GM_USER` — Game Master username for smoke tests
+- `PIVOT_STAGING_GM_PASSWORD` — Game Master password
+- `PIVOT_STAGING_PLAYER_USER` — Player username for smoke tests
+- `PIVOT_STAGING_PLAYER_PASSWORD` — Player password
+- `PIVOT_PACKAGE_VERSION` — (Optional) Expected package version for verification
+
+### Secrets for `production` Environment
+
+Production requires similar deploy secrets as staging, but with production-specific values. The production environment **must** require human approval. Do not use Foundry website account passwords in production secrets.
 
 The public hostnames are **not** assumed to be SSH destinations. Do not invent users, paths, or unit names. A previous operator runbook mentioned systemd units and `/opt/foundryvtt[-dev]/data` on a Hetzner host; confirm the current layout by filling the secrets above.
 
