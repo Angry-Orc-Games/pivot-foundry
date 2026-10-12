@@ -545,7 +545,7 @@ export function buildRollModeDialogContent(localize: (key: string) => string): s
       )}</label>`;
     })
     .join("");
-  return `<fieldset class="pivot-roll-mode-dialog"><legend>${escapeHtml(
+  return `<fieldset class="pf-roll-mode-dialog"><legend>${escapeHtml(
     localize("PIVOT.RollDialog.Title"),
   )}</legend>${options}</fieldset>`;
 }
@@ -1060,7 +1060,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
   try {
     const result = await DialogV2.prompt({
       window: { title: localizeText("PIVOT.RollDialog.Title") },
-      classes: ["pivot-fantasy"],
+      classes: ["pf-sheet"],
       content: buildRollModeDialogContent(localizeText),
       ok: {
         label: localizeText("PIVOT.RollDialog.Roll"),

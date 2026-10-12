@@ -1,58 +1,59 @@
-.pivot-fantasy .pivot-roll-mode-dialog {
+.pf-sheet .pf-roll-mode-dialog {
   display: grid;
   gap: var(--pf-space-2);
 }
 
-.pivot-fantasy .pivot-roll-mode-dialog label {
+.pf-sheet .pf-roll-mode-dialog label {
   align-items: center;
   display: flex;
   gap: var(--pf-space-2);
 }
 
 /* Content base and font settings per Pivot Fantasy UI Standard v1.0 */
-.pivot-fantasy .window-content {
+.pf-sheet .window-content {
   background: var(--pf-bg);
   color: var(--pf-ink);
+  container-type: inline-size;
   font: 14px/1.45 var(--pf-font-body);
   padding: var(--pf-space-3);
 }
 
-.pivot-fantasy .window-content :is(h1, h2, h3, h4) {
+.pf-sheet .window-content :is(h1, h2, h3, h4) {
   font-family: var(--pf-font-display);
   line-height: 1.2;
   margin: 0 0 0.4em;
   border: none;
 }
 
-.pivot-fantasy .window-content h1 {
+.pf-sheet .window-content h1 {
   font-size: 1.5rem;
 }
 
-.pivot-fantasy .window-content h2 {
+.pf-sheet .window-content h2 {
   font-size: 1.3rem;
 }
 
-.pivot-fantasy .window-content h3 {
+.pf-sheet .window-content h3 {
   font-size: 1.1rem;
   margin-top: 1.2em;
 }
 
-.pivot-fantasy .window-content h4 {
+.pf-sheet .window-content h4 {
   font-size: 1rem;
 }
 
-.pivot-fantasy .window-content :is(button, input, select, textarea) {
+.pf-sheet .window-content :is(button, input, select, textarea) {
   font: inherit;
   color: inherit;
 }
 
 /* Focus outline per §7.11 - 2px accent outline on :focus-visible, cancel core glow */
-.pivot-fantasy
+.pf-sheet
   :is(
-    .pivot-sheet-button,
-    .pivot-mod,
-    .pivot-ability > button,
-    .pivot-skill-row button,
+    .pf-sheet-button,
+    .pf-mod,
+    .pf-ability > button,
+    .pf-skill-row button,
     .rollable,
     input,
     select,
@@ -64,48 +65,48 @@
   outline-offset: var(--pf-focus-offset);
 }
 
-.pivot-fantasy :is(.pivot-sheet-button, input, select, textarea):is(:focus, :focus-visible) {
+.pf-sheet :is(.pf-sheet-button, input, select, textarea):is(:focus, :focus-visible) {
   box-shadow: none;
 }
 
-.pivot-fantasy :is(.pivot-sheet-button, input, select, textarea):focus:not(:focus-visible) {
+.pf-sheet :is(.pf-sheet-button, input, select, textarea):focus:not(:focus-visible) {
   outline: none;
 }
 
 /* Disabled state per §7.11 */
-.pivot-fantasy :is(button, input, select, textarea):disabled,
-.pivot-fantasy [aria-disabled="true"] {
+.pf-sheet :is(button, input, select, textarea):disabled,
+.pf-sheet [aria-disabled="true"] {
   opacity: var(--pf-disabled-opacity);
   cursor: not-allowed;
 }
 
 /* Legacy variable mapping - keep for now (ticket 2 will rename classes) */
-.pivot-fantasy.sheet {
-  --pivot-ink: var(--pf-ink);
-  --pivot-blue: var(--pf-accent);
-  --pivot-gold: var(--pf-accent);
-  --pivot-paper: var(--pf-bg);
-  --pivot-paper-deep: var(--pf-line);
-  --pivot-line: var(--pf-line);
+.pf-sheet.sheet {
+  --pf-ink: var(--pf-ink);
+  --pf-blue: var(--pf-accent);
+  --pf-gold: var(--pf-accent);
+  --pf-paper: var(--pf-bg);
+  --pf-paper-deep: var(--pf-line);
+  --pf-line: var(--pf-line);
   color: var(--pf-ink);
 }
 
-.pivot-character-sheet,
-.pivot-item-sheet {
+.pf-character-sheet,
+.pf-item-sheet {
   background: var(--pf-bg);
   padding: var(--pf-space-3);
 }
 
-.pivot-fantasy.sheet.actor .window-content {
+.pf-sheet.sheet.actor .window-content {
   overflow: hidden;
 }
 
-.pivot-fantasy.sheet.item .window-content {
+.pf-sheet.sheet.item .window-content {
   overflow-x: hidden;
   overflow-y: auto;
 }
 
-.pivot-character-sheet {
+.pf-character-sheet {
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -115,13 +116,13 @@
   overflow: hidden;
 }
 
-.pivot-item-sheet {
+.pf-item-sheet {
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
 }
 
-.pivot-sheet-header {
+.pf-sheet-header {
   align-items: end;
   background: var(--pf-accent);
   border-bottom: 3px solid var(--pf-accent);
@@ -133,27 +134,27 @@
   padding: var(--pf-space-4) 20px var(--pf-space-4);
 }
 
-.pivot-sheet-header.compact {
+.pf-sheet-header.compact {
   margin-bottom: var(--pf-space-4);
 }
 
-.pivot-title-block label,
-.pivot-header-stats span,
-.pivot-panel h2,
-.pivot-tabs a {
+.pf-title-block label,
+.pf-header-stats span,
+.pf-panel h2,
+.pf-tabs a {
   color: var(--pf-accent);
   font-family: var(--pf-font-body);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.pivot-sheet-header .pivot-title-block label,
-.pivot-sheet-header .pivot-header-stats span {
+.pf-sheet-header .pf-title-block label,
+.pf-sheet-header .pf-header-stats span {
   color: var(--pf-accent-ink);
   font-size: 12px;
 }
 
-.pivot-fantasy .pivot-sheet-header .pivot-title-block input {
+.pf-sheet .pf-sheet-header .pf-title-block input {
   background: var(--pf-accent);
   border: 0;
   border-bottom: 1px solid var(--pf-accent-ink);
@@ -164,13 +165,13 @@
   width: 100%;
 }
 
-.pivot-header-stats {
+.pf-header-stats {
   display: grid;
   gap: var(--pf-space-3);
   grid-template-columns: 84px 120px;
 }
 
-.pivot-fantasy .pivot-sheet-header .pivot-header-stats input {
+.pf-sheet .pf-sheet-header .pf-header-stats input {
   -webkit-text-fill-color: var(--pf-accent-ink);
   background: var(--pf-accent);
   border: 1px solid var(--pf-accent-ink);
@@ -180,11 +181,11 @@
   text-align: center;
 }
 
-.pivot-abilities-panel {
+.pf-abilities-panel {
   flex: 0 0 auto;
 }
 
-.pivot-tabs {
+.pf-tabs {
   border-bottom: 1px solid var(--pf-line);
   display: flex;
   flex-wrap: wrap;
@@ -193,7 +194,7 @@
   margin-bottom: var(--pf-space-3);
 }
 
-.pivot-tabs a {
+.pf-tabs a {
   border: 1px solid transparent;
   border-bottom: 0;
   cursor: pointer;
@@ -201,81 +202,81 @@
   padding: 7px 10px;
 }
 
-.pivot-tabs a.active {
+.pf-tabs a.active {
   background: var(--pf-panel);
   border-color: var(--pf-line);
   color: var(--pf-ink);
 }
 
-.pivot-tab-body .tab {
+.pf-tab-body .tab {
   display: none;
 }
 
-.pivot-tab-body .tab.active {
+.pf-tab-body .tab.active {
   display: block;
 }
 
-.pivot-tab-body {
+.pf-tab-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding-right: var(--pf-space-1);
 }
 
-.pivot-grid.two {
+.pf-grid.two {
   display: grid;
   gap: var(--pf-space-3);
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.pivot-panel {
+.pf-panel {
   border: 1px solid var(--pf-line);
   border-radius: var(--pf-radius-md);
   margin-bottom: var(--pf-space-3);
   padding: var(--pf-space-3);
 }
 
-.pivot-panel h2 {
+.pf-panel h2 {
   border-bottom: 2px solid var(--pf-accent);
   font-size: 15px;
   margin: 0 0 var(--pf-space-2);
   padding-bottom: var(--pf-space-1);
 }
 
-.pivot-field-grid,
-.pivot-resource-grid,
-.pivot-currency {
+.pf-field-grid,
+.pf-resource-grid,
+.pf-currency {
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.pivot-field-grid label,
-.pivot-resource-grid label,
-.pivot-currency label,
-.pivot-wide-field {
+.pf-field-grid label,
+.pf-resource-grid label,
+.pf-currency label,
+.pf-wide-field {
   display: grid;
   gap: var(--pf-space-1);
 }
 
-.pivot-field-grid span,
-.pivot-resource-grid span,
-.pivot-currency span,
-.pivot-wide-field span {
+.pf-field-grid span,
+.pf-resource-grid span,
+.pf-currency span,
+.pf-wide-field span {
   color: var(--pf-accent);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.pivot-stat-strip {
+.pf-stat-strip {
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   margin-bottom: var(--pf-space-3);
 }
 
-.pivot-stat {
+.pf-stat {
   align-content: center;
   background: var(--pf-panel);
   border: 1px solid var(--pf-line);
@@ -286,22 +287,22 @@
   text-align: center;
 }
 
-.pivot-stat span {
+.pf-stat span {
   color: var(--pf-accent);
   font-size: 10px;
   text-transform: uppercase;
 }
 
-.pivot-stat strong {
+.pf-stat strong {
   font-family: var(--pf-font-display);
   font-size: 21px;
 }
 
-.pivot-stat input {
+.pf-stat input {
   text-align: center;
 }
 
-.pivot-resource-actions {
+.pf-resource-actions {
   align-items: center;
   display: grid;
   gap: var(--pf-space-1);
@@ -309,19 +310,19 @@
   grid-template-columns: 32px 1fr 32px;
 }
 
-.pivot-recover-pool {
+.pf-recover-pool {
   grid-column: 1 / -1;
 }
 
-.pivot-vitality,
-.pivot-survival {
+.pf-vitality,
+.pf-survival {
   border-top: 1px solid var(--pf-line);
   margin-top: var(--pf-space-3);
   padding-top: var(--pf-space-3);
 }
 
-.pivot-vitality h3,
-.pivot-survival h3 {
+.pf-vitality h3,
+.pf-survival h3 {
   color: var(--pf-accent);
   font-family: var(--pf-font-body);
   font-size: 13px;
@@ -330,12 +331,12 @@
   text-transform: uppercase;
 }
 
-.pivot-vitality-grid {
+.pf-vitality-grid {
   display: grid;
   gap: var(--pf-space-2);
 }
 
-.pivot-meter-block {
+.pf-meter-block {
   background: var(--pf-panel);
   border: 1px solid var(--pf-line);
   border-radius: var(--pf-radius-md);
@@ -344,67 +345,67 @@
   padding: var(--pf-space-2);
 }
 
-.pivot-meter-heading {
+.pf-meter-heading {
   align-items: baseline;
   display: flex;
   justify-content: space-between;
   gap: var(--pf-space-2);
 }
 
-.pivot-meter-heading span,
-.pivot-hit-die span,
-.pivot-temp-hp span,
-.pivot-death-track span {
+.pf-meter-heading span,
+.pf-hit-die span,
+.pf-temp-hp span,
+.pf-death-track span {
   color: var(--pf-accent);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.pivot-meter-heading strong,
-.pivot-temp-hp strong {
+.pf-meter-heading strong,
+.pf-temp-hp strong {
   font-family: var(--pf-font-display);
   font-size: 18px;
 }
 
-.pivot-meter {
+.pf-meter {
   background: var(--pf-chip);
   border-radius: var(--pf-radius-pill);
   height: 10px;
   overflow: hidden;
 }
 
-.pivot-meter-fill {
+.pf-meter-fill {
   height: 100%;
   min-width: 0;
 }
 
-.pivot-meter-fill.hp {
+.pf-meter-fill.hp {
   background: var(--pf-bad);
 }
 
-.pivot-meter-fill.pool {
+.pf-meter-fill.pool {
   background: var(--pf-accent);
 }
 
-.pivot-meter-fields {
+.pf-meter-fields {
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.pivot-meter-fields label,
-.pivot-hit-die {
+.pf-meter-fields label,
+.pf-hit-die {
   display: grid;
   gap: var(--pf-space-1);
 }
 
-.pivot-pool-value {
+.pf-pool-value {
   min-height: 32px;
   text-align: center;
 }
 
-.pivot-fantasy .pivot-resource-actions button {
+.pf-sheet .pf-resource-actions button {
   background: var(--pf-accent);
   border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
@@ -413,7 +414,7 @@
   min-height: 32px;
 }
 
-.pivot-sheet-button {
+.pf-sheet-button {
   background: var(--pf-panel);
   border: 1px solid var(--pf-line);
   border-radius: var(--pf-radius-sm);
@@ -426,18 +427,18 @@
   text-align: center;
 }
 
-.pivot-fantasy .pivot-sheet-button.primary {
+.pf-sheet .pf-sheet-button.primary {
   background: var(--pf-accent);
   border-color: var(--pf-accent);
   color: var(--pf-accent-ink);
 }
 
-.pivot-sheet-button.primary:hover {
+.pf-sheet-button.primary:hover {
   background: var(--pf-accent-hover);
   border-color: var(--pf-accent-hover);
 }
 
-.pivot-survival-header {
+.pf-survival-header {
   align-items: center;
   display: flex;
   gap: var(--pf-space-2);
@@ -445,11 +446,11 @@
   margin-bottom: var(--pf-space-2);
 }
 
-.pivot-survival-header h3 {
+.pf-survival-header h3 {
   margin: 0;
 }
 
-.pivot-status {
+.pf-status {
   border-radius: var(--pf-radius-pill);
   font-size: 11px;
   font-weight: 700;
@@ -458,28 +459,28 @@
   text-transform: uppercase;
 }
 
-.pivot-status.alive {
+.pf-status.alive {
   background: var(--pf-good-soft);
   color: var(--pf-good);
 }
 
-.pivot-status.dying {
+.pf-status.dying {
   background: var(--pf-bad-soft);
   color: var(--pf-bad);
 }
 
-.pivot-status.stable {
+.pf-status.stable {
   background: var(--pf-warn-soft);
   color: var(--pf-warn);
 }
 
-.pivot-status.dead,
-.pivot-status.unconfirmed {
+.pf-status.dead,
+.pf-status.unconfirmed {
   background: var(--pf-chip);
   color: var(--pf-muted);
 }
 
-.pivot-temp-hp {
+.pf-temp-hp {
   align-items: baseline;
   display: flex;
   gap: var(--pf-space-2);
@@ -487,21 +488,21 @@
   margin-bottom: var(--pf-space-2);
 }
 
-.pivot-rest-actions,
-.pivot-survival-actions {
+.pf-rest-actions,
+.pf-survival-actions {
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: var(--pf-space-2);
 }
 
-.pivot-survival-note {
+.pf-survival-note {
   color: var(--pf-muted);
   font-size: 12px;
   margin: var(--pf-space-2) 0 0;
 }
 
-.pivot-death-saves {
+.pf-death-saves {
   align-items: stretch;
   background: var(--pf-panel);
   border: 1px solid var(--pf-line);
@@ -512,18 +513,18 @@
   padding: var(--pf-space-2);
 }
 
-.pivot-death-track {
+.pf-death-track {
   display: grid;
   gap: var(--pf-space-1);
   justify-items: center;
 }
 
-.pivot-pips {
+.pf-pips {
   display: flex;
   gap: var(--pf-space-1);
 }
 
-.pivot-pip {
+.pf-pip {
   background: transparent;
   border: 2px solid var(--pf-accent);
   border-radius: 50%;
@@ -533,38 +534,38 @@
   width: 16px;
 }
 
-.pivot-pip.success.filled {
+.pf-pip.success.filled {
   background: var(--pf-good);
   border-color: var(--pf-good);
 }
 
-.pivot-pip.failure.filled {
+.pf-pip.failure.filled {
   background: var(--pf-bad);
   border-color: var(--pf-bad);
 }
 
-.pivot-resource-actions button,
-.pivot-sheet-button,
-.pivot-section-header button,
-.pivot-table-row button,
-.pivot-mod,
-.pivot-ability > button,
-.pivot-skill-row button,
+.pf-resource-actions button,
+.pf-sheet-button,
+.pf-section-header button,
+.pf-table-row button,
+.pf-mod,
+.pf-ability > button,
+.pf-skill-row button,
 .rollable {
   cursor: pointer;
 }
 
-.pivot-resource-actions span {
+.pf-resource-actions span {
   text-align: center;
 }
 
-.pivot-abilities {
+.pf-abilities {
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(6, minmax(110px, 1fr));
 }
 
-.pivot-ability > label:has(input[type="number"]) span {
+.pf-ability > label:has(input[type="number"]) span {
   border: 0;
   clip: rect(0, 0, 0, 0);
   height: 1px;
@@ -577,7 +578,7 @@
 }
 
 @container (min-width: 1200px) {
-  .pivot-ability > label:has(input[type="number"]) span {
+  .pf-ability > label:has(input[type="number"]) span {
     border: initial;
     clip: initial;
     height: initial;
@@ -591,18 +592,18 @@
 }
 
 @container (max-width: 765px) {
-  .pivot-abilities {
+  .pf-abilities {
     grid-template-columns: repeat(3, minmax(110px, 1fr));
   }
 }
 
 @container (max-width: 520px) {
-  .pivot-abilities {
+  .pf-abilities {
     grid-template-columns: repeat(2, minmax(110px, 1fr));
   }
 }
 
-.pivot-ability {
+.pf-ability {
   background: var(--pf-panel);
   border: 1px solid var(--pf-line);
   border-radius: var(--pf-radius-md);
@@ -616,12 +617,12 @@
   padding: var(--pf-space-1);
 }
 
-.pivot-ability > button:first-child {
+.pf-ability > button:first-child {
   grid-area: name;
   min-width: 0;
 }
 
-.pivot-ability > label:has(input[type="number"]) {
+.pf-ability > label:has(input[type="number"]) {
   align-items: center;
   display: flex;
   gap: var(--pf-space-1);
@@ -629,34 +630,34 @@
   min-width: 0;
 }
 
-.pivot-ability > label:has(input[type="number"]) input {
+.pf-ability > label:has(input[type="number"]) input {
   flex: 0 1 3.5em;
   min-width: 3.2em;
   width: 3.5em;
 }
 
-.pivot-ability > label:has(input[type="number"]) input::-webkit-inner-spin-button,
-.pivot-ability > label:has(input[type="number"]) input::-webkit-outer-spin-button {
+.pf-ability > label:has(input[type="number"]) input::-webkit-inner-spin-button,
+.pf-ability > label:has(input[type="number"]) input::-webkit-outer-spin-button {
   appearance: none;
   margin: 0;
 }
 
-.pivot-ability > label:has(input[type="number"]) input[type="number"] {
+.pf-ability > label:has(input[type="number"]) input[type="number"] {
   appearance: textfield;
 }
 
-.pivot-ability .pivot-mod {
+.pf-ability .pf-mod {
   grid-area: mod;
   min-width: 0;
 }
 
-.pivot-ability .pivot-check {
+.pf-ability .pf-check {
   grid-area: primary;
   justify-content: flex-start;
   min-width: 0;
 }
 
-.pivot-ability > button:first-child {
+.pf-ability > button:first-child {
   background: transparent;
   border: 0;
   color: var(--pf-accent);
@@ -665,13 +666,13 @@
   text-transform: uppercase;
 }
 
-.pivot-check {
+.pf-check {
   align-items: center;
   display: flex;
   gap: var(--pf-space-1);
 }
 
-.pivot-check input[type="checkbox"] {
+.pf-check input[type="checkbox"] {
   appearance: none;
   background: var(--pf-bg);
   border: 1px solid var(--pf-line-strong);
@@ -685,7 +686,7 @@
   width: 18px;
 }
 
-.pivot-check input[type="checkbox"]::before {
+.pf-check input[type="checkbox"]::before {
   box-shadow: inset 1em 1em var(--pf-accent);
   clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 19%, 86% 6%, 36% 70%);
   content: "";
@@ -695,15 +696,15 @@
   width: 12px;
 }
 
-.pivot-check input[type="checkbox"]:checked::before {
+.pf-check input[type="checkbox"]:checked::before {
   transform: scale(1);
 }
 
-.pivot-check.compact span {
+.pf-check.compact span {
   font-size: 10px;
 }
 
-.pivot-mod {
+.pf-mod {
   background: var(--pf-panel);
   border: 2px solid var(--pf-accent);
   border-radius: var(--pf-radius-pill);
@@ -715,12 +716,12 @@
   white-space: nowrap;
 }
 
-.pivot-skill-list {
+.pf-skill-list {
   display: grid;
   gap: var(--pf-space-1);
 }
 
-.pivot-skill-row {
+.pf-skill-row {
   align-items: center;
   border-bottom: 1px solid var(--pf-line);
   display: grid;
@@ -729,78 +730,78 @@
   min-height: 32px;
 }
 
-.pivot-skill-row .pivot-check {
+.pf-skill-row .pf-check {
   min-width: 0;
 }
 
-.pivot-skill-row .pivot-check span {
+.pf-skill-row .pf-check span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pivot-skill-row input[type="number"],
-.pivot-skill-row button {
+.pf-skill-row input[type="number"],
+.pf-skill-row button {
   min-height: 28px;
   text-align: center;
 }
 
-.pivot-skill-ability {
+.pf-skill-ability {
   color: var(--pf-muted);
   font-size: 11px;
   text-align: center;
 }
 
-.pivot-check-grid {
+.pf-check-grid {
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.pivot-section-header {
+.pf-section-header {
   align-items: center;
   display: flex;
   gap: var(--pf-space-2);
   justify-content: space-between;
 }
 
-.pivot-table {
+.pf-table {
   display: grid;
   gap: var(--pf-space-1);
 }
 
-.pivot-table-head,
-.pivot-table-row {
+.pf-table-head,
+.pf-table-row {
   align-items: center;
   display: grid;
   gap: var(--pf-space-2);
 }
 
-.pivot-weapon-table .pivot-table-head,
-.pivot-weapon-table .pivot-table-row {
+.pf-weapon-table .pf-table-head,
+.pf-weapon-table .pf-table-row {
   grid-template-columns: minmax(150px, 2fr) 60px 60px minmax(80px, 1fr) minmax(84px, 1fr) 32px;
 }
 
-.pivot-armour-table .pivot-table-head,
-.pivot-armour-table .pivot-table-row,
-.pivot-equipment-table .pivot-table-head,
-.pivot-equipment-table .pivot-table-row {
+.pf-armour-table .pf-table-head,
+.pf-armour-table .pf-table-row,
+.pf-equipment-table .pf-table-head,
+.pf-equipment-table .pf-table-row {
   grid-template-columns: minmax(150px, 2fr) minmax(72px, 1fr) 68px minmax(76px, 1fr) 32px;
 }
 
-.pivot-table-head {
+.pf-table-head {
   border-bottom: 1px solid var(--pf-accent);
   color: var(--pf-accent);
   font-size: 11px;
   text-transform: uppercase;
 }
 
-.pivot-table-row {
+.pf-table-row {
   border-bottom: 1px solid var(--pf-line);
   min-height: 34px;
 }
 
-.pivot-list-item {
+.pf-list-item {
   align-items: center;
   border-bottom: 1px solid var(--pf-line);
   display: grid;
@@ -809,11 +810,11 @@
   min-height: 34px;
 }
 
-.pivot-list-item > button:last-child:nth-child(3) {
+.pf-list-item > button:last-child:nth-child(3) {
   grid-column: 4;
 }
 
-.pivot-item-name {
+.pf-item-name {
   background: transparent;
   border: 0;
   color: var(--pf-accent);
@@ -826,32 +827,32 @@
   white-space: nowrap;
 }
 
-.pivot-breakdown {
+.pf-breakdown {
   color: var(--pf-muted);
   font-size: 12px;
   margin: 0 0 var(--pf-space-2);
 }
 
-.pivot-item-type {
+.pf-item-type {
   color: var(--pf-accent-ink);
   font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.pivot-character-sheet textarea,
-.pivot-item-sheet textarea {
+.pf-character-sheet textarea,
+.pf-item-sheet textarea {
   min-height: 90px;
   resize: vertical;
   width: 100%;
 }
 
-.pivot-character-sheet input,
-.pivot-character-sheet select,
-.pivot-character-sheet textarea,
-.pivot-item-sheet input,
-.pivot-item-sheet select,
-.pivot-item-sheet textarea {
+.pf-character-sheet input,
+.pf-character-sheet select,
+.pf-character-sheet textarea,
+.pf-item-sheet input,
+.pf-item-sheet select,
+.pf-item-sheet textarea {
   background: var(--pf-bg);
   border: 1px solid var(--pf-line-strong);
   border-radius: var(--pf-radius-sm);
@@ -859,68 +860,68 @@
   min-width: 0;
 }
 
-.pivot-effects-list {
+.pf-effects-list {
   display: grid;
   gap: var(--pf-space-1);
   margin: 0;
   padding-left: 1.25rem;
 }
 
-.pivot-effects-list li {
+.pf-effects-list li {
   display: flex;
   flex-wrap: wrap;
   gap: var(--pf-space-2);
 }
 
-.pivot-effect-type {
+.pf-effect-type {
   font-weight: 700;
 }
 
-.pivot-effects-empty {
+.pf-effects-empty {
   margin: 0;
 }
 
-@media (max-width: 820px) {
-  .pivot-character-sheet,
-  .pivot-item-sheet {
+@container (max-width: 820px) {
+  .pf-character-sheet,
+  .pf-item-sheet {
     min-width: 0;
   }
 
-  .pivot-sheet-header,
-  .pivot-grid.two,
-  .pivot-field-grid,
-  .pivot-resource-grid,
-  .pivot-currency,
-  .pivot-rest-actions,
-  .pivot-survival-actions,
-  .pivot-death-saves,
-  .pivot-meter-fields {
+  .pf-sheet-header,
+  .pf-grid.two,
+  .pf-field-grid,
+  .pf-resource-grid,
+  .pf-currency,
+  .pf-rest-actions,
+  .pf-survival-actions,
+  .pf-death-saves,
+  .pf-meter-fields {
     grid-template-columns: 1fr;
   }
 
-  .pivot-stat-strip {
+  .pf-stat-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .pivot-skill-row {
+  .pf-skill-row {
     grid-template-columns: minmax(120px, 1fr) repeat(2, 44px);
   }
 
-  .pivot-weapon-table .pivot-table-head,
-  .pivot-weapon-table .pivot-table-row,
-  .pivot-armour-table .pivot-table-head,
-  .pivot-armour-table .pivot-table-row,
-  .pivot-equipment-table .pivot-table-head,
-  .pivot-equipment-table .pivot-table-row {
+  .pf-weapon-table .pf-table-head,
+  .pf-weapon-table .pf-table-row,
+  .pf-armour-table .pf-table-head,
+  .pf-armour-table .pf-table-row,
+  .pf-equipment-table .pf-table-head,
+  .pf-equipment-table .pf-table-row {
     grid-template-columns: minmax(120px, 1fr) 52px 32px;
   }
 
-  .pivot-weapon-table .pivot-table-head span:nth-child(n + 3):nth-child(-n + 5),
-  .pivot-weapon-table .pivot-table-row > *:nth-child(n + 3):nth-child(-n + 5),
-  .pivot-armour-table .pivot-table-head span:nth-child(n + 3):nth-child(-n + 4),
-  .pivot-armour-table .pivot-table-row > *:nth-child(n + 3):nth-child(-n + 4),
-  .pivot-equipment-table .pivot-table-head span:nth-child(n + 3):nth-child(-n + 4),
-  .pivot-equipment-table .pivot-table-row > *:nth-child(n + 3):nth-child(-n + 4) {
+  .pf-weapon-table .pf-table-head span:nth-child(n + 3):nth-child(-n + 5),
+  .pf-weapon-table .pf-table-row > *:nth-child(n + 3):nth-child(-n + 5),
+  .pf-armour-table .pf-table-head span:nth-child(n + 3):nth-child(-n + 4),
+  .pf-armour-table .pf-table-row > *:nth-child(n + 3):nth-child(-n + 4),
+  .pf-equipment-table .pf-table-head span:nth-child(n + 3):nth-child(-n + 4),
+  .pf-equipment-table .pf-table-row > *:nth-child(n + 3):nth-child(-n + 4) {
     display: none;
   }
 }

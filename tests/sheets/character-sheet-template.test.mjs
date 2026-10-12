@@ -8,9 +8,9 @@ describe("character sheet template structure", () => {
     const template = readFileSync(templatePath, "utf-8");
 
     // Find the position of the abilities panel and the tabs navigation
-    const abilitiesPanelIndex = template.indexOf('class="pivot-panel pivot-abilities-panel"');
-    const tabsNavigationIndex = template.indexOf('class="tabs pivot-tabs"');
-    const tabBodyIndex = template.indexOf('class="pivot-tab-body"');
+    const abilitiesPanelIndex = template.indexOf('class="pf-panel pf-abilities-panel"');
+    const tabsNavigationIndex = template.indexOf('class="tabs pf-tabs"');
+    const tabBodyIndex = template.indexOf('class="pf-tab-body"');
 
     // Verify that the abilities panel exists
     expect(abilitiesPanelIndex).toBeGreaterThan(-1);
@@ -43,7 +43,7 @@ describe("character sheet template structure", () => {
     const template = readFileSync(templatePath, "utf-8");
 
     // Extract the abilities panel content
-    const abilitiesPanelStart = template.indexOf('class="pivot-panel pivot-abilities-panel"');
+    const abilitiesPanelStart = template.indexOf('class="pf-panel pf-abilities-panel"');
     const abilitiesPanelEnd = template.indexOf("</section>", abilitiesPanelStart);
     const abilitiesPanelContent = template.slice(abilitiesPanelStart, abilitiesPanelEnd);
 

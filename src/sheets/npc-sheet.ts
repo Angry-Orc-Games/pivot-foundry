@@ -100,7 +100,7 @@ export function createPivotNpcSheetClass(foundry: FoundryRuntime): TypeDataModel
     declare document: NpcActorLike;
 
     static DEFAULT_OPTIONS = {
-      classes: ["pivot-fantasy", "sheet", "actor", "npc"],
+      classes: ["pf-sheet", "sheet", "actor", "npc"],
       tag: "form",
       position: {
         width: 640,
@@ -132,7 +132,7 @@ export function createPivotNpcSheetClass(foundry: FoundryRuntime): TypeDataModel
 
     async _prepareContext(): Promise<NpcSheetContext> {
       const baseContext = prepareNpcSheetContext(this.document);
-      const rootId = (this as { id?: string }).id ?? "pivot-npc";
+      const rootId = (this as { id?: string }).id ?? "pf-npc";
 
       return {
         ...baseContext,
