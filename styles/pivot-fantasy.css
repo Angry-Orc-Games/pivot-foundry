@@ -489,17 +489,29 @@
   grid-template-columns: repeat(6, minmax(110px, 1fr));
 }
 
-@container (max-width: 880px) {
+.pivot-ability > label:has(input[type="number"]) span {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@container (min-width: 1200px) {
   .pivot-ability > label:has(input[type="number"]) span {
-    border: 0;
-    clip: rect(0, 0, 0, 0);
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    padding: 0;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
+    border: initial;
+    clip: initial;
+    height: initial;
+    margin: initial;
+    overflow: initial;
+    padding: initial;
+    position: initial;
+    white-space: initial;
+    width: initial;
   }
 }
 
