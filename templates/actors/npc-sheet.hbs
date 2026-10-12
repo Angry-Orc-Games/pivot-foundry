@@ -20,14 +20,14 @@
         <label>
           <span>{{localize "PIVOT.Fields.Tier"}}</span>
           <select name="system.tier" {{disabledAttr}}>
-            {{selectOptions config.tierChoices selected=system.tier}}
+            {{selectOptions config.tierChoices selected=system.tier localize=true}}
           </select>
         </label>
 
         <label>
           <span>{{localize "PIVOT.Fields.CreatureType"}}</span>
           <select name="system.creatureType" {{disabledAttr}}>
-            {{selectOptions config.creatureTypeChoices selected=system.creatureType}}
+            {{selectOptions config.creatureTypeChoices selected=system.creatureType localize=true}}
           </select>
         </label>
       </div>
@@ -36,7 +36,7 @@
         <label>
           <span>{{localize "PIVOT.Fields.Overlay"}}</span>
           <select name="system.overlay" {{disabledAttr}}>
-            {{selectOptions config.overlayChoices selected=system.overlay}}
+            {{selectOptions config.overlayChoices selected=system.overlay localize=true}}
           </select>
         </label>
       </div>
