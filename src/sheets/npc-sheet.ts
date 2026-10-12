@@ -100,7 +100,7 @@ export function createPivotNpcSheetClass(foundry: FoundryRuntime): TypeDataModel
     declare document: NpcActorLike;
 
     static DEFAULT_OPTIONS = {
-      classes: ["pf-sheet", "sheet", "actor", "npc"],
+      classes: ["pivot-fantasy", "pf-sheet", "sheet", "actor", "npc"],
       tag: "form",
       position: {
         width: 640,

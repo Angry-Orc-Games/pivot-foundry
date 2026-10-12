@@ -881,7 +881,7 @@
   margin: 0;
 }
 
-@container (max-width: 820px) {
+@container (max-width: 680px) {
   .pf-character-sheet,
   .pf-item-sheet {
     min-width: 0;

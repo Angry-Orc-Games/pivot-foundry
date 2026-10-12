@@ -1060,7 +1060,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
   try {
     const result = await DialogV2.prompt({
       window: { title: localizeText("PIVOT.RollDialog.Title") },
-      classes: ["pf-sheet"],
+      classes: ["pivot-fantasy", "pf-sheet"],
       content: buildRollModeDialogContent(localizeText),
       ok: {
         label: localizeText("PIVOT.RollDialog.Roll"),

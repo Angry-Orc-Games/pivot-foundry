@@ -1,5 +1,5 @@
 /* styles/pf-tokens.css — Pivot Fantasy UI Standard v1.0 §9. Do not add raw hex anywhere else. */
-.pf-sheet {
+.pivot-fantasy {
   --pf-bg: #f3ede0;
   --pf-panel: #fffdf7;
   --pf-ink: #2b2620;
@@ -31,8 +31,8 @@
   --pf-focus-offset: 2px;
   --pf-disabled-opacity: 0.45;
 }
-.theme-dark .pf-sheet:not(.theme-light),
-.pf-sheet.theme-dark {
+.theme-dark .pivot-fantasy:not(.theme-light),
+.pivot-fantasy.theme-dark {
   --pf-bg: #1b1814;
   --pf-panel: #26221c;
   --pf-ink: #ede6d6;
@@ -53,7 +53,7 @@
   --pf-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 /* Print sheet: fixed, never themed */
-.pf-sheet :is(.pf-print-wrap, .pf-print) {
+.pivot-fantasy :is(.pf-print-wrap, .pf-print) {
   --pf-sheet-paper: #fff;
   --pf-sheet-ink: #1c1a16;
   --pf-sheet-rule: #ddd;
