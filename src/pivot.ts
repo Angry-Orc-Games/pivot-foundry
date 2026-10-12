@@ -94,6 +94,22 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
       },
     };
 
+    // Set CONFIG.Combat.initiative formula for Combat Tracker roll buttons
+    // Formula uses @initiative which resolves from actor.getRollData() -> actor.system.initiative
+    // Character.prepareDerivedData() sets initiative = dex mod + bonus + item effects
+    // NPC.prepareDerivedData() sets initiative = combatBonuses.physical
+    const config = runtime.CONFIG as typeof runtime.CONFIG & {
+      Combat?: { initiative?: { formula?: string } | string };
+    };
+    if (!config.Combat) {
+      config.Combat = {};
+    }
+    if (typeof config.Combat.initiative === "object") {
+      config.Combat.initiative.formula = "1d20 + @initiative";
+    } else {
+      config.Combat.initiative = { formula: "1d20 + @initiative" };
+    }
+
     const documentSheetConfig = runtime.foundry.applications.apps.DocumentSheetConfig;
     documentSheetConfig.registerSheet(
       runtime.ActorDocument,

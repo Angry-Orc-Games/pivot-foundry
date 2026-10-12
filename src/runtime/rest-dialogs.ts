@@ -100,7 +100,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
       <label>${escapeHtml(localizeRest("PoolDiceToSpend"))} (${escapeHtml(localizeRest("Max"))}: ${maxSpends})<br>
         <input type="number" name="poolSpends" min="0" max="${maxSpends}" step="1" value="1">
       </label>
-      <p><em>${escapeHtml(localizeRest("ShortRestPoolInfo"))} (die: ${ctx.hitDie}, Con mod: ${formatSigned(ctx.conMod)})</em></p>
+      <p><em>${escapeHtml(runtime().game?.i18n?.format?.("PIVOT.Rest.ShortRestPoolInfo", { die: ctx.hitDie }) ?? `Each die: exploding ${ctx.hitDie} + Con mod → HP`)} (Con mod: ${formatSigned(ctx.conMod)})</em></p>
       ${
         ctx.awakened
           ? `<label><input type="checkbox" name="inDanger" value="yes"> ${escapeHtml(localizeRest("ShortRestInDanger"))}</label>

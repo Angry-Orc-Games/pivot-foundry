@@ -34,6 +34,33 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      - name: Check required staging secrets
+        env:
+          HAVE_FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
+          HAVE_FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
+          HAVE_FOUNDRY_RELEASE_CACHE_URL: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
+          HAVE_FOUNDRY_RELEASE_SHA256: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
+          HAVE_FOUNDRY_DEPLOY_SSH_HOST: ${{ secrets.FOUNDRY_DEPLOY_SSH_HOST != '' }}
+          HAVE_FOUNDRY_DEPLOY_SSH_USER: ${{ secrets.FOUNDRY_DEPLOY_SSH_USER != '' }}
+          HAVE_FOUNDRY_DEPLOY_SSH_KEY: ${{ secrets.FOUNDRY_DEPLOY_SSH_KEY != '' }}
+          HAVE_FOUNDRY_DEPLOY_TARGET_DIR: ${{ secrets.FOUNDRY_DEPLOY_TARGET_DIR != '' }}
+          HAVE_FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR != '' }}
+          HAVE_FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE != '' }}
+        run: |
+          # Fail fast with the names (never values) of missing staging environment secrets.
+          missing=""
+          for name in FOUNDRY_ADMIN_KEY FOUNDRY_LICENSE_KEY FOUNDRY_RELEASE_CACHE_URL FOUNDRY_RELEASE_SHA256 \
+                      FOUNDRY_DEPLOY_SSH_HOST FOUNDRY_DEPLOY_SSH_USER FOUNDRY_DEPLOY_SSH_KEY \
+                      FOUNDRY_DEPLOY_TARGET_DIR FOUNDRY_DEPLOY_BACKUP_DIR FOUNDRY_DEPLOY_SERVICE; do
+            var="HAVE_${name}"
+            if [ "${!var}" != "true" ]; then missing="${missing} ${name}"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secrets on GitHub Environment 'staging':${missing}. See docs/deployment.md."
+            exit 3
+          fi
+          echo "All required staging secrets are configured."
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -60,6 +87,10 @@ jobs:
           console.log("Staging will deploy", identity.commit, sha);
           '
 
+      - name: Install Playwright browser
+        # Needed by the isolated E2E below as well as the external staging smoke.
+        run: npx playwright install chromium --with-deps
+
       - name: Run isolated Foundry E2E against the CI artifact
         env:
           FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
@@ -67,6 +98,11 @@ jobs:
           FOUNDRY_RELEASE_CACHE_URL: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL }}
           FOUNDRY_RELEASE_SHA256: ${{ secrets.FOUNDRY_RELEASE_SHA256 }}
           PIVOT_REQUIRE_RELEASE_SHA256: "1"
+          # The job-level env points at the shared build server (staging). This step runs a
+          # disposable local Foundry container instead, so override the target; otherwise
+          # assertSafeTarget refuses with "Refusing to reset the shared staging server" (exit 8).
+          PIVOT_FOUNDRY_TARGET: e2e
+          PIVOT_FOUNDRY_BASE_URL: ""
         run: |
           # foundry:e2e rebuilds the zip; restore the exact CI bytes afterward if needed.
           CI_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
@@ -85,8 +121,21 @@ jobs:
           PIVOT_DEPLOY_PUBLIC_URL: https://build.angryorcgames.com
         run: node scripts/deploy-package.mjs staging
 
-      - name: Install Playwright browser
-        run: npx playwright install chromium --with-deps
+      - name: Wait for the build server to come back after restart
+        run: |
+          for _ in $(seq 1 36); do
+            if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
+              let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
+                const s = JSON.parse(d || "{}");
+                process.exit(s.active === true ? 0 : 1);
+              });'; then
+              echo "Build server is active."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Build server did not report active within 180s after deploy."
+          exit 1
 
       - name: External staging smoke
         env:
