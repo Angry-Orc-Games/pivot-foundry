@@ -20,7 +20,7 @@
 .pivot-fantasy .window-content :is(h1, h2, h3, h4) {
   font-family: var(--pf-font-display);
   line-height: 1.2;
-  margin: 0 0 .4em;
+  margin: 0 0 0.4em;
   border: none;
 }
 
@@ -47,7 +47,19 @@
 }
 
 /* Focus outline per §7.11 - 2px accent outline on :focus-visible, cancel core glow */
-.pivot-fantasy :is(.pivot-sheet-button, .pivot-mod, .pivot-ability > button, .pivot-skill-row button, .rollable, input, select, textarea, summary, a):focus-visible {
+.pivot-fantasy
+  :is(
+    .pivot-sheet-button,
+    .pivot-mod,
+    .pivot-ability > button,
+    .pivot-skill-row button,
+    .rollable,
+    input,
+    select,
+    textarea,
+    summary,
+    a
+  ):focus-visible {
   outline: var(--pf-focus-outline);
   outline-offset: var(--pf-focus-offset);
 }
