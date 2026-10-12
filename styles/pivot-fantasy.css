@@ -925,3 +925,369 @@
     display: none;
   }
 }
+
+/* ===================================================================
+   PRINT LAYOUT CSS - Ticket 3: Character Sheet Restructure
+   =================================================================== */
+
+/* Fixed print tokens: declared on print sheet only, never flip with theme */
+.pf-sheet :is(.pf-print-wrap, .pf-print) {
+  --pf-sheet-paper: #fff;
+  --pf-sheet-ink: #1c1a16;
+  --pf-sheet-rule: #ddd;
+  --pf-sheet-muted: #555;
+  --pf-sheet-accent: #8a3b12;
+  --pf-sheet-accent-soft: #f1dccb;
+}
+
+/* Print wrapper and print sheet */
+.pf-sheet .pf-print-wrap {
+  background: var(--pf-sheet-paper);
+  color: var(--pf-sheet-ink);
+  padding: var(--pf-space-4);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
+  max-width: 900px;
+  margin: 0 auto var(--pf-space-3);
+}
+
+.pf-sheet .pf-print {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--pf-sheet-ink);
+}
+
+.pf-sheet .pf-print :is(h1, h2, h3) {
+  color: var(--pf-sheet-ink);
+}
+
+.pf-sheet .pf-print h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.pf-sheet .pf-print h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1.5px solid var(--pf-sheet-accent);
+  color: var(--pf-sheet-accent);
+  margin: 12px 0 4px;
+  padding-bottom: 1px;
+}
+
+.pf-sheet .pf-print ul {
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+/* Header */
+.pf-sheet .pf-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 2px solid var(--pf-sheet-ink);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  gap: var(--pf-space-3);
+}
+
+.pf-sheet .pf-hdr-id {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pf-sheet .pf-hdr-meta {
+  flex: 0 1 auto;
+  text-align: right;
+}
+
+.pf-sheet .pf-hdr h1 {
+  margin: 0 0 4px 0;
+}
+
+/* Inline inputs for print sheet */
+.pf-sheet .pf-inline {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--pf-sheet-rule);
+  color: var(--pf-sheet-ink);
+  font: inherit;
+  padding: 0;
+}
+
+.pf-sheet .pf-inline:hover,
+.pf-sheet .pf-inline:focus {
+  border-bottom-color: var(--pf-sheet-accent);
+}
+
+.pf-sheet .pf-inline.pf-name {
+  font-family: var(--pf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  width: 100%;
+}
+
+.pf-sheet .pf-inline.pf-tagline {
+  font-style: italic;
+  width: 100%;
+}
+
+.pf-sheet .pf-inline.pf-num {
+  width: 4ch;
+  text-align: center;
+}
+
+/* Stats grid: 4 boxed stat cards */
+.pf-sheet .pf-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pf-sheet .pf-stat {
+  border: 1.5px solid var(--pf-sheet-ink);
+  border-radius: var(--pf-radius-md);
+  text-align: center;
+  padding: 3px;
+}
+
+.pf-sheet .pf-stat b {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.pf-sheet .pf-stat span {
+  font: 700 17px var(--pf-font-display);
+  display: block;
+}
+
+.pf-sheet .pf-stat small {
+  display: block;
+  font-size: 11px;
+}
+
+/* Abilities grid: 6 ability boxes */
+.pf-sheet .pf-abil {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pf-sheet .pf-ab {
+  border: 1.5px solid var(--pf-sheet-ink);
+  border-radius: var(--pf-radius-md);
+  text-align: center;
+  padding: 3px 2px;
+  position: relative;
+}
+
+.pf-sheet .pf-ab.pf-prime {
+  background: var(--pf-sheet-accent-soft);
+}
+
+.pf-sheet .pf-ab b {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.pf-sheet .pf-ab span {
+  font: 700 18px var(--pf-font-display);
+  display: block;
+}
+
+.pf-sheet .pf-ab small {
+  display: block;
+  font-size: 11px;
+}
+
+.pf-sheet .pf-ab-name {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.pf-sheet .pf-ab-score {
+  width: 100%;
+  text-align: center;
+  font: 700 18px var(--pf-font-display);
+  padding: 0;
+}
+
+.pf-sheet .pf-ab-save {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.pf-sheet .pf-prime-toggle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+}
+
+.pf-sheet .pf-prime-toggle input {
+  width: auto;
+}
+
+/* Initiative/PP line and footnote */
+.pf-sheet .pf-init-pp {
+  margin-bottom: 4px;
+}
+
+/* Two-column layout */
+.pf-sheet .pf-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+/* Skills table */
+.pf-sheet .pf-print table.pf-skills {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11.5px;
+}
+
+.pf-sheet .pf-print table.pf-skills td {
+  padding: 1px 4px;
+  border-bottom: 1px solid var(--pf-sheet-rule);
+  text-align: left;
+}
+
+.pf-sheet .pf-print table.pf-skills td.pf-r {
+  text-align: right;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-check {
+  display: inline;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-check input {
+  margin-right: 4px;
+}
+
+/* Lists */
+.pf-sheet .pf-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.pf-sheet .pf-list li {
+  margin: 2px 0;
+}
+
+.pf-sheet .pf-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--pf-sheet-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pf-sheet .pf-bp-cost {
+  font-size: 10px;
+  color: var(--pf-sheet-muted);
+}
+
+/* Funds inline inputs */
+.pf-sheet .pf-funds {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.pf-sheet .pf-funds label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pf-sheet .pf-funds .pf-inline.pf-num {
+  width: 6ch;
+}
+
+/* Footer */
+.pf-sheet .pf-footer {
+  margin-top: 8px;
+  border-top: 1px solid var(--pf-sheet-rule);
+  padding-top: 4px;
+}
+
+/* Small text */
+.pf-sheet .pf-print .pf-small {
+  font-size: 10.5px;
+  color: var(--pf-sheet-muted);
+}
+
+/* Screen reader only */
+.pf-sheet .pf-sr {
+  position: absolute;
+  left: -9999px;
+}
+
+/* Roll buttons in print context */
+.pf-sheet .pf-print .pf-roll {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--pf-sheet-ink);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.pf-sheet .pf-print .pf-roll:hover {
+  color: var(--pf-sheet-accent);
+}
+
+/* Container queries for responsive print layout */
+@container pf-sheet (max-width: 720px) {
+  .pf-sheet .pf-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-sheet .pf-abil {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pf-sheet .pf-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@container pf-sheet (max-width: 560px) {
+  .pf-sheet .pf-hdr {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pf-sheet .pf-hdr-meta {
+    text-align: left;
+  }
+
+  .pf-sheet .pf-abil {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pf-sheet .pf-funds {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ensure container name is set on the character sheet root */
+.pf-sheet .pf-character-sheet {
+  container-name: pf-sheet;
+}

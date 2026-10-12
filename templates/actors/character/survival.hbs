@@ -1,0 +1,180 @@
+{{! Survival tab: HP meter, temp HP, death saves, rests }}
+<section class="pf-card">
+  <h2>{{localize "PIVOT.Sections.Vitality"}}</h2>
+  <div class="pf-vitality-grid">
+    {{! HP Meter }}
+    <div class="pf-meter-block">
+      <div class="pf-meter-heading">
+        <span>{{localize "PIVOT.Fields.HPMax"}}</span>
+        <strong>{{system.attributes.hp.value}} / {{system.attributes.hp.max}}</strong>
+      </div>
+      <div class="pf-meter" aria-hidden="true">
+        <div class="pf-meter-fill hp" style="width: {{hpPercent}}%;"></div>
+      </div>
+      <div class="pf-meter-fields">
+        <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
+            readonly
+            aria-label="Current HP"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.attributes.hp.value}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.HPMax"}}</span><input
+            name="system.attributes.hp.max"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.attributes.hp.max}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+    </div>
+
+    {{! Pool Meter }}
+    <div class="pf-meter-block">
+      <div class="pf-meter-heading">
+        <span>{{localize "PIVOT.Fields.Pool"}}</span>
+        <strong>{{system.resources.pool.value}} / {{derived.pool.max}}</strong>
+      </div>
+      <div class="pf-meter" aria-hidden="true">
+        <div class="pf-meter-fill pool" style="width: {{poolPercent}}%;"></div>
+      </div>
+      <div class="pf-resource-actions">
+        <button
+          type="button"
+          data-action="adjustResource"
+          data-path="resources.pool.value"
+          data-delta="-1"
+          aria-label="{{localize 'PIVOT.Actions.DecreasePool'}}"
+          title="{{localize 'PIVOT.Actions.DecreasePool'}}"
+          {{disabledAttr}}
+        >-</button>
+        <input
+          class="pf-pool-value"
+          name="system.resources.pool.value"
+          type="number"
+          min="0"
+          step="1"
+          value="{{system.resources.pool.value}}"
+          aria-label="{{localize 'PIVOT.Fields.Pool'}}"
+          {{disabledAttr}}
+        />
+        <button
+          type="button"
+          data-action="adjustResource"
+          data-path="resources.pool.value"
+          data-delta="1"
+          aria-label="{{localize 'PIVOT.Actions.IncreasePool'}}"
+          title="{{localize 'PIVOT.Actions.IncreasePool'}}"
+          {{disabledAttr}}
+        >+</button>
+      </div>
+      <button
+        type="button"
+        class="pf-sheet-button"
+        data-action="recoverPoolLongRest"
+        aria-label="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
+        title="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
+        {{disabledAttr}}
+      >{{localize "PIVOT.Actions.RecoverPoolLongRest"}}</button>
+    </div>
+
+    {{! Hit Die }}
+    <label class="pf-hit-die"><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
+        name="system.attributes.hitDie"
+        {{disabledAttr}}
+      >{{selectOptions config.hitDiceChoices selected=system.attributes.hitDie}}</select></label>
+  </div>
+</section>
+
+{{! Rest Actions }}
+<div class="pf-rest-actions">
+  <button type="button" class="pf-sheet-button" data-action="shortRest" {{disabledAttr}}>{{localize
+      "PIVOT.Actions.ShortRest"
+    }}</button>
+  <button type="button" class="pf-sheet-button" data-action="longRest" {{disabledAttr}}>{{localize
+      "PIVOT.Actions.LongRest"
+    }}</button>
+</div>
+
+{{! Survival Section }}
+<section class="pf-card pf-survival">
+  <div class="pf-survival-header">
+    <h3>{{localize "PIVOT.Sections.Survival"}}</h3>
+    <span class="pf-status {{survivalStatus}}">{{localize survivalLabel}}</span>
+  </div>
+  <div class="pf-temp-hp">
+    <span>{{localize "PIVOT.Survival.Temp"}}</span>
+    <strong>{{system.attributes.hp.temp}}</strong>
+  </div>
+  <div class="pf-survival-actions">
+    <button
+      type="button"
+      class="pf-sheet-button primary"
+      data-action="survivalRoll"
+      {{disabledAttr}}
+    >{{localize "PIVOT.Survival.RollTitle"}}</button>
+    <button type="button" class="pf-sheet-button" data-action="tempHp" {{disabledAttr}}>{{localize
+        "PIVOT.Survival.Temp"
+      }}</button>
+    <button
+      type="button"
+      class="pf-sheet-button"
+      data-action="deathSave"
+      {{disabledAttr}}
+    >{{localize "PIVOT.Survival.DeathSave"}}</button>
+    <button
+      type="button"
+      class="pf-sheet-button"
+      data-action="clearTempHp"
+      {{disabledAttr}}
+    >{{localize "PIVOT.Survival.ClearTemp"}}</button>
+    {{#if isGM}}<button
+        type="button"
+        class="pf-sheet-button"
+        data-action="correctSurvival"
+      >{{localize "PIVOT.Survival.Correction"}}</button>{{/if}}
+  </div>
+
+  {{! Death Saves }}
+  <div class="pf-death-saves">
+    <div class="pf-death-track">
+      <span>{{localize "PIVOT.Fields.Successes"}}</span>
+      <div
+        class="pf-pips"
+        role="img"
+        aria-label="{{localize
+          'PIVOT.Fields.Successes'
+        }}: {{system.attributes.deathSaves.successes}}"
+      >
+        {{#each deathSaveSuccessPips}}
+          {{#if this}}
+            <span class="pf-pip success filled"></span>
+          {{else}}
+            <span class="pf-pip success"></span>
+          {{/if}}
+        {{/each}}
+      </div>
+    </div>
+    <div class="pf-death-track">
+      <span>{{localize "PIVOT.Fields.Failures"}}</span>
+      <div
+        class="pf-pips"
+        role="img"
+        aria-label="{{localize 'PIVOT.Fields.Failures'}}: {{system.attributes.deathSaves.failures}}"
+      >
+        {{#each deathSaveFailurePips}}
+          {{#if this}}
+            <span class="pf-pip failure filled"></span>
+          {{else}}
+            <span class="pf-pip failure"></span>
+          {{/if}}
+        {{/each}}
+      </div>
+    </div>
+  </div>
+
+  <p class="pf-survival-note">{{localize "PIVOT.Survival.ManualConsequences"}}</p>
+</section>

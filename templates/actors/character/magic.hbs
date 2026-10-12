@@ -1,0 +1,116 @@
+{{! Magic tab: awakened, MP, streams, abilities, runes }}
+<div class="pf-grid two">
+  <section class="pf-card">
+    <h2>{{localize "PIVOT.Sections.Magic"}}</h2>
+    <label class="pf-check"><input
+        name="system.magic.awakened"
+        type="checkbox"
+        {{checked system.magic.awakened}}
+        {{disabledAttr}}
+      />
+      <span>{{localize "PIVOT.Fields.Awakened"}}</span></label>
+    <label><span>{{localize "PIVOT.Fields.MagicAbility"}}</span><select
+        name="system.magic.ability"
+        {{disabledAttr}}
+      >{{selectOptions
+          config.magicAbilities
+          selected=system.magic.ability
+          blank=""
+          valueAttr="key"
+          labelAttr="label"
+        }}</select></label>
+    <label><span>{{localize "PIVOT.Fields.MPRemaining"}}</span><input
+        name="system.magic.mp.value"
+        type="number"
+        min="0"
+        step="1"
+        value="{{system.magic.mp.value}}"
+        {{disabledAttr}}
+      /></label>
+    <div class="pf-resource-actions">
+      <button
+        type="button"
+        data-action="adjustResource"
+        data-path="magic.mp.value"
+        data-delta="-1"
+        aria-label="{{localize 'PIVOT.Actions.DecreaseMP'}}"
+        title="{{localize 'PIVOT.Actions.DecreaseMP'}}"
+        {{disabledAttr}}
+      >-</button>
+      <span>{{system.magic.mp.value}} / {{derived.magic.mp.max}}</span>
+      <button
+        type="button"
+        data-action="adjustResource"
+        data-path="magic.mp.value"
+        data-delta="1"
+        aria-label="{{localize 'PIVOT.Actions.IncreaseMP'}}"
+        title="{{localize 'PIVOT.Actions.IncreaseMP'}}"
+        {{disabledAttr}}
+      >+</button>
+    </div>
+  </section>
+
+  <section class="pf-card">
+    <div class="pf-section-header"><h2>{{localize "PIVOT.Sections.MagicStreams"}}</h2><button
+        type="button"
+        data-action="createItem"
+        data-type="magicStream"
+        aria-label="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
+        title="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
+        {{disabledAttr}}
+      >+</button></div>
+    {{#each items.magicStreams}}<div class="pf-list-item"><button
+          type="button"
+          class="pf-item-name"
+          data-action="openItem"
+          data-item-id="{{id}}"
+        >{{name}}</button><span>{{localize "PIVOT.Fields.Echelon"}}
+          {{system.echelon}}</span><button
+          type="button"
+          data-action="deleteItem"
+          data-item-id="{{id}}"
+          aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+          title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+          {{disabledAttr}}
+        >x</button></div>{{/each}}
+
+    <div class="pf-section-header"><h2>{{localize "PIVOT.Sections.MagicAbilities"}}</h2><button
+        type="button"
+        data-action="createItem"
+        data-type="magicAbility"
+        aria-label="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
+        title="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
+        {{disabledAttr}}
+      >+</button></div>
+    {{#each items.magicAbilities}}<div class="pf-list-item"><button
+          type="button"
+          data-action="roll"
+          data-roll-kind="magicAbility"
+          data-key="{{id}}"
+          data-label="{{name}}"
+        >{{name}}</button><span>{{system.mpCost}} MP</span><button
+          type="button"
+          data-action="openItem"
+          data-item-id="{{id}}"
+          aria-label="{{localize 'PIVOT.Actions.EditItem'}}"
+          title="{{localize 'PIVOT.Actions.EditItem'}}"
+          {{disabledAttr}}
+        >...</button><button
+          type="button"
+          data-action="deleteItem"
+          data-item-id="{{id}}"
+          aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+          title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+          {{disabledAttr}}
+        >x</button></div>{{/each}}
+  </section>
+</div>
+
+<section class="pf-card">
+  <h2>{{localize "PIVOT.Sections.Runes"}}</h2>
+  <textarea
+    name="system.notes.runesThaumaturgy"
+    rows="5"
+    {{disabledAttr}}
+  >{{system.notes.runesThaumaturgy}}</textarea>
+</section>
