@@ -25,6 +25,26 @@ describe("m003 - Schema V2 Migration", () => {
       });
     });
 
+    it("adds concept, focus, and backgroundTier to legacy actors at schema version 0", () => {
+      const result = planSchemaV2ActorMigration({
+        schemaVersion: 0,
+        identity: {
+          player: "Legacy",
+          backgroundText: "Hermit",
+        },
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        changed: true,
+        update: {
+          "system.identity.concept": "",
+          "system.identity.focus": "",
+          "system.identity.backgroundTier": 0,
+        },
+      });
+    });
+
     it("only adds missing fields when some are already present", () => {
       const result = planSchemaV2ActorMigration({
         schemaVersion: 1,
@@ -62,7 +82,16 @@ describe("m003 - Schema V2 Migration", () => {
         identity: {},
       });
 
-      expect(result).toEqual({ ok: true, changed: false });
+      // v0 actors should be migrated by m003
+      expect(result).toEqual({
+        ok: true,
+        changed: true,
+        update: {
+          "system.identity.concept": "",
+          "system.identity.focus": "",
+          "system.identity.backgroundTier": 0,
+        },
+      });
     });
 
     it("does not migrate when all fields are already present", () => {
@@ -135,7 +164,14 @@ describe("m003 - Schema V2 Migration", () => {
         },
       });
 
-      expect(result).toEqual({ ok: true, changed: false });
+      // v0 items should be migrated by m003
+      expect(result).toEqual({
+        ok: true,
+        changed: true,
+        update: {
+          "system.cost.bp": 0,
+        },
+      });
     });
 
     it("does not migrate when bp is already present", () => {

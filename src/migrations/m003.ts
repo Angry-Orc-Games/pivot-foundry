@@ -15,8 +15,8 @@ export function planSchemaV2ActorMigration(storedSystem: unknown): MigrationPlan
 
   const version = typeof storedSystem.schemaVersion === "number" ? storedSystem.schemaVersion : 0;
 
-  // Only migrate if we're at version 1 (the previous version)
-  if (version !== 1) {
+  // Only migrate if we're at version 0 or 1 (legacy versions before these fields existed)
+  if (version > 1) {
     return { ok: true, changed: false };
   }
 
@@ -61,8 +61,8 @@ export function planSchemaV2ItemMigration(storedSystem: unknown): MigrationPlan 
 
   const version = typeof storedSystem.schemaVersion === "number" ? storedSystem.schemaVersion : 0;
 
-  // Only migrate if we're at version 1 (the previous version)
-  if (version !== 1) {
+  // Only migrate if we're at version 0 or 1 (legacy versions before this field existed)
+  if (version > 1) {
     return { ok: true, changed: false };
   }
 
