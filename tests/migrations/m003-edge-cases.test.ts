@@ -95,21 +95,65 @@ describe("m003 edge cases", () => {
     });
   });
 
-  describe("missing fields with schema >= 2 are safe", () => {
-    it("an actor at v2 missing new fields does not cause migration", () => {
-      // Simulates a document that was created at v2 but doesn't have the fields
-      // (shouldn't happen in practice, but we want to be defensive)
+  describe("migration preserves existing data", () => {
+    it("preserves HP, pool, and other existing values when migrating actors", () => {
       const result = planSchemaV2ActorMigration({
-        schemaVersion: 2,
+        schemaVersion: 1,
         identity: {
           player: "Test",
-          speciesText: "Human",
-          backgroundText: "Noble",
-          // concept, focus, backgroundTier are missing
+          speciesText: "Dwarf",
+          backgroundText: "Soldier",
+        },
+        attributes: {
+          hp: { value: 42, max: 50, temp: 5 },
+          hitDie: "d10",
+        },
+        resources: {
+          pool: { value: 8 },
         },
       });
 
-      expect(result).toEqual({ ok: true, changed: false });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.changed).toBe(true);
+      if (!result.changed) return;
+
+      // Should only add the missing identity fields
+      expect(result.update).toEqual({
+        "system.identity.concept": "",
+        "system.identity.focus": "",
+        "system.identity.backgroundTier": 0,
+      });
+
+      // Should NOT touch hp, hitDie, pool, or any other fields
+      expect(result.update).not.toHaveProperty("system.attributes.hp");
+      expect(result.update).not.toHaveProperty("system.attributes.hitDie");
+      expect(result.update).not.toHaveProperty("system.resources.pool");
+    });
+
+    it("preserves cost.pool and cost.mp when migrating items", () => {
+      const result = planSchemaV2ItemMigration({
+        schemaVersion: 1,
+        category: "feat",
+        cost: {
+          pool: 2,
+          mp: 1,
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.changed).toBe(true);
+      if (!result.changed) return;
+
+      // Should only add bp
+      expect(result.update).toEqual({
+        "system.cost.bp": 0,
+      });
+
+      // Should NOT touch other cost fields
+      expect(result.update).not.toHaveProperty("system.cost.pool");
+      expect(result.update).not.toHaveProperty("system.cost.mp");
     });
   });
 });
