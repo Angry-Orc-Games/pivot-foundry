@@ -26,6 +26,7 @@ interface RestContext {
   magicAbilityScore: number | null;
   conMod: number;
   hitDie: string;
+  temp: number;
 }
 
 function extractRestContext(actor: ActorLike): RestContext | null {
@@ -35,6 +36,7 @@ function extractRestContext(actor: ActorLike): RestContext | null {
   const hpMax = numberAt(system, ["attributes", "hp", "max"], 0);
   const poolCurrent = numberAt(system, ["resources", "pool", "value"], 0);
   const mpCurrent = numberAt(system, ["magic", "mp", "value"], 0);
+  const temp = numberAt(system, ["attributes", "hp", "temp"], 0);
   const awakened = booleanAt(system, ["magic", "awakened"], false);
 
   const magicAbilityKey = stringAtNullable(system, ["magic", "ability"]);
@@ -63,6 +65,7 @@ function extractRestContext(actor: ActorLike): RestContext | null {
     magicAbilityScore,
     conMod,
     hitDie,
+    temp,
   };
 }
 
@@ -97,7 +100,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
       <label>${escapeHtml(localizeRest("PoolDiceToSpend"))} (${escapeHtml(localizeRest("Max"))}: ${maxSpends})<br>
         <input type="number" name="poolSpends" min="0" max="${maxSpends}" step="1" value="1">
       </label>
-      <p><em>${escapeHtml(localizeRest("ShortRestPoolInfo"))} (die: ${ctx.hitDie}, Con mod: ${formatSigned(ctx.conMod)})</em></p>
+      <p><em>${escapeHtml(runtime().game?.i18n?.format?.("PIVOT.Rest.ShortRestPoolInfo", { die: ctx.hitDie }) ?? `Each die: exploding ${ctx.hitDie} + Con mod → HP`)} (Con mod: ${formatSigned(ctx.conMod)})</em></p>
       ${
         ctx.awakened
           ? `<label><input type="checkbox" name="inDanger" value="yes"> ${escapeHtml(localizeRest("ShortRestInDanger"))}</label>
@@ -306,11 +309,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     controlMagicRoll,
   });
 
-  const update: Record<string, unknown> = {
-    "system.attributes.hp.value": hpResult.hpFinal,
-    "system.resources.pool.value": poolResult.poolFinal,
-    "system.magic.mp.value": mpResult.mpFinal,
-  };
+  const update = buildLongRestUpdate(hpResult.hpFinal, poolResult.poolFinal, mpResult.mpFinal);
 
   try {
     await actor.update?.(update);
@@ -330,6 +329,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     mpResult.mpRecovered > 0
       ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
       : "",
+    ctx.temp > 0 ? `${escapeHtml(localizeRest("TempHpCleared"))}: ${ctx.temp}` : "",
   ]
     .filter(Boolean)
     .join(" • ");
@@ -339,6 +339,19 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
   } catch {
     warnRest("ChatFailed");
   }
+}
+
+export function buildLongRestUpdate(
+  hpFinal: number,
+  poolFinal: number,
+  mpFinal: number,
+): Record<string, unknown> {
+  return {
+    "system.attributes.hp.value": hpFinal,
+    "system.resources.pool.value": poolFinal,
+    "system.magic.mp.value": mpFinal,
+    "system.attributes.hp.temp": 0,
+  };
 }
 
 function numberAt(source: Record<string, unknown>, path: string[], fallback: number): number {
