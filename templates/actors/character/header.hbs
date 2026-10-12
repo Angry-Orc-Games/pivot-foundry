@@ -27,7 +27,8 @@
   </div>
   <div class="pf-hdr-meta">
     <div><b>{{speciesLabel}}</b>,
-      <b>{{backgroundLabel}}</b></div>
+      <b>{{backgroundLabel}}</b>{{#if tierLabel}}
+        ({{tierLabel}}){{/if}}</div>
     <div class="pf-small">Pivot: Fantasy, level
       {{#if editable}}
         <input

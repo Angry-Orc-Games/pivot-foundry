@@ -1,4 +1,5 @@
 import { planSurvivalMigration } from "./m002";
+import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
 import {
   planActorMigration,
   planItemMigration,
@@ -67,14 +68,24 @@ export async function runWorldMigrations(
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
     game.items,
-  ).map((document) => ({ document, plan: planItemMigration(readStoredSystem(document)) }));
+  ).map((document) => {
+    const stored = readStoredSystem(document);
+    return {
+      document,
+      plan: combineItemMigrations(stored),
+    };
+  });
   for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
     planned.push({
       document: actor,
       plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
     });
-    for (const item of listDocuments(actor.items))
-      planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
+    for (const item of listDocuments(actor.items)) {
+      planned.push({
+        document: item,
+        plan: combineItemMigrations(readStoredSystem(item)),
+      });
+    }
   }
   for (const entry of planned) {
     const result = await persistMigration(entry.document, entry.plan, dependencies);
@@ -86,7 +97,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002`,
+        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -183,10 +194,32 @@ export function planAllActorMigrations(source: unknown, type?: string): Migratio
   if (!first.ok || (type && type !== "character")) return first;
   const second = planSurvivalMigration(source);
   if (!second.ok) return second;
+  const third = planSchemaV2ActorMigration(source);
+  if (!third.ok) return third;
+  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      ...(first.changed ? first.update : {}),
+      ...(second.changed ? second.update : {}),
+      ...(third.changed ? third.update : {}),
+    },
+  };
+}
+
+function combineItemMigrations(source: unknown): MigrationPlan {
+  const first = planItemMigration(source);
+  if (!first.ok) return first;
+  const second = planSchemaV2ItemMigration(source);
+  if (!second.ok) return second;
   if (!first.changed && !second.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
-    update: { ...(first.changed ? first.update : {}), ...(second.changed ? second.update : {}) },
+    update: {
+      ...(first.changed ? first.update : {}),
+      ...(second.changed ? second.update : {}),
+    },
   };
 }
