@@ -171,6 +171,7 @@
 }
 
 .pivot-fantasy .pivot-sheet-header .pivot-header-stats input {
+  -webkit-text-fill-color: var(--pf-accent-ink);
   background: var(--pf-accent);
   border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
