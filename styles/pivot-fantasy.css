@@ -157,7 +157,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pf-accent-ink);
-  color: var(--pf-accent-ink);
+  color: var(--pf-accent-ink) !important;
   font-family: var(--pf-font-display);
   font-size: 28px;
   font-weight: 700;
@@ -174,7 +174,7 @@
   background: transparent;
   border: 1px solid var(--pf-accent-ink);
   border-radius: var(--pf-radius-sm);
-  color: var(--pf-accent-ink);
+  color: var(--pf-accent-ink) !important;
   font-weight: 700;
   text-align: center;
 }
@@ -428,7 +428,7 @@
 .pivot-sheet-button.primary {
   background: var(--pf-accent);
   border-color: var(--pf-accent);
-  color: var(--pf-accent-ink);
+  color: var(--pf-accent-ink) !important;
 }
 
 .pivot-sheet-button.primary:hover {
