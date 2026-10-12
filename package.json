@@ -30,7 +30,8 @@
     "prepare:release": "node scripts/prepare-release-manifest.mjs",
     "package:system": "node scripts/build-system-package.mjs",
     "artifact:identity": "node scripts/artifact-identity.mjs",
-    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build && npm run audit",
+    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build && npm run audit && npm run verify:l10n",
+    "verify:l10n": "node scripts/verify-l10n-keys.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
