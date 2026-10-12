@@ -157,7 +157,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid currentColor;
-  color: inherit;
+  color: var(--pf-accent-ink);
   font-family: var(--pf-font-display);
   font-size: 28px;
   font-weight: 700;
@@ -171,7 +171,7 @@
 }
 
 .pivot-header-stats input {
-  background: var(--pf-panel);
+  background: var(--pf-bg);
   border: 1px solid var(--pf-line-strong);
   border-radius: var(--pf-radius-sm);
   color: var(--pf-ink);
@@ -703,8 +703,10 @@
 }
 
 .pivot-mod {
+  background: var(--pf-panel);
   border: 2px solid var(--pf-accent);
   border-radius: var(--pf-radius-pill);
+  color: var(--pf-ink);
   font-size: 12px;
   font-weight: 700;
   min-height: 28px;
