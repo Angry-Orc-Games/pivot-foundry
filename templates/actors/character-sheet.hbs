@@ -30,6 +30,47 @@
     </div>
   </header>
 
+  <section class="pivot-panel pivot-abilities-panel">
+    <h2>{{localize "PIVOT.Sections.Abilities"}}</h2>
+    <div class="pivot-abilities">
+      {{#each abilityRows}}
+        <article class="pivot-ability">
+          <button
+            type="button"
+            data-action="roll"
+            data-roll-kind="ability"
+            data-key="{{key}}"
+            data-label="{{label}}"
+          >{{label}}</button>
+          <label><span>{{localize "PIVOT.Fields.Score"}}</span><input
+              name="{{scorePath}}"
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              value="{{score}}"
+              {{disabledAttr}}
+            /></label>
+          <label class="pivot-check"><input
+              name="{{primaryPath}}"
+              type="checkbox"
+              {{checked primary}}
+              {{disabledAttr}}
+            />
+            <span>{{localize "PIVOT.Fields.Primary"}}</span></label>
+          <button
+            type="button"
+            class="pivot-mod"
+            data-action="roll"
+            data-roll-kind="save"
+            data-key="{{key}}"
+            data-label="{{label}} save"
+          >{{mod}} / {{save}}</button>
+        </article>
+      {{/each}}
+    </div>
+  </section>
+
   <nav
     class="tabs pivot-tabs"
     data-group="primary"
@@ -375,47 +416,6 @@
           </section>
         </section>
       </div>
-
-      <section class="pivot-panel">
-        <h2>{{localize "PIVOT.Sections.Abilities"}}</h2>
-        <div class="pivot-abilities">
-          {{#each abilityRows}}
-            <article class="pivot-ability">
-              <button
-                type="button"
-                data-action="roll"
-                data-roll-kind="ability"
-                data-key="{{key}}"
-                data-label="{{label}}"
-              >{{label}}</button>
-              <label><span>{{localize "PIVOT.Fields.Score"}}</span><input
-                  name="{{scorePath}}"
-                  type="number"
-                  min="1"
-                  max="30"
-                  step="1"
-                  value="{{score}}"
-                  {{disabledAttr}}
-                /></label>
-              <label class="pivot-check"><input
-                  name="{{primaryPath}}"
-                  type="checkbox"
-                  {{checked primary}}
-                  {{disabledAttr}}
-                />
-                <span>{{localize "PIVOT.Fields.Primary"}}</span></label>
-              <button
-                type="button"
-                class="pivot-mod"
-                data-action="roll"
-                data-roll-kind="save"
-                data-key="{{key}}"
-                data-label="{{label}} save"
-              >{{mod}} / {{save}}</button>
-            </article>
-          {{/each}}
-        </div>
-      </section>
     </section>
 
     <section class="tab {{tabs.skills.cssClass}}" data-group="primary" data-tab="skills">
