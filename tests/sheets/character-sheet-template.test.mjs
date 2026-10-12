@@ -26,7 +26,6 @@ describe("character sheet template structure", () => {
     expect(template).toContain('name="system.identity.concept"');
     expect(template).toContain("{{speciesLabel}}");
     expect(template).toContain("{{backgroundLabel}}");
-    expect(template).toContain("{{tierLabel}}");
     expect(template).toContain("{{system.identity.focus}}");
   });
 

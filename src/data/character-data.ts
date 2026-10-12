@@ -77,18 +77,9 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
         }),
         identity: schemaField(fields, {
           player: stringField(fields, { required: true, initial: "" }),
-          concept: stringField(fields, { required: true, initial: "" }),
           backgroundText: stringField(fields, { required: true, initial: "" }),
-          backgroundTier: numberField(fields, {
-            required: true,
-            integer: true,
-            min: 0,
-            max: 3,
-            initial: 0,
-          }),
           speciesText: stringField(fields, { required: true, initial: "" }),
           languages: arrayField(fields, stringField(fields, { required: true, initial: "" })),
-          focus: stringField(fields, { required: true, initial: "" }),
           loyalty: stringField(fields, { required: true, initial: "" }),
           weight: schemaField(fields, {
             value: numberField(fields, { required: true, nullable: true, initial: null, min: 0 }),

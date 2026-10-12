@@ -210,6 +210,17 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
+        toggleEditMode: function (
+          this: PivotCharacterSheet & {
+            options: { editable?: boolean };
+            render: (force?: boolean) => void;
+          },
+        ) {
+          // Toggle edit mode by inverting options.editable
+          const currentEditable = this.options.editable !== false;
+          this.options.editable = !currentEditable;
+          this.render();
+        },
         survivalRoll: async function (this: { document: ActorLike }) {
           await damageRollDialog(this.document);
         },
@@ -430,8 +441,9 @@ export function prepareCharacterSheetContext(
     speciesCategoryItems[0]?.name || stringAt(system, ["identity", "speciesText"], "");
   const backgroundLabel =
     backgroundCategoryItems[0]?.name || stringAt(system, ["identity", "backgroundText"], "");
+  // Read tier defensively (ticket 4 will add this field)
   const tierNum = numberAt(system, ["identity", "backgroundTier"], 0);
-  const tierLabel = tierNum > 0 ? ["I", "II", "III"][tierNum - 1] || "" : "";
+  const tierLabel = tierNum > 0 ? `Tier ${tierNum}` : "";
 
   // Calculate Con modifier for HP footnote
   const conMod = formatSigned(derived.abilities.con.mod);

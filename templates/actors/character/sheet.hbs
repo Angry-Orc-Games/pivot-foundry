@@ -15,9 +15,8 @@
                 {{disabledAttr}}
                 role="checkbox"
                 aria-label="Proficient in {{label}}"
-              /><span>●</span></label>
+              /><span>{{label}}{{#if expertise}} (Expertise){{/if}}</span></label>
           </td>
-          <td>{{label}}{{#if expertise}} (Expertise){{/if}}</td>
           <td class="pf-small">{{ability}}</td>
           <td class="pf-r"><button
               type="button"
