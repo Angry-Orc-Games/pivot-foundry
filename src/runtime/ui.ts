@@ -64,7 +64,7 @@ export async function prompt<T>(
   try {
     return (await dialog.prompt({
       window: { title: windowTitle },
-      classes: ["pivot-fantasy"],
+      classes: ["pivot-fantasy", "pf-sheet"],
       content,
       ok: {
         label: okLabel,

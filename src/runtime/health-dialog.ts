@@ -58,7 +58,7 @@ export function installHealthChatHook(hooks: {
   ) => unknown;
 }): void {
   hooks.on?.("renderChatMessageHTML", (message, html) => {
-    const button = html.querySelector<HTMLButtonElement>("[data-pivot-apply]");
+    const button = html.querySelector<HTMLButtonElement>("[data-pf-apply]");
     if (!button) return;
     if (!readDamagePayload(message) || !message.id) {
       button.remove();

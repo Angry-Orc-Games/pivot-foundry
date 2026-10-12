@@ -1,10 +1,10 @@
-<section class="pivot-npc-sheet" data-document-id="{{actor.id}}">
-  <header class="pivot-sheet-header">
-    <div class="pivot-title-block">
+<section class="pf-npc-sheet" data-document-id="{{actor.id}}">
+  <header class="pf-sheet-header">
+    <div class="pf-title-block">
       <label for="{{rootId}}-name">{{localize "PIVOT.Fields.NPCName"}}</label>
       <input id="{{rootId}}-name" name="name" type="text" value="{{actor.name}}" {{disabledAttr}} />
     </div>
-    <div class="pivot-header-stats">
+    <div class="pf-header-stats">
       <label>
         <span>{{localize "PIVOT.Fields.CR"}}</span>
         <input name="system.cr" type="text" value="{{system.cr}}" {{disabledAttr}} />
@@ -12,11 +12,11 @@
     </div>
   </header>
 
-  <div class="pivot-sheet-body">
-    <section class="pivot-classification">
+  <div class="pf-sheet-body">
+    <section class="pf-classification">
       <h2>{{localize "PIVOT.Sections.Classification"}}</h2>
 
-      <div class="pivot-attribute-row">
+      <div class="pf-attribute-row">
         <label>
           <span>{{localize "PIVOT.Fields.Tier"}}</span>
           <select name="system.tier" {{disabledAttr}}>
@@ -32,7 +32,7 @@
         </label>
       </div>
 
-      <div class="pivot-attribute-row">
+      <div class="pf-attribute-row">
         <label>
           <span>{{localize "PIVOT.Fields.Overlay"}}</span>
           <select name="system.overlay" {{disabledAttr}}>
@@ -42,10 +42,10 @@
       </div>
     </section>
 
-    <section class="pivot-attributes">
+    <section class="pf-attributes">
       <h2>{{localize "PIVOT.Sections.Attributes"}}</h2>
 
-      <div class="pivot-attribute-row">
+      <div class="pf-attribute-row">
         <label>
           <span>{{localize "PIVOT.Fields.HPCurrent"}}</span>
           <input
@@ -71,7 +71,7 @@
         </label>
       </div>
 
-      <div class="pivot-attribute-row">
+      <div class="pf-attribute-row">
         <label>
           <span>{{localize "PIVOT.Fields.ArmourClass"}}</span>
           <input
@@ -98,10 +98,10 @@
       </div>
     </section>
 
-    <section class="pivot-combat-bonuses">
+    <section class="pf-combat-bonuses">
       <h2>{{localize "PIVOT.Sections.CombatBonuses"}}</h2>
 
-      <div class="pivot-attribute-row">
+      <div class="pf-attribute-row">
         <label>
           <span>{{localize "PIVOT.Fields.PhysicalBonus"}}</span>
           <input
@@ -126,21 +126,21 @@
       </div>
     </section>
 
-    <section class="pivot-biography">
+    <section class="pf-biography">
       <h2>{{localize "PIVOT.Fields.Biography"}}</h2>
       <textarea name="system.biography" rows="8" {{disabledAttr}}>{{system.biography}}</textarea>
     </section>
 
-    <section class="pivot-items">
+    <section class="pf-items">
       <h2>{{localize "PIVOT.Sections.Items"}}</h2>
 
       {{#if items}}
-        <ul class="pivot-item-list">
+        <ul class="pf-item-list">
           {{#each items}}
-            <li class="pivot-item" data-item-id="{{this.id}}">
-              <span class="pivot-item-name">{{this.name}}</span>
-              <span class="pivot-item-type">{{this.type}}</span>
-              <div class="pivot-item-controls">
+            <li class="pf-item" data-item-id="{{this.id}}">
+              <span class="pf-item-name">{{this.name}}</span>
+              <span class="pf-item-type">{{this.type}}</span>
+              <div class="pf-item-controls">
                 <button
                   type="button"
                   data-action="editItem"
@@ -162,7 +162,7 @@
           {{/each}}
         </ul>
       {{else}}
-        <p class="pivot-empty-message">{{localize "PIVOT.Messages.NoItems"}}</p>
+        <p class="pf-empty-message">{{localize "PIVOT.Messages.NoItems"}}</p>
       {{/if}}
     </section>
   </div>
