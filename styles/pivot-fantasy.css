@@ -799,6 +799,7 @@
 /* Override Foundry's default table styling */
 .pf-sheet table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
@@ -816,6 +817,7 @@
 
 .pf-sheet table tbody td {
   padding: 4px 8px;
+  text-align: left;
   border-bottom: 1px solid var(--pf-line);
 }
 
@@ -1249,6 +1251,11 @@
   text-align: center;
   font: 700 18px var(--pf-font-display);
   padding: 0;
+}
+
+.pf-sheet .pf-ab-score:disabled {
+  opacity: 1;
+  color: var(--pf-ink);
 }
 
 .pf-sheet .pf-ab-save {

@@ -17,8 +17,11 @@ const sheet = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "sheet.hbs"), "
 const tokens = readFileSync(join(__dirname, "../styles/pf-tokens.css"), "utf-8");
 const css = readFileSync(join(__dirname, "../styles/pivot-fantasy.css"), "utf-8");
 
+// Load localization
+const enJson = JSON.parse(readFileSync(join(__dirname, "../lang/en.json"), "utf-8"));
+
 // Register helpers
-Handlebars.registerHelper("localize", (key) => key);
+Handlebars.registerHelper("localize", (key) => enJson[key] || key);
 Handlebars.registerHelper("checked", (value) => (value ? "checked" : ""));
 Handlebars.registerHelper("selectOptions", () => "");
 
