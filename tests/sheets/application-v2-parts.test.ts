@@ -4,11 +4,74 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { JSDOM } from "jsdom";
 import { prepareCharacterSheetContext } from "../../src/sheets/character-sheet";
+import { prepareNpcSheetContext } from "../../src/sheets/npc-sheet";
 
 // Load all character part templates
-const TEMPLATE_DIR = join(__dirname, "../../templates/actors/character");
-const PARTS = ["header", "vitals", "tabs", "sheet", "survival", "inventory", "magic", "notes"];
+const CHARACTER_TEMPLATE_DIR = join(__dirname, "../../templates/actors/character");
+const CHARACTER_PARTS = [
+  "header",
+  "vitals",
+  "tabs",
+  "sheet",
+  "survival",
+  "inventory",
+  "magic",
+  "notes",
+];
 
+// NPC sheet has only one PARTS entry: form -> npc-sheet.hbs
+const NPC_TEMPLATE_PATH = join(__dirname, "../../templates/actors/npc-sheet.hbs");
+
+// NPC fixture for context (with items to test {{#if items}} true branch)
+const npcWithItemsFixture = {
+  id: "test-npc-goblin",
+  name: "Goblin Scout",
+  type: "npc",
+  system: {
+    tier: "gonk",
+    creatureType: "humanoid",
+    overlay: "none",
+    attributes: {
+      hp: { value: 15, max: 20 },
+      ac: 14,
+      speed: 8,
+    },
+    combatBonuses: {
+      physical: 2,
+      intellectual: -1,
+    },
+    cr: "1/2",
+    biography: "A sneaky goblin scout.",
+  },
+  items: [
+    { id: "item-1", name: "Shortsword", type: "weapon", system: {} },
+    { id: "item-2", name: "Leather Armor", type: "armour", system: {} },
+  ],
+};
+
+// NPC fixture without items (to test {{#if items}} false branch / {{else}})
+const npcWithoutItemsFixture = {
+  id: "test-npc-skeleton",
+  name: "Skeleton Warrior",
+  type: "npc",
+  system: {
+    tier: "gonk",
+    creatureType: "undead",
+    overlay: "undead",
+    attributes: {
+      hp: { value: 10, max: 10 },
+      ac: 12,
+      speed: 6,
+    },
+    combatBonuses: {
+      physical: 1,
+      intellectual: -2,
+    },
+    cr: "1/4",
+    biography: "An animated skeleton.",
+  },
+  items: [], // Empty items array to trigger {{else}} branch
+};
 // Joe fixture for context
 const joeFixture = {
   id: "test-actor-joe",
@@ -93,15 +156,62 @@ Handlebars.registerHelper("checked", (value: boolean) => (value ? "checked" : ""
 Handlebars.registerHelper("selectOptions", () => "");
 
 describe("ApplicationV2 PARTS single root element requirement", () => {
-  PARTS.forEach((partName) => {
-    it(`${partName}.hbs renders exactly one root element`, () => {
+  describe("Character sheet PARTS", () => {
+    CHARACTER_PARTS.forEach((partName) => {
+      it(`${partName}.hbs renders exactly one root element`, () => {
+        // Load template
+        const templatePath = join(CHARACTER_TEMPLATE_DIR, `${partName}.hbs`);
+        const templateSource = readFileSync(templatePath, "utf-8");
+        const template = Handlebars.compile(templateSource);
+
+        // Prepare context
+        const context = prepareCharacterSheetContext(joeFixture, true);
+
+        // Render HTML
+        const html = template(context);
+
+        // Parse with JSDOM
+        const dom = new JSDOM(html);
+        const { document } = dom.window;
+        const body = document.body;
+
+        // Check for non-whitespace text nodes at root level
+        const rootTextNodes = Array.from(body.childNodes).filter(
+          (node) => node.nodeType === 3 && node.textContent?.trim() !== "",
+        );
+
+        if (rootTextNodes.length > 0) {
+          throw new Error(
+            `${partName}.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
+          );
+        }
+
+        // Check for exactly one root element
+        const rootElements = Array.from(body.children);
+        if (rootElements.length !== 1) {
+          throw new Error(
+            `${partName}.hbs must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
+          );
+        }
+
+        // Verify it's a proper HTML element
+        const root = rootElements[0];
+        expect(root?.tagName).toBeTruthy();
+        console.log(
+          `✓ character/${partName}.hbs renders <${root?.tagName?.toLowerCase()}> as single root`,
+        );
+      });
+    });
+  });
+
+  describe("NPC sheet PARTS", () => {
+    it("npc-sheet.hbs renders exactly one root element (with items)", () => {
       // Load template
-      const templatePath = join(TEMPLATE_DIR, `${partName}.hbs`);
-      const templateSource = readFileSync(templatePath, "utf-8");
+      const templateSource = readFileSync(NPC_TEMPLATE_PATH, "utf-8");
       const template = Handlebars.compile(templateSource);
 
-      // Prepare context
-      const context = prepareCharacterSheetContext(joeFixture, true);
+      // Prepare context with items (tests {{#if items}} true branch)
+      const context = { ...prepareNpcSheetContext(npcWithItemsFixture), rootId: "test-npc" };
 
       // Render HTML
       const html = template(context);
@@ -118,7 +228,7 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
 
       if (rootTextNodes.length > 0) {
         throw new Error(
-          `${partName}.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
+          `npc-sheet.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
         );
       }
 
@@ -126,14 +236,62 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
       const rootElements = Array.from(body.children);
       if (rootElements.length !== 1) {
         throw new Error(
-          `${partName}.hbs must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
+          `npc-sheet.hbs must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
         );
       }
 
       // Verify it's a proper HTML element
       const root = rootElements[0];
       expect(root?.tagName).toBeTruthy();
-      console.log(`✓ ${partName}.hbs renders <${root?.tagName?.toLowerCase()}> as single root`);
+      console.log(
+        `✓ npc-sheet.hbs (with items) renders <${root?.tagName?.toLowerCase()}> as single root`,
+      );
+    });
+
+    it("npc-sheet.hbs renders exactly one root element (without items, {{else}} branch)", () => {
+      // Load template
+      const templateSource = readFileSync(NPC_TEMPLATE_PATH, "utf-8");
+      const template = Handlebars.compile(templateSource);
+
+      // Prepare context without items (tests {{#if items}} false branch / {{else}})
+      const context = {
+        ...prepareNpcSheetContext(npcWithoutItemsFixture),
+        rootId: "test-npc-empty",
+      };
+
+      // Render HTML
+      const html = template(context);
+
+      // Parse with JSDOM
+      const dom = new JSDOM(html);
+      const { document } = dom.window;
+      const body = document.body;
+
+      // Check for non-whitespace text nodes at root level
+      const rootTextNodes = Array.from(body.childNodes).filter(
+        (node) => node.nodeType === 3 && node.textContent?.trim() !== "",
+      );
+
+      if (rootTextNodes.length > 0) {
+        throw new Error(
+          `npc-sheet.hbs (empty) has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
+        );
+      }
+
+      // Check for exactly one root element
+      const rootElements = Array.from(body.children);
+      if (rootElements.length !== 1) {
+        throw new Error(
+          `npc-sheet.hbs (empty) must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
+        );
+      }
+
+      // Verify it's a proper HTML element
+      const root = rootElements[0];
+      expect(root?.tagName).toBeTruthy();
+      console.log(
+        `✓ npc-sheet.hbs (without items, {{else}}) renders <${root?.tagName?.toLowerCase()}> as single root`,
+      );
     });
   });
 });
