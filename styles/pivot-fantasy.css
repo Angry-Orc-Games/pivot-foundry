@@ -821,6 +821,33 @@
   border-bottom: 1px solid var(--pf-line);
 }
 
+/* Attacks table specific column widths */
+.pf-sheet .pf-attacks {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.pf-sheet .pf-attacks th:nth-child(1),
+.pf-sheet .pf-attacks td:nth-child(1) {
+  width: 50%;
+}
+
+.pf-sheet .pf-attacks th:nth-child(2),
+.pf-sheet .pf-attacks td:nth-child(2) {
+  width: 20%;
+}
+
+.pf-sheet .pf-attacks th:nth-child(3),
+.pf-sheet .pf-attacks td:nth-child(3) {
+  width: 30%;
+}
+
+.pf-sheet .pf-attacks td button {
+  width: 100%;
+  text-align: left;
+}
+
 .pf-table-row {
   border-bottom: 1px solid var(--pf-line);
   min-height: 34px;
