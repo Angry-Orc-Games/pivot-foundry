@@ -18,7 +18,7 @@
     {{! Speed stat card }}
     <div class="pf-stat">
       <b>SPEED</b>
-      <span>{{derived.speed.value}} m</span>
+      <span>{{#if derived.speed.value}}{{derived.speed.value}} m{{else}}—{{/if}}</span>
       <small>Prof. bonus +{{derived.proficiencyBonus}}</small>
     </div>
 

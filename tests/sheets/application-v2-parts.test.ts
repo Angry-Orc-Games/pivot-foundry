@@ -147,7 +147,18 @@ const joeFixture = {
     },
     currency: { gp: 0, sp: 0, cp: 0, other: "" },
   },
-  items: [],
+  items: [
+    {
+      id: "flaw-addiction",
+      name: "Addiction",
+      type: "feature",
+      system: {
+        category: "flaw",
+        cost: { gp: 0, bp: 1 },
+        description: "Compelled to seek a specific substance.",
+      },
+    },
+  ],
 };
 
 // Register Handlebars helpers that templates expect
