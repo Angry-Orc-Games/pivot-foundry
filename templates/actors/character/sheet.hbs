@@ -1,218 +1,220 @@
 {{! Sheet tab: two-column print layout }}
-<div class="pf-cols">
-  {{! LEFT COLUMN }}
-  <div>
-    {{! Skills }}
-    <h3>Skills</h3>
-    <table class="pf-table pf-skills">
-      {{#each skillRows}}
-        <tr>
-          <td>
-            <label class="pf-check"><input
-                type="checkbox"
-                name="{{proficientPath}}"
-                {{checked proficient}}
-                {{disabledAttr}}
-                role="checkbox"
-                aria-label="Proficient in {{label}}"
-              /><span>{{label}}{{#if expertise}} (Expertise){{/if}}</span></label>
-          </td>
-          <td class="pf-small">{{ability}}</td>
-          <td class="pf-r"><button
-              type="button"
-              class="pf-roll"
-              data-action="roll"
-              data-roll-kind="skill"
-              data-key="{{id}}"
-              data-label="{{label}}"
-            >{{total}}</button></td>
-        </tr>
-      {{/each}}
-    </table>
-    <div class="pf-small">Languages: {{form.languagesText}}</div>
-
-    {{! Proficiencies }}
-    <h3>Proficiencies</h3>
-    <div class="pf-small">
-      <div><b>Weapons:</b> {{proficiencyText.weapons}}</div>
-      <div><b>Armour:</b> {{proficiencyText.armour}}</div>
-      <div><b>Shields:</b> {{proficiencyText.shields}}</div>
-    </div>
-  </div>
-
-  {{! RIGHT COLUMN }}
-  <div>
-    {{! Attacks }}
-    <h3>Attacks</h3>
-    <table class="pf-table pf-attacks">
-      <thead>
-        <tr>
-          <th>Weapon</th>
-          <th>Die</th>
-          <th>Attack</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each items.weapons}}
+<article class="pf-sheet-content">
+  <div class="pf-cols">
+    {{! LEFT COLUMN }}
+    <div>
+      {{! Skills }}
+      <h3>Skills</h3>
+      <table class="pf-table pf-skills">
+        {{#each skillRows}}
           <tr>
-            <td><button
-                type="button"
-                class="pf-link"
-                data-action="openItem"
-                data-item-id="{{id}}"
-              >{{name}}</button></td>
-            <td><button
-                type="button"
-                class="pf-roll"
-                data-action="roll"
-                data-roll-kind="weaponDamage"
-                data-key="{{id}}"
-                data-label="{{name}} damage"
-              >{{summary.damageFormula}}</button></td>
+            <td>
+              <label class="pf-check"><input
+                  type="checkbox"
+                  name="{{proficientPath}}"
+                  {{checked proficient}}
+                  {{disabledAttr}}
+                  role="checkbox"
+                  aria-label="Proficient in {{label}}"
+                /><span>{{label}}{{#if expertise}} (Expertise){{/if}}</span></label>
+            </td>
+            <td class="pf-small">{{ability}}</td>
             <td class="pf-r"><button
                 type="button"
                 class="pf-roll"
                 data-action="roll"
-                data-roll-kind="weaponAttack"
+                data-roll-kind="skill"
                 data-key="{{id}}"
-                data-label="{{name}} attack"
-              >{{summary.bth}}</button></td>
+                data-label="{{label}}"
+              >{{total}}</button></td>
           </tr>
         {{/each}}
-      </tbody>
-    </table>
-    <div class="pf-small">Proficiency bonus is added when proficient. Exploding dice: natural max
-      re-rolls once.</div>
+      </table>
+      <div class="pf-small">Languages: {{form.languagesText}}</div>
 
-    {{! Feats }}
-    <h3>Feats</h3>
-    <ul class="pf-list">
-      {{#each items.feats}}
-        <li><button
-            type="button"
-            class="pf-link"
-            data-action="openItem"
-            data-item-id="{{id}}"
-          >{{name}}</button></li>
-      {{/each}}
-    </ul>
+      {{! Proficiencies }}
+      <h3>Proficiencies</h3>
+      <div class="pf-small">
+        <div><b>Weapons:</b> {{proficiencyText.weapons}}</div>
+        <div><b>Armour:</b> {{proficiencyText.armour}}</div>
+        <div><b>Shields:</b> {{proficiencyText.shields}}</div>
+      </div>
+    </div>
 
-    {{! Flaws (only if any exist) }}
-    {{#if items.flaws}}
-      <h3>Flaws</h3>
+    {{! RIGHT COLUMN }}
+    <div>
+      {{! Attacks }}
+      <h3>Attacks</h3>
+      <table class="pf-table pf-attacks">
+        <thead>
+          <tr>
+            <th>Weapon</th>
+            <th>Die</th>
+            <th>Attack</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items.weapons}}
+            <tr>
+              <td><button
+                  type="button"
+                  class="pf-link"
+                  data-action="openItem"
+                  data-item-id="{{id}}"
+                >{{name}}</button></td>
+              <td><button
+                  type="button"
+                  class="pf-roll"
+                  data-action="roll"
+                  data-roll-kind="weaponDamage"
+                  data-key="{{id}}"
+                  data-label="{{name}} damage"
+                >{{summary.damageFormula}}</button></td>
+              <td class="pf-r"><button
+                  type="button"
+                  class="pf-roll"
+                  data-action="roll"
+                  data-roll-kind="weaponAttack"
+                  data-key="{{id}}"
+                  data-label="{{name}} attack"
+                >{{summary.bth}}</button></td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      <div class="pf-small">Proficiency bonus is added when proficient. Exploding dice: natural max
+        re-rolls once.</div>
+
+      {{! Feats }}
+      <h3>Feats</h3>
       <ul class="pf-list">
-        {{#each items.flaws}}
+        {{#each items.feats}}
           <li><button
               type="button"
               class="pf-link"
               data-action="openItem"
               data-item-id="{{id}}"
-            >{{name}}</button>{{#if system.cost.bp}}
-              <span class="pf-bp-cost">(+{{system.cost.bp}} BP)</span>{{/if}}</li>
+            >{{name}}</button></li>
         {{/each}}
       </ul>
-    {{/if}}
 
-    {{! Traits }}
-    <h3>Traits</h3>
+      {{! Flaws (only if any exist) }}
+      {{#if items.flaws}}
+        <h3>Flaws</h3>
+        <ul class="pf-list">
+          {{#each items.flaws}}
+            <li><button
+                type="button"
+                class="pf-link"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button>{{#if system.cost.bp}}
+                <span class="pf-bp-cost">(+{{system.cost.bp}} BP)</span>{{/if}}</li>
+          {{/each}}
+        </ul>
+      {{/if}}
+
+      {{! Traits }}
+      <h3>Traits</h3>
+      <ul class="pf-list">
+        {{#each items.traits}}
+          <li><button
+              type="button"
+              class="pf-link"
+              data-action="openItem"
+              data-item-id="{{id}}"
+            >{{name}}</button></li>
+        {{/each}}
+      </ul>
+
+      {{! Magic summary (only if awakened) }}
+      {{#if system.magic.awakened}}
+        <div class="pf-small"><b>Magic:</b>
+          MP
+          {{system.magic.mp.value}}/{{derived.magic.mp.max}}, ability
+          {{system.magic.ability}}
+          · Streams:
+          {{magicStreamsText}}</div>
+      {{/if}}
+
+      {{! Loyalty and details }}
+      <div class="pf-small">
+        <div><b>Loyalty:</b>
+          <input
+            class="pf-inline"
+            name="system.identity.loyalty"
+            type="text"
+            value="{{system.identity.loyalty}}"
+            {{disabledAttr}}
+          /></div>
+        {{#if system.identity.backgroundText}}<div><b>From:</b>
+            {{system.identity.backgroundText}}</div>{{/if}}
+        {{#if system.identity.speciesText}}<div><b>Looks:</b>
+            {{system.identity.speciesText}}</div>{{/if}}
+      </div>
+    </div>
+  </div>
+
+  {{! Gear and funds (full width below columns) }}
+  <h3>Gear and funds</h3>
+  <div class="pf-cols">
     <ul class="pf-list">
-      {{#each items.traits}}
-        <li><button
-            type="button"
-            class="pf-link"
-            data-action="openItem"
-            data-item-id="{{id}}"
-          >{{name}}</button></li>
+      {{#each items.equipment}}
+        <li>{{name}}{{#if system.quantity}} ({{system.quantity}}){{/if}}</li>
       {{/each}}
+      {{#if derived.armourClass.armourWorn}}
+        <li><i>Wearing: {{derived.armourClass.armourWorn}}</i></li>
+      {{/if}}
     </ul>
-
-    {{! Magic summary (only if awakened) }}
-    {{#if system.magic.awakened}}
-      <div class="pf-small"><b>Magic:</b>
-        MP
-        {{system.magic.mp.value}}/{{derived.magic.mp.max}}, ability
-        {{system.magic.ability}}
-        · Streams:
-        {{magicStreamsText}}</div>
-    {{/if}}
-
-    {{! Loyalty and details }}
-    <div class="pf-small">
-      <div><b>Loyalty:</b>
-        <input
-          class="pf-inline"
-          name="system.identity.loyalty"
-          type="text"
-          value="{{system.identity.loyalty}}"
-          {{disabledAttr}}
-        /></div>
-      {{#if system.identity.backgroundText}}<div><b>From:</b>
-          {{system.identity.backgroundText}}</div>{{/if}}
-      {{#if system.identity.speciesText}}<div><b>Looks:</b>
-          {{system.identity.speciesText}}</div>{{/if}}
+    <div>
+      <div class="pf-funds">
+        <label>GP
+          <input
+            class="pf-inline pf-num"
+            name="system.currency.gp"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.currency.gp}}"
+            {{disabledAttr}}
+          /></label>
+        <label>SP
+          <input
+            class="pf-inline pf-num"
+            name="system.currency.sp"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.currency.sp}}"
+            {{disabledAttr}}
+          /></label>
+        <label>CP
+          <input
+            class="pf-inline pf-num"
+            name="system.currency.cp"
+            type="number"
+            min="0"
+            step="1"
+            value="{{system.currency.cp}}"
+            {{disabledAttr}}
+          /></label>
+        <label>Other
+          <input
+            class="pf-inline"
+            name="system.currency.other"
+            type="text"
+            value="{{system.currency.other}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+      <div class="pf-small">Weight carried: {{derived.totalWeight}}</div>
     </div>
   </div>
-</div>
 
-{{! Gear and funds (full width below columns) }}
-<h3>Gear and funds</h3>
-<div class="pf-cols">
-  <ul class="pf-list">
-    {{#each items.equipment}}
-      <li>{{name}}{{#if system.quantity}} ({{system.quantity}}){{/if}}</li>
-    {{/each}}
-    {{#if derived.armourClass.armourWorn}}
-      <li><i>Wearing: {{derived.armourClass.armourWorn}}</i></li>
-    {{/if}}
-  </ul>
-  <div>
-    <div class="pf-funds">
-      <label>GP
-        <input
-          class="pf-inline pf-num"
-          name="system.currency.gp"
-          type="number"
-          min="0"
-          step="1"
-          value="{{system.currency.gp}}"
-          {{disabledAttr}}
-        /></label>
-      <label>SP
-        <input
-          class="pf-inline pf-num"
-          name="system.currency.sp"
-          type="number"
-          min="0"
-          step="1"
-          value="{{system.currency.sp}}"
-          {{disabledAttr}}
-        /></label>
-      <label>CP
-        <input
-          class="pf-inline pf-num"
-          name="system.currency.cp"
-          type="number"
-          min="0"
-          step="1"
-          value="{{system.currency.cp}}"
-          {{disabledAttr}}
-        /></label>
-      <label>Other
-        <input
-          class="pf-inline"
-          name="system.currency.other"
-          type="text"
-          value="{{system.currency.other}}"
-          {{disabledAttr}}
-        /></label>
-    </div>
-    <div class="pf-small">Weight carried: {{derived.totalWeight}}</div>
-  </div>
-</div>
-
-{{! Footer }}
-<div class="pf-small pf-footer">Build Points:
-  {{system.progression.buildPoints}}
-  · Progression Points:
-  {{system.progression.progressionPoints}}
-  · Rules: the book wins if this sheet disagrees.</div>
+  {{! Footer }}
+  <div class="pf-small pf-footer">Build Points:
+    {{system.progression.buildPoints}}
+    · Progression Points:
+    {{system.progression.progressionPoints}}
+    · Rules: the book wins if this sheet disagrees.</div>
+</article>

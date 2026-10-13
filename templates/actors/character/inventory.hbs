@@ -1,140 +1,144 @@
 {{! Inventory tab: weapons, armour, equipment tables }}
-<section class="pf-card">
-  <div class="pf-section-header">
-    <h2>{{localize "PIVOT.Sections.Weapons"}}</h2>
-    <button
-      type="button"
-      data-action="createItem"
-      data-type="weapon"
-      aria-label="{{localize 'PIVOT.Actions.CreateWeapon'}}"
-      title="{{localize 'PIVOT.Actions.CreateWeapon'}}"
-      {{disabledAttr}}
-    >+</button>
-  </div>
-  <div class="pf-table pf-weapon-table">
-    <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Weapon"}}</span><span>BTH</span><span
-      >BTD</span><span>{{localize "PIVOT.Fields.Damage"}}</span><span>{{localize
-          "PIVOT.Fields.Range"
-        }}</span><span></span></div>
-    {{#each items.weapons}}
-      <div class="pf-table-row" data-item-id="{{id}}">
-        <button
-          type="button"
-          class="pf-item-name"
-          data-action="openItem"
-          data-item-id="{{id}}"
-        >{{name}}</button>
-        <button
-          type="button"
-          data-action="roll"
-          data-roll-kind="weaponAttack"
-          data-key="{{id}}"
-          data-label="{{name}} attack"
-        >{{summary.bth}}</button>
-        <span>{{summary.btd}}</span>
-        <button
-          type="button"
-          data-action="roll"
-          data-roll-kind="weaponDamage"
-          data-key="{{id}}"
-          data-label="{{name}} damage"
-        >{{summary.damageFormula}}</button>
-        <span>{{summary.range.normal}} / {{summary.range.long}}</span>
-        <button
-          type="button"
-          data-action="deleteItem"
-          data-item-id="{{id}}"
-          aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
-          title="{{localize 'PIVOT.Actions.DeleteItem'}}"
-          {{disabledAttr}}
-        >x</button>
-      </div>
-    {{/each}}
-  </div>
-</section>
+<article class="pf-inventory-tab">
+  <section class="pf-card">
+    <div class="pf-section-header">
+      <h2>{{localize "PIVOT.Sections.Weapons"}}</h2>
+      <button
+        type="button"
+        data-action="createItem"
+        data-type="weapon"
+        aria-label="{{localize 'PIVOT.Actions.CreateWeapon'}}"
+        title="{{localize 'PIVOT.Actions.CreateWeapon'}}"
+        {{disabledAttr}}
+      >+</button>
+    </div>
+    <div class="pf-table pf-weapon-table">
+      <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Weapon"}}</span><span
+        >BTH</span><span>BTD</span><span>{{localize "PIVOT.Fields.Damage"}}</span><span>{{localize
+            "PIVOT.Fields.Range"
+          }}</span><span></span></div>
+      {{#each items.weapons}}
+        <div class="pf-table-row" data-item-id="{{id}}">
+          <button
+            type="button"
+            class="pf-item-name"
+            data-action="openItem"
+            data-item-id="{{id}}"
+          >{{name}}</button>
+          <button
+            type="button"
+            data-action="roll"
+            data-roll-kind="weaponAttack"
+            data-key="{{id}}"
+            data-label="{{name}} attack"
+          >{{summary.bth}}</button>
+          <span>{{summary.btd}}</span>
+          <button
+            type="button"
+            data-action="roll"
+            data-roll-kind="weaponDamage"
+            data-key="{{id}}"
+            data-label="{{name}} damage"
+          >{{summary.damageFormula}}</button>
+          <span>{{summary.range.normal}} / {{summary.range.long}}</span>
+          <button
+            type="button"
+            data-action="deleteItem"
+            data-item-id="{{id}}"
+            aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+            title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+            {{disabledAttr}}
+          >x</button>
+        </div>
+      {{/each}}
+    </div>
+  </section>
 
-<section class="pf-card">
-  <div class="pf-section-header">
-    <h2>{{localize "PIVOT.Sections.Armour"}}</h2>
-    <button
-      type="button"
-      data-action="createItem"
-      data-type="armour"
-      aria-label="{{localize 'PIVOT.Actions.CreateArmour'}}"
-      title="{{localize 'PIVOT.Actions.CreateArmour'}}"
-      {{disabledAttr}}
-    >+</button>
-  </div>
-  <p class="pf-breakdown">{{derived.armourClass.armourWorn}}
-    |
-    {{derived.armourClass.breakdown}}</p>
-  <div class="pf-table pf-armour-table">
-    <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span>{{localize
-          "PIVOT.Fields.Category"
-        }}</span><span>{{localize "PIVOT.Fields.Bonus"}}</span><span>{{localize
-          "PIVOT.Fields.Equipped"
-        }}</span><span></span></div>
-    {{#each items.armour}}
-      <div class="pf-table-row" data-item-id="{{id}}">
-        <button
-          type="button"
-          class="pf-item-name"
-          data-action="openItem"
-          data-item-id="{{id}}"
-        >{{name}}</button><span>{{system.category}}</span><span>{{system.acBonus}}</span><span>{{#if
-            system.equipped
-          }}{{localize "PIVOT.Common.Yes"}}{{else}}{{localize "PIVOT.Common.No"}}{{/if}}</span>
-        <button
-          type="button"
-          data-action="deleteItem"
-          data-item-id="{{id}}"
-          aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
-          title="{{localize 'PIVOT.Actions.DeleteItem'}}"
-          {{disabledAttr}}
-        >x</button>
-      </div>
-    {{/each}}
-  </div>
-</section>
+  <section class="pf-card">
+    <div class="pf-section-header">
+      <h2>{{localize "PIVOT.Sections.Armour"}}</h2>
+      <button
+        type="button"
+        data-action="createItem"
+        data-type="armour"
+        aria-label="{{localize 'PIVOT.Actions.CreateArmour'}}"
+        title="{{localize 'PIVOT.Actions.CreateArmour'}}"
+        {{disabledAttr}}
+      >+</button>
+    </div>
+    <p class="pf-breakdown">{{derived.armourClass.armourWorn}}
+      |
+      {{derived.armourClass.breakdown}}</p>
+    <div class="pf-table pf-armour-table">
+      <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span>{{localize
+            "PIVOT.Fields.Category"
+          }}</span><span>{{localize "PIVOT.Fields.Bonus"}}</span><span>{{localize
+            "PIVOT.Fields.Equipped"
+          }}</span><span></span></div>
+      {{#each items.armour}}
+        <div class="pf-table-row" data-item-id="{{id}}">
+          <button
+            type="button"
+            class="pf-item-name"
+            data-action="openItem"
+            data-item-id="{{id}}"
+          >{{name}}</button><span>{{system.category}}</span><span>{{system.acBonus}}</span><span
+          >{{#if system.equipped}}{{localize "PIVOT.Common.Yes"}}{{else}}{{localize
+                "PIVOT.Common.No"
+              }}{{/if}}</span>
+          <button
+            type="button"
+            data-action="deleteItem"
+            data-item-id="{{id}}"
+            aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+            title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+            {{disabledAttr}}
+          >x</button>
+        </div>
+      {{/each}}
+    </div>
+  </section>
 
-<section class="pf-card">
-  <div class="pf-section-header">
-    <h2>{{localize "PIVOT.Sections.Equipment"}}</h2>
-    <strong>{{localize "PIVOT.Fields.WeightTotal"}}: {{derived.totalWeight}}</strong>
-    <button
-      type="button"
-      data-action="createItem"
-      data-type="equipment"
-      aria-label="{{localize 'PIVOT.Actions.CreateEquipment'}}"
-      title="{{localize 'PIVOT.Actions.CreateEquipment'}}"
-      {{disabledAttr}}
-    >+</button>
-  </div>
-  <div class="pf-table pf-equipment-table">
-    <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span>{{localize
-          "PIVOT.Fields.Quantity"
-        }}</span><span>{{localize "PIVOT.Fields.Weight"}}</span><span>{{localize
-          "PIVOT.Fields.Carried"
-        }}</span><span></span></div>
-    {{#each items.equipment}}
-      <div class="pf-table-row" data-item-id="{{id}}">
-        <button
-          type="button"
-          class="pf-item-name"
-          data-action="openItem"
-          data-item-id="{{id}}"
-        >{{name}}</button><span>{{system.quantity}}</span><span>{{system.weight}}</span><span>{{#if
-            system.carried
-          }}{{localize "PIVOT.Common.Yes"}}{{else}}{{localize "PIVOT.Common.No"}}{{/if}}</span>
-        <button
-          type="button"
-          data-action="deleteItem"
-          data-item-id="{{id}}"
-          aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
-          title="{{localize 'PIVOT.Actions.DeleteItem'}}"
-          {{disabledAttr}}
-        >x</button>
-      </div>
-    {{/each}}
-  </div>
-</section>
+  <section class="pf-card">
+    <div class="pf-section-header">
+      <h2>{{localize "PIVOT.Sections.Equipment"}}</h2>
+      <strong>{{localize "PIVOT.Fields.WeightTotal"}}: {{derived.totalWeight}}</strong>
+      <button
+        type="button"
+        data-action="createItem"
+        data-type="equipment"
+        aria-label="{{localize 'PIVOT.Actions.CreateEquipment'}}"
+        title="{{localize 'PIVOT.Actions.CreateEquipment'}}"
+        {{disabledAttr}}
+      >+</button>
+    </div>
+    <div class="pf-table pf-equipment-table">
+      <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span>{{localize
+            "PIVOT.Fields.Quantity"
+          }}</span><span>{{localize "PIVOT.Fields.Weight"}}</span><span>{{localize
+            "PIVOT.Fields.Carried"
+          }}</span><span></span></div>
+      {{#each items.equipment}}
+        <div class="pf-table-row" data-item-id="{{id}}">
+          <button
+            type="button"
+            class="pf-item-name"
+            data-action="openItem"
+            data-item-id="{{id}}"
+          >{{name}}</button><span>{{system.quantity}}</span><span>{{system.weight}}</span><span
+          >{{#if system.carried}}{{localize "PIVOT.Common.Yes"}}{{else}}{{localize
+                "PIVOT.Common.No"
+              }}{{/if}}</span>
+          <button
+            type="button"
+            data-action="deleteItem"
+            data-item-id="{{id}}"
+            aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+            title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+            {{disabledAttr}}
+          >x</button>
+        </div>
+      {{/each}}
+    </div>
+  </section>
+</article>
