@@ -197,7 +197,7 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
 
   class PivotCharacterSheet extends BaseSheet {
     static DEFAULT_OPTIONS = {
-      classes: [SYSTEM_ID, "sheet", "actor", "character"],
+      classes: ["pivot-fantasy", "pf-sheet", SYSTEM_ID, "sheet", "actor", "character"],
       position: { width: 820, height: 760 },
       tag: "form",
       window: {
