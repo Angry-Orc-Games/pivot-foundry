@@ -133,6 +133,8 @@ const joeFixture = {
 
 // Generate HTML wrapper
 function generateHTML(theme, content, width) {
+  const bodyTheme = theme === "dark" ? "theme-dark" : "";
+  const bg = theme === "dark" ? "#0d0b09" : "#f0f0f0";
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -146,16 +148,18 @@ function generateHTML(theme, content, width) {
       margin: 0;
       padding: 20px;
       font-family: system-ui, -apple-system, sans-serif;
-      background: ${theme === "theme-dark" ? "#0d0b09" : "#f0f0f0"};
+      background: ${bg};
     }
     ${tokens}
     ${css}
   </style>
 </head>
-<body class="${theme} pivot-fantasy">
-  <div class="pf-sheet" style="container-type: inline-size; width: ${width}px; margin: 0 auto;">
-    <div class="pf-character-sheet pf-print-wrap">
-      ${content}
+<body class="${bodyTheme}">
+  <div class="pivot-fantasy ${bodyTheme}" style="container-type: inline-size; width: ${width}px; margin: 0 auto;">
+    <div class="pf-sheet">
+      <div class="pf-character-sheet pf-print-wrap">
+        ${content}
+      </div>
     </div>
   </div>
 </body>
@@ -168,10 +172,10 @@ async function generateScreenshots() {
   const page = await browser.newPage();
 
   const scenarios = [
-    { theme: "theme-light", width: 640, name: "review-light-640" },
-    { theme: "theme-dark", width: 640, name: "review-dark-640" },
-    { theme: "theme-light", width: 900, name: "review-light-900" },
-    { theme: "theme-dark", width: 900, name: "review-dark-900" },
+    { theme: "light", width: 640, name: "review-light-640" },
+    { theme: "dark", width: 640, name: "review-dark-640" },
+    { theme: "light", width: 900, name: "review-light-900" },
+    { theme: "dark", width: 900, name: "review-dark-900" },
   ];
 
   for (const scenario of scenarios) {
@@ -492,13 +496,43 @@ async function generateScreenshots() {
     await page.setContent(html);
     await page.setViewportSize({ width: scenario.width + 40, height: 1200 });
 
-    const outputPath = `/opt/cursor/artifacts/${scenario.name}.png`;
+    const outputPath = `artifacts/${scenario.name}.png`;
     await page.screenshot({ path: outputPath, fullPage: false });
     console.log(`Generated ${scenario.name}.png`);
+
+    // Generate crops for light-640 and dark-640
+    if (scenario.width === 640) {
+      // Skills crop
+      const skillsElement = await page.locator("table.pf-skills").first();
+      if (skillsElement) {
+        await skillsElement.screenshot({
+          path: `artifacts/${scenario.name}-skills.png`,
+        });
+        console.log(`  - ${scenario.name}-skills.png`);
+      }
+
+      // Tabs crop
+      const tabsElement = await page.locator(".pf-tabs");
+      if (tabsElement) {
+        await tabsElement.screenshot({
+          path: `artifacts/${scenario.name}-tabs.png`,
+        });
+        console.log(`  - ${scenario.name}-tabs.png`);
+      }
+
+      // Ability cards crop (vitals section with ability boxes)
+      const abilitiesElement = await page.locator(".pf-abil").first();
+      if (abilitiesElement) {
+        await abilitiesElement.screenshot({
+          path: `artifacts/${scenario.name}-abilities.png`,
+        });
+        console.log(`  - ${scenario.name}-abilities.png`);
+      }
+    }
   }
 
   await browser.close();
-  console.log("\nAll review screenshots generated!");
+  console.log("\nAll review screenshots generated in artifacts/!");
 }
 
 generateScreenshots().catch(console.error);

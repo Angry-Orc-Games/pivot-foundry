@@ -848,6 +848,39 @@
   text-align: left;
 }
 
+/* Ensure proper text contrast ratios in light theme */
+.pivot-fantasy .pf-sheet table.pf-skills label,
+.pivot-fantasy .pf-sheet table.pf-skills span {
+  color: var(--pf-ink);
+}
+
+.pivot-fantasy .pf-sheet table.pf-skills td.pf-small {
+  color: var(--pf-muted);
+}
+
+.pivot-fantasy .pf-sheet .pf-tabs a {
+  color: var(--pf-accent);
+}
+
+.pivot-fantasy .pf-sheet .pf-tabs a.active {
+  color: var(--pf-ink);
+}
+
+.pivot-fantasy .pf-sheet label > span,
+.pivot-fantasy .pf-sheet .pf-card label > span,
+.pivot-fantasy .pf-sheet .pf-stat-card > span,
+.pivot-fantasy .pf-sheet .pf-small {
+  color: var(--pf-muted);
+}
+
+.pivot-fantasy .pf-sheet input,
+.pivot-fantasy .pf-sheet select,
+.pivot-fantasy .pf-sheet textarea,
+.pivot-fantasy .pf-sheet option {
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
 .pf-table-row {
   border-bottom: 1px solid var(--pf-line);
   min-height: 34px;
@@ -1398,11 +1431,6 @@
   margin-top: 8px;
   border-top: 1px solid var(--pf-line);
   padding-top: 4px;
-}
-
-/* Small text and muted labels */
-.pf-sheet .pf-small {
-  color: var(--pf-muted);
 }
 
 .pf-sheet .pf-print .pf-small {
