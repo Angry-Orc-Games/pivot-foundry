@@ -80,30 +80,20 @@
   cursor: not-allowed;
 }
 
-/* Legacy variable mapping - keep for now (ticket 2 will rename classes) */
-.pf-sheet.sheet {
-  --pf-ink: var(--pf-ink);
-  --pf-blue: var(--pf-accent);
-  --pf-gold: var(--pf-accent);
-  --pf-paper: var(--pf-bg);
-  --pf-paper-deep: var(--pf-line);
-  --pf-line: var(--pf-line);
-  color: var(--pf-ink);
+:is(.pivot-fantasy, .pf-sheet).sheet .window-content {
+  overflow: hidden;
+}
+
+:is(.pivot-fantasy, .pf-sheet).sheet.item .window-content {
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .pf-character-sheet,
 .pf-item-sheet {
   background: var(--pf-bg);
   padding: var(--pf-space-3);
-}
-
-.pf-sheet.sheet.actor .window-content {
-  overflow: hidden;
-}
-
-.pf-sheet.sheet.item .window-content {
-  overflow-x: hidden;
-  overflow-y: auto;
+  color: var(--pf-ink);
 }
 
 .pf-character-sheet {
@@ -208,6 +198,16 @@
   color: var(--pf-ink);
 }
 
+/* ApplicationV2 tab visibility - PARTS render directly in .window-content */
+.pf-sheet .window-content > .tab {
+  display: none;
+}
+
+.pf-sheet .window-content > .tab.active {
+  display: block;
+}
+
+/* For test harness compatibility */
 .pf-tab-body .tab {
   display: none;
 }
@@ -849,34 +849,47 @@
 }
 
 /* Ensure proper text contrast ratios in light theme */
-.pivot-fantasy .pf-sheet table.pf-skills label,
-.pivot-fantasy .pf-sheet table.pf-skills span {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) table.pf-skills label,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) table.pf-skills span {
   color: var(--pf-ink);
 }
 
-.pivot-fantasy .pf-sheet table.pf-skills td.pf-small {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) table.pf-skills td.pf-small {
   color: var(--pf-muted);
 }
 
-.pivot-fantasy .pf-sheet .pf-tabs a {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-tabs a {
   color: var(--pf-accent);
 }
 
-.pivot-fantasy .pf-sheet .pf-tabs a.active {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-tabs a.active {
   color: var(--pf-ink);
 }
 
-.pivot-fantasy .pf-sheet label > span,
-.pivot-fantasy .pf-sheet .pf-card label > span,
-.pivot-fantasy .pf-sheet .pf-stat-card > span,
-.pivot-fantasy .pf-sheet .pf-small {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) label > span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-card label > span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-stat-card > span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-small {
   color: var(--pf-muted);
 }
 
-.pivot-fantasy .pf-sheet input,
-.pivot-fantasy .pf-sheet select,
-.pivot-fantasy .pf-sheet textarea,
-.pivot-fantasy .pf-sheet option {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) input,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) select,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) textarea,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) option {
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
+/* Ensure skill modifier chips and inline inputs have proper theming */
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-roll,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-inline {
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
+/* NPC Classification selects */
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-classification select {
   color: var(--pf-ink);
   background: var(--pf-panel);
 }
