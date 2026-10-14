@@ -1,0 +1,160 @@
+name: Foundry E2E Remote
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "53 7 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-e2e-remote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-remote:
+    name: Remote E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: foundry-e2e-remote
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Check remote E2E secrets
+        id: creds
+        env:
+          HAVE_HOST: ${{ secrets.FOUNDRY_TEST_HOST != '' }}
+          HAVE_USER: ${{ secrets.FOUNDRY_TEST_USER != '' }}
+          HAVE_PORT: ${{ secrets.FOUNDRY_TEST_PORT != '' }}
+          HAVE_KEY: ${{ secrets.FOUNDRY_TEST_SSH_KEY != '' }}
+          HAVE_WORLD: ${{ secrets.FOUNDRY_TEST_WORLD_ID != '' }}
+          HAVE_ADMIN: ${{ secrets.FOUNDRY_TEST_ADMIN_KEY != '' }}
+        run: |
+          if [ "$HAVE_HOST" = "true" ] && [ "$HAVE_USER" = "true" ] && [ "$HAVE_PORT" = "true" ] && [ "$HAVE_KEY" = "true" ] && [ "$HAVE_WORLD" = "true" ] && [ "$HAVE_ADMIN" = "true" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Missing FOUNDRY_TEST_* secrets. Configure foundry-e2e-remote environment: FOUNDRY_TEST_HOST, FOUNDRY_TEST_USER, FOUNDRY_TEST_PORT, FOUNDRY_TEST_SSH_KEY, FOUNDRY_TEST_WORLD_ID, FOUNDRY_TEST_ADMIN_KEY."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Build and package system
+        run: npm run package:system
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.FOUNDRY_TEST_SSH_KEY }}" > ~/.ssh/foundry_test_key
+          chmod 600 ~/.ssh/foundry_test_key
+          ssh-keyscan -p "${{ secrets.FOUNDRY_TEST_PORT }}" "${{ secrets.FOUNDRY_TEST_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Install system on remote
+        env:
+          FOUNDRY_TEST_HOST: ${{ secrets.FOUNDRY_TEST_HOST }}
+          FOUNDRY_TEST_USER: ${{ secrets.FOUNDRY_TEST_USER }}
+          FOUNDRY_TEST_PORT: ${{ secrets.FOUNDRY_TEST_PORT }}
+        run: |
+          ssh -i ~/.ssh/foundry_test_key -p "$FOUNDRY_TEST_PORT" "$FOUNDRY_TEST_USER@$FOUNDRY_TEST_HOST" \
+            "install systems pivot-fantasy" < system.zip
+
+      - name: Start remote Foundry tunnel
+        id: start
+        env:
+          FOUNDRY_TEST_HOST: ${{ secrets.FOUNDRY_TEST_HOST }}
+          FOUNDRY_TEST_USER: ${{ secrets.FOUNDRY_TEST_USER }}
+          FOUNDRY_TEST_PORT: ${{ secrets.FOUNDRY_TEST_PORT }}
+        run: |
+          set +e
+          ssh -i ~/.ssh/foundry_test_key -p "$FOUNDRY_TEST_PORT" "$FOUNDRY_TEST_USER@$FOUNDRY_TEST_HOST" \
+            "start" > start-output.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+
+          cat start-output.txt
+
+          if [ $EXIT_CODE -eq 2 ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "SKIPPED: license busy / outside window, no evidence" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::start command failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+
+          echo "skipped=false" >> "$GITHUB_OUTPUT"
+
+      - name: Open SSH tunnel
+        if: steps.start.outputs.skipped != 'true'
+        env:
+          FOUNDRY_TEST_HOST: ${{ secrets.FOUNDRY_TEST_HOST }}
+          FOUNDRY_TEST_USER: ${{ secrets.FOUNDRY_TEST_USER }}
+          FOUNDRY_TEST_PORT: ${{ secrets.FOUNDRY_TEST_PORT }}
+        run: |
+          ssh -i ~/.ssh/foundry_test_key -p "$FOUNDRY_TEST_PORT" \
+            -L 30002:localhost:30000 \
+            -N -f "$FOUNDRY_TEST_USER@$FOUNDRY_TEST_HOST"
+
+          echo "Waiting for tunnel to be ready on localhost:30002..."
+          timeout 120 bash -c 'until curl -sf http://localhost:30002 > /dev/null 2>&1; do sleep 2; done' || {
+            echo "::error::Tunnel did not become ready within 120 seconds"
+            exit 1
+          }
+          echo "Tunnel is ready"
+
+      - name: Run remote E2E tests
+        if: steps.start.outputs.skipped != 'true'
+        env:
+          FOUNDRY_TEST_WORLD_ID: ${{ secrets.FOUNDRY_TEST_WORLD_ID }}
+          FOUNDRY_TEST_ADMIN_KEY: ${{ secrets.FOUNDRY_TEST_ADMIN_KEY }}
+        run: |
+          npm run test:e2e:remote
+
+          if [ -f test-results/.last-run.json ]; then
+            TEST_COUNT=$(jq -r '.suites[].specs | length' test-results/.last-run.json 2>/dev/null | awk '{s+=$1} END {print s}')
+            if [ -z "$TEST_COUNT" ] || [ "$TEST_COUNT" -eq 0 ]; then
+              echo "::error::Zero tests ran"
+              exit 1
+            fi
+            echo "Ran $TEST_COUNT tests"
+          fi
+
+      - name: Kill tunnel
+        if: always() && steps.start.outputs.skipped != 'true'
+        run: |
+          pkill -f "ssh.*localhost:30002" || true
+
+      - name: Stop remote Foundry
+        if: always() && steps.start.outputs.skipped != 'true'
+        env:
+          FOUNDRY_TEST_HOST: ${{ secrets.FOUNDRY_TEST_HOST }}
+          FOUNDRY_TEST_USER: ${{ secrets.FOUNDRY_TEST_USER }}
+          FOUNDRY_TEST_PORT: ${{ secrets.FOUNDRY_TEST_PORT }}
+        run: |
+          ssh -i ~/.ssh/foundry_test_key -p "$FOUNDRY_TEST_PORT" "$FOUNDRY_TEST_USER@$FOUNDRY_TEST_HOST" \
+            "stop" || echo "stop command failed but continuing"
+
+      - name: Upload diagnostics
+        if: failure() && steps.start.outputs.skipped != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pivot-foundry-e2e-remote-diagnostics
+          path: |
+            playwright-report
+            test-results
+            start-output.txt
+          if-no-files-found: warn
+          retention-days: 7

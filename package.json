@@ -21,6 +21,7 @@
     "foundry:reset": "node scripts/foundry-cli.mjs reset",
     "foundry:e2e": "node scripts/foundry-cli.mjs e2e",
     "test:e2e": "node scripts/foundry-cli.mjs e2e",
+    "test:e2e:remote": "npx playwright test --config e2e/remote/playwright.config.ts",
     "test:e2e:staging": "node scripts/run-external-e2e.mjs staging",
     "test:e2e:production": "node scripts/run-external-e2e.mjs production",
     "lint": "eslint . --max-warnings=0",
