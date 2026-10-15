@@ -118,7 +118,9 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
   );
 
-  if (!inputs) return;
+  // Cancel / dismiss must be a clean no-op (DialogV2 may return a string or partial object).
+  if (!inputs || typeof inputs !== "object") return;
+  if (typeof inputs.poolSpendsRaw !== "string") return;
 
   const poolSpends = parsePoolSpends(inputs.poolSpendsRaw, maxSpends);
 

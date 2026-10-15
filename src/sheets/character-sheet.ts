@@ -14,7 +14,8 @@ import {
   weaponCategories,
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
-import { selectInitiativeCombatant } from "../rules/combat";
+import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { applyChatMessageMode } from "../runtime/ui";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -102,6 +103,9 @@ export interface CombatantLike {
 }
 
 export interface CombatLike {
+  id?: string;
+  active?: boolean;
+  isActive?: boolean;
   combatants?: Iterable<CombatantLike> | { contents: CombatantLike[] };
 }
 
@@ -1029,8 +1033,17 @@ function getCombatants(combat: CombatLike): CombatantLike[] {
 }
 
 function getActiveCombat(): CombatLike | null {
-  const game = globalThis as typeof globalThis & { game?: { combat?: CombatLike | null } };
-  return game.game?.combat ?? null;
+  const game = globalThis as typeof globalThis & {
+    game?: {
+      combat?: CombatLike | null;
+      combats?: {
+        active?: CombatLike | null;
+        viewed?: CombatLike | null;
+        contents?: Iterable<CombatLike>;
+      };
+    };
+  };
+  return resolveActiveCombat(game.game) as CombatLike | null;
 }
 
 function getChatMessageConstructor():
@@ -1049,12 +1062,7 @@ function getChatMessageConstructor():
 }
 
 function applyRollMode(messageData: Record<string, unknown>, rollMode?: string): void {
-  const globals = globalThis as typeof globalThis & {
-    ChatMessage?: {
-      applyRollMode?: (data: Record<string, unknown>, mode: string) => unknown;
-    };
-  };
-  globals.ChatMessage?.applyRollMode?.(messageData, rollMode ?? getRollMode());
+  applyChatMessageMode(messageData, rollMode ?? getRollMode());
 }
 
 function getRollMode(): string {

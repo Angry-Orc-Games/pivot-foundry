@@ -585,3 +585,199 @@ describe("Short rest ordering", () => {
     expect((chatData.rolls as unknown[]).length).toBeGreaterThan(0);
   });
 });
+
+describe("Short Rest cancel is a clean no-op", () => {
+  it("does not throw when dialog cancel returns undefined fields", async () => {
+    const warnSpy = vi.fn();
+    const updateSpy = vi.fn(async () => ({}));
+
+    vi.stubGlobal("ChatMessage", {
+      create: vi.fn(async () => ({ id: "should-not-create" })),
+      applyMode: vi.fn(),
+      applyRollMode: vi.fn(),
+    });
+
+    vi.stubGlobal("game", {
+      i18n: { localize: (key: string) => key, format: (key: string) => key },
+    });
+
+    vi.stubGlobal("ui", {
+      notifications: { warn: warnSpy },
+    });
+
+    vi.stubGlobal("foundry", {
+      applications: {
+        api: {
+          DialogV2: {
+            // Foundry cancel / dismiss can resolve to a non-null non-form value
+            prompt: vi.fn().mockResolvedValue({ poolSpendsRaw: undefined, inDanger: false }),
+          },
+        },
+      },
+    });
+
+    const actor = {
+      name: "Hero",
+      type: "character",
+      system: {
+        abilities: { con: { score: 12 } },
+        attributes: { hp: { value: 8, max: 20, temp: 0 }, hitDie: "d8" },
+        resources: { pool: { value: 2, maxBonus: 0 } },
+        progression: { level: 3 },
+        skills: {},
+        magic: { awakened: false },
+      },
+      items: [],
+      update: updateSpy,
+    };
+
+    await expect(shortRestDialog(actor)).resolves.toBeUndefined();
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when dialog cancel returns a bare action string", async () => {
+    vi.stubGlobal("ChatMessage", {
+      create: vi.fn(),
+      applyMode: vi.fn(),
+    });
+    vi.stubGlobal("game", {
+      i18n: { localize: (key: string) => key, format: (key: string) => key },
+    });
+    vi.stubGlobal("ui", { notifications: { warn: vi.fn() } });
+    vi.stubGlobal("foundry", {
+      applications: {
+        api: {
+          DialogV2: {
+            prompt: vi.fn().mockResolvedValue("cancel"),
+          },
+        },
+      },
+    });
+
+    const actor = {
+      name: "Hero",
+      type: "character",
+      system: {
+        abilities: { con: { score: 12 } },
+        attributes: { hp: { value: 8, max: 20, temp: 0 }, hitDie: "d8" },
+        resources: { pool: { value: 2, maxBonus: 0 } },
+        progression: { level: 3 },
+        skills: {},
+        magic: { awakened: false },
+      },
+      items: [],
+      update: vi.fn(async () => ({})),
+    };
+
+    await expect(shortRestDialog(actor)).resolves.toBeUndefined();
+    expect(actor.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("Sheet initiative targets active combat", () => {
+  it("updates combatant on combats.active, not viewed inactive encounter", async () => {
+    const activeUpdate = vi.fn(async () => {});
+    const inactiveUpdate = vi.fn(async () => {});
+
+    const inactiveCombat = {
+      id: "w4EanWvgyzXg1Etw",
+      active: false,
+      combatants: [{ id: "old-c", actorId: "actor-1", update: inactiveUpdate }],
+    };
+    const activeCombat = {
+      id: "active-combat",
+      active: true,
+      combatants: [{ id: "c1", actorId: "actor-1", update: activeUpdate }],
+    };
+
+    vi.stubGlobal("game", {
+      settings: { get: () => "roll" },
+      i18n: { localize: (key: string) => key },
+      dice3d: {
+        waitFor3DAnimationByMessageID: vi.fn(async () => {}),
+      },
+      combat: inactiveCombat,
+      combats: {
+        active: activeCombat,
+        viewed: inactiveCombat,
+        contents: [inactiveCombat, activeCombat],
+      },
+    });
+
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "normal") } } },
+    });
+
+    vi.stubGlobal("ChatMessage", {
+      create: vi.fn(async () => ({ id: "msg-init-active" })),
+      applyMode: vi.fn(),
+      applyRollMode: vi.fn(),
+      getSpeaker: () => ({ alias: "Hero" }),
+    });
+
+    vi.stubGlobal(
+      "Roll",
+      class {
+        dice = [{ faces: 20, results: [{ result: 12 }] }];
+        async evaluate() {
+          return this;
+        }
+        async render() {
+          return "<div>15</div>";
+        }
+      },
+    );
+
+    const actor = {
+      id: "actor-1",
+      name: "Hero",
+      type: "character",
+      system: {
+        progression: { level: 5 },
+        abilities: { dex: { score: 14, primary: false } },
+        skills: {},
+        attributes: { initiative: { bonus: 2 } },
+      },
+      items: [],
+    };
+
+    const { createPivotCharacterSheetClass, prepareCharacterSheetContext } =
+      await import("../../src/sheets/character-sheet");
+
+    prepareCharacterSheetContext(actor);
+
+    const SheetClass = createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+          },
+        },
+      },
+    } as never);
+
+    const sheet = new SheetClass();
+    Object.defineProperty(sheet, "document", { value: actor, writable: true });
+
+    const rollAction = (SheetClass as { DEFAULT_OPTIONS?: { actions?: { roll?: unknown } } })
+      .DEFAULT_OPTIONS?.actions?.roll as (
+      this: unknown,
+      event: Event,
+      target: { dataset: Record<string, string> },
+    ) => Promise<void>;
+
+    await rollAction.call(
+      sheet,
+      new Event("click") as never,
+      {
+        dataset: { rollKind: "initiative", label: "Initiative" },
+      } as never,
+    );
+
+    expect(activeUpdate).toHaveBeenCalled();
+    expect(inactiveUpdate).not.toHaveBeenCalled();
+  });
+});
