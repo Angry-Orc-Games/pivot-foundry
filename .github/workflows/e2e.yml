@@ -42,7 +42,8 @@ jobs:
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Foundry E2E not run. Configure GitHub Environment foundry-e2e secrets: FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, FOUNDRY_RELEASE_CACHE_URL, FOUNDRY_RELEASE_SHA256."
+            echo "::error::Foundry E2E cannot run. Configure GitHub Environment foundry-e2e secrets: FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, FOUNDRY_RELEASE_CACHE_URL, FOUNDRY_RELEASE_SHA256."
+            exit 1
           fi
 
       - name: Setup Node
@@ -59,6 +60,10 @@ jobs:
       - name: Install Playwright browser
         if: steps.creds.outputs.available == 'true'
         run: npx playwright install chromium --with-deps
+
+      - name: Run sheet E2E tests
+        if: steps.creds.outputs.available == 'true'
+        run: node scripts/e2e-sheet-tests.mjs
 
       - name: Run packaged Foundry E2E
         if: steps.creds.outputs.available == 'true'

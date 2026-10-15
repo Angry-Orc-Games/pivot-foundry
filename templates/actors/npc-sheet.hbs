@@ -1,169 +1,181 @@
-<section class="pf-npc-sheet" data-document-id="{{actor.id}}">
-  <header class="pf-sheet-header">
-    <div class="pf-title-block">
-      <label for="{{rootId}}-name">{{localize "PIVOT.Fields.NPCName"}}</label>
-      <input id="{{rootId}}-name" name="name" type="text" value="{{actor.name}}" {{disabledAttr}} />
+<div class="pf-sheet">
+  <section class="pf-npc-sheet" data-document-id="{{actor.id}}">
+    <header class="pf-sheet-header">
+      <div class="pf-title-block">
+        <label for="{{rootId}}-name">{{localize "PIVOT.Fields.NPCName"}}</label>
+        <input
+          id="{{rootId}}-name"
+          name="name"
+          type="text"
+          value="{{actor.name}}"
+          {{disabledAttr}}
+        />
+      </div>
+      <div class="pf-header-stats">
+        <label>
+          <span>{{localize "PIVOT.Fields.CR"}}</span>
+          <input name="system.cr" type="text" value="{{system.cr}}" {{disabledAttr}} />
+        </label>
+      </div>
+    </header>
+
+    <div class="pf-sheet-body">
+      <section class="pf-classification">
+        <h2>{{localize "PIVOT.Sections.Classification"}}</h2>
+
+        <div class="pf-attribute-row">
+          <label>
+            <span>{{localize "PIVOT.Fields.Tier"}}</span>
+            <select name="system.tier" {{disabledAttr}}>
+              {{selectOptions config.tierChoices selected=system.tier localize=true}}
+            </select>
+          </label>
+
+          <label>
+            <span>{{localize "PIVOT.Fields.CreatureType"}}</span>
+            <select name="system.creatureType" {{disabledAttr}}>
+              {{selectOptions
+                config.creatureTypeChoices
+                selected=system.creatureType
+                localize=true
+              }}
+            </select>
+          </label>
+        </div>
+
+        <div class="pf-attribute-row">
+          <label>
+            <span>{{localize "PIVOT.Fields.Overlay"}}</span>
+            <select name="system.overlay" {{disabledAttr}}>
+              {{selectOptions config.overlayChoices selected=system.overlay localize=true}}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="pf-attributes">
+        <h2>{{localize "PIVOT.Sections.Attributes"}}</h2>
+
+        <div class="pf-attribute-row">
+          <label>
+            <span>{{localize "PIVOT.Fields.HPCurrent"}}</span>
+            <input
+              name="system.attributes.hp.value"
+              type="number"
+              min="0"
+              step="1"
+              value="{{system.attributes.hp.value}}"
+              {{disabledAttr}}
+            />
+          </label>
+
+          <label>
+            <span>{{localize "PIVOT.Fields.HPMax"}}</span>
+            <input
+              name="system.attributes.hp.max"
+              type="number"
+              min="0"
+              step="1"
+              value="{{system.attributes.hp.max}}"
+              {{disabledAttr}}
+            />
+          </label>
+        </div>
+
+        <div class="pf-attribute-row">
+          <label>
+            <span>{{localize "PIVOT.Fields.ArmourClass"}}</span>
+            <input
+              name="system.attributes.ac"
+              type="number"
+              min="0"
+              step="1"
+              value="{{system.attributes.ac}}"
+              {{disabledAttr}}
+            />
+          </label>
+
+          <label>
+            <span>{{localize "PIVOT.Fields.Speed"}}</span>
+            <input
+              name="system.attributes.speed"
+              type="number"
+              min="0"
+              step="1"
+              value="{{system.attributes.speed}}"
+              {{disabledAttr}}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section class="pf-combat-bonuses">
+        <h2>{{localize "PIVOT.Sections.CombatBonuses"}}</h2>
+
+        <div class="pf-attribute-row">
+          <label>
+            <span>{{localize "PIVOT.Fields.PhysicalBonus"}}</span>
+            <input
+              name="system.combatBonuses.physical"
+              type="number"
+              step="1"
+              value="{{system.combatBonuses.physical}}"
+              {{disabledAttr}}
+            />
+          </label>
+
+          <label>
+            <span>{{localize "PIVOT.Fields.IntellectualBonus"}}</span>
+            <input
+              name="system.combatBonuses.intellectual"
+              type="number"
+              step="1"
+              value="{{system.combatBonuses.intellectual}}"
+              {{disabledAttr}}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section class="pf-biography">
+        <h2>{{localize "PIVOT.Fields.Biography"}}</h2>
+        <textarea name="system.biography" rows="8" {{disabledAttr}}>{{system.biography}}</textarea>
+      </section>
+
+      <section class="pf-items">
+        <h2>{{localize "PIVOT.Sections.Items"}}</h2>
+
+        {{#if items}}
+          <ul class="pf-item-list">
+            {{#each items}}
+              <li class="pf-item" data-item-id="{{this.id}}">
+                <span class="pf-item-name">{{this.name}}</span>
+                <span class="pf-item-type">{{this.type}}</span>
+                <div class="pf-item-controls">
+                  <button
+                    type="button"
+                    data-action="editItem"
+                    data-item-id="{{this.id}}"
+                    title="{{localize 'PIVOT.Actions.EditItem'}}"
+                  >
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button
+                    type="button"
+                    data-action="deleteItem"
+                    data-item-id="{{this.id}}"
+                    title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p class="pf-empty-message">{{localize "PIVOT.Messages.NoItems"}}</p>
+        {{/if}}
+      </section>
     </div>
-    <div class="pf-header-stats">
-      <label>
-        <span>{{localize "PIVOT.Fields.CR"}}</span>
-        <input name="system.cr" type="text" value="{{system.cr}}" {{disabledAttr}} />
-      </label>
-    </div>
-  </header>
-
-  <div class="pf-sheet-body">
-    <section class="pf-classification">
-      <h2>{{localize "PIVOT.Sections.Classification"}}</h2>
-
-      <div class="pf-attribute-row">
-        <label>
-          <span>{{localize "PIVOT.Fields.Tier"}}</span>
-          <select name="system.tier" {{disabledAttr}}>
-            {{selectOptions config.tierChoices selected=system.tier localize=true}}
-          </select>
-        </label>
-
-        <label>
-          <span>{{localize "PIVOT.Fields.CreatureType"}}</span>
-          <select name="system.creatureType" {{disabledAttr}}>
-            {{selectOptions config.creatureTypeChoices selected=system.creatureType localize=true}}
-          </select>
-        </label>
-      </div>
-
-      <div class="pf-attribute-row">
-        <label>
-          <span>{{localize "PIVOT.Fields.Overlay"}}</span>
-          <select name="system.overlay" {{disabledAttr}}>
-            {{selectOptions config.overlayChoices selected=system.overlay localize=true}}
-          </select>
-        </label>
-      </div>
-    </section>
-
-    <section class="pf-attributes">
-      <h2>{{localize "PIVOT.Sections.Attributes"}}</h2>
-
-      <div class="pf-attribute-row">
-        <label>
-          <span>{{localize "PIVOT.Fields.HPCurrent"}}</span>
-          <input
-            name="system.attributes.hp.value"
-            type="number"
-            min="0"
-            step="1"
-            value="{{system.attributes.hp.value}}"
-            {{disabledAttr}}
-          />
-        </label>
-
-        <label>
-          <span>{{localize "PIVOT.Fields.HPMax"}}</span>
-          <input
-            name="system.attributes.hp.max"
-            type="number"
-            min="0"
-            step="1"
-            value="{{system.attributes.hp.max}}"
-            {{disabledAttr}}
-          />
-        </label>
-      </div>
-
-      <div class="pf-attribute-row">
-        <label>
-          <span>{{localize "PIVOT.Fields.ArmourClass"}}</span>
-          <input
-            name="system.attributes.ac"
-            type="number"
-            min="0"
-            step="1"
-            value="{{system.attributes.ac}}"
-            {{disabledAttr}}
-          />
-        </label>
-
-        <label>
-          <span>{{localize "PIVOT.Fields.Speed"}}</span>
-          <input
-            name="system.attributes.speed"
-            type="number"
-            min="0"
-            step="1"
-            value="{{system.attributes.speed}}"
-            {{disabledAttr}}
-          />
-        </label>
-      </div>
-    </section>
-
-    <section class="pf-combat-bonuses">
-      <h2>{{localize "PIVOT.Sections.CombatBonuses"}}</h2>
-
-      <div class="pf-attribute-row">
-        <label>
-          <span>{{localize "PIVOT.Fields.PhysicalBonus"}}</span>
-          <input
-            name="system.combatBonuses.physical"
-            type="number"
-            step="1"
-            value="{{system.combatBonuses.physical}}"
-            {{disabledAttr}}
-          />
-        </label>
-
-        <label>
-          <span>{{localize "PIVOT.Fields.IntellectualBonus"}}</span>
-          <input
-            name="system.combatBonuses.intellectual"
-            type="number"
-            step="1"
-            value="{{system.combatBonuses.intellectual}}"
-            {{disabledAttr}}
-          />
-        </label>
-      </div>
-    </section>
-
-    <section class="pf-biography">
-      <h2>{{localize "PIVOT.Fields.Biography"}}</h2>
-      <textarea name="system.biography" rows="8" {{disabledAttr}}>{{system.biography}}</textarea>
-    </section>
-
-    <section class="pf-items">
-      <h2>{{localize "PIVOT.Sections.Items"}}</h2>
-
-      {{#if items}}
-        <ul class="pf-item-list">
-          {{#each items}}
-            <li class="pf-item" data-item-id="{{this.id}}">
-              <span class="pf-item-name">{{this.name}}</span>
-              <span class="pf-item-type">{{this.type}}</span>
-              <div class="pf-item-controls">
-                <button
-                  type="button"
-                  data-action="editItem"
-                  data-item-id="{{this.id}}"
-                  title="{{localize 'PIVOT.Actions.EditItem'}}"
-                >
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button
-                  type="button"
-                  data-action="deleteItem"
-                  data-item-id="{{this.id}}"
-                  title="{{localize 'PIVOT.Actions.DeleteItem'}}"
-                >
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </li>
-          {{/each}}
-        </ul>
-      {{else}}
-        <p class="pf-empty-message">{{localize "PIVOT.Messages.NoItems"}}</p>
-      {{/if}}
-    </section>
-  </div>
-</section>
+  </section>
+</div>

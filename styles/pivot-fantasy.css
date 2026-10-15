@@ -73,37 +73,28 @@
   outline: none;
 }
 
-/* Disabled state per §7.11 */
+/* Disabled state per §7.11 - use background instead of opacity for text contrast */
 .pf-sheet :is(button, input, select, textarea):disabled,
 .pf-sheet [aria-disabled="true"] {
-  opacity: var(--pf-disabled-opacity);
   cursor: not-allowed;
+  background: var(--pf-bg);
+  border-color: var(--pf-muted);
 }
 
-/* Legacy variable mapping - keep for now (ticket 2 will rename classes) */
-.pf-sheet.sheet {
-  --pf-ink: var(--pf-ink);
-  --pf-blue: var(--pf-accent);
-  --pf-gold: var(--pf-accent);
-  --pf-paper: var(--pf-bg);
-  --pf-paper-deep: var(--pf-line);
-  --pf-line: var(--pf-line);
-  color: var(--pf-ink);
+:is(.pivot-fantasy, .pf-sheet).sheet .window-content {
+  overflow: hidden;
+}
+
+:is(.pivot-fantasy, .pf-sheet).sheet.item .window-content {
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .pf-character-sheet,
 .pf-item-sheet {
   background: var(--pf-bg);
   padding: var(--pf-space-3);
-}
-
-.pf-sheet.sheet.actor .window-content {
-  overflow: hidden;
-}
-
-.pf-sheet.sheet.item .window-content {
-  overflow-x: hidden;
-  overflow-y: auto;
+  color: var(--pf-ink);
 }
 
 .pf-character-sheet {
@@ -148,8 +139,13 @@
   text-transform: uppercase;
 }
 
-.pf-sheet-header .pf-title-block label,
-.pf-sheet-header .pf-header-stats span {
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-sheet-header .pf-title-block label,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-sheet-header .pf-header-stats span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet)
+  .pf-sheet-header
+  .pf-header-stats
+  label
+  > span {
   color: var(--pf-accent-ink);
   font-size: 12px;
 }
@@ -163,6 +159,11 @@
   font-size: 28px;
   font-weight: 700;
   width: 100%;
+}
+
+.pf-sheet .pf-sheet-header .pf-title-block input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: var(--pf-accent-ink);
 }
 
 .pf-header-stats {
@@ -179,6 +180,11 @@
   color: var(--pf-accent-ink);
   font-weight: 700;
   text-align: center;
+}
+
+.pf-sheet .pf-sheet-header .pf-header-stats input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: var(--pf-accent-ink);
 }
 
 .pf-abilities-panel {
@@ -208,6 +214,16 @@
   color: var(--pf-ink);
 }
 
+/* ApplicationV2 tab visibility - PARTS render directly in .window-content */
+.pf-sheet .window-content > .tab {
+  display: none;
+}
+
+.pf-sheet .window-content > .tab.active {
+  display: block;
+}
+
+/* For test harness compatibility */
 .pf-tab-body .tab {
   display: none;
 }
@@ -796,6 +812,104 @@
   text-transform: uppercase;
 }
 
+/* Override Foundry's default table styling */
+.pf-sheet table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.pf-sheet table thead th {
+  background: var(--pf-accent-soft);
+  color: var(--pf-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  text-align: left;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--pf-accent);
+}
+
+.pf-sheet table tbody td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--pf-line);
+}
+
+/* Attacks table specific column widths */
+.pf-sheet .pf-attacks {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.pf-sheet .pf-attacks th:nth-child(1),
+.pf-sheet .pf-attacks td:nth-child(1) {
+  width: 50%;
+}
+
+.pf-sheet .pf-attacks th:nth-child(2),
+.pf-sheet .pf-attacks td:nth-child(2) {
+  width: 20%;
+}
+
+.pf-sheet .pf-attacks th:nth-child(3),
+.pf-sheet .pf-attacks td:nth-child(3) {
+  width: 30%;
+}
+
+.pf-sheet .pf-attacks td button {
+  width: 100%;
+  text-align: left;
+}
+
+/* Ensure proper text contrast ratios in light theme */
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) table.pf-skills label,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) table.pf-skills span {
+  color: var(--pf-ink);
+}
+
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) table.pf-skills td.pf-small {
+  color: var(--pf-muted);
+}
+
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-tabs a {
+  color: var(--pf-accent);
+}
+
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-tabs a.active {
+  color: var(--pf-ink);
+}
+
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) label > span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-card label > span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-stat-card > span,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-small {
+  color: var(--pf-muted);
+}
+
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) input,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) select,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) textarea,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) option {
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
+/* Ensure skill modifier chips and inline inputs have proper theming */
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-roll,
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-inline {
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
+/* NPC Classification selects */
+:is(.pivot-fantasy.pf-sheet, .pivot-fantasy .pf-sheet) .pf-classification select {
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
 .pf-table-row {
   border-bottom: 1px solid var(--pf-line);
   min-height: 34px;
@@ -924,4 +1038,503 @@
   .pf-equipment-table .pf-table-row > *:nth-child(n + 3):nth-child(-n + 4) {
     display: none;
   }
+}
+
+/* ===================================================================
+   PRINT LAYOUT CSS - Ticket 3: Character Sheet Restructure
+   =================================================================== */
+
+/* Print wrapper and print sheet */
+.pf-sheet .pf-print-wrap {
+  background: var(--pf-panel);
+  color: var(--pf-ink);
+  padding: var(--pf-space-4);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
+  max-width: 900px;
+  margin: 0 auto var(--pf-space-3);
+}
+
+.pf-sheet .pf-print {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--pf-ink);
+}
+
+.pf-sheet .pf-print :is(h1, h2, h3) {
+  color: var(--pf-ink);
+}
+
+/* NPC sheet body sections */
+.pf-sheet .pf-sheet-body {
+  background: var(--pf-panel);
+  padding: var(--pf-space-3);
+}
+
+.pf-sheet .pf-sheet-body section {
+  margin-bottom: var(--pf-space-3);
+}
+
+.pf-sheet .pf-sheet-body h2 {
+  font-size: 16px;
+  margin: 0 0 var(--pf-space-2) 0;
+  color: var(--pf-accent);
+  border-bottom: 1px solid var(--pf-line);
+  padding-bottom: var(--pf-space-1);
+}
+
+/* NPC attribute rows: label-over-input grid layout */
+.pf-sheet .pf-attribute-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--pf-space-2);
+  margin-bottom: var(--pf-space-2);
+}
+
+.pf-sheet .pf-attribute-row label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-space-1);
+}
+
+.pf-sheet .pf-attribute-row label span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pf-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pf-sheet .pf-attribute-row input,
+.pf-sheet .pf-attribute-row select {
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-ink);
+  font: inherit;
+  padding: var(--pf-space-1);
+}
+
+.pf-sheet .pf-attribute-row input:focus,
+.pf-sheet .pf-attribute-row select:focus {
+  border-color: var(--pf-accent);
+  outline: none;
+}
+
+.pf-sheet .pf-biography textarea {
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-ink);
+  font: inherit;
+  padding: var(--pf-space-2);
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+}
+
+.pf-sheet .pf-biography textarea:focus {
+  border-color: var(--pf-accent);
+  outline: none;
+}
+
+.pf-sheet .pf-print h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.pf-sheet .pf-print h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1.5px solid var(--pf-accent);
+  color: var(--pf-accent);
+  margin: 12px 0 4px;
+  padding-bottom: 1px;
+}
+
+.pf-sheet .pf-print ul {
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+/* Header */
+.pf-sheet .pf-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 2px solid var(--pf-ink);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  gap: var(--pf-space-3);
+}
+
+.pf-sheet .pf-hdr-id {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pf-sheet .pf-hdr-meta {
+  flex: 0 1 auto;
+  text-align: right;
+}
+
+.pf-sheet .pf-hdr-actions {
+  flex: 0 0 auto;
+}
+
+.pf-sheet .pf-hdr h1 {
+  margin: 0 0 4px 0;
+}
+
+/* View mode read-only text (full contrast) */
+.pf-sheet .pf-name-view {
+  font-family: var(--pf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--pf-ink);
+  margin: 0 0 4px 0;
+}
+
+.pf-sheet .pf-tagline-view {
+  font-style: italic;
+  color: var(--pf-ink-muted);
+  margin-bottom: 4px;
+}
+
+/* Edit toggle button */
+.pf-sheet .window-content .pf-edit-toggle {
+  background: var(--pf-accent);
+  color: var(--pf-accent-ink);
+  border: 0;
+  border-radius: var(--pf-radius-sm);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pf-edit-toggle:hover {
+  opacity: 0.9;
+}
+
+/* Inline inputs for print sheet */
+.pf-sheet .pf-inline {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--pf-line);
+  color: var(--pf-ink);
+  font: inherit;
+  padding: 0;
+}
+
+.pf-sheet .pf-inline:hover,
+.pf-sheet .pf-inline:focus {
+  border-bottom-color: var(--pf-accent);
+}
+
+.pf-sheet .pf-inline.pf-name {
+  font-family: var(--pf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  width: 100%;
+}
+
+.pf-sheet .pf-inline.pf-tagline {
+  font-style: italic;
+  width: 100%;
+}
+
+.pf-sheet .pf-inline.pf-num {
+  width: 4ch;
+  text-align: center;
+}
+
+/* Stats grid: 4 boxed stat cards */
+.pf-sheet .pf-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pf-sheet .pf-stat {
+  background: var(--pf-panel);
+  border: 1.5px solid var(--pf-ink);
+  border-radius: var(--pf-radius-md);
+  text-align: center;
+  padding: 3px;
+}
+
+.pf-sheet .pf-stat b {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--pf-ink-muted);
+}
+
+.pf-sheet .pf-stat span {
+  font: 700 17px var(--pf-font-display);
+  display: block;
+  color: var(--pf-ink);
+}
+
+.pf-sheet .pf-stat small {
+  display: block;
+  font-size: 11px;
+  color: var(--pf-ink-muted);
+}
+
+/* Abilities grid: 6 ability boxes */
+.pf-sheet .pf-abil {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pf-sheet .pf-ab {
+  background: var(--pf-panel);
+  border: 1.5px solid var(--pf-ink);
+  border-radius: var(--pf-radius-md);
+  text-align: center;
+  padding: 3px 2px;
+  position: relative;
+}
+
+.pf-sheet .pf-ab.pf-prime {
+  background: var(--pf-accent-soft);
+}
+
+.pf-sheet .pf-ab b {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.pf-sheet .pf-ab span {
+  font: 700 18px var(--pf-font-display);
+  display: block;
+}
+
+.pf-sheet .pf-ab small {
+  display: block;
+  font-size: 11px;
+  color: var(--pf-ink);
+}
+
+.pf-sheet .pf-ab-name {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.pf-sheet .pf-ab-score {
+  width: 100%;
+  text-align: center;
+  font: 700 18px var(--pf-font-display);
+  padding: 0;
+}
+
+.pf-sheet .pf-ab-score:disabled {
+  opacity: 1;
+  color: var(--pf-ink);
+}
+
+/* NPC sheet: ensure disabled inputs and selects have full contrast */
+.pf-npc-sheet input:disabled,
+.pf-npc-sheet select:disabled {
+  opacity: 1;
+  color: var(--pf-ink);
+  background: var(--pf-panel);
+}
+
+.pf-sheet .pf-ab-save {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.pf-sheet .pf-prime-toggle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+}
+
+.pf-sheet .pf-prime-toggle input {
+  width: auto;
+}
+
+/* Initiative/PP line and footnote */
+.pf-sheet .pf-init-pp {
+  margin-bottom: 4px;
+}
+
+/* Two-column layout */
+.pf-sheet .pf-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+/* Skills table */
+.pf-sheet .pf-print table.pf-skills {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11.5px;
+}
+
+.pf-sheet .pf-print table.pf-skills td {
+  padding: 1px 4px;
+  border-bottom: 1px solid var(--pf-line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.pf-sheet .pf-print table.pf-skills td.pf-r {
+  text-align: right;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-check input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-check span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Lists */
+.pf-sheet .pf-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.pf-sheet .pf-list li {
+  margin: 2px 0;
+}
+
+.pf-sheet .pf-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--pf-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pf-sheet .pf-bp-cost {
+  font-size: 10px;
+  color: var(--pf-ink-muted);
+}
+
+/* Funds inline inputs */
+.pf-sheet .pf-funds {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.pf-sheet .pf-funds label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--pf-ink);
+}
+
+.pf-sheet .pf-funds .pf-inline.pf-num {
+  width: 6ch;
+}
+
+/* Footer */
+.pf-sheet .pf-footer {
+  margin-top: 8px;
+  border-top: 1px solid var(--pf-line);
+  padding-top: 4px;
+}
+
+.pf-sheet .pf-print .pf-small {
+  font-size: 10.5px;
+  color: var(--pf-ink-muted);
+}
+
+.pf-sheet .pf-print .pf-small b {
+  color: var(--pf-ink);
+}
+
+/* Screen reader only */
+.pf-sheet .pf-sr {
+  position: absolute;
+  left: -9999px;
+}
+
+/* Roll buttons in print context */
+.pf-sheet .pf-print .pf-roll {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--pf-ink);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.pf-sheet .pf-print .pf-roll:hover {
+  color: var(--pf-accent);
+}
+
+/* Container queries for responsive print layout */
+@container pf-sheet (max-width: 720px) {
+  .pf-sheet .pf-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-sheet .pf-abil {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pf-sheet .pf-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@container pf-sheet (max-width: 560px) {
+  .pf-sheet .pf-hdr {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pf-sheet .pf-hdr-meta {
+    text-align: left;
+  }
+
+  .pf-sheet .pf-abil {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pf-sheet .pf-funds {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ensure container name is set on the character sheet root */
+.pf-sheet .pf-character-sheet {
+  container-name: pf-sheet;
 }
