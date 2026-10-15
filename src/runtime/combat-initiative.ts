@@ -1,11 +1,12 @@
 import { waitForDice3D } from "./dice3d";
+import { applyChatMessageMode, toMessageMode } from "./ui";
 
 export interface InitiativeRollLike {
   total?: number;
   evaluate(): Promise<unknown>;
   toMessage(
     data: Record<string, unknown>,
-    options: { create?: boolean; rollMode?: string; messageMode?: string },
+    options: { create?: boolean; messageMode?: string },
   ): Promise<Record<string, unknown>>;
 }
 
@@ -43,7 +44,11 @@ export interface RollInitiativeDeps {
 
 function chatMessageApi(): {
   create?: (data: unknown) => Promise<unknown>;
-  implementation?: { create?: (data: unknown) => Promise<unknown> };
+  createDocuments?: (data: unknown[]) => Promise<unknown>;
+  implementation?: {
+    create?: (data: unknown) => Promise<unknown>;
+    createDocuments?: (data: unknown[]) => Promise<unknown>;
+  };
   getSpeaker?: (opts: Record<string, unknown>) => unknown;
 } {
   return (globalThis as typeof globalThis & { ChatMessage?: ReturnType<typeof chatMessageApi> })
@@ -122,18 +127,22 @@ export async function rollInitiativeWaitingForDice3D(
 
     const chatData = await roll.toMessage(baseData, {
       create: false,
-      rollMode: mode,
-      messageMode: mode,
+      messageMode: toMessageMode(mode),
     });
+    applyChatMessageMode(chatData, mode);
     if (index > 0) chatData.sound = null;
     messageDataList.push(chatData);
   }
 
   if (!updates.length) return combat;
 
+  // Document.create/createDocuments are static methods that read `this.implementation`;
+  // they must be invoked on the class, never as a detached function reference.
   const ChatMessage = chatMessageApi();
-  const create = ChatMessage?.implementation?.create ?? ChatMessage?.create;
-  const created = create ? await create(messageDataList) : [];
+  const Cls = ChatMessage?.implementation ?? ChatMessage;
+  let created: unknown = [];
+  if (Cls?.createDocuments) created = await Cls.createDocuments(messageDataList);
+  else if (Cls?.create) created = await Cls.create(messageDataList);
   for (const message of normalizeCreatedMessages(created)) {
     await wait(message);
   }

@@ -163,3 +163,96 @@ describe("installCombatInitiativeDice3DWait", () => {
     expect(callOrder).not.toContain("original");
   });
 });
+
+describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
+  it("calls static create/createDocuments bound to the class (no detached `this`)", async () => {
+    const order: string[] = [];
+    const applyMode = vi.fn();
+    const applyRollMode = vi.fn();
+    // Foundry v14: static methods read `this.implementation`; detached calls throw
+    // "Cannot read properties of undefined (reading 'implementation')".
+    class BaseChatMessage {
+      id?: string;
+      static get implementation(): typeof BaseChatMessage {
+        return ChatMessageV14;
+      }
+      static async createDocuments(data: object[]) {
+        const impl = this.implementation;
+        order.push("chat");
+        return data.map((d, i) => Object.assign(new impl(), d, { id: `m${i}` }));
+      }
+      static async create(data: object | object[]) {
+        const list = Array.isArray(data) ? data : [data];
+        const created = await this.implementation.createDocuments(list);
+        return Array.isArray(data) ? created : created[0];
+      }
+      static getSpeaker() {
+        return { alias: "Hero" };
+      }
+      static applyMode = applyMode;
+      static applyRollMode = applyRollMode;
+    }
+    class ChatMessageV14 extends BaseChatMessage {}
+    vi.stubGlobal("ChatMessage", ChatMessageV14);
+    vi.stubGlobal("game", {
+      settings: { get: (_s: string, k: string) => (k === "messageMode" ? "public" : undefined) },
+      dice3d: {
+        waitFor3DAnimationByMessageID: vi.fn(async (id: string) => {
+          expect(id).toBe("m0");
+          order.push("dice3d");
+        }),
+      },
+    });
+
+    const toMessage = vi.fn<
+      (
+        data: Record<string, unknown>,
+        opts: Record<string, unknown>,
+      ) => Promise<Record<string, unknown>>
+    >(async (data) => ({
+      ...data,
+      rolls: [{ total: 12 }],
+    }));
+    const combatant = {
+      id: "c1",
+      isOwner: true,
+      name: "Hero",
+      hidden: false,
+      getInitiativeRoll: () => ({ total: 12, evaluate: async () => undefined, toMessage }),
+    };
+    const combat = {
+      combatant: null,
+      turns: [],
+      combatants: { get: (id: string) => (id === "c1" ? combatant : undefined) },
+      updateEmbeddedDocuments: vi.fn(async () => {
+        order.push("update");
+      }),
+      update: vi.fn(async () => undefined),
+    };
+    // Exercise the real tracker path: patched Combat.prototype.rollInitiative.
+    class Combat {
+      async rollInitiative(): Promise<unknown> {
+        throw new Error("core");
+      }
+    }
+    vi.stubGlobal("Combat", Combat);
+    resetCombatInitiativeDice3DWaitForTests();
+    installCombatInitiativeDice3DWait();
+    await (
+      Combat.prototype.rollInitiative as (this: unknown, ids: string[]) => Promise<unknown>
+    ).call(combat, ["c1"]);
+
+    expect(order).toEqual(["chat", "dice3d", "update"]);
+    expect(combat.updateEmbeddedDocuments).toHaveBeenCalledWith("Combatant", [
+      { _id: "c1", initiative: 12 },
+    ]);
+    const opts = toMessage.mock.calls[0]?.[1] ?? {};
+    expect(opts).not.toHaveProperty("rollMode");
+    expect(opts.messageMode).toBe("public");
+    expect(applyMode).toHaveBeenCalledWith(
+      expect.objectContaining({ rolls: [{ total: 12 }] }),
+      "public",
+    );
+    expect(applyRollMode).not.toHaveBeenCalled();
+  });
+});
