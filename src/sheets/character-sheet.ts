@@ -603,6 +603,76 @@ export function nextResourceValue(
   return Math.max(0, current + delta);
 }
 
+async function rollInitiativeWithDiceAnimation(options: {
+  actor: ActorLike;
+  roll: { toMessage: (data: Record<string, unknown>) => Promise<unknown> };
+  total: number;
+  flavor: string;
+  combat: CombatLike | null | undefined;
+  notify: (level: "warn" | "error", message: string) => void;
+  localize: (key: string) => string;
+}): Promise<void> {
+  const { actor, roll, total, flavor, combat, notify, localize } = options;
+
+  // Get roll mode from game settings (defaults to "roll" = public)
+  const game = globalThis as typeof globalThis & {
+    game?: { settings?: { get?: (scope: string, key: string) => unknown } };
+  };
+  const rawMode = game.game?.settings?.get?.("core", "rollMode");
+  const rollMode = typeof rawMode === "string" ? rawMode : "roll";
+
+  // Create chat message data with Roll attached
+  const chatData = (await roll.toMessage({
+    speaker: speakerForActor(actor),
+    flavor,
+  })) as Record<string, unknown>;
+
+  // Apply roll mode using Foundry's standard method
+  const ChatMessage = (
+    globalThis as typeof globalThis & {
+      ChatMessage?: {
+        implementation?: { createDocuments?: (data: unknown[]) => Promise<unknown> };
+        createDocuments?: (data: unknown[]) => Promise<unknown>;
+        applyRollMode?: (data: Record<string, unknown>, mode: string) => void;
+      };
+    }
+  ).ChatMessage;
+
+  if (ChatMessage?.applyRollMode) {
+    ChatMessage.applyRollMode(chatData, rollMode);
+  }
+
+  // Create message using class-bound method (Foundry v14 requirement)
+  const Cls = ChatMessage?.implementation ?? ChatMessage;
+  let created: unknown = [];
+  if (Cls?.createDocuments) {
+    created = await Cls.createDocuments([chatData]);
+  }
+
+  // Wait for Dice So Nice animation if present
+  const createdList = Array.isArray(created) ? created : [];
+  const message = createdList[0] as { id?: string } | undefined;
+  if (message?.id) {
+    const dice3d = (
+      globalThis as typeof globalThis & {
+        game?: { dice3d?: { waitFor3DAnimationByMessageID?: (id: string) => Promise<void> } };
+      }
+    ).game?.dice3d;
+    if (dice3d?.waitFor3DAnimationByMessageID) {
+      await dice3d.waitFor3DAnimationByMessageID(message.id);
+    }
+  }
+
+  // Update combatant initiative after animation
+  await applyInitiativeRollToCombat({
+    actorId: actorDocumentId(actor),
+    total,
+    combat,
+    notify,
+    localize,
+  });
+}
+
 export async function applyInitiativeRollToCombat(options: {
   actorId: string | undefined;
   total: number;
@@ -787,18 +857,21 @@ async function rollAction(
 
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
-  await resultRoll.toMessage({
-    speaker: speakerForActor(context.actor),
-    flavor,
-  });
 
   if (request.rollKind === "initiative") {
-    await applyInitiativeRollToCombat({
-      actorId: actorDocumentId(actor),
+    await rollInitiativeWithDiceAnimation({
+      actor,
+      roll: resultRoll,
       total,
+      flavor,
       combat: getActiveCombat(),
       notify: notifyUser,
       localize: localizeText,
+    });
+  } else {
+    await resultRoll.toMessage({
+      speaker: speakerForActor(context.actor),
+      flavor,
     });
   }
 }
