@@ -49,8 +49,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install Playwright
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright browsers
+        run: npx --yes playwright@$(node -p "require('./package.json').devDependencies.playwright") install chromium --with-deps
 
       - name: E2E sheet tests
         run: node scripts/e2e-sheet-tests.mjs

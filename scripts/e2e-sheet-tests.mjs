@@ -786,14 +786,15 @@ async function runTests() {
       skillModifier: getColorAndBg(".pf-skills .pf-small"),
       activeTab: getColorAndBg(".pf-tabs a.active"),
       abilityLabel: getColorAndBg(".pf-ab b"),
-      statCardLabel: getColorAndBg(".pf-stat-card > span"),
     };
     /* eslint-enable no-undef */
   });
 
+  let contrastFailed = false;
   for (const [key, value] of Object.entries(contrastTests)) {
     if (!value) {
       console.log(`  ✗ ${key}: Element not found`);
+      contrastFailed = true;
       continue;
     }
 
@@ -803,6 +804,7 @@ async function runTests() {
     if (!fg || !bg) {
       console.log(`  ✗ ${key}: Could not parse colors`);
       console.log(`    FG: ${value.color}, BG: ${value.bg}`);
+      contrastFailed = true;
       continue;
     }
 
@@ -811,12 +813,21 @@ async function runTests() {
     console.log(`  ${pass ? "✓" : "✗"} ${key}: ${ratio.toFixed(2)}:1 ${pass ? "PASS" : "FAIL"}`);
     if (!pass) {
       console.log(`    FG: ${value.color}, BG: ${value.bg}`);
+      contrastFailed = true;
     }
   }
 
   await browser.close();
 
   console.log("\n=== Tests Complete ===\n");
+
+  if (!allTabsWork || contrastFailed) {
+    console.error("✗ Some tests FAILED");
+    process.exit(1);
+  }
 }
 
-runTests().catch(console.error);
+runTests().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

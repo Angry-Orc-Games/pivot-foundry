@@ -35,7 +35,8 @@ Measurements from rendered pixels in browser with `getComputedStyle`, verified a
 7. **Character disabled inputs** (Loyalty, GP/SP/CP/Other values - view mode)
    - Fix applied: Removed `opacity: 0.45`, use `background: var(--pf-bg)` and `border-color: var(--pf-muted)` instead
    - Text color: `var(--pf-ink)` (no opacity dimming)
-   - Rendered contrast: **12.85:1** ✓ PASS
+   - Rendered colors: #2b2620 on #fffdf7
+   - Rendered contrast: **14.74:1** ✓ PASS
 
 ## Dark Theme
 
@@ -60,7 +61,8 @@ Measurements from rendered pixels in browser with `getComputedStyle`, verified a
 12. **Character disabled inputs** (Loyalty, GP/SP/CP/Other values - view mode)
     - Fix applied: Removed `opacity: 0.45`, use `background: var(--pf-bg)` and `border-color: var(--pf-muted)` instead
     - Text color: `var(--pf-ink)` (no opacity dimming)
-    - Rendered contrast: **10.44:1** ✓ PASS
+    - Rendered colors: #ede6d6 on #1b1814
+    - Rendered contrast: **12.72:1** ✓ PASS
 
 ## Summary
 
@@ -86,4 +88,4 @@ This ensures read-only values in view mode maintain ≥4.5:1 contrast while stil
 3. **Loyalty label**: Added `.pf-sheet .pf-print .pf-small b { color: var(--pf-ink) }`
 4. **Currency labels**: Added `color: var(--pf-ink)` to `.pf-sheet .pf-funds label`
 
-**All contrasts now: 6.68:1 to 12.85:1** ✓ PASS (minimum 4.5:1 required)
+**All contrasts now: 6.68:1 to 14.74:1** ✓ PASS (minimum 4.5:1 required)
