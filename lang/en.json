@@ -233,6 +233,7 @@
   "PIVOT.Survival.DeathSave": "Roll Death Save",
   "PIVOT.Survival.DeathFailed": "Death save unavailable or update uncertain. Check HP and survival state before rolling again.",
   "PIVOT.Survival.StateChanged": "Character state changed while rolling. No death save was applied.",
+  "PIVOT.Survival.UpdateFailed": "Death save was rolled but the actor update failed. Check HP and survival state.",
   "PIVOT.Survival.Correction": "GM Survival Correction / Stabilize",
   "PIVOT.Survival.CorrectionHelp": "Confirm legacy state, stabilize at zero HP, or correct an error. Choose Conscious only with positive HP. Stabilization and restored HP reset counters.",
   "PIVOT.Survival.Successes": "Successes",

@@ -14,6 +14,7 @@ import { SYSTEM_ID } from "./config";
 import { createPivotCharacterSheetClass } from "./sheets/character-sheet";
 import { createPivotNpcSheetClass } from "./sheets/npc-sheet";
 import { createPivotItemSheetClass } from "./sheets/item-sheet";
+import { installCombatInitiativeDice3DWait } from "./runtime/combat-initiative";
 
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
@@ -146,6 +147,8 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   });
 
   runtime.Hooks.once("ready", () => {
+    installCombatInitiativeDice3DWait();
+
     const globals = globalThis as typeof globalThis & {
       game?: WorldMigrationGame;
       ui?: {
