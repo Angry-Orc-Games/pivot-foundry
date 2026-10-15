@@ -558,7 +558,6 @@ describe("D20 roll attachments for Dice So Nice!", () => {
           return this;
         }
         toMessage = toMessage;
-        constructor() {}
       },
     );
 

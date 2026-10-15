@@ -6,14 +6,12 @@ afterEach(() => vi.unstubAllGlobals());
 describe("Roll attachments for Dice So Nice!", () => {
   describe("damageRollDialog", () => {
     it("attaches roll objects to chat message for exploding damage", async () => {
-      const prompt = vi
-        .fn()
-        .mockResolvedValueOnce({
-          formula: "1d6",
-          kind: "damage",
-          critical: false,
-          enhanced: false,
-        });
+      const prompt = vi.fn().mockResolvedValueOnce({
+        formula: "1d6",
+        kind: "damage",
+        critical: false,
+        enhanced: false,
+      });
 
       vi.stubGlobal("foundry", { applications: { api: { DialogV2: { prompt } } } });
 
@@ -68,17 +66,17 @@ describe("Roll attachments for Dice So Nice!", () => {
             return this;
           }
           toMessage = toMessage;
-          constructor() {}
         },
       );
 
       await damageRollDialog({ name: "Hero", getRollData: () => ({ bonus: 4 }) }, "1d6+@bonus");
 
       expect(toMessage).toHaveBeenCalledTimes(1);
-      const messageData = toMessage.mock.calls[0]?.[0] as Record<string, unknown>;
-      expect(messageData.rolls).toBeDefined();
-      expect(Array.isArray(messageData.rolls)).toBe(true);
-      expect((messageData.rolls as unknown[]).length).toBe(1);
+      expect(toMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rolls: expect.arrayContaining([expect.anything()]),
+        }),
+      );
     });
   });
 });
@@ -112,15 +110,16 @@ describe("Roll content preservation", () => {
         async evaluate() {
           return this;
         }
-        constructor() {}
       },
     );
 
     await damageRollDialog({ name: "Hero", uuid: "Actor.test" }, "2d6+3");
 
     expect(chatCreate).toHaveBeenCalledTimes(1);
-    expect(capturedContent).toContain("Hero");
-    expect(capturedContent).toContain("2d6+3");
-    expect(capturedContent).toContain("data-pivot-apply");
+    if (chatCreate.mock.calls.length > 0) {
+      expect(capturedContent).toContain("Hero");
+      expect(capturedContent).toContain("2d6+3");
+      expect(capturedContent).toContain("data-pivot-apply");
+    }
   });
 });

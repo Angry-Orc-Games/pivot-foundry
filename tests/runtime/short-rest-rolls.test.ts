@@ -5,9 +5,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("Short rest roll attachments for Dice So Nice!", () => {
   it("attaches all hit die rolls to short rest chat message", async () => {
-    const prompt = vi
-      .fn()
-      .mockResolvedValueOnce({ poolSpendsRaw: "2", inDanger: false });
+    const prompt = vi.fn().mockResolvedValueOnce({ poolSpendsRaw: "2", inDanger: false });
 
     vi.stubGlobal("foundry", { applications: { api: { DialogV2: { prompt } } } });
 
@@ -40,6 +38,7 @@ describe("Short rest roll attachments for Dice So Nice!", () => {
 
     const actor = {
       name: "Hero",
+      type: "character",
       system: {
         abilities: { con: { score: 14 } },
         attributes: {
@@ -87,7 +86,6 @@ describe("Short rest roll attachments for Dice So Nice!", () => {
         async evaluate() {
           return this;
         }
-        constructor() {}
       },
     );
 
@@ -100,6 +98,7 @@ describe("Short rest roll attachments for Dice So Nice!", () => {
 
     const actor = {
       name: "Hero",
+      type: "character",
       system: {
         abilities: { con: { score: 12 } },
         attributes: {

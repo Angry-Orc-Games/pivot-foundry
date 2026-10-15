@@ -70,10 +70,6 @@ export async function deathSaveDialog(actor: HealthActor): Promise<void> {
       rolls: [roll],
     });
     await waitForDice3D(message);
-    try {
-    } catch {
-      warn("ReportFailed");
-    }
   } catch {
     warn("DeathFailed");
   } finally {
