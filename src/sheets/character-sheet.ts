@@ -3,6 +3,7 @@ import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../ru
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
+import { waitForDice3D } from "../runtime/dice3d";
 import {
   abilities,
   armourCategories,
@@ -762,7 +763,6 @@ async function rollAction(
     await roll.toMessage({
       speaker: speakerForActor(context.actor),
       flavor: request.label,
-      rolls: [roll],
     });
     return;
   }
@@ -786,13 +786,17 @@ async function rollAction(
     localize: localizeText,
   });
 
-  const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
-  await resultRoll.evaluate();
-  const message = await resultRoll.toMessage({
+  const ChatMessage = getChatMessageConstructor();
+  if (!ChatMessage) return;
+
+  const messageData = {
     speaker: speakerForActor(context.actor),
     flavor,
-    rolls: [poolRoll, resultRoll],
-  });
+    content: `<div class="dice-roll"><div class="dice-result"><h4 class="dice-total">${total}</h4></div></div>`,
+    rolls: [poolRoll],
+  };
+  applyRollMode(messageData);
+  const message = await ChatMessage.create(messageData);
 
   if (request.rollKind === "initiative") {
     await waitForDice3D(message);
@@ -1026,6 +1030,30 @@ function getActiveCombat(): CombatLike | null {
   return game.game?.combat ?? null;
 }
 
+function getChatMessageConstructor():
+  | {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    }
+  | undefined {
+  const globals = globalThis as typeof globalThis & {
+    ChatMessage?: {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    };
+  };
+  return globals.ChatMessage;
+}
+
+function applyRollMode(messageData: Record<string, unknown>): void {
+  const globals = globalThis as typeof globalThis & {
+    ChatMessage?: {
+      applyRollMode?: (data: Record<string, unknown>, mode: string) => unknown;
+    };
+  };
+  globals.ChatMessage?.applyRollMode?.(messageData, "roll");
+}
+
 function getRollConstructor():
   | (new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
@@ -1207,30 +1235,6 @@ function deletePath(source: Record<string, unknown>, path: string[]): void {
   }
   const final = path[path.length - 1];
   if (final && isRecord(current)) Reflect.deleteProperty(current, final);
-}
-
-async function waitForDice3D(message: unknown): Promise<void> {
-  const messageId =
-    message && typeof message === "object" && "id" in message && typeof message.id === "string"
-      ? message.id
-      : null;
-  if (!messageId) return;
-
-  const globals = globalThis as typeof globalThis & {
-    game?: {
-      dice3d?: {
-        waitFor3DAnimationByMessageID?: (id: string) => Promise<void>;
-      };
-    };
-  };
-
-  if (globals.game?.dice3d?.waitFor3DAnimationByMessageID) {
-    try {
-      await globals.game.dice3d.waitFor3DAnimationByMessageID(messageId);
-    } catch {
-      // Dice So Nice! not available or animation failed; continue without waiting
-    }
-  }
 }
 
 async function callOptionalSuper(

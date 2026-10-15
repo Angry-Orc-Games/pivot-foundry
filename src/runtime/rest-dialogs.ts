@@ -13,6 +13,7 @@ import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
+import { waitForDice3D } from "./dice3d";
 
 interface RestContext {
   actor: ActorLike;
@@ -202,18 +203,6 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   });
 
   const newHp = Math.min(ctx.hpMax, ctx.hpCurrent + totalHealed);
-  const update: Record<string, unknown> = {
-    "system.attributes.hp.value": newHp,
-    "system.resources.pool.value": poolRemaining,
-    "system.magic.mp.value": mpResult.mpFinal,
-  };
-
-  try {
-    await actor.update?.(update);
-  } catch {
-    warnRest("RestFailed");
-    return;
-  }
 
   const diceChains = diceResults
     .map((d) => `d${d.faces}: [${d.results.join(" → ")}] ${formatSigned(ctx.conMod)} = ${d.total}`)
@@ -231,12 +220,26 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     .join(" • ");
 
   try {
-    await createChat({
+    const message = await createChat({
       content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
       rolls: diceRolls,
     });
+    await waitForDice3D(message);
   } catch {
     warnRest("ChatFailed");
+  }
+
+  const update: Record<string, unknown> = {
+    "system.attributes.hp.value": newHp,
+    "system.resources.pool.value": poolRemaining,
+    "system.magic.mp.value": mpResult.mpFinal,
+  };
+
+  try {
+    await actor.update?.(update);
+  } catch {
+    warnRest("RestFailed");
+    return;
   }
 }
 
