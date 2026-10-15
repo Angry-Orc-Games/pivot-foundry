@@ -155,6 +155,11 @@
   width: 100%;
 }
 
+.pf-sheet .pf-sheet-header .pf-title-block input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: var(--pf-accent-ink);
+}
+
 .pf-header-stats {
   display: grid;
   gap: var(--pf-space-3);
@@ -169,6 +174,11 @@
   color: var(--pf-accent-ink);
   font-weight: 700;
   text-align: center;
+}
+
+.pf-sheet .pf-sheet-header .pf-header-stats input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: var(--pf-accent-ink);
 }
 
 .pf-abilities-panel {
@@ -1190,7 +1200,7 @@
 /* Edit toggle button */
 .pf-edit-toggle {
   background: var(--pf-accent);
-  color: var(--pf-bg);
+  color: var(--pf-accent-ink);
   border: 0;
   border-radius: var(--pf-radius-sm);
   padding: 4px 12px;
@@ -1329,6 +1339,14 @@
 .pf-sheet .pf-ab-score:disabled {
   opacity: 1;
   color: var(--pf-ink);
+}
+
+/* NPC sheet: ensure disabled inputs and selects have full contrast */
+.pf-npc-sheet input:disabled,
+.pf-npc-sheet select:disabled {
+  opacity: 1;
+  color: var(--pf-ink);
+  background: var(--pf-panel);
 }
 
 .pf-sheet .pf-ab-save {

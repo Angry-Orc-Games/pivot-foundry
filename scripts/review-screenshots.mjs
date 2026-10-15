@@ -160,12 +160,11 @@ function generateHTML(theme, content, width, sheetType = "character") {
     }
     ${tokens}
     ${css}
-    /* Simulate ApplicationV2 window-content structure */
+    /* Simulate ApplicationV2 window-content structure for full-page screenshots */
     .window-content {
       display: flex;
       flex-direction: column;
-      height: ${sheetType === "character" ? "600px" : "auto"};
-      overflow: hidden;
+      min-height: auto;
     }
   </style>
 </head>
@@ -521,10 +520,10 @@ async function generateScreenshots() {
     const html = generateHTML(scenario.theme, content, scenario.width);
 
     await page.setContent(html);
-    await page.setViewportSize({ width: scenario.width + 40, height: 1200 });
+    await page.setViewportSize({ width: scenario.width + 40, height: 800 });
 
     const outputPath = `artifacts/${scenario.name}.png`;
-    await page.screenshot({ path: outputPath, fullPage: false });
+    await page.screenshot({ path: outputPath, fullPage: true });
     console.log(`Generated ${scenario.name}.png`);
 
     // Generate crops for light-640 and dark-640

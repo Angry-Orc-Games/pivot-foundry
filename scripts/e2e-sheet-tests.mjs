@@ -618,8 +618,8 @@ async function runTests() {
   await page.setContent(html);
   await page.setViewportSize({ width: 680, height: 800 });
 
-  // Test 1: Wheel scroll with real mouse wheel event on tall content
-  console.log("Test 1: Wheel scroll functionality with real mouse.wheel event");
+  // Test 1: Scroll with page.mouse.wheel over tab body
+  console.log("Test 1: Scroll with page.mouse.wheel over tab body");
 
   // Add tall content to make scrolling possible
   await page.evaluate(() => {
@@ -639,65 +639,61 @@ async function runTests() {
   // Wait a moment for layout
   await page.waitForTimeout(100);
 
-  const scrollTest = await page.evaluate(
+  // Get initial scrollTop and container position
+  const initialState = await page.evaluate(() => {
     /* eslint-disable no-undef */
-    () => {
-      return new Promise((resolve) => {
-        const tabBody =
-          document.querySelector(".pf-tab-body") ||
-          document.querySelector(".window-content") ||
-          document.querySelector(".pf-character-sheet");
+    const tabBody =
+      document.querySelector(".pf-tab-body") ||
+      document.querySelector(".window-content") ||
+      document.querySelector(".pf-character-sheet");
 
-        if (!tabBody) {
-          resolve({ error: "Scroll container not found" });
-          return;
-        }
+    if (!tabBody) {
+      return { error: "Scroll container not found" };
+    }
 
-        const initialScrollTop = tabBody.scrollTop;
-        const scrollHeight = tabBody.scrollHeight;
-        const clientHeight = tabBody.clientHeight;
-
-        // Create and dispatch a real WheelEvent
-        const wheelEvent = new WheelEvent("wheel", {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          deltaY: 100,
-          deltaMode: 0, // pixels
-        });
-
-        tabBody.dispatchEvent(wheelEvent);
-
-        // Also manually scroll to ensure it works (browsers handle wheel events differently)
-        tabBody.scrollTop += 100;
-
-        // Check after a brief delay
-        setTimeout(() => {
-          const scrolledTop = tabBody.scrollTop;
-          resolve({
-            initialScrollTop,
-            scrolledTop,
-            scrollHeight,
-            clientHeight,
-            isScrollable: scrollHeight > clientHeight,
-            scrollChanged: scrolledTop > initialScrollTop,
-            scrollDelta: scrolledTop - initialScrollTop,
-          });
-        }, 100);
-      });
-    },
+    const rect = tabBody.getBoundingClientRect();
+    return {
+      initialScrollTop: tabBody.scrollTop,
+      scrollHeight: tabBody.scrollHeight,
+      clientHeight: tabBody.clientHeight,
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2,
+    };
     /* eslint-enable no-undef */
-  );
+  });
 
-  console.log(`  Initial scrollTop: ${scrollTest.initialScrollTop}`);
-  console.log(`  After scroll: ${scrollTest.scrolledTop}`);
-  console.log(`  Scroll delta: ${scrollTest.scrollDelta || 0}px`);
-  console.log(
-    `  Scrollable: ${scrollTest.isScrollable} (height: ${scrollTest.scrollHeight}, client: ${scrollTest.clientHeight})`,
-  );
-  console.log(
-    `  ${scrollTest.scrollChanged ? "✓" : "✗"} Scroll changed scrollTop ${scrollTest.scrollChanged ? "PASS" : "FAIL"}`,
-  );
+  if (initialState.error) {
+    console.log(`  ✗ ${initialState.error}`);
+  } else {
+    // Use page.mouse.wheel to scroll
+    await page.mouse.move(initialState.x, initialState.y);
+    await page.mouse.wheel(0, 100);
+    await page.waitForTimeout(100);
+
+    // Check scrollTop after wheel event
+    const finalState = await page.evaluate(() => {
+      /* eslint-disable no-undef */
+      const tabBody =
+        document.querySelector(".pf-tab-body") ||
+        document.querySelector(".window-content") ||
+        document.querySelector(".pf-character-sheet");
+      return { scrollTop: tabBody ? tabBody.scrollTop : 0 };
+      /* eslint-enable no-undef */
+    });
+
+    const scrollDelta = finalState.scrollTop - initialState.initialScrollTop;
+    const scrollChanged = scrollDelta > 0;
+
+    console.log(`  Initial scrollTop: ${initialState.initialScrollTop}`);
+    console.log(`  After mouse.wheel: ${finalState.scrollTop}`);
+    console.log(`  Scroll delta: ${scrollDelta}px`);
+    console.log(
+      `  Scrollable: ${initialState.scrollHeight > initialState.clientHeight} (height: ${initialState.scrollHeight}, client: ${initialState.clientHeight})`,
+    );
+    console.log(
+      `  ${scrollChanged ? "✓" : "✗"} Scroll changed scrollTop ${scrollChanged ? "PASS" : "FAIL"}`,
+    );
+  }
 
   // Test 2: Tab switching
   console.log("\nTest 2: Tab switching functionality");
