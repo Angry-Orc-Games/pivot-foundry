@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import Handlebars from "handlebars";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { prepareCharacterSheetContext } from "../../src/sheets/character-sheet";
 import { prepareNpcSheetContext } from "../../src/sheets/npc-sheet";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load all character part templates
 const CHARACTER_TEMPLATE_DIR = join(__dirname, "../../templates/actors/character");
@@ -188,12 +192,12 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
 
         // Check for non-whitespace text nodes at root level
         const rootTextNodes = Array.from(body.childNodes).filter(
-          (node) => node.nodeType === 3 && node.textContent?.trim() !== "",
+          (node): node is Text => node.nodeType === 3 && (node.textContent?.trim() ?? "") !== "",
         );
 
         if (rootTextNodes.length > 0) {
           throw new Error(
-            `${partName}.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
+            `${partName}.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent ?? "").join(" ")}"`,
           );
         }
 
@@ -201,15 +205,15 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
         const rootElements = Array.from(body.children);
         if (rootElements.length !== 1) {
           throw new Error(
-            `${partName}.hbs must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
+            `${partName}.hbs must render exactly one root element, found ${rootElements.length}: ${Array.from(rootElements, (el) => el.tagName).join(", ")}`,
           );
         }
 
         // Verify it's a proper HTML element
-        const root = rootElements[0];
-        expect(root?.tagName).toBeTruthy();
+        const root = rootElements[0] as Element;
+        expect(root.tagName).toBeTruthy();
         console.log(
-          `✓ character/${partName}.hbs renders <${root?.tagName?.toLowerCase()}> as single root`,
+          `✓ character/${partName}.hbs renders <${root.tagName.toLowerCase()}> as single root`,
         );
       });
     });
@@ -234,12 +238,12 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
 
       // Check for non-whitespace text nodes at root level
       const rootTextNodes = Array.from(body.childNodes).filter(
-        (node) => node.nodeType === 3 && node.textContent?.trim() !== "",
+        (node): node is Text => node.nodeType === 3 && (node.textContent?.trim() ?? "") !== "",
       );
 
       if (rootTextNodes.length > 0) {
         throw new Error(
-          `npc-sheet.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
+          `npc-sheet.hbs has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent ?? "").join(" ")}"`,
         );
       }
 
@@ -247,15 +251,15 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
       const rootElements = Array.from(body.children);
       if (rootElements.length !== 1) {
         throw new Error(
-          `npc-sheet.hbs must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
+          `npc-sheet.hbs must render exactly one root element, found ${rootElements.length}: ${Array.from(rootElements, (el) => el.tagName).join(", ")}`,
         );
       }
 
       // Verify it's a proper HTML element
-      const root = rootElements[0];
-      expect(root?.tagName).toBeTruthy();
+      const root = rootElements[0] as Element;
+      expect(root.tagName).toBeTruthy();
       console.log(
-        `✓ npc-sheet.hbs (with items) renders <${root?.tagName?.toLowerCase()}> as single root`,
+        `✓ npc-sheet.hbs (with items) renders <${root.tagName.toLowerCase()}> as single root`,
       );
     });
 
@@ -280,12 +284,12 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
 
       // Check for non-whitespace text nodes at root level
       const rootTextNodes = Array.from(body.childNodes).filter(
-        (node) => node.nodeType === 3 && node.textContent?.trim() !== "",
+        (node): node is Text => node.nodeType === 3 && (node.textContent?.trim() ?? "") !== "",
       );
 
       if (rootTextNodes.length > 0) {
         throw new Error(
-          `npc-sheet.hbs (empty) has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent).join(" ")}"`,
+          `npc-sheet.hbs (empty) has non-whitespace text at root level: "${rootTextNodes.map((n) => n.textContent ?? "").join(" ")}"`,
         );
       }
 
@@ -293,15 +297,15 @@ describe("ApplicationV2 PARTS single root element requirement", () => {
       const rootElements = Array.from(body.children);
       if (rootElements.length !== 1) {
         throw new Error(
-          `npc-sheet.hbs (empty) must render exactly one root element, found ${rootElements.length}: ${rootElements.map((el) => el.tagName).join(", ")}`,
+          `npc-sheet.hbs (empty) must render exactly one root element, found ${rootElements.length}: ${Array.from(rootElements, (el) => el.tagName).join(", ")}`,
         );
       }
 
       // Verify it's a proper HTML element
-      const root = rootElements[0];
-      expect(root?.tagName).toBeTruthy();
+      const root = rootElements[0] as Element;
+      expect(root.tagName).toBeTruthy();
       console.log(
-        `✓ npc-sheet.hbs (without items, {{else}}) renders <${root?.tagName?.toLowerCase()}> as single root`,
+        `✓ npc-sheet.hbs (without items, {{else}}) renders <${root.tagName.toLowerCase()}> as single root`,
       );
     });
   });
