@@ -155,10 +155,10 @@ describe("prepareCharacterSheetContext", () => {
 
     expect(baseline.abilityRows.find((row) => row.key === "dex")?.score).toBe(14);
     expect(boosted.abilityRows.find((row) => row.key === "dex")?.score).toBe(14);
-    expect(baseline.abilityRows.find((row) => row.key === "dex")?.mod).toBe(2);
-    expect(boosted.abilityRows.find((row) => row.key === "dex")?.mod).toBe(3);
-    expect(baseline.skillRows.find((row) => row.id === "perception")?.total).toBe(4);
-    expect(boosted.skillRows.find((row) => row.id === "perception")?.total).toBe(6);
+    expect(baseline.abilityRows.find((row) => row.key === "dex")?.mod).toBe("+2");
+    expect(boosted.abilityRows.find((row) => row.key === "dex")?.mod).toBe("+3");
+    expect(baseline.skillRows.find((row) => row.id === "perception")?.total).toBe("+4");
+    expect(boosted.skillRows.find((row) => row.id === "perception")?.total).toBe("+6");
     expect(boosted.derived.proficiencies.weapons.bows).toBe(true);
     expect(baseline.derived.initiative).toBe(4);
     expect(boosted.derived.initiative).toBe(5);

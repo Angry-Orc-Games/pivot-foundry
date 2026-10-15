@@ -3,55 +3,73 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("character sheet template structure", () => {
-  it("renders abilities section before tabs navigation", () => {
-    const templatePath = resolve(process.cwd(), "templates/actors/character-sheet.hbs");
+  it("vitals partial includes ability rows", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/vitals.hbs");
     const template = readFileSync(templatePath, "utf-8");
 
-    // Find the position of the abilities panel and the tabs navigation
-    const abilitiesPanelIndex = template.indexOf('class="pf-panel pf-abilities-panel"');
-    const tabsNavigationIndex = template.indexOf('class="tabs pf-tabs"');
-    const tabBodyIndex = template.indexOf('class="pf-tab-body"');
-
-    // Verify that the abilities panel exists
-    expect(abilitiesPanelIndex).toBeGreaterThan(-1);
-
-    // Verify that tabs navigation exists
-    expect(tabsNavigationIndex).toBeGreaterThan(-1);
-
-    // Verify that abilities panel comes before tabs navigation
-    expect(abilitiesPanelIndex).toBeLessThan(tabsNavigationIndex);
-
-    // Verify that abilities panel comes before tab body
-    expect(abilitiesPanelIndex).toBeLessThan(tabBodyIndex);
-
-    // Verify that tabs navigation comes before tab body
-    expect(tabsNavigationIndex).toBeLessThan(tabBodyIndex);
+    // Verify the vitals partial uses the abilityRows data
+    expect(template).toContain("{{#each abilityRows}}");
+    expect(template).toContain('data-roll-kind="ability"');
+    expect(template).toContain('data-roll-kind="save"');
+    expect(template).toContain("{{scorePath}}");
+    expect(template).toContain("{{primaryPath}}");
+    expect(template).toContain("{{short}}");
+    expect(template).toContain("{{mod}}");
+    expect(template).toContain("{{save}}");
   });
 
-  it("does not include abilities section inside Core tab", () => {
-    const templatePath = resolve(process.cwd(), "templates/actors/character-sheet.hbs");
+  it("header partial includes concept and tier fields", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/header.hbs");
     const template = readFileSync(templatePath, "utf-8");
 
-    // Verify that abilities are not duplicated in the Core tab
-    // The abilities should only appear in the top-level panel, not inside the Core tab
-    const abilitiesHeadingCount = (template.match(/PIVOT\.Sections\.Abilities/g) || []).length;
-    expect(abilitiesHeadingCount).toBe(1);
+    // Verify new header fields
+    expect(template).toContain('name="system.identity.concept"');
+    expect(template).toContain("{{speciesLabel}}");
+    expect(template).toContain("{{backgroundLabel}}");
+    expect(template).toContain("{{system.identity.focus}}");
   });
 
-  it("includes all six ability rows in the abilities panel", () => {
-    const templatePath = resolve(process.cwd(), "templates/actors/character-sheet.hbs");
+  it("tabs partial includes Sheet, Survival, Inventory, Magic, Notes tabs", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/tabs.hbs");
     const template = readFileSync(templatePath, "utf-8");
 
-    // Extract the abilities panel content
-    const abilitiesPanelStart = template.indexOf('class="pf-panel pf-abilities-panel"');
-    const abilitiesPanelEnd = template.indexOf("</section>", abilitiesPanelStart);
-    const abilitiesPanelContent = template.slice(abilitiesPanelStart, abilitiesPanelEnd);
+    expect(template).toContain('data-tab="sheet"');
+    expect(template).toContain('data-tab="survival"');
+    expect(template).toContain('data-tab="inventory"');
+    expect(template).toContain('data-tab="magic"');
+    expect(template).toContain('data-tab="notes"');
+  });
 
-    // Verify the abilities panel uses the abilityRows data
-    expect(abilitiesPanelContent).toContain("{{#each abilityRows}}");
-    expect(abilitiesPanelContent).toContain('data-roll-kind="ability"');
-    expect(abilitiesPanelContent).toContain('data-roll-kind="save"');
-    expect(abilitiesPanelContent).toContain("{{scorePath}}");
-    expect(abilitiesPanelContent).toContain("{{primaryPath}}");
+  it("sheet partial has two-column print layout", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/sheet.hbs");
+    const template = readFileSync(templatePath, "utf-8");
+
+    // Verify print layout structure
+    expect(template).toContain('class="pf-cols"');
+    expect(template).toContain('class="pf-table pf-skills"');
+    expect(template).toContain('class="pf-table pf-attacks"');
+    expect(template).toContain("{{#each items.feats}}");
+    expect(template).toContain("{{#each items.flaws}}");
+    expect(template).toContain("{{#each items.traits}}");
+    expect(template).toContain("{{proficiencyText.weapons}}");
+    expect(template).toContain("{{proficiencyText.armour}}");
+    expect(template).toContain("{{proficiencyText.shields}}");
+  });
+
+  it("vitals partial includes stat cards and abilities", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/vitals.hbs");
+    const template = readFileSync(templatePath, "utf-8");
+
+    // Verify stat cards
+    expect(template).toContain('class="pf-stats"');
+    expect(template).toContain('class="pf-stat"');
+    expect(template).toContain("ARMOUR CLASS");
+    expect(template).toContain("HIT POINTS");
+    expect(template).toContain("SPEED");
+    expect(template).toContain("POOL");
+
+    // Verify abilities grid
+    expect(template).toContain('class="pf-abil"');
+    expect(template).toContain('class="{{abilityClass}}"');
   });
 });
