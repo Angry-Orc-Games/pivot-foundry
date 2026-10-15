@@ -73,11 +73,12 @@
   outline: none;
 }
 
-/* Disabled state per §7.11 */
+/* Disabled state per §7.11 - use background instead of opacity for text contrast */
 .pf-sheet :is(button, input, select, textarea):disabled,
 .pf-sheet [aria-disabled="true"] {
-  opacity: var(--pf-disabled-opacity);
   cursor: not-allowed;
+  background: var(--pf-bg);
+  border-color: var(--pf-muted);
 }
 
 :is(.pivot-fantasy, .pf-sheet).sheet .window-content {

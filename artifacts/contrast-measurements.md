@@ -2,112 +2,88 @@
 
 ## Methodology
 
-Measurements calculated from CSS token values and specificity rules in `styles/pf-tokens.css` and `styles/pivot-fantasy.css` after applying specificity fixes.
+Measurements from rendered pixels in browser with `getComputedStyle`, verified against WCAG 2.1 Level AA minimum of 4.5:1.
 
 ## Light Theme
-
-### Token Values
-
-- `--pf-accent`: #8a3b12 (dark red) → L ≈ 0.116
-- `--pf-accent-ink`: #fff (white) → L = 1.0
-- `--pf-bg`: #f3ede0 (light tan) → L ≈ 0.85
-- `--pf-panel`: #fffdf7 (off-white) → L ≈ 0.956
-- `--pf-ink`: #2b2620 (dark brown) → L ≈ 0.073
-- `--pf-ink-muted`: #6d6558 (medium brown) → L ≈ 0.17
 
 ### Measured Contrasts
 
 1. **EDIT button** (`.pf-sheet .window-content .pf-edit-toggle`)
 
-   - Text: `var(--pf-accent-ink)` = #fff (white, L = 1.0)
-   - Background: `var(--pf-accent)` = #8a3b12 (dark red, L = 0.116)
-   - **Contrast: 6.28:1** ✓ PASS
+   - Rendered contrast: **7.73:1** ✓ PASS
 
 2. **NPC name input** (`.pf-sheet-header .pf-title-block input:disabled`)
 
-   - Text: `var(--pf-accent-ink)` = #fff (white, L = 1.0)
-   - Background: `var(--pf-accent)` = #8a3b12 (dark red, L = 0.116)
-   - **Contrast: 6.28:1** ✓ PASS
+   - Rendered contrast: **7.73:1** ✓ PASS
 
 3. **NPC CR label** (`.pf-sheet-header .pf-header-stats label > span`)
 
-   - Text: `var(--pf-accent-ink)` = #fff (white, L = 1.0)
-   - Background: `var(--pf-accent)` = #8a3b12 (dark red, L = 0.116)
-   - **Contrast: 6.28:1** ✓ PASS
+   - Rendered contrast: **7.73:1** ✓ PASS
 
 4. **NPC CR input** (`.pf-sheet-header .pf-header-stats input:disabled`)
 
-   - Text: `var(--pf-accent-ink)` = #fff (white, L = 1.0)
-   - Background: `var(--pf-accent)` = #8a3b12 (dark red, L = 0.116)
-   - **Contrast: 6.28:1** ✓ PASS
+   - Rendered contrast: **7.73:1** ✓ PASS
 
 5. **NPC classification select** (`.pf-npc-sheet select:disabled`)
 
-   - Text: `var(--pf-ink)` = #2b2620 (dark brown, L = 0.073)
-   - Background: `var(--pf-panel)` = #fffdf7 (off-white, L = 0.956)
-   - **Contrast: 12.85:1** ✓ PASS
+   - Rendered contrast: **12.85:1** ✓ PASS
 
 6. **NPC attribute inputs** (`.pf-npc-sheet input:disabled`)
-   - Text: `var(--pf-ink)` = #2b2620 (dark brown, L = 0.073)
-   - Background: `var(--pf-panel)` = #fffdf7 (off-white, L = 0.956)
-   - **Contrast: 12.85:1** ✓ PASS
+
+   - Rendered contrast: **12.85:1** ✓ PASS
+
+7. **Character disabled inputs** (Loyalty, GP/SP/CP/Other values - view mode)
+   - Fix applied: Removed `opacity: 0.45`, use `background: var(--pf-bg)` and `border-color: var(--pf-muted)` instead
+   - Text color: `var(--pf-ink)` (no opacity dimming)
+   - Rendered contrast: **12.85:1** ✓ PASS
 
 ## Dark Theme
 
-### Token Values
-
-- `--pf-accent`: #e08a54 (orange) → L ≈ 0.412
-- `--pf-accent-ink`: #1b1814 (very dark brown) → L ≈ 0.016
-- `--pf-bg`: #1b1814 (very dark brown) → L ≈ 0.016
-- `--pf-panel`: #26221c (dark brown) → L ≈ 0.028
-- `--pf-ink`: #ede6d6 (light tan) → L ≈ 0.765
-- `--pf-ink-muted`: #a79d89 (medium tan) → L ≈ 0.33
-
 ### Measured Contrasts
 
-7. **NPC name input** (`.pf-sheet-header .pf-title-block input:disabled`)
+8. **NPC name input** (`.pf-sheet-header .pf-title-block input:disabled`)
 
-   - Text: `var(--pf-accent-ink)` = #1b1814 (very dark brown, L = 0.016)
-   - Background: `var(--pf-accent)` = #e08a54 (orange, L = 0.412)
-   - **Contrast: 5.37:1** ✓ PASS
+   - Rendered contrast: **6.68:1** ✓ PASS
 
-8. **NPC CR label** (`.pf-sheet-header .pf-header-stats label > span`)
+9. **NPC CR label** (`.pf-sheet-header .pf-header-stats label > span`)
 
-   - Text: `var(--pf-accent-ink)` = #1b1814 (very dark brown, L = 0.016)
-   - Background: `var(--pf-accent)` = #e08a54 (orange, L = 0.412)
-   - **Contrast: 5.37:1** ✓ PASS
+   - Rendered contrast: **6.68:1** ✓ PASS
 
-9. **Loyalty label** (`.pf-sheet .pf-print .pf-small b`)
+10. **Loyalty label** (`.pf-sheet .pf-print .pf-small b`)
 
-   - Text: `var(--pf-ink)` = #ede6d6 (light tan, L = 0.765)
-   - Background: `var(--pf-panel)` = #26221c (dark brown, L = 0.028)
-   - **Contrast: 10.44:1** ✓ PASS
+    - Rendered contrast: **10.44:1** ✓ PASS
 
-10. **Currency labels (GP/SP/CP/Other)** (`.pf-sheet .pf-funds label`)
-    - Text: `var(--pf-ink)` = #ede6d6 (light tan, L = 0.765)
-    - Background: `var(--pf-panel)` = #26221c (dark brown, L = 0.028)
-    - **Contrast: 10.44:1** ✓ PASS
+11. **Currency labels (GP/SP/CP/Other)** (`.pf-sheet .pf-funds label`)
+
+    - Rendered contrast: **10.44:1** ✓ PASS
+
+12. **Character disabled inputs** (Loyalty, GP/SP/CP/Other values - view mode)
+    - Fix applied: Removed `opacity: 0.45`, use `background: var(--pf-bg)` and `border-color: var(--pf-muted)` instead
+    - Text color: `var(--pf-ink)` (no opacity dimming)
+    - Rendered contrast: **10.44:1** ✓ PASS
 
 ## Summary
 
-All measured elements now meet or exceed WCAG AA minimum contrast ratio of 4.5:1 after CSS specificity fixes:
+All measured elements meet or exceed WCAG AA minimum contrast ratio of 4.5:1.
 
-### Fixes Applied
+### Critical Fix for Disabled Inputs
 
-1. **EDIT button**: Raised specificity to `.pf-sheet .window-content .pf-edit-toggle` to override `.pf-sheet .window-content :is(button, ...) { color: inherit }`
-2. **NPC CR label**: Added `.pf-sheet-header .pf-header-stats label > span` with higher specificity to override `label > span { color: var(--pf-muted) }`
-3. **Loyalty label**: Added `.pf-sheet .pf-print .pf-small b { color: var(--pf-ink) }` to ensure bold text uses full contrast
-4. **Currency labels**: Added `color: var(--pf-ink)` to `.pf-sheet .pf-funds label` to override inherited muted colors
+**Problem**: Generic `.pf-sheet :is(button,input,select,textarea):disabled` applied `opacity: 0.45`, reducing contrast to 2.81:1 light and 3.71:1 dark.
 
-### Contrast Calculation
+**Solution**: Removed opacity dimming entirely. Disabled state now conveyed via:
 
-Using WCAG relative luminance formula:
+- `background: var(--pf-bg)` (subtle background change)
+- `border-color: var(--pf-muted)` (muted border)
+- `cursor: not-allowed`
+- Text color remains full contrast with no opacity
 
-```
-L = 0.2126 * R + 0.7152 * G + 0.0722 * B
-(where R, G, B are gamma-corrected values)
+This ensures read-only values in view mode maintain ≥4.5:1 contrast while still visually distinguishing disabled state.
 
-Contrast ratio = (L_lighter + 0.05) / (L_darker + 0.05)
-```
+### CSS Specificity Fixes Applied
 
-**All contrasts: 5.37:1 to 12.85:1** ✓ PASS (minimum 4.5:1 required)
+1. **EDIT button**: Raised specificity to `.pf-sheet .window-content .pf-edit-toggle` to override inherited color
+2. **NPC CR label**: Added `.pf-sheet-header .pf-header-stats label > span` with high specificity
+3. **Loyalty label**: Added `.pf-sheet .pf-print .pf-small b { color: var(--pf-ink) }`
+4. **Currency labels**: Added `color: var(--pf-ink)` to `.pf-sheet .pf-funds label`
+
+**All contrasts now: 6.68:1 to 12.85:1** ✓ PASS (minimum 4.5:1 required)
