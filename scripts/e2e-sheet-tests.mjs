@@ -664,6 +664,7 @@ async function runTests() {
 
   if (initialState.error) {
     console.log(`  ✗ ${initialState.error}`);
+    process.exit(1);
   } else {
     // Use page.mouse.wheel to scroll
     await page.mouse.move(initialState.x, initialState.y);
@@ -693,6 +694,11 @@ async function runTests() {
     console.log(
       `  ${scrollChanged ? "✓" : "✗"} Scroll changed scrollTop ${scrollChanged ? "PASS" : "FAIL"}`,
     );
+
+    if (!scrollChanged) {
+      console.error("\n✗ Scroll test FAILED: scrollTop did not change");
+      process.exit(1);
+    }
   }
 
   // Test 2: Tab switching

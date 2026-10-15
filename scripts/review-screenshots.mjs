@@ -676,7 +676,7 @@ async function generateNPCScreenshots() {
     await page.setViewportSize({ width: scenario.width + 40, height: 800 });
 
     const outputPath = `artifacts/${scenario.name}.png`;
-    await page.screenshot({ path: outputPath, fullPage: false });
+    await page.screenshot({ path: outputPath, fullPage: true });
     console.log(`Generated ${scenario.name}.png`);
 
     // Crop NPC classification selects at 640px
@@ -695,6 +695,63 @@ async function generateNPCScreenshots() {
   console.log("\nNPC review screenshots generated!");
 }
 
+async function generateItemScreenshots() {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+
+  const itemData = {
+    item: { id: "item-1", name: "Longsword", type: "weapon" },
+    system: {
+      description: "A well-crafted longsword.",
+      quantity: 1,
+      weight: 3,
+      cost: { gp: 15, sp: 0, cp: 0 },
+    },
+    disabledAttr: "disabled",
+  };
+
+  const itemTemplate = `
+    <div class="pf-item-sheet">
+      <header class="pf-sheet-header">
+        <div class="pf-title-block">
+          <label>Item Name</label>
+          <input type="text" value="${itemData.item.name}" disabled />
+        </div>
+        <div class="pf-header-stats">
+          <label>
+            <span>Type</span>
+            <input type="text" value="${itemData.item.type}" disabled />
+          </label>
+        </div>
+      </header>
+      <div class="pf-sheet-body">
+        <section>
+          <label><span>Description</span><textarea disabled>${itemData.system.description}</textarea></label>
+        </section>
+      </div>
+    </div>
+  `;
+
+  const scenarios = [
+    { theme: "light", width: 640, name: "item-light-640" },
+    { theme: "dark", width: 640, name: "item-dark-640" },
+  ];
+
+  for (const scenario of scenarios) {
+    const html = generateHTML(scenario.theme, itemTemplate, scenario.width, "item");
+    await page.setContent(html);
+    await page.setViewportSize({ width: scenario.width + 40, height: 600 });
+
+    const outputPath = `artifacts/${scenario.name}.png`;
+    await page.screenshot({ path: outputPath, fullPage: true });
+    console.log(`Generated ${scenario.name}.png`);
+  }
+
+  await browser.close();
+  console.log("\nItem review screenshots generated!");
+}
+
 generateScreenshots()
   .then(() => generateNPCScreenshots())
+  .then(() => generateItemScreenshots())
   .catch(console.error);
