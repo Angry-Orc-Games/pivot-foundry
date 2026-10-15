@@ -50,7 +50,7 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browsers
-        run: npx --no playwright install chromium --with-deps
+        run: npx --no @playwright/test install chromium --with-deps
 
       - name: E2E sheet tests
         run: node scripts/e2e-sheet-tests.mjs
