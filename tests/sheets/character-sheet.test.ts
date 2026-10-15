@@ -574,17 +574,20 @@ describe("D20 roll attachments for Dice So Nice!", () => {
     Object.defineProperty(sheet, "document", { value: actor, writable: true });
 
     const rollAction = (SheetClass as { DEFAULT_OPTIONS?: { actions?: { roll?: unknown } } })
-      .DEFAULT_OPTIONS?.actions?.roll;
+      .DEFAULT_OPTIONS?.actions?.roll as (
+      this: unknown,
+      event: Event,
+      target: { dataset: Record<string, string> },
+    ) => Promise<void>;
 
-    if (typeof rollAction === "function") {
-      await rollAction.call(
-        sheet,
-        new Event("click") as never,
-        {
-          dataset: { rollKind: "save", key: "str", label: "Strength Save" },
-        } as never,
-      );
-    }
+    expect(rollAction).toBeTypeOf("function");
+    await rollAction.call(
+      sheet,
+      new Event("click") as never,
+      {
+        dataset: { rollKind: "save", key: "str", label: "Strength Save" },
+      } as never,
+    );
 
     expect(chatCreate).toHaveBeenCalledTimes(1);
     const messageData = chatCreate.mock.calls[0]?.[0] as Record<string, unknown>;
@@ -593,5 +596,96 @@ describe("D20 roll attachments for Dice So Nice!", () => {
     expect(rolls.length).toBe(1);
     expect(rolls[0]?.formula).toBe("2d20");
     expect(rolls[0]?.dice).toBeDefined();
+  });
+
+  it("message content equals resultRoll.render() output", async () => {
+    const renderedContent = "<div class='dice-roll'>Result: 18</div>";
+    const chatCreate = vi.fn(async (data: Record<string, unknown>) => ({
+      id: "msg-render",
+      ...(data as object),
+    }));
+
+    vi.stubGlobal("game", {
+      settings: { get: () => "roll" },
+      i18n: { localize: (key: string) => key },
+      dice3d: {
+        waitFor3DAnimationByMessageID: vi.fn(async () => {}),
+      },
+    });
+
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "normal") } } },
+    });
+
+    vi.stubGlobal("ChatMessage", {
+      create: chatCreate,
+      applyRollMode: vi.fn(),
+      getSpeaker: () => ({ alias: "Hero" }),
+    });
+
+    vi.stubGlobal(
+      "Roll",
+      class {
+        dice = [{ faces: 20, results: [{ result: 15 }] }];
+        async evaluate() {
+          return this;
+        }
+        async render() {
+          return renderedContent;
+        }
+        constructor(public formula: string) {}
+      },
+    );
+
+    const actor = {
+      name: "Hero",
+      type: "character",
+      system: {
+        progression: { level: 5 },
+        abilities: { str: { score: 16, primary: true } },
+        skills: {},
+      },
+      items: [],
+    };
+
+    const { createPivotCharacterSheetClass, prepareCharacterSheetContext } =
+      await import("../../src/sheets/character-sheet");
+
+    prepareCharacterSheetContext(actor);
+
+    const SheetClass = createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+          },
+        },
+      },
+    } as never);
+
+    const sheet = new SheetClass();
+    Object.defineProperty(sheet, "document", { value: actor, writable: true });
+
+    const rollAction = (SheetClass as { DEFAULT_OPTIONS?: { actions?: { roll?: unknown } } })
+      .DEFAULT_OPTIONS?.actions?.roll as (
+      this: unknown,
+      event: Event,
+      target: { dataset: Record<string, string> },
+    ) => Promise<void>;
+
+    expect(rollAction).toBeTypeOf("function");
+    await rollAction.call(
+      sheet,
+      new Event("click") as never,
+      {
+        dataset: { rollKind: "save", key: "str", label: "Save" },
+      } as never,
+    );
+
+    expect(chatCreate).toHaveBeenCalledTimes(1);
+    const messageData = chatCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(messageData.content).toBe(renderedContent);
   });
 });
