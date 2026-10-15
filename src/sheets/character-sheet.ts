@@ -3,6 +3,7 @@ import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../ru
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
+import { waitForDice3D } from "../runtime/dice3d";
 import {
   abilities,
   armourCategories,
@@ -13,7 +14,8 @@ import {
   weaponCategories,
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
-import { selectInitiativeCombatant } from "../rules/combat";
+import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { applyChatMessageMode } from "../runtime/ui";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -101,6 +103,9 @@ export interface CombatantLike {
 }
 
 export interface CombatLike {
+  id?: string;
+  active?: boolean;
+  isActive?: boolean;
   combatants?: Iterable<CombatantLike> | { contents: CombatantLike[] };
 }
 
@@ -787,12 +792,21 @@ async function rollAction(
 
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
-  await resultRoll.toMessage({
+
+  const ChatMessage = getChatMessageConstructor();
+  if (!ChatMessage) return;
+
+  const messageData = {
     speaker: speakerForActor(context.actor),
     flavor,
-  });
+    content: await resultRoll.render(),
+    rolls: [poolRoll],
+  };
+  applyRollMode(messageData, getRollMode());
+  const message = await ChatMessage.create(messageData);
 
   if (request.rollKind === "initiative") {
+    await waitForDice3D(message);
     await applyInitiativeRollToCombat({
       actorId: actorDocumentId(actor),
       total,
@@ -1019,14 +1033,55 @@ function getCombatants(combat: CombatLike): CombatantLike[] {
 }
 
 function getActiveCombat(): CombatLike | null {
-  const game = globalThis as typeof globalThis & { game?: { combat?: CombatLike | null } };
-  return game.game?.combat ?? null;
+  const game = globalThis as typeof globalThis & {
+    game?: {
+      combat?: CombatLike | null;
+      combats?: {
+        active?: CombatLike | null;
+        viewed?: CombatLike | null;
+        contents?: Iterable<CombatLike>;
+      };
+    };
+  };
+  return resolveActiveCombat(game.game) as CombatLike | null;
+}
+
+function getChatMessageConstructor():
+  | {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    }
+  | undefined {
+  const globals = globalThis as typeof globalThis & {
+    ChatMessage?: {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    };
+  };
+  return globals.ChatMessage;
+}
+
+function applyRollMode(messageData: Record<string, unknown>, rollMode?: string): void {
+  applyChatMessageMode(messageData, rollMode ?? getRollMode());
+}
+
+function getRollMode(): string {
+  const globals = globalThis as typeof globalThis & {
+    game?: {
+      settings?: {
+        get?: (scope: string, key: string) => unknown;
+      };
+    };
+  };
+  const mode = globals.game?.settings?.get?.("core", "rollMode");
+  return typeof mode === "string" ? mode : "roll";
 }
 
 function getRollConstructor():
   | (new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     })
@@ -1035,6 +1090,7 @@ function getRollConstructor():
     Roll?: new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     };

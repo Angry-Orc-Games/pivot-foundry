@@ -189,6 +189,7 @@ export function calculateMagicAbilityModifier(
  * Caps valid spend at current Pool max.
  */
 export function parsePoolSpends(raw: string, max: number): number | null {
+  if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   if (trimmed === "") return null;
 

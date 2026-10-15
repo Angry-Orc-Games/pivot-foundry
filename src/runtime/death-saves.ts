@@ -9,6 +9,8 @@ import {
 import { busyHealthActors, readSurvival, survivalUpdate, type HealthActor } from "./health";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 import { promptRollMode } from "../sheets/character-sheet";
+import { waitForDice3D } from "./dice3d";
+
 const busy = busyHealthActors;
 export async function deathSaveDialog(actor: HealthActor): Promise<void> {
   if (!actor.uuid || busy.has(actor.uuid) || actor.isOwner !== true) return;
@@ -38,14 +40,21 @@ export async function deathSaveDialog(actor: HealthActor): Promise<void> {
       return;
     }
     const next = resolveDeathSave(current, natural);
-    await actor.update(survivalUpdate(next));
+    let message: unknown = null;
     try {
-      await createChat({
+      message = await createChat({
         speaker: { alias: actor.name },
         content: `<h3>${escapeHtml(actor.name)} — ${localize("DeathSave")}</h3><p>${faces.join(", ")} → ${natural} (${escapeHtml(mode)})</p><p>${escapeHtml(localize(next.status))}: ${next.successes} / ${next.failures}</p><p>${localize("ManualConsequences")}</p>`,
+        rolls: [roll],
       });
+      await waitForDice3D(message);
     } catch {
       warn("ReportFailed");
+    }
+    try {
+      await actor.update(survivalUpdate(next));
+    } catch {
+      warn("UpdateFailed");
     }
   } catch {
     warn("DeathFailed");

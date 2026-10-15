@@ -367,3 +367,17 @@ describe("Short Rest dialog string formatting", () => {
     }
   });
 });
+
+describe("parsePoolSpends cancel / non-string", () => {
+  it("returns null for undefined without throwing", () => {
+    expect(parsePoolSpends(undefined as unknown as string, 3)).toBe(null);
+  });
+
+  it("returns null for null without throwing", () => {
+    expect(parsePoolSpends(null as unknown as string, 3)).toBe(null);
+  });
+
+  it("returns null for non-string number without throwing", () => {
+    expect(parsePoolSpends(1 as unknown as string, 3)).toBe(null);
+  });
+});

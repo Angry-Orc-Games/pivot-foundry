@@ -31,6 +31,7 @@ export interface RuntimeGlobals {
   Roll?: new (formula: string, data?: Record<string, unknown>) => RuntimeRoll;
   ChatMessage?: {
     create(data: Record<string, unknown>): Promise<unknown>;
+    applyMode?(data: Record<string, unknown>, mode: string): unknown;
     applyRollMode?(data: Record<string, unknown>, mode: string): unknown;
   };
   ui?: { notifications?: { warn(message: string): void } };
@@ -81,9 +82,36 @@ export function field(form: HTMLFormElement, name: string): string {
   return String(new FormData(form).get(name) ?? "");
 }
 
+const ROLL_MODE_TO_MESSAGE_MODE: Record<string, string> = {
+  roll: "public",
+  publicroll: "public",
+  gmroll: "gm",
+  blindroll: "blind",
+  selfroll: "self",
+  public: "public",
+  gm: "gm",
+  blind: "blind",
+  self: "self",
+};
+
+/** Map legacy core rollMode values to Foundry v14 ChatMessage mode keys. */
+export function toMessageMode(mode: string): string {
+  return ROLL_MODE_TO_MESSAGE_MODE[mode] ?? mode;
+}
+
+export function applyChatMessageMode(data: Record<string, unknown>, mode: string): void {
+  const Chat = runtime().ChatMessage;
+  if (!Chat) return;
+  if (Chat.applyMode) {
+    Chat.applyMode(data, toMessageMode(mode));
+    return;
+  }
+  Chat.applyRollMode?.(data, mode);
+}
+
 export async function createChat(data: Record<string, unknown>): Promise<unknown> {
   const Chat = runtime().ChatMessage;
   if (!Chat) throw new Error("Chat unavailable");
-  Chat.applyRollMode?.(data, "roll");
+  applyChatMessageMode(data, "roll");
   return Chat.create(data);
 }
