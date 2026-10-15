@@ -43,12 +43,12 @@ jobs:
           [ "$HAVE_LICENSE" = "true" ] || missing+=("FOUNDRY_LICENSE_KEY")
           [ "$HAVE_CACHE" = "true" ] || missing+=("FOUNDRY_RELEASE_CACHE_URL")
           [ "$HAVE_SHA" = "true" ] || missing+=("FOUNDRY_RELEASE_SHA256")
-          
+
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': ${missing[*]}"
             exit 1
           fi
-          
+
           echo "available=true" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
