@@ -132,9 +132,17 @@ const joeFixture = {
 };
 
 // Generate HTML wrapper
-function generateHTML(theme, content, width) {
+function generateHTML(theme, content, width, sheetType = "character") {
   const bodyTheme = theme === "dark" ? "theme-dark" : "";
+  const appTheme = theme === "dark" ? "theme-dark" : "";
   const bg = theme === "dark" ? "#0d0b09" : "#f0f0f0";
+
+  // Match Foundry ApplicationV2 structure
+  const appClasses =
+    sheetType === "character"
+      ? `pivot-fantasy pf-sheet sheet ${appTheme}`
+      : `pivot-fantasy ${appTheme}`;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -152,15 +160,34 @@ function generateHTML(theme, content, width) {
     }
     ${tokens}
     ${css}
+    /* Simulate ApplicationV2 window-content structure */
+    .window-content {
+      display: flex;
+      flex-direction: column;
+      height: ${sheetType === "character" ? "600px" : "auto"};
+      overflow: hidden;
+    }
   </style>
 </head>
 <body class="${bodyTheme}">
-  <div class="pivot-fantasy ${bodyTheme}" style="container-type: inline-size; width: ${width}px; margin: 0 auto;">
-    <div class="pf-sheet">
-      <div class="pf-character-sheet pf-print-wrap">
-        ${content}
+  <div class="${appClasses}" style="container-type: inline-size; width: ${width}px; margin: 0 auto;">
+    ${
+      sheetType === "character"
+        ? `
+      <div class="pf-character-sheet">
+        <div class="window-content">
+          ${content}
+        </div>
       </div>
-    </div>
+    `
+        : `
+      <div class="pf-sheet">
+        <div class="pf-npc-sheet window-content">
+          ${content}
+        </div>
+      </div>
+    `
+    }
   </div>
 </body>
 </html>
@@ -528,6 +555,15 @@ async function generateScreenshots() {
         });
         console.log(`  - ${scenario.name}-abilities.png`);
       }
+
+      // Attacks table crop
+      const attacksElement = await page.locator("table.pf-attacks").first();
+      if (attacksElement) {
+        await attacksElement.screenshot({
+          path: `artifacts/${scenario.name}-attacks.png`,
+        });
+        console.log(`  - ${scenario.name}-attacks.png`);
+      }
     }
   }
 
@@ -535,4 +571,131 @@ async function generateScreenshots() {
   console.log("\nAll review screenshots generated in artifacts/!");
 }
 
-generateScreenshots().catch(console.error);
+async function generateNPCScreenshots() {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+
+  const npcData = {
+    actor: { id: "npc-1", name: "Goblin Raider" },
+    system: {
+      cr: "1",
+      tier: "standard",
+      creatureType: "humanoid",
+      overlay: "",
+      attributes: { hp: { value: 15, max: 15 }, ac: 13, speed: 30 },
+      combatBonuses: { physical: 2, intellectual: 0 },
+      biography: "A typical goblin raider from the wastes.",
+    },
+    config: {
+      tierChoices: { standard: "Standard", elite: "Elite", champion: "Champion" },
+      creatureTypeChoices: { humanoid: "Humanoid", beast: "Beast", undead: "Undead" },
+      overlayChoices: { "": "None", fiend: "Fiend", celestial: "Celestial" },
+    },
+    disabledAttr: "disabled",
+    items: [],
+  };
+
+  const npcTemplate = `
+    <div class="pf-npc-sheet">
+      <header class="pf-sheet-header">
+        <div class="pf-title-block">
+          <label>NPC Name</label>
+          <input type="text" value="${npcData.actor.name}" disabled />
+        </div>
+        <div class="pf-header-stats">
+          <label>
+            <span>CR</span>
+            <input type="text" value="${npcData.system.cr}" disabled />
+          </label>
+        </div>
+      </header>
+
+      <div class="pf-sheet-body">
+        <section class="pf-classification">
+          <h2>Classification</h2>
+          <div class="pf-attribute-row">
+            <label>
+              <span>Tier</span>
+              <select disabled>
+                <option selected>${npcData.config.tierChoices[npcData.system.tier]}</option>
+              </select>
+            </label>
+            <label>
+              <span>Creature Type</span>
+              <select disabled>
+                <option selected>${npcData.config.creatureTypeChoices[npcData.system.creatureType]}</option>
+              </select>
+            </label>
+          </div>
+          <div class="pf-attribute-row">
+            <label>
+              <span>Overlay</span>
+              <select disabled>
+                <option selected>None</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="pf-attributes">
+          <h2>Attributes</h2>
+          <div class="pf-attribute-row">
+            <label>
+              <span>HP Current</span>
+              <input type="number" value="${npcData.system.attributes.hp.value}" disabled />
+            </label>
+            <label>
+              <span>HP Max</span>
+              <input type="number" value="${npcData.system.attributes.hp.max}" disabled />
+            </label>
+          </div>
+          <div class="pf-attribute-row">
+            <label>
+              <span>AC</span>
+              <input type="number" value="${npcData.system.attributes.ac}" disabled />
+            </label>
+            <label>
+              <span>Speed</span>
+              <input type="number" value="${npcData.system.attributes.speed}" disabled />
+            </label>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+
+  const scenarios = [
+    { theme: "light", width: 640, name: "npc-light-640" },
+    { theme: "dark", width: 640, name: "npc-dark-640" },
+    { theme: "light", width: 900, name: "npc-light-900" },
+    { theme: "dark", width: 900, name: "npc-dark-900" },
+  ];
+
+  for (const scenario of scenarios) {
+    const html = generateHTML(scenario.theme, npcTemplate, scenario.width, "npc");
+    await page.setContent(html);
+    await page.setViewportSize({ width: scenario.width + 40, height: 800 });
+
+    const outputPath = `artifacts/${scenario.name}.png`;
+    await page.screenshot({ path: outputPath, fullPage: false });
+    console.log(`Generated ${scenario.name}.png`);
+
+    // Crop NPC classification selects at 640px
+    if (scenario.width === 640) {
+      const classificationElement = await page.locator(".pf-classification");
+      if (classificationElement) {
+        await classificationElement.screenshot({
+          path: `artifacts/${scenario.name}-classification.png`,
+        });
+        console.log(`  - ${scenario.name}-classification.png`);
+      }
+    }
+  }
+
+  await browser.close();
+  console.log("\nNPC review screenshots generated!");
+}
+
+generateScreenshots()
+  .then(() => generateNPCScreenshots())
+  .catch(console.error);

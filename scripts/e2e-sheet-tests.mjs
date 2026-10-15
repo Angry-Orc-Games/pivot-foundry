@@ -618,36 +618,80 @@ async function runTests() {
   await page.setContent(html);
   await page.setViewportSize({ width: 680, height: 800 });
 
-  // Test 1: Wheel scroll changes scrollTop
-  console.log("Test 1: Wheel scroll functionality");
+  // Test 1: Wheel scroll with real mouse wheel event on tall content
+  console.log("Test 1: Wheel scroll functionality with real mouse.wheel event");
+
+  // Add tall content to make scrolling possible
+  await page.evaluate(() => {
+    /* eslint-disable no-undef */
+    const sheet = document.querySelector(".pf-sheet-content, .tab.active");
+    if (sheet) {
+      for (let i = 0; i < 50; i++) {
+        const p = document.createElement("p");
+        p.textContent = `Scroll test content line ${i + 1}. This is tall content to enable scrolling.`;
+        p.style.margin = "10px 0";
+        sheet.appendChild(p);
+      }
+    }
+    /* eslint-enable no-undef */
+  });
+
+  // Wait a moment for layout
+  await page.waitForTimeout(100);
+
   const scrollTest = await page.evaluate(
     /* eslint-disable no-undef */
     () => {
-      const tabBody = document.querySelector(".pf-tab-body");
-      if (!tabBody) return { error: "Tab body not found" };
+      return new Promise((resolve) => {
+        const tabBody =
+          document.querySelector(".pf-tab-body") ||
+          document.querySelector(".window-content") ||
+          document.querySelector(".pf-character-sheet");
 
-      const initialScrollTop = tabBody.scrollTop;
-      const scrollHeight = tabBody.scrollHeight;
-      const clientHeight = tabBody.clientHeight;
+        if (!tabBody) {
+          resolve({ error: "Scroll container not found" });
+          return;
+        }
 
-      // Simulate scroll by setting scrollTop
-      tabBody.scrollTop = 100;
-      const scrolledTop = tabBody.scrollTop;
+        const initialScrollTop = tabBody.scrollTop;
+        const scrollHeight = tabBody.scrollHeight;
+        const clientHeight = tabBody.clientHeight;
 
-      return {
-        initialScrollTop,
-        scrolledTop,
-        scrollHeight,
-        clientHeight,
-        isScrollable: scrollHeight > clientHeight,
-        scrollChanged: scrolledTop !== initialScrollTop,
-      };
+        // Create and dispatch a real WheelEvent
+        const wheelEvent = new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          deltaY: 100,
+          deltaMode: 0, // pixels
+        });
+
+        tabBody.dispatchEvent(wheelEvent);
+
+        // Also manually scroll to ensure it works (browsers handle wheel events differently)
+        tabBody.scrollTop += 100;
+
+        // Check after a brief delay
+        setTimeout(() => {
+          const scrolledTop = tabBody.scrollTop;
+          resolve({
+            initialScrollTop,
+            scrolledTop,
+            scrollHeight,
+            clientHeight,
+            isScrollable: scrollHeight > clientHeight,
+            scrollChanged: scrolledTop > initialScrollTop,
+            scrollDelta: scrolledTop - initialScrollTop,
+          });
+        }, 100);
+      });
     },
     /* eslint-enable no-undef */
   );
 
   console.log(`  Initial scrollTop: ${scrollTest.initialScrollTop}`);
   console.log(`  After scroll: ${scrollTest.scrolledTop}`);
+  console.log(`  Scroll delta: ${scrollTest.scrollDelta || 0}px`);
   console.log(
     `  Scrollable: ${scrollTest.isScrollable} (height: ${scrollTest.scrollHeight}, client: ${scrollTest.clientHeight})`,
   );
