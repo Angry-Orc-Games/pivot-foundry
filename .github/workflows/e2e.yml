@@ -38,12 +38,18 @@ jobs:
           HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
           HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
         run: |
-          if [ "$HAVE_ADMIN" = "true" ] && [ "$HAVE_LICENSE" = "true" ] && [ "$HAVE_CACHE" = "true" ] && [ "$HAVE_SHA" = "true" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Foundry E2E not run. Configure GitHub Environment foundry-e2e secrets: FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, FOUNDRY_RELEASE_CACHE_URL, FOUNDRY_RELEASE_SHA256."
+          missing=()
+          [ "$HAVE_ADMIN" = "true" ] || missing+=("FOUNDRY_ADMIN_KEY")
+          [ "$HAVE_LICENSE" = "true" ] || missing+=("FOUNDRY_LICENSE_KEY")
+          [ "$HAVE_CACHE" = "true" ] || missing+=("FOUNDRY_RELEASE_CACHE_URL")
+          [ "$HAVE_SHA" = "true" ] || missing+=("FOUNDRY_RELEASE_SHA256")
+          
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': ${missing[*]}"
+            exit 1
           fi
+          
+          echo "available=true" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         if: steps.creds.outputs.available == 'true'
@@ -70,6 +76,14 @@ jobs:
           PIVOT_REQUIRE_RELEASE_SHA256: "1"
           PIVOT_FOUNDRY_TARGET: e2e
         run: npm run foundry:e2e
+
+      - name: Verify tests executed
+        if: steps.creds.outputs.available == 'true'
+        run: |
+          if [ ! -d "playwright-report" ] && [ ! -d "test-results" ]; then
+            echo "::error::E2E job completed but no Playwright test artifacts were created. Tests may not have executed."
+            exit 1
+          fi
 
       - name: Record E2E acceptance
         if: steps.creds.outputs.available == 'true' && success()
