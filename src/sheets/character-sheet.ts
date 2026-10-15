@@ -786,16 +786,19 @@ async function rollAction(
     localize: localizeText,
   });
 
+  const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
+  await resultRoll.evaluate();
+
   const ChatMessage = getChatMessageConstructor();
   if (!ChatMessage) return;
 
   const messageData = {
     speaker: speakerForActor(context.actor),
     flavor,
-    content: `<div class="dice-roll"><div class="dice-result"><h4 class="dice-total">${total}</h4></div></div>`,
+    content: await resultRoll.render(),
     rolls: [poolRoll],
   };
-  applyRollMode(messageData);
+  applyRollMode(messageData, getRollMode());
   const message = await ChatMessage.create(messageData);
 
   if (request.rollKind === "initiative") {
@@ -1045,19 +1048,32 @@ function getChatMessageConstructor():
   return globals.ChatMessage;
 }
 
-function applyRollMode(messageData: Record<string, unknown>): void {
+function applyRollMode(messageData: Record<string, unknown>, rollMode?: string): void {
   const globals = globalThis as typeof globalThis & {
     ChatMessage?: {
       applyRollMode?: (data: Record<string, unknown>, mode: string) => unknown;
     };
   };
-  globals.ChatMessage?.applyRollMode?.(messageData, "roll");
+  globals.ChatMessage?.applyRollMode?.(messageData, rollMode ?? getRollMode());
+}
+
+function getRollMode(): string {
+  const globals = globalThis as typeof globalThis & {
+    game?: {
+      settings?: {
+        get?: (scope: string, key: string) => unknown;
+      };
+    };
+  };
+  const mode = globals.game?.settings?.get?.("core", "rollMode");
+  return typeof mode === "string" ? mode : "roll";
 }
 
 function getRollConstructor():
   | (new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     })
@@ -1066,6 +1082,7 @@ function getRollConstructor():
     Roll?: new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     };
