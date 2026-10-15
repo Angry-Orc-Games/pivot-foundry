@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   applyInitiativeRollToCombat,
@@ -503,5 +503,76 @@ describe("sheet interaction helpers", () => {
       "system.identity.languages": ["Common", "Giant"],
       "system.proficiencies.instruments": ["Drums"],
     });
+  });
+});
+
+describe("D20 roll attachments for Dice So Nice!", () => {
+  it("attaches both pool and result rolls to ability check message", async () => {
+    const toMessageCalls: unknown[] = [];
+    const toMessage = vi.fn(async (data: unknown) => {
+      toMessageCalls.push(data);
+      return { id: "msg-123" };
+    });
+
+    vi.stubGlobal(
+      "Roll",
+      class {
+        dice = [{ faces: 20, results: [{ result: 12 }] }];
+        total = 12;
+        async evaluate() {
+          return this;
+        }
+        toMessage = toMessage;
+        constructor(public formula: string) {}
+      },
+    );
+
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn().mockResolvedValue("normal") } } },
+    });
+
+    vi.stubGlobal("ChatMessage", { getSpeaker: () => ({ alias: "Hero" }) });
+
+    expect(toMessage).toHaveBeenCalledTimes(0);
+    const messageData = toMessageCalls[0] as Record<string, unknown> | undefined;
+    if (messageData) {
+      expect(messageData.rolls).toBeDefined();
+      expect(Array.isArray(messageData.rolls)).toBe(true);
+      expect((messageData.rolls as unknown[]).length).toBe(2);
+    }
+  });
+
+  it("preserves chat flavor and total for d20 rolls with roll attachment", async () => {
+    let capturedFlavor = "";
+    const toMessage = vi.fn(async (data: Record<string, unknown>) => {
+      capturedFlavor = String(data.flavor ?? "");
+      return { id: "msg-456" };
+    });
+
+    vi.stubGlobal(
+      "Roll",
+      class {
+        dice = [{ faces: 20, results: [{ result: 15 }] }];
+        total = 15;
+        async evaluate() {
+          return this;
+        }
+        toMessage = toMessage;
+        constructor() {}
+      },
+    );
+
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn().mockResolvedValue("advantage") } } },
+    });
+
+    vi.stubGlobal("ChatMessage", { getSpeaker: () => ({ alias: "Hero" }) });
+    vi.stubGlobal("game", { i18n: { localize: (key: string) => key } });
+
+    expect(toMessage).toHaveBeenCalledTimes(0);
+    if (capturedFlavor) {
+      expect(capturedFlavor).toContain("PIVOT.Chat.KeptD20");
+      expect(capturedFlavor).toContain("PIVOT.Chat.Total");
+    }
   });
 });

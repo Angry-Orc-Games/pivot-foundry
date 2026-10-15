@@ -46,16 +46,19 @@ export async function damageRollDialog(
       await ordinary.toMessage({
         speaker: { alias: actor.name },
         flavor: escapeHtml(localize("OrdinaryWarning")),
+        rolls: [ordinary],
       });
       return;
     }
     const progress = rollProgress();
+    const diceRolls: InstanceType<typeof Roll>[] = [];
     const result = await rollExploding(
       input.formula,
       { critical: input.kind === "damage" && input.critical, enhanced: input.enhanced },
       async (faces) => {
         const die = new Roll(`1d${faces}`);
         await progress.wait(die.evaluate());
+        diceRolls.push(die);
         if (die.total === undefined) throw new Error("Incomplete");
         return die.total;
       },
@@ -80,6 +83,7 @@ export async function damageRollDialog(
       speaker: { alias: actor.name },
       content,
       flags: { [SYSTEM_ID]: { survivalRoll: payload } },
+      rolls: diceRolls,
     });
   } catch {
     warn("RollFailed");

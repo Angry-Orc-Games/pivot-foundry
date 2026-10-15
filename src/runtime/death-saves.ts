@@ -9,6 +9,31 @@ import {
 import { busyHealthActors, readSurvival, survivalUpdate, type HealthActor } from "./health";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 import { promptRollMode } from "../sheets/character-sheet";
+
+async function waitForDice3D(message: unknown): Promise<void> {
+  const messageId =
+    message && typeof message === "object" && "id" in message && typeof message.id === "string"
+      ? message.id
+      : null;
+  if (!messageId) return;
+
+  const globals = globalThis as typeof globalThis & {
+    game?: {
+      dice3d?: {
+        waitFor3DAnimationByMessageID?: (id: string) => Promise<void>;
+      };
+    };
+  };
+
+  if (globals.game?.dice3d?.waitFor3DAnimationByMessageID) {
+    try {
+      await globals.game.dice3d.waitFor3DAnimationByMessageID(messageId);
+    } catch {
+      // Dice So Nice! not available or animation failed; continue without waiting
+    }
+  }
+}
+
 const busy = busyHealthActors;
 export async function deathSaveDialog(actor: HealthActor): Promise<void> {
   if (!actor.uuid || busy.has(actor.uuid) || actor.isOwner !== true) return;
@@ -39,11 +64,13 @@ export async function deathSaveDialog(actor: HealthActor): Promise<void> {
     }
     const next = resolveDeathSave(current, natural);
     await actor.update(survivalUpdate(next));
+    const message = await createChat({
+      speaker: { alias: actor.name },
+      content: `<h3>${escapeHtml(actor.name)} — ${localize("DeathSave")}</h3><p>${faces.join(", ")} → ${natural} (${escapeHtml(mode)})</p><p>${escapeHtml(localize(next.status))}: ${next.successes} / ${next.failures}</p><p>${localize("ManualConsequences")}</p>`,
+      rolls: [roll],
+    });
+    await waitForDice3D(message);
     try {
-      await createChat({
-        speaker: { alias: actor.name },
-        content: `<h3>${escapeHtml(actor.name)} — ${localize("DeathSave")}</h3><p>${faces.join(", ")} → ${natural} (${escapeHtml(mode)})</p><p>${escapeHtml(localize(next.status))}: ${next.successes} / ${next.failures}</p><p>${localize("ManualConsequences")}</p>`,
-      });
     } catch {
       warn("ReportFailed");
     }

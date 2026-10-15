@@ -135,6 +135,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   let poolRemaining = ctx.poolCurrent;
   let totalHealed = 0;
   const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
+  const diceRolls: InstanceType<typeof Roll>[] = [];
 
   try {
     const progress = rollProgress();
@@ -163,6 +164,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
         async (faces) => {
           const die = new Roll(`1d${faces}`);
           await progress.wait(die.evaluate());
+          diceRolls.push(die);
           if (die.total === undefined) throw new Error("Incomplete");
           return die.total;
         },
@@ -231,6 +233,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   try {
     await createChat({
       content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
+      rolls: diceRolls,
     });
   } catch {
     warnRest("ChatFailed");

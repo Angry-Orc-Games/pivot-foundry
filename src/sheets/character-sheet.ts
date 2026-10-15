@@ -762,6 +762,7 @@ async function rollAction(
     await roll.toMessage({
       speaker: speakerForActor(context.actor),
       flavor: request.label,
+      rolls: [roll],
     });
     return;
   }
@@ -787,12 +788,14 @@ async function rollAction(
 
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
-  await resultRoll.toMessage({
+  const message = await resultRoll.toMessage({
     speaker: speakerForActor(context.actor),
     flavor,
+    rolls: [poolRoll, resultRoll],
   });
 
   if (request.rollKind === "initiative") {
+    await waitForDice3D(message);
     await applyInitiativeRollToCombat({
       actorId: actorDocumentId(actor),
       total,
@@ -1204,6 +1207,30 @@ function deletePath(source: Record<string, unknown>, path: string[]): void {
   }
   const final = path[path.length - 1];
   if (final && isRecord(current)) Reflect.deleteProperty(current, final);
+}
+
+async function waitForDice3D(message: unknown): Promise<void> {
+  const messageId =
+    message && typeof message === "object" && "id" in message && typeof message.id === "string"
+      ? message.id
+      : null;
+  if (!messageId) return;
+
+  const globals = globalThis as typeof globalThis & {
+    game?: {
+      dice3d?: {
+        waitFor3DAnimationByMessageID?: (id: string) => Promise<void>;
+      };
+    };
+  };
+
+  if (globals.game?.dice3d?.waitFor3DAnimationByMessageID) {
+    try {
+      await globals.game.dice3d.waitFor3DAnimationByMessageID(messageId);
+    } catch {
+      // Dice So Nice! not available or animation failed; continue without waiting
+    }
+  }
 }
 
 async function callOptionalSuper(
