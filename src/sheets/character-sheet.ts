@@ -3,6 +3,7 @@ import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../ru
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
+import { waitForDiceSoNiceAnimation } from "../runtime/dice-so-nice";
 import {
   abilities,
   armourCategories,
@@ -653,26 +654,7 @@ async function rollInitiativeWithDiceAnimation(options: {
   const createdList = Array.isArray(created) ? created : [];
   const message = createdList[0] as { id?: string } | undefined;
   if (message?.id) {
-    const gameGlobal = globalThis as typeof globalThis & {
-      game?: {
-        modules?: { get?: (id: string) => { active?: boolean } | undefined };
-        dice3d?: { waitFor3DAnimationByMessageID?: (id: string) => Promise<void> };
-      };
-    };
-    const dsnModule = gameGlobal.game?.modules?.get?.("dice-so-nice");
-    const dice3d = gameGlobal.game?.dice3d;
-
-    // Only wait if DSN module is active and dice3d API is available
-    if (dsnModule?.active && dice3d?.waitFor3DAnimationByMessageID) {
-      try {
-        // Cap wait at 10s to prevent stuck animations from blocking initiative
-        const waitPromise = dice3d.waitFor3DAnimationByMessageID(message.id);
-        const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 10000));
-        await Promise.race([waitPromise, timeoutPromise]);
-      } catch {
-        // If DSN wait throws, continue anyway
-      }
-    }
+    await waitForDiceSoNiceAnimation(message.id);
   }
 
   // Update combatant initiative after animation
