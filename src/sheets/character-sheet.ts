@@ -837,6 +837,18 @@ async function rollAction(
   const mode = await promptRollMode();
   if (!mode) return;
 
+  if (request.rollKind === "initiative") {
+    await rollSheetInitiative({
+      actor,
+      RollConstructor,
+      mode,
+      modifier: request.modifier,
+      label: request.label,
+      combat: getActiveCombat(),
+    });
+    return;
+  }
+
   const resolution = dicePoolForRollMode(mode);
   const poolRoll = new RollConstructor(d20PoolFormula(resolution.dieCount));
   await poolRoll.evaluate();
@@ -856,22 +868,69 @@ async function rollAction(
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
 
-  if (request.rollKind === "initiative") {
-    await rollInitiativeWithDiceAnimation({
-      actor,
-      roll: resultRoll,
-      total,
-      flavor,
-      combat: getActiveCombat(),
-      notify: notifyUser,
-      localize: localizeText,
-    });
-  } else {
-    await resultRoll.toMessage({
-      speaker: speakerForActor(context.actor),
-      flavor,
-    });
-  }
+  await resultRoll.toMessage({
+    speaker: speakerForActor(context.actor),
+    flavor,
+  });
+}
+
+/**
+ * Initiative formula with real d20 terms so Dice So Nice animates every rolled die.
+ * Keep modifiers mirror selectKeptD20: highest -> kh1, lowest -> kl1, single -> plain.
+ */
+export function initiativeRollFormula(
+  resolution: { dieCount: number; pick: "single" | "highest" | "lowest" },
+  modifier: number,
+): string {
+  const keep = resolution.pick === "highest" ? "kh1" : resolution.pick === "lowest" ? "kl1" : "";
+  return `${d20PoolFormula(resolution.dieCount)}${keep}${formatSigned(modifier)}`;
+}
+
+type InitiativeRoll = {
+  evaluate: () => Promise<unknown>;
+  dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+  terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+  toMessage: (
+    data: Record<string, unknown>,
+    options?: { rollMode?: string; create?: boolean },
+  ) => Promise<unknown>;
+};
+
+export async function rollSheetInitiative(options: {
+  actor: ActorLike;
+  RollConstructor: new (formula: string) => unknown;
+  mode: RollMode;
+  modifier: number;
+  label: string;
+  combat: CombatLike | null | undefined;
+}): Promise<{ kept: number; total: number }> {
+  const { actor, mode, modifier, label, combat } = options;
+  const resolution = dicePoolForRollMode(mode);
+  const roll = new options.RollConstructor(
+    initiativeRollFormula(resolution, modifier),
+  ) as InitiativeRoll;
+  await roll.evaluate();
+  const kept = selectKeptD20(naturalResultsFromRoll(roll), resolution);
+  const total = kept + modifier;
+  const flavor = buildD20ChatFlavor({
+    label,
+    mode,
+    kept,
+    modifier,
+    total,
+    attackCrit: null,
+    localize: localizeText,
+  });
+  await rollInitiativeWithDiceAnimation({
+    actor,
+    roll,
+    total,
+    flavor,
+    combat,
+    notify: notifyUser,
+    localize: localizeText,
+  });
+  return { kept, total };
 }
 
 async function adjustResourceAction(
