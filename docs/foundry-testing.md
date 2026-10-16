@@ -15,7 +15,17 @@ npm run verify
 npm run package:system
 ```
 
-`npm run verify` does not start Foundry and does not prove browser behavior.
+`npm run verify` does not start Foundry and does not prove browser behavior. It does run the unit suite with coverage thresholds.
+
+Fast checks during implementation:
+
+```sh
+npm run test
+npm run test:agent -- --json src/rules/rest.ts
+npm run test:changed
+```
+
+`test:agent` prints a stable pass/fail summary and writes `test-results/unit-summary.json`. Use it when a tool needs an exit code and a short failure list. Use `npm run test:coverage` when the question is untested lines.
 
 ## Packaged E2E
 

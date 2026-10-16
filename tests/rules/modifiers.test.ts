@@ -22,6 +22,12 @@ describe("abilityModifier", () => {
   ])("score %i -> modifier %i", (score, expected) => {
     expect(abilityModifier(score)).toBe(expected);
   });
+
+  it("rejects scores outside the ability table", () => {
+    expect(() => abilityModifier(0)).toThrow(RangeError);
+    expect(() => abilityModifier(31)).toThrow(RangeError);
+    expect(() => abilityModifier(10.5)).toThrow(RangeError);
+  });
 });
 
 describe("proficiencyBonusForLevel", () => {
@@ -39,5 +45,10 @@ describe("proficiencyBonusForLevel", () => {
     [20, 6],
   ])("level %i -> proficiency bonus +%i", (level, expected) => {
     expect(proficiencyBonusForLevel(level)).toBe(expected);
+  });
+
+  it("rejects non-positive levels", () => {
+    expect(() => proficiencyBonusForLevel(0)).toThrow(RangeError);
+    expect(() => proficiencyBonusForLevel(1.2)).toThrow(RangeError);
   });
 });

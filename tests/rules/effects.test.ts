@@ -195,5 +195,24 @@ describe("describeEffectRule", () => {
       typeLabelKey: "PIVOT.Effects.SkillBonus",
       detail: "Perception +2",
     });
+    expect(describeEffectRule({ type: "abilityScoreBonus", ability: "str", amount: -1 })).toEqual({
+      typeLabelKey: "PIVOT.Effects.AbilityScoreBonus",
+      detail: "STR -1",
+    });
+    expect(describeEffectRule({ type: "armourProficiency", category: "shield" })).toEqual({
+      typeLabelKey: "PIVOT.Effects.ArmourProficiency",
+      detail: "Shields",
+    });
+    expect(describeEffectRule({ type: "weaponProficiency", category: "bows" })).toEqual({
+      typeLabelKey: "PIVOT.Effects.WeaponProficiency",
+      detail: "Bows",
+    });
+    expect(describeEffectRule({ type: "acBonus", amount: 1 })).toMatchObject({ detail: "+1" });
+    expect(describeEffectRule({ type: "initiativeBonus", amount: 2 })).toMatchObject({
+      detail: "+2",
+    });
+    expect(describeEffectRule({ type: "speedBonus", amount: 5 })).toMatchObject({ detail: "+5" });
+    expect(describeEffectRule({ type: "poolMaxBonus", amount: 1 })).toMatchObject({ detail: "+1" });
+    expect(describeEffectRule({ type: "mpMaxBonus", amount: 3 })).toMatchObject({ detail: "+3" });
   });
 });
