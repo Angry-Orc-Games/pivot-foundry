@@ -1,6 +1,29 @@
 import { waitForDiceSoNiceAnimation } from "./dice-so-nice";
 import type { TypeDataModelConstructor } from "../foundry-runtime";
 
+interface CombatantLike {
+  id?: string;
+  _id?: string;
+  actor?: {
+    id?: string;
+    name?: string;
+  };
+  token?: unknown;
+  hidden?: boolean;
+  getInitiativeRoll?: (formula: string) => Promise<{
+    toMessage?: (
+      data: Record<string, unknown>,
+      options?: { rollMode?: string; create?: boolean },
+    ) => Promise<Record<string, unknown>>;
+    total?: number;
+  }>;
+  _getInitiativeFormula?: () => string;
+}
+
+interface TurnLike {
+  id?: string;
+}
+
 export function createPivotCombatClass(
   BaseCombat: TypeDataModelConstructor,
 ): TypeDataModelConstructor {
@@ -8,6 +31,7 @@ export function createPivotCombatClass(
     /**
      * Roll initiative for one or more combatants.
      * Override to create chat messages with proper roll mode and wait for Dice So Nice animations.
+     * Follows Foundry v14 Combat.rollInitiative semantics.
      */
     async rollInitiative(
       ids: string | string[],
@@ -22,28 +46,17 @@ export function createPivotCombatClass(
       if (combatantIds.length === 0) return this;
 
       // Get combatants collection
-      const combatants = (this as { combatants?: unknown }).combatants as
-        | Iterable<{
-            id?: string;
-            actor?: {
-              id?: string;
-              name?: string;
-              getInitiativeRoll?: (formula: string) => Promise<{
-                evaluate: (options?: Record<string, unknown>) => Promise<unknown>;
-                total?: number;
-              }>;
-            };
-            _id?: string;
-          }>
-        | undefined;
-
+      const combatants = (this as { combatants?: Iterable<CombatantLike> }).combatants;
       if (!combatants) return this;
 
       const combatantList = Array.from(combatants);
 
       // Get roll mode from settings
       const game = globalThis as typeof globalThis & {
-        game?: { settings?: { get?: (scope: string, key: string) => unknown } };
+        game?: {
+          settings?: { get?: (scope: string, key: string) => unknown };
+          i18n?: { format?: (key: string, data: Record<string, unknown>) => string };
+        };
       };
       const rawMode = game.game?.settings?.get?.("core", "rollMode");
       const rollMode = typeof rawMode === "string" ? rawMode : "roll";
@@ -52,61 +65,106 @@ export function createPivotCombatClass(
       const ChatMessage = (
         globalThis as typeof globalThis & {
           ChatMessage?: {
-            implementation?: { createDocuments?: (data: unknown[]) => Promise<unknown> };
+            implementation?: {
+              create?: (data: Record<string, unknown>) => Promise<unknown>;
+              createDocuments?: (data: unknown[]) => Promise<unknown>;
+            };
+            create?: (data: Record<string, unknown>) => Promise<unknown>;
             createDocuments?: (data: unknown[]) => Promise<unknown>;
-            applyRollMode?: (data: Record<string, unknown>, mode: string) => void;
-            getSpeaker?: (options: { actor: unknown }) => Record<string, unknown>;
+            getSpeaker?: (options: {
+              actor?: unknown;
+              token?: unknown;
+              alias?: string;
+            }) => Record<string, unknown>;
           };
         }
       ).ChatMessage;
 
+      // Remember current combatant for turn preservation
+      const currentCombatantId = (this as { combatant?: { id?: string } }).combatant?.id;
+
       // Roll initiative for each combatant
       const updates: Array<{ _id: string; initiative: number }> = [];
-      const formula =
-        options.formula ??
-        (
-          this as { _getInitiativeFormula?: (combatant: unknown) => string }
-        )._getInitiativeFormula?.(combatantList[0]) ??
-        "1d20";
 
       for (const combatantId of combatantIds) {
         const combatant = combatantList.find((c) => (c.id ?? c._id) === combatantId);
-        if (!combatant?.actor?.getInitiativeRoll) continue;
+        // Skip if combatant missing, no actor, or no getInitiativeRoll method
+        if (!combatant?.actor || !combatant.getInitiativeRoll) continue;
 
-        // Evaluate the roll
-        const roll = await combatant.actor.getInitiativeRoll(formula);
-        await roll.evaluate({ async: true });
+        // Resolve formula per combatant
+        const formula = options.formula ?? combatant._getInitiativeFormula?.() ?? "1d20";
 
+        // Evaluate the roll using combatant method
+        const roll = await combatant.getInitiativeRoll(formula);
         const total = roll.total ?? 0;
 
-        // Create chat message data
-        const speaker = ChatMessage?.getSpeaker?.({ actor: combatant.actor }) ?? {
-          alias: combatant.actor.name ?? "Unknown",
-        };
+        // Get speaker with actor, token, and alias
+        const speaker = ChatMessage?.getSpeaker?.({
+          actor: combatant.actor,
+          token: combatant.token,
+          alias: combatant.actor.name,
+        }) ?? { alias: combatant.actor.name ?? "Unknown" };
 
-        const chatData = {
-          speaker,
-          flavor: `${combatant.actor.name ?? "Unknown"} rolls for Initiative!`,
-          type: 5, // CHAT_MESSAGE_TYPES.ROLL
-          roll,
-          ...options.messageOptions,
-        };
+        // Format flavor using i18n
+        const flavor =
+          game.game?.i18n?.format?.("COMBAT.RollsInitiative", {
+            name: combatant.actor.name ?? "Unknown",
+          }) ?? `${combatant.actor.name ?? "Unknown"} rolls for Initiative!`;
 
-        // Apply roll mode
-        if (ChatMessage?.applyRollMode) {
-          ChatMessage.applyRollMode(chatData, rollMode);
+        // Build message data using roll.toMessage with core.initiativeRoll flag
+        let chatData: Record<string, unknown> = {};
+        if (roll.toMessage) {
+          chatData = await roll.toMessage(
+            {
+              speaker,
+              flavor,
+              flags: { "core.initiativeRoll": true },
+            },
+            { rollMode: "roll", create: false },
+          );
         }
 
-        // Create message
+        // Merge messageOptions
+        if (options.messageOptions) {
+          chatData = { ...chatData, ...options.messageOptions };
+        }
+
+        // Handle hidden combatant / blindroll rule: if combatant is hidden, force blind roll mode
+        const effectiveRollMode = combatant.hidden ? "blindroll" : rollMode;
+
+        // Apply roll mode after merging messageOptions
+        const CHAT_MESSAGE_STYLES = { ROLL: 1, EMOTE: 2, WHISPER: 3, OTHER: 0, OOC: 0, IC: 0 };
+        if (effectiveRollMode !== "roll") {
+          chatData.whisper =
+            effectiveRollMode === "blindroll" || effectiveRollMode === "gmroll"
+              ? ((
+                  game.game as { users?: { contents?: Array<{ id?: string; isGM?: boolean }> } }
+                )?.users?.contents
+                  ?.filter((u) => u.isGM)
+                  .map((u) => u.id) ?? [])
+              : effectiveRollMode === "selfroll"
+                ? [
+                    ((game.game as { user?: { id?: string } })?.user?.id ??
+                      (game.game as { userId?: string })?.userId) ||
+                      "",
+                  ]
+                : chatData.whisper;
+          chatData.blind = effectiveRollMode === "blindroll";
+          chatData.type = CHAT_MESSAGE_STYLES.ROLL;
+        }
+
+        // Create message using ChatMessage.implementation.create for single message
         const Cls = ChatMessage?.implementation ?? ChatMessage;
-        let created: unknown = [];
-        if (Cls?.createDocuments) {
-          created = await Cls.createDocuments([chatData]);
+        let created: unknown;
+        if (Cls?.create) {
+          created = await Cls.create(chatData);
+        } else if (Cls?.createDocuments) {
+          const createdList = await Cls.createDocuments([chatData]);
+          created = Array.isArray(createdList) ? createdList[0] : undefined;
         }
 
         // Wait for Dice So Nice animation
-        const createdList = Array.isArray(created) ? created : [];
-        const message = createdList[0] as { id?: string } | undefined;
+        const message = created as { id?: string } | undefined;
         if (message?.id) {
           await waitForDiceSoNiceAnimation(message.id);
         }
@@ -127,11 +185,19 @@ export function createPivotCombatClass(
         ).updateEmbeddedDocuments?.("Combatant", updates);
       }
 
-      // Update turn order if requested
-      if (options.updateTurn !== false) {
-        await (this as { update?: (data: Record<string, unknown>) => Promise<unknown> }).update?.({
-          turn: 0,
-        });
+      // Preserve current turn if requested (matching core behavior)
+      if (options.updateTurn !== false && currentCombatantId) {
+        const turns = (this as { turns?: TurnLike[] }).turns;
+        if (turns) {
+          const turnIndex = turns.findIndex((t) => t.id === currentCombatantId);
+          if (turnIndex !== -1) {
+            await (
+              this as { update?: (data: Record<string, unknown>) => Promise<unknown> }
+            ).update?.({
+              turn: turnIndex,
+            });
+          }
+        }
       }
 
       return this;
