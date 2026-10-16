@@ -21,12 +21,12 @@ Fast checks during implementation:
 
 ```sh
 npm run test
-npm run test:agent -- --json src/rules/rest.ts
-npm run test:agent -- --testNamePattern "short rest" src/runtime/rest-dialogs.ts
-npm run test:changed
+npm run --silent test:agent -- --json src/rules/rest.ts
+npm run --silent test:agent -- --json --testNamePattern shortRestDialog src/runtime/rest-dialogs.ts
+npm run --silent test:changed
 ```
 
-`test:agent` prints a stable pass/fail summary and writes `test-results/unit-summary.json`. The JSON lists the inputs, the test files that ran, and failing assertions. `--changed` includes untracked files and runs the full suite if a unit-test input was deleted. Use `npm run test:coverage` when the question is untested lines.
+`test:agent` prints a stable pass/fail summary and writes `test-results/unit-summary.json`. Use `--silent` when stdout must be a single JSON object. The JSON lists the inputs, the test files that ran, and failing assertions. `--changed` includes untracked files and runs the full suite if a unit-test input was deleted. Use `npm run test:coverage` when the question is untested lines.
 
 ## Packaged E2E
 

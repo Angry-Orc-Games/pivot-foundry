@@ -2,11 +2,11 @@
 /**
  * Programmatic Vitest runner for the AI feedback loop.
  *
+ *   npm run --silent test:agent -- --json
+ *   npm run --silent test:agent -- --json src/rules/rest.ts
+ *   npm run --silent test:agent -- --json --testNamePattern shortRestDialog
+ *   npm run --silent test:changed
  *   npm run test:agent
- *   npm run test:agent -- src/rules/rest.ts
- *   npm run test:agent -- --testNamePattern "short rest"
- *   npm run test:changed
- *   npm run test:agent -- --json
  *
  * --json prints one summary object on stdout. Vitest's own log stays on stderr
  * in text mode. Exit code is 0 only when every selected test passes.
