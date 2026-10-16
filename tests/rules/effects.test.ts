@@ -51,6 +51,12 @@ describe("validateEffectRule", () => {
     expect(() => validateEffectRule({ type: "weaponProficiency", category: "lasers" })).toThrow(
       /Unknown weapon category/,
     );
+    expect(() => validateEffectRule({ type: "armourProficiency", category: "cloth" })).toThrow(
+      /Unknown armour proficiency category/,
+    );
+    expect(() =>
+      validateEffectRule({ type: "abilityScoreBonus", ability: "luck", amount: 1 }),
+    ).toThrow(/Unknown ability/);
     expect(() => validateEffectRule({ type: "acBonus", formula: "1d4" })).toThrow();
     expect(() => validateEffectRule({ type: "acBonus", amount: 1.5 })).toThrow(/finite integer/);
   });
@@ -207,6 +213,26 @@ describe("describeEffectRule", () => {
       typeLabelKey: "PIVOT.Effects.WeaponProficiency",
       detail: "Bows",
     });
+    expect(describeEffectRule({ type: "armourProficiency", category: "light" }).detail).toBe(
+      "Light",
+    );
+    expect(describeEffectRule({ type: "armourProficiency", category: "medium" }).detail).toBe(
+      "Medium",
+    );
+    expect(describeEffectRule({ type: "armourProficiency", category: "heavy" }).detail).toBe(
+      "Heavy",
+    );
+    for (const [category, detail] of [
+      ["meleeLight", "Melee: Light"],
+      ["meleeMedium", "Melee: Medium"],
+      ["meleeHeavy", "Melee: Heavy"],
+      ["meleeTwoHandedHeavy", "Melee: 2-Handed"],
+      ["crossbows", "Crossbows"],
+      ["thrown", "Thrown Weapons"],
+      ["improvised", "Improvised"],
+    ] as const) {
+      expect(describeEffectRule({ type: "weaponProficiency", category }).detail).toBe(detail);
+    }
     expect(describeEffectRule({ type: "acBonus", amount: 1 })).toMatchObject({ detail: "+1" });
     expect(describeEffectRule({ type: "initiativeBonus", amount: 2 })).toMatchObject({
       detail: "+2",

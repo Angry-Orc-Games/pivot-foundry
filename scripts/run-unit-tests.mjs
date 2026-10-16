@@ -4,11 +4,14 @@
  *
  *   npm run test:agent
  *   npm run test:agent -- src/rules/rest.ts
+ *   npm run test:agent -- --testNamePattern "short rest"
  *   npm run test:changed
  *   npm run test:agent -- --json
  *
  * --json prints one summary object on stdout. Vitest's own log stays on stderr
  * in text mode. Exit code is 0 only when every selected test passes.
+ * --changed includes untracked files and runs the full suite when a unit-test
+ * input was deleted.
  */
 
 import { execFileSync, spawn } from "node:child_process";
@@ -29,6 +32,14 @@ const STATIC_READS = [
     pattern: /^templates\/actors\/character-sheet\.hbs$/,
     tests: ["tests/sheets/character-sheet-template.test.mjs"],
   },
+  {
+    pattern: /^templates\/actors\/npc-sheet\.hbs$/,
+    tests: ["tests/sheets/npc-sheet.test.ts", "tests/sheets/sheet-templates.test.mjs"],
+  },
+  {
+    pattern: /^templates\/items\/item-sheet\.hbs$/,
+    tests: ["tests/sheets/item-sheet.test.ts", "tests/sheets/sheet-templates.test.mjs"],
+  },
 ];
 
 export function unitTestInputs(changedPaths) {
@@ -43,10 +54,23 @@ export function unitTestInputs(changedPaths) {
   return [...new Set(inputs)];
 }
 
+export function classifyChangedPaths(paths, fileExists) {
+  const normalized = paths.map((file) => file.replaceAll("\\", "/").replace(/^\.\//, ""));
+  const deleted = normalized.filter((file) => UNIT_INPUT.test(file) && !fileExists(file));
+  if (deleted.length > 0) return { mode: "all", files: [], reason: "deleted unit-test input" };
+  const files = unitTestInputs(normalized);
+  if (files.length === 0) {
+    return { mode: "skip", files: [], reason: "no unit-test inputs in the change set" };
+  }
+  return { mode: "related", files };
+}
+
 export function summarizeReport(report) {
   const failures = [];
+  const testFiles = [];
   for (const file of report.testResults ?? []) {
     const relativeFile = path.relative(ROOT, file.name ?? "").replaceAll("\\", "/");
+    if (relativeFile) testFiles.push(relativeFile);
     for (const assertion of file.assertionResults ?? []) {
       if (assertion.status !== "failed") continue;
       const location = assertion.location?.line ? `:${assertion.location.line}` : "";
@@ -70,6 +94,9 @@ export function summarizeReport(report) {
     pending: report.numPendingTests ?? 0,
     total,
     durationMs: null,
+    inputs: [],
+    testFiles,
+    testNamePattern: null,
     failures,
     reason: total === 0 ? "no tests ran" : undefined,
   };
@@ -84,6 +111,9 @@ export function formatSummary(summary) {
     `total: ${summary.total}`,
     `durationMs: ${summary.durationMs ?? "unknown"}`,
   ];
+  if (summary.inputs?.length) lines.push(`inputs: ${summary.inputs.join(", ")}`);
+  if (summary.testNamePattern) lines.push(`testNamePattern: ${summary.testNamePattern}`);
+  if (summary.testFiles?.length) lines.push(`testFiles: ${summary.testFiles.length}`);
   if (summary.reason) lines.push(`reason: ${summary.reason}`);
   if (summary.failures.length > 0) {
     lines.push("", "failures:");
@@ -104,8 +134,15 @@ function trimFailure(message) {
   return lines.join("\n");
 }
 
-function parseArgs(argv) {
-  const options = { json: false, coverage: false, changed: false, base: undefined, files: [] };
+export function parseArgs(argv) {
+  const options = {
+    json: false,
+    coverage: false,
+    changed: false,
+    base: undefined,
+    testNamePattern: undefined,
+    files: [],
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--json") options.json = true;
@@ -115,6 +152,10 @@ function parseArgs(argv) {
       options.base = argv[index + 1];
       index += 1;
       if (!options.base) throw new Error("--base requires a git ref.");
+    } else if (arg === "--testNamePattern" || arg === "-t") {
+      options.testNamePattern = argv[index + 1];
+      index += 1;
+      if (!options.testNamePattern) throw new Error("--testNamePattern requires a string.");
     } else if (arg === "--") {
       options.files.push(...argv.slice(index + 1));
       break;
@@ -125,7 +166,10 @@ function parseArgs(argv) {
   if (options.changed && options.files.length > 0) {
     throw new Error("Pass either --changed or file paths, not both.");
   }
-  if (options.coverage && (options.changed || options.files.length > 0)) {
+  if (
+    options.coverage &&
+    (options.changed || options.files.length > 0 || options.testNamePattern)
+  ) {
     throw new Error("Coverage thresholds apply to the full suite. Run npm run test:coverage.");
   }
   return options;
@@ -157,23 +201,17 @@ function resolveBase(explicit) {
 function changedPaths(base) {
   const resolved = resolveBase(base);
   const lists = [
-    git(["diff", "--name-only", "--diff-filter=ACMR"]),
-    git(["diff", "--name-only", "--cached", "--diff-filter=ACMR"]),
+    git(["diff", "--name-only", "--diff-filter=ACMRD"]),
+    git(["diff", "--name-only", "--cached", "--diff-filter=ACMRD"]),
+    git(["ls-files", "--others", "--exclude-standard"]),
   ];
   if (resolved !== "HEAD") {
-    lists.push(git(["diff", "--name-only", "--diff-filter=ACMR", `${resolved}...HEAD`]));
+    lists.push(git(["diff", "--name-only", "--diff-filter=ACMRD", `${resolved}...HEAD`]));
   }
   return [...new Set(lists.flat())];
 }
 
-function deletedUnitInputs(paths) {
-  return paths.filter((file) => {
-    const normalized = file.replaceAll("\\", "/");
-    return UNIT_INPUT.test(normalized) && !existsSync(path.join(ROOT, normalized));
-  });
-}
-
-async function runVitest(files, coverage) {
+async function runVitest(files, coverage, testNamePattern) {
   await mkdir(path.dirname(REPORT_PATH), { recursive: true });
   await rm(REPORT_PATH, { force: true });
   const args = [
@@ -184,6 +222,7 @@ async function runVitest(files, coverage) {
     REPORT_PATH,
   ];
   if (coverage) args.push("--coverage");
+  if (testNamePattern) args.push("--testNamePattern", testNamePattern);
   args.push(...files);
 
   const started = Date.now();
@@ -212,24 +251,16 @@ async function main() {
   let files = options.files;
   let skipped = null;
 
+  let changedReason;
   if (options.changed) {
-    const paths = changedPaths(options.base);
-    if (deletedUnitInputs(paths).length > 0) files = [];
-    else {
-      files = unitTestInputs(paths);
-      if (files.length === 0) {
-        skipped = {
-          status: "pass",
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          total: 0,
-          durationMs: 0,
-          failures: [],
-          reason: "no unit-test inputs in the change set",
-        };
-      }
-    }
+    const decision = classifyChangedPaths(changedPaths(options.base), (file) =>
+      existsSync(path.join(ROOT, file)),
+    );
+    changedReason = decision.reason;
+    if (decision.mode === "skip") {
+      skipped = emptySummary(decision.reason);
+      skipped.status = "pass";
+    } else files = decision.files;
   }
 
   for (const file of files) {
@@ -238,20 +269,42 @@ async function main() {
     }
   }
 
-  const summary = skipped ?? (await execute(files, options.coverage, options.json));
-  const body = `${JSON.stringify(summary, null, 2)}\n`;
-  await mkdir(path.dirname(SUMMARY_PATH), { recursive: true });
-  await writeFile(SUMMARY_PATH, body, "utf8");
-
-  if (options.json) process.stdout.write(body);
-  else process.stdout.write(formatSummary(summary));
+  const summary = skipped ?? (await execute(files, options));
+  summary.inputs = files;
+  summary.testNamePattern = options.testNamePattern ?? null;
+  if (changedReason && summary.status === "pass") summary.reason = changedReason;
+  await writeSummary(summary, options.json);
 
   if (summary.status !== "pass") process.exitCode = 1;
 }
 
-async function execute(files, coverage, json) {
-  const run = await runVitest(files, coverage);
-  if (!json) {
+function emptySummary(reason) {
+  return {
+    status: "fail",
+    passed: 0,
+    failed: 0,
+    pending: 0,
+    total: 0,
+    durationMs: 0,
+    inputs: [],
+    testFiles: [],
+    testNamePattern: null,
+    failures: [],
+    reason,
+  };
+}
+
+async function writeSummary(summary, json) {
+  const body = `${JSON.stringify(summary, null, 2)}\n`;
+  await mkdir(path.dirname(SUMMARY_PATH), { recursive: true });
+  await writeFile(SUMMARY_PATH, body, "utf8");
+  if (json) process.stdout.write(body);
+  else process.stdout.write(formatSummary(summary));
+}
+
+async function execute(files, options) {
+  const run = await runVitest(files, options.coverage, options.testNamePattern);
+  if (!options.json) {
     if (run.stdout) process.stderr.write(run.stdout);
     if (run.stderr) process.stderr.write(run.stderr);
   }
@@ -260,9 +313,8 @@ async function execute(files, coverage, json) {
   try {
     report = JSON.parse(await readFile(REPORT_PATH, "utf8"));
   } catch {
-    const summary = summarizeReport({});
+    const summary = emptySummary("Vitest did not write a JSON report");
     summary.durationMs = run.durationMs;
-    summary.reason = "Vitest did not write a JSON report";
     summary.failures.push({
       name: "vitest",
       file: "scripts/run-unit-tests.mjs",
@@ -283,9 +335,19 @@ async function execute(files, coverage, json) {
 const isDirectRun =
   process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) {
-  main().catch((error) => {
+  main().catch(async (error) => {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
+    const summary = emptySummary(message);
+    summary.failures.push({
+      name: "run-unit-tests",
+      file: "scripts/run-unit-tests.mjs",
+      messages: [message],
+    });
+    try {
+      await writeSummary(summary, process.argv.includes("--json"));
+    } catch {
+      process.stderr.write(`${message}\n`);
+    }
     process.exitCode = 1;
   });
 }

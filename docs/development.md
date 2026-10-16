@@ -61,8 +61,8 @@ For faster inner-loop checks, run the narrower script that matches the change:
 - `npm run format:check` for Prettier formatting
 - `npm run typecheck` for TypeScript compiler validation
 - `npm run test` for the fast Vitest unit suite
-- `npm run test:agent -- --json` for a machine-readable summary, optionally limited to files (`npm run test:agent -- src/rules/rest.ts`)
-- `npm run test:changed` for unit tests affected by the current git diff
+- `npm run test:agent -- --json` for a machine-readable summary, optionally limited to files (`npm run test:agent -- src/rules/rest.ts`) or a name (`npm run test:agent -- --testNamePattern "short rest"`)
+- `npm run test:changed` for unit tests affected by the current git diff, including untracked files
 - `npm run test:coverage` for the full suite plus v8 coverage thresholds
 - `npm run build` for the Foundry runtime bundle
 - `npm run audit` for dependency vulnerability checks
@@ -71,7 +71,7 @@ For faster inner-loop checks, run the narrower script that matches the change:
 
 Vitest fails when test files are missing (`passWithNoTests: false`) and when a test is focused with `.only`. If a slice temporarily moves or renames tests, keep that behavior intact and update the matching test include patterns instead of allowing empty test runs.
 
-`npm run test:agent` is the programmatic loop for agents. It always exits non-zero on failure and writes `test-results/unit-summary.json`. `--json` prints that same object on stdout. Pass source, test, language, pack, or `system.json` paths to run the tests that import them. `npm run test:changed` does that for the working tree and commits since `origin/main`. Documentation-only diffs pass without running tests. `npm run test:coverage` and `npm run verify` run the full suite and enforce v8 thresholds: about 68% statements globally, and 90% statements / 100% functions under `src/rules/`.
+`npm run test:agent` is the programmatic loop for agents. It always exits non-zero on failure and writes `test-results/unit-summary.json`. `--json` prints that same object on stdout, including `inputs`, `testFiles`, and any `testNamePattern`. Pass source, test, language, pack, or `system.json` paths to run the tests that import them. `npm run test:changed` does that for the working tree, untracked files, and commits since `origin/main`. Documentation-only diffs pass without running tests. A deleted unit-test input runs the full suite. Usage errors still write the JSON summary. `npm run test:coverage` and `npm run verify` run the full suite and enforce v8 thresholds: 82% statements globally, and 94% statements / 100% functions under `src/rules/`.
 
 Use fast unit tests for rules behavior first. Add Playwright Foundry E2E when the change depends on Foundry documents, hooks, sheets, packaged assets, or browser behavior.
 
