@@ -365,3 +365,92 @@ describe("Initiative roll with Dice So Nice integration", () => {
     expect(dsnWaitSpy).toHaveBeenCalledWith("m0");
   });
 });
+
+describe("rollInitiativeWithDiceAnimation (sheet path)", () => {
+  it("creates exactly one message with create:false and stores the evaluated total after DSN", async () => {
+    const { rollInitiativeWithDiceAnimation } = await import("../../src/sheets/character-sheet");
+    const callOrder: string[] = [];
+    const create = vi.fn(async (data: Record<string, unknown>) => {
+      callOrder.push("chat");
+      return { ...data, id: "sheet-msg" };
+    });
+    const createDocuments = vi.fn(async () => [{ id: "unused" }]);
+    vi.stubGlobal("ChatMessage", { implementation: { create, createDocuments } });
+    const waitFor = vi.fn(async (id: string) => {
+      callOrder.push(`dsn:${id}`);
+    });
+    vi.stubGlobal("game", {
+      settings: { get: () => "gmroll" },
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
+      dice3d: { waitFor3DAnimationByMessageID: waitFor },
+    });
+
+    const roll = {
+      _evaluated: false,
+      total: undefined as number | undefined,
+      evaluate: vi.fn(async function (this: { _evaluated: boolean; total?: number }) {
+        this._evaluated = true;
+        this.total = 17;
+        return this;
+      }),
+      toMessage: vi.fn<
+        (data: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<unknown>
+      >(async (data) => ({ ...data })),
+    };
+    await roll.evaluate();
+
+    const update = vi.fn(async (d: { initiative: number }) => {
+      callOrder.push(`update:${d.initiative}`);
+    });
+    const combat = { combatants: [{ id: "c1", actorId: "a1", update }] };
+
+    await rollInitiativeWithDiceAnimation({
+      actor: { id: "a1", name: "Hero", type: "character" } as never,
+      roll,
+      total: roll.total ?? 0,
+      flavor: "Initiative",
+      combat: combat as never,
+      notify: vi.fn(),
+      localize: (k: string) => k,
+    });
+
+    expect(roll.toMessage).toHaveBeenCalledTimes(1);
+    expect(roll.toMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ flags: { "core.initiativeRoll": true } }),
+      { rollMode: "gmroll", create: false },
+    );
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(createDocuments).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({ initiative: 17 });
+    expect(callOrder).toEqual(["chat", "dsn:sheet-msg", "update:17"]);
+  });
+
+  it("falls back to createDocuments once when create is unavailable", async () => {
+    const { rollInitiativeWithDiceAnimation } = await import("../../src/sheets/character-sheet");
+    const createDocuments = vi.fn(async (data: unknown[]) =>
+      data.map(() => ({ id: "fallback-msg" })),
+    );
+    vi.stubGlobal("ChatMessage", { implementation: { createDocuments } });
+    vi.stubGlobal("game", { settings: { get: () => "roll" }, modules: { get: () => undefined } });
+    const roll = {
+      toMessage: vi.fn<
+        (data: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<unknown>
+      >(async (data) => ({ ...data })),
+    };
+    const update = vi.fn(async () => {});
+
+    await rollInitiativeWithDiceAnimation({
+      actor: { id: "a1", name: "Hero", type: "character" } as never,
+      roll,
+      total: 9,
+      flavor: "Initiative",
+      combat: { combatants: [{ id: "c1", actorId: "a1", update }] } as never,
+      notify: vi.fn(),
+      localize: (k: string) => k,
+    });
+
+    expect(createDocuments).toHaveBeenCalledTimes(1);
+    expect(roll.toMessage.mock.calls[0]?.[1]).toEqual({ rollMode: "roll", create: false });
+    expect(update).toHaveBeenCalledWith({ initiative: 9 });
+  });
+});

@@ -933,3 +933,101 @@ describe("PivotCombat rollInitiative", () => {
     expect(updateCalled).toBe(true);
   });
 });
+
+describe("PivotCombat rollInitiative with unevaluated v14 rolls", () => {
+  function makeUnevaluatedRoll(result: number) {
+    const roll = {
+      _evaluated: false,
+      total: undefined as number | undefined,
+      evaluate: vi.fn(async () => {
+        roll._evaluated = true;
+        roll.total = result;
+        return roll;
+      }),
+      toMessage: vi.fn<
+        (data: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<unknown>
+      >(async (data) => ({ ...data })),
+    };
+    return roll;
+  }
+
+  function setup(options: { currentId?: string; reorder?: boolean } = {}) {
+    let msgCount = 0;
+    const create = vi.fn(async () => ({ id: `msg${++msgCount}` }));
+    const g = globalThis as Record<string, unknown>;
+    g.game = {
+      settings: { get: () => "roll" },
+      modules: { get: () => ({ active: false }) },
+      i18n: { format: (_k: string, d: Record<string, unknown>) => `${String(d.name)} rolls` },
+    };
+    g.ChatMessage = {
+      implementation: { create },
+      getSpeaker: () => ({ alias: "Test" }),
+    };
+    const rolls = { c1: makeUnevaluatedRoll(3), c2: makeUnevaluatedRoll(12) };
+    const updates: Array<{ _id: string; initiative: number }> = [];
+    const updateCalls: Array<Record<string, unknown>> = [];
+
+    class BaseCombat {
+      combatants = (["c1", "c2"] as const).map((id) => ({
+        id,
+        _id: id,
+        actor: { id: `a-${id}`, name: id },
+        hidden: false,
+        getInitiativeRoll: vi.fn(async () => rolls[id]),
+        _getInitiativeFormula: () => "1d20",
+      }));
+      combatant = options.currentId ? { id: options.currentId } : undefined;
+      turns: Array<{ id: string }> = [{ id: "c1" }, { id: "c2" }];
+      updateEmbeddedDocuments = vi.fn(
+        async (_t: string, u: Array<{ _id: string; initiative: number }>) => {
+          updates.push(...u);
+          // Simulate core re-sorting turns by initiative (descending)
+          if (options.reorder) this.turns = [{ id: "c2" }, { id: "c1" }];
+        },
+      );
+      update = vi.fn(async (data: Record<string, unknown>) => {
+        updateCalls.push(data);
+      });
+    }
+
+    const PivotCombat = createPivotCombatClass(BaseCombat as never);
+    const combat = new PivotCombat() as {
+      rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
+    };
+    return { combat, rolls, updates, updateCalls, create };
+  }
+
+  it("evaluates the roll and stores its total, with one message per roll and create:false", async () => {
+    const { combat, rolls, updates, create } = setup();
+    await combat.rollInitiative(["c1", "c2"]);
+
+    expect(rolls.c1.evaluate).toHaveBeenCalledTimes(1);
+    expect(rolls.c2.evaluate).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([
+      { _id: "c1", initiative: 3 },
+      { _id: "c2", initiative: 12 },
+    ]);
+    expect(create).toHaveBeenCalledTimes(2);
+    for (const roll of [rolls.c1, rolls.c2]) {
+      expect(roll.toMessage).toHaveBeenCalledTimes(1);
+      expect(roll.toMessage.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ create: false }));
+    }
+  });
+
+  it("does not re-evaluate an already evaluated roll", async () => {
+    const { combat, rolls, updates } = setup();
+    rolls.c1._evaluated = true;
+    rolls.c1.total = 7;
+    await combat.rollInitiative(["c1"]);
+    expect(rolls.c1.evaluate).not.toHaveBeenCalled();
+    expect(updates).toEqual([{ _id: "c1", initiative: 7 }]);
+  });
+
+  it("preserves the current turn after rolling once the round has started", async () => {
+    const { combat, updateCalls } = setup({ currentId: "c1", reorder: true });
+    await combat.rollInitiative(["c2"]);
+    // c2 rolled higher and was sorted first; current combatant c1 is now index 1
+    expect(updateCalls).toEqual([{ turn: 1 }]);
+  });
+});

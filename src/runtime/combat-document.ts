@@ -16,6 +16,8 @@ interface CombatantLike {
       options?: { rollMode?: string; create?: boolean },
     ) => Promise<Record<string, unknown>>;
     total?: number;
+    _evaluated?: boolean;
+    evaluate?: () => Promise<unknown>;
   }>;
   _getInitiativeFormula?: () => string;
 }
@@ -96,6 +98,8 @@ export function createPivotCombatClass(
 
         // Evaluate the roll using combatant method
         const roll = await combatant.getInitiativeRoll(formula);
+        // v14 returns an unevaluated Roll; evaluate before reading total.
+        if (!roll._evaluated) await roll.evaluate?.();
         const total = roll.total ?? 0;
 
         // Get speaker with actor, token, and alias

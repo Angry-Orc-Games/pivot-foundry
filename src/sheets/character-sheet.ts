@@ -604,9 +604,14 @@ export function nextResourceValue(
   return Math.max(0, current + delta);
 }
 
-async function rollInitiativeWithDiceAnimation(options: {
+export async function rollInitiativeWithDiceAnimation(options: {
   actor: ActorLike;
-  roll: { toMessage: (data: Record<string, unknown>) => Promise<unknown> };
+  roll: {
+    toMessage: (
+      data: Record<string, unknown>,
+      options?: { rollMode?: string; create?: boolean },
+    ) => Promise<unknown>;
+  };
   total: number;
   flavor: string;
   combat: CombatLike | null | undefined;
@@ -622,37 +627,36 @@ async function rollInitiativeWithDiceAnimation(options: {
   const rawMode = game.game?.settings?.get?.("core", "rollMode");
   const rollMode = typeof rawMode === "string" ? rawMode : "roll";
 
-  // Create chat message data with Roll attached
-  const chatData = (await roll.toMessage({
-    speaker: speakerForActor(actor),
-    flavor,
-  })) as Record<string, unknown>;
+  // Build message data only (create:false); roll mode is applied by toMessage.
+  const chatData = (await roll.toMessage(
+    { speaker: speakerForActor(actor), flavor, flags: { "core.initiativeRoll": true } },
+    { rollMode, create: false },
+  )) as Record<string, unknown>;
 
-  // Apply roll mode using Foundry's standard method
   const ChatMessage = (
     globalThis as typeof globalThis & {
       ChatMessage?: {
-        implementation?: { createDocuments?: (data: unknown[]) => Promise<unknown> };
+        implementation?: {
+          create?: (data: Record<string, unknown>) => Promise<unknown>;
+          createDocuments?: (data: unknown[]) => Promise<unknown>;
+        };
+        create?: (data: Record<string, unknown>) => Promise<unknown>;
         createDocuments?: (data: unknown[]) => Promise<unknown>;
-        applyRollMode?: (data: Record<string, unknown>, mode: string) => void;
       };
     }
   ).ChatMessage;
 
-  if (ChatMessage?.applyRollMode) {
-    ChatMessage.applyRollMode(chatData, rollMode);
-  }
-
-  // Create message using class-bound method (Foundry v14 requirement)
+  // Create exactly one message (Foundry v14 class-bound create)
   const Cls = ChatMessage?.implementation ?? ChatMessage;
-  let created: unknown = [];
-  if (Cls?.createDocuments) {
-    created = await Cls.createDocuments([chatData]);
+  let message: { id?: string } | undefined;
+  if (Cls?.create) {
+    message = (await Cls.create(chatData)) as { id?: string } | undefined;
+  } else if (Cls?.createDocuments) {
+    const created = await Cls.createDocuments([chatData]);
+    message = (Array.isArray(created) ? created[0] : undefined) as { id?: string } | undefined;
   }
 
-  // Wait for Dice So Nice animation if present and active
-  const createdList = Array.isArray(created) ? created : [];
-  const message = createdList[0] as { id?: string } | undefined;
+  // Wait for Dice So Nice animation on that message
   if (message?.id) {
     await waitForDiceSoNiceAnimation(message.id);
   }
