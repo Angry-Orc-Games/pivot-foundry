@@ -111,7 +111,26 @@ export function createPivotCombatClass(
             name: combatant.actor.name ?? "Unknown",
           }) ?? `${combatant.actor.name ?? "Unknown"} rolls for Initiative!`;
 
+        // Compute effective roll mode: hidden combatant with 'roll' mode becomes 'gmroll'
+        // Honor messageOptions.rollMode if provided
+        const messageOptionsRollMode =
+          options.messageOptions && "rollMode" in options.messageOptions
+            ? options.messageOptions.rollMode
+            : undefined;
+        const baseRollMode =
+          typeof messageOptionsRollMode === "string" ? messageOptionsRollMode : rollMode;
+        const effectiveRollMode =
+          combatant.hidden && baseRollMode === "roll" ? "gmroll" : baseRollMode;
+
+        // Extract messageOptions without rollMode (will be passed separately to toMessage)
+        const messageOptionsWithoutRollMode = options.messageOptions
+          ? Object.fromEntries(
+              Object.entries(options.messageOptions).filter(([key]) => key !== "rollMode"),
+            )
+          : {};
+
         // Build message data using roll.toMessage with core.initiativeRoll flag
+        // toMessage applies the roll mode itself
         let chatData: Record<string, unknown> = {};
         if (roll.toMessage) {
           chatData = await roll.toMessage(
@@ -119,38 +138,10 @@ export function createPivotCombatClass(
               speaker,
               flavor,
               flags: { "core.initiativeRoll": true },
+              ...messageOptionsWithoutRollMode,
             },
-            { rollMode: "roll", create: false },
+            { rollMode: effectiveRollMode, create: false },
           );
-        }
-
-        // Merge messageOptions
-        if (options.messageOptions) {
-          chatData = { ...chatData, ...options.messageOptions };
-        }
-
-        // Handle hidden combatant / blindroll rule: if combatant is hidden, force blind roll mode
-        const effectiveRollMode = combatant.hidden ? "blindroll" : rollMode;
-
-        // Apply roll mode after merging messageOptions
-        const CHAT_MESSAGE_STYLES = { ROLL: 1, EMOTE: 2, WHISPER: 3, OTHER: 0, OOC: 0, IC: 0 };
-        if (effectiveRollMode !== "roll") {
-          chatData.whisper =
-            effectiveRollMode === "blindroll" || effectiveRollMode === "gmroll"
-              ? ((
-                  game.game as { users?: { contents?: Array<{ id?: string; isGM?: boolean }> } }
-                )?.users?.contents
-                  ?.filter((u) => u.isGM)
-                  .map((u) => u.id) ?? [])
-              : effectiveRollMode === "selfroll"
-                ? [
-                    ((game.game as { user?: { id?: string } })?.user?.id ??
-                      (game.game as { userId?: string })?.userId) ||
-                      "",
-                  ]
-                : chatData.whisper;
-          chatData.blind = effectiveRollMode === "blindroll";
-          chatData.type = CHAT_MESSAGE_STYLES.ROLL;
         }
 
         // Create message using ChatMessage.implementation.create for single message

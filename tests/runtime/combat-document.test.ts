@@ -482,6 +482,275 @@ describe("PivotCombat rollInitiative", () => {
     ]);
   });
 
+  it("passes gmroll mode for hidden combatant with roll mode", async () => {
+    let passedRollMode: string | undefined;
+    let chatDataType: number | undefined;
+
+    // Mock globalThis
+    const mockGlobal = globalThis as typeof globalThis & {
+      game?: {
+        settings?: { get?: (scope: string, key: string) => unknown };
+        modules?: { get?: (id: string) => { active?: boolean } | undefined };
+        i18n?: { format?: (key: string, data: Record<string, unknown>) => string };
+      };
+      ChatMessage?: {
+        implementation?: {
+          create?: (data: Record<string, unknown>) => Promise<unknown>;
+        };
+        getSpeaker?: (options: {
+          actor?: unknown;
+          token?: unknown;
+          alias?: string;
+        }) => Record<string, unknown>;
+      };
+    };
+
+    mockGlobal.game = {
+      settings: { get: () => "roll" },
+      modules: { get: () => ({ active: false }) },
+      i18n: {
+        format: vi.fn((key: string, data: Record<string, unknown>) => {
+          return `${data.name} rolls for Initiative!`;
+        }),
+      },
+    };
+
+    mockGlobal.ChatMessage = {
+      implementation: {
+        create: vi.fn(async (data: Record<string, unknown>) => {
+          chatDataType = data.type as number | undefined;
+          return { id: "msg1" };
+        }),
+      },
+      getSpeaker: vi.fn(() => ({ alias: "Test" })),
+    };
+
+    class BaseCombat {
+      combatants = [
+        {
+          id: "c1",
+          _id: "c1",
+          actor: {
+            id: "a1",
+            name: "Hero",
+          },
+          token: { name: "Hero Token" },
+          hidden: true, // Hidden combatant
+          getInitiativeRoll: vi.fn(async () => ({
+            total: 15,
+            toMessage: vi.fn(async (_data, options?: { rollMode?: string }) => {
+              passedRollMode = options?.rollMode;
+              return {
+                speaker: { alias: "Hero" },
+                flavor: "Hero rolls for Initiative!",
+              };
+            }),
+          })),
+          _getInitiativeFormula: vi.fn(() => "1d20"),
+        },
+      ];
+
+      updateEmbeddedDocuments = vi.fn(async () => {});
+      update = vi.fn(async () => {});
+      combatant = undefined;
+      turns = [];
+    }
+
+    const PivotCombat = createPivotCombatClass(BaseCombat as never);
+    const combat = new PivotCombat();
+
+    await (
+      combat as {
+        rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).rollInitiative(["c1"]);
+
+    // Hidden combatant with 'roll' mode should get 'gmroll'
+    expect(passedRollMode).toBe("gmroll");
+    // Should not have type field set (toMessage handles it)
+    expect(chatDataType).toBeUndefined();
+  });
+
+  it("honors messageOptions.rollMode when provided", async () => {
+    let passedRollMode: string | undefined;
+
+    // Mock globalThis
+    const mockGlobal = globalThis as typeof globalThis & {
+      game?: {
+        settings?: { get?: (scope: string, key: string) => unknown };
+        modules?: { get?: (id: string) => { active?: boolean } | undefined };
+        i18n?: { format?: (key: string, data: Record<string, unknown>) => string };
+      };
+      ChatMessage?: {
+        implementation?: {
+          create?: (data: Record<string, unknown>) => Promise<unknown>;
+        };
+        getSpeaker?: (options: {
+          actor?: unknown;
+          token?: unknown;
+          alias?: string;
+        }) => Record<string, unknown>;
+      };
+    };
+
+    mockGlobal.game = {
+      settings: { get: () => "roll" },
+      modules: { get: () => ({ active: false }) },
+      i18n: {
+        format: vi.fn((key: string, data: Record<string, unknown>) => {
+          return `${data.name} rolls for Initiative!`;
+        }),
+      },
+    };
+
+    mockGlobal.ChatMessage = {
+      implementation: {
+        create: vi.fn(async () => ({ id: "msg1" })),
+      },
+      getSpeaker: vi.fn(() => ({ alias: "Test" })),
+    };
+
+    class BaseCombat {
+      combatants = [
+        {
+          id: "c1",
+          _id: "c1",
+          actor: {
+            id: "a1",
+            name: "Hero",
+          },
+          token: { name: "Hero Token" },
+          hidden: false,
+          getInitiativeRoll: vi.fn(async () => ({
+            total: 15,
+            toMessage: vi.fn(async (_data, options?: { rollMode?: string }) => {
+              passedRollMode = options?.rollMode;
+              return {
+                speaker: { alias: "Hero" },
+                flavor: "Hero rolls for Initiative!",
+              };
+            }),
+          })),
+          _getInitiativeFormula: vi.fn(() => "1d20"),
+        },
+      ];
+
+      updateEmbeddedDocuments = vi.fn(async () => {});
+      update = vi.fn(async () => {});
+      combatant = undefined;
+      turns = [];
+    }
+
+    const PivotCombat = createPivotCombatClass(BaseCombat as never);
+    const combat = new PivotCombat();
+
+    await (
+      combat as {
+        rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).rollInitiative(["c1"], { messageOptions: { rollMode: "blindroll" } });
+
+    // messageOptions.rollMode should be honored
+    expect(passedRollMode).toBe("blindroll");
+  });
+
+  it("merges messageOptions correctly without duplicating rollMode", async () => {
+    let receivedMessageData: Record<string, unknown> = {};
+    let receivedOptions: { rollMode?: string; create?: boolean } = {};
+
+    // Mock globalThis
+    const mockGlobal = globalThis as typeof globalThis & {
+      game?: {
+        settings?: { get?: (scope: string, key: string) => unknown };
+        modules?: { get?: (id: string) => { active?: boolean } | undefined };
+        i18n?: { format?: (key: string, data: Record<string, unknown>) => string };
+      };
+      ChatMessage?: {
+        implementation?: {
+          create?: (data: Record<string, unknown>) => Promise<unknown>;
+        };
+        getSpeaker?: (options: {
+          actor?: unknown;
+          token?: unknown;
+          alias?: string;
+        }) => Record<string, unknown>;
+      };
+    };
+
+    mockGlobal.game = {
+      settings: { get: () => "roll" },
+      modules: { get: () => ({ active: false }) },
+      i18n: {
+        format: vi.fn((key: string, data: Record<string, unknown>) => {
+          return `${data.name} rolls for Initiative!`;
+        }),
+      },
+    };
+
+    mockGlobal.ChatMessage = {
+      implementation: {
+        create: vi.fn(async () => ({ id: "msg1" })),
+      },
+      getSpeaker: vi.fn(() => ({ alias: "Test" })),
+    };
+
+    class BaseCombat {
+      combatants = [
+        {
+          id: "c1",
+          _id: "c1",
+          actor: {
+            id: "a1",
+            name: "Hero",
+          },
+          token: { name: "Hero Token" },
+          hidden: false,
+          getInitiativeRoll: vi.fn(async () => ({
+            total: 15,
+            toMessage: vi.fn(
+              async (
+                data: Record<string, unknown>,
+                options?: { rollMode?: string; create?: boolean },
+              ) => {
+                receivedMessageData = data;
+                receivedOptions = options ?? {};
+                return {
+                  speaker: { alias: "Hero" },
+                  flavor: "Hero rolls for Initiative!",
+                  customField: data.customField,
+                };
+              },
+            ),
+          })),
+          _getInitiativeFormula: vi.fn(() => "1d20"),
+        },
+      ];
+
+      updateEmbeddedDocuments = vi.fn(async () => {});
+      update = vi.fn(async () => {});
+      combatant = undefined;
+      turns = [];
+    }
+
+    const PivotCombat = createPivotCombatClass(BaseCombat as never);
+    const combat = new PivotCombat();
+
+    await (
+      combat as {
+        rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).rollInitiative(["c1"], {
+      messageOptions: { customField: "test-value", rollMode: "gmroll" },
+    });
+
+    // customField should be in the message data
+    expect(receivedMessageData.customField).toBe("test-value");
+    // rollMode should NOT be in the message data (passed separately)
+    expect(receivedMessageData.rollMode).toBeUndefined();
+    // rollMode should be in the options
+    expect(receivedOptions.rollMode).toBe("gmroll");
+  });
+
   it("continues when DSN wait times out", async () => {
     let updateCalled = false;
     let waitPromiseStarted = false;
