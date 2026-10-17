@@ -22,8 +22,8 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || format('foundry-e2e-{0}', github.event.pull_request.number || github.ref) }}
-  cancel-in-progress: true
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || 'foundry-e2e' }}
+  cancel-in-progress: false
 
 jobs:
   gate:
@@ -129,6 +129,10 @@ jobs:
       - name: Install trusted dependencies
         if: steps.recheck.outputs.ok == 'true'
         run: npm ci
+
+      - name: Install Playwright browser
+        if: steps.recheck.outputs.ok == 'true'
+        run: npx playwright install chromium --with-deps
 
       - name: Checkout system under test
         if: steps.recheck.outputs.ok == 'true'

@@ -26,7 +26,7 @@ rsync -a --delete \
   --exclude '/node_modules/' \
   --exclude '/.git/' \
   --exclude '/under-test/' \
-  --exclude '/vite.config.ts' \
+  --exclude '/vite.config.*' \
   --exclude '/vitest.config.ts' \
   --exclude '/eslint.config.js' \
   --exclude '/tsconfig.json' \

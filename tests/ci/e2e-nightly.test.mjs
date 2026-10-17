@@ -315,6 +315,7 @@ describe("per-target license gate", () => {
     expect(steps.find((step) => step.name === "Run packaged Foundry E2E")?.guard).toContain(
       "steps.creds.outputs.available == 'true'",
     );
+    expect(steps.some((step) => step.name === "Install Playwright browser")).toBe(true);
   });
 });
 
@@ -330,6 +331,7 @@ describe("trusted overlay", () => {
     await writeFile(join(runner, "scripts", "foundry-cli.mjs"), "trusted-runner\n");
     await writeFile(join(runner, "package.json"), '{"name":"trusted"}\n');
     await writeFile(join(runner, "vite.config.ts"), "trusted-vite\n");
+    await writeFile(join(system, "vite.config.js"), "untrusted-vite-js\n");
     await writeFile(join(runner, "src", "old.txt"), "old\n");
     await writeFile(join(system, "scripts", "foundry-cli.mjs"), "untrusted-runner\n");
     await writeFile(join(system, "package.json"), '{"name":"untrusted"}\n');
@@ -344,6 +346,7 @@ describe("trusted overlay", () => {
     );
     expect(await readFile(join(runner, "package.json"), "utf8")).toBe('{"name":"trusted"}\n');
     expect(await readFile(join(runner, "vite.config.ts"), "utf8")).toBe("trusted-vite\n");
+    await expect(readFile(join(runner, "vite.config.js"), "utf8")).rejects.toThrow();
     expect(await readFile(join(runner, "src", "sheet.txt"), "utf8")).toBe("from-pr\n");
     await expect(readFile(join(runner, "src", "old.txt"), "utf8")).rejects.toThrow();
     await rm(dir, { recursive: true, force: true });
