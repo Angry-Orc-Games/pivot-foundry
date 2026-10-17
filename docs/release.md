@@ -31,14 +31,14 @@ git push origin v0.1.0
 
 [`release.yml`](../.github/workflows/release.yml):
 
-1. Runs `scripts/ci/e2e-gate.sh require` from a sparse checkout of the workflow commit (`github.sha`). The tag is not checked out in that job. Outside 02:00-06:00 America/New_York, or when prod or build has a signed-in user, the job fails and Foundry does not start.
+1. Runs `scripts/ci/e2e-gate.sh require` from a sparse checkout of the workflow commit (`github.sha`). The tag is not checked out in that job. Outside 02:00-05:30 America/New_York, at or after 05:30, or when prod or build has a signed-in user, the job fails and Foundry does not start.
 2. Checks out `refs/tags/${tag}` and runs `npm run verify`.
 3. `npm run prepare:release` (rewrites version/download on the release copy of `system.json`).
 4. Builds that exact `system.zip` and `artifact-identity.json`.
 5. Checks the gate again from `github.sha`, then checks out `refs/tags/${tag}` and runs Foundry E2E against those bytes (`--skip-package`).
 6. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only if that E2E job succeeded.
 
-If step 3 changes artifact bytes, step 5 is what makes the new zip eligible. A failed gate or a failed E2E job does not publish. Re-run the tag workflow inside the 02:00-06:00 ET window when nobody is signed in.
+If step 3 changes artifact bytes, step 5 is what makes the new zip eligible. A failed gate or a failed E2E job does not publish. Re-run the tag workflow inside the 02:00-05:30 ET window when nobody is signed in.
 
 Foundry installs use:
 

@@ -11,19 +11,15 @@ write_output() {
   fi
 }
 
-notice() {
-  printf '::notice::%s\n' "$1"
-}
-
 close_gate() {
   local reason=$1
   write_output ok false
   if [[ $mode == require ]]; then
-    notice "Re-run inside the 02:00-06:00 ET window. Foundry was not started. ${reason}"
-    exit 1
+    printf '::error::Re-run inside the 02:00-05:30 ET window. Foundry was not started. %s\n' "$reason"
+  else
+    printf '::error::Foundry was not started. %s\n' "$reason"
   fi
-  notice "Skipped: ${reason}"
-  exit 0
+  exit 1
 }
 
 read_count() {
@@ -38,17 +34,27 @@ read_count() {
 }
 
 license_gate() {
-  local hour count host url
+  local clock hour minute count host url
   local -a busy=()
 
-  if ! hour=$(TZ=America/New_York date +%H); then
-    close_gate "could not read America/New_York hour (shared Foundry license)"
+  if ! clock=$(TZ=America/New_York date +%H%M); then
+    close_gate "could not read America/New_York clock (shared Foundry license)"
+  fi
+  if [[ ! $clock =~ ^[0-9]{4}$ ]]; then
+    close_gate "could not read America/New_York clock (shared Foundry license)"
   fi
 
+  hour=${clock:0:2}
+  minute=${clock:2:2}
   case $hour in
-    02|03|04|05) ;;
+    02|03|04) ;;
+    05)
+      if ((10#$minute >= 30)); then
+        close_gate "outside 02:00-05:30 ET quiet hours (shared Foundry license)"
+      fi
+      ;;
     *)
-      close_gate "outside 02:00-06:00 ET quiet hours (shared Foundry license)"
+      close_gate "outside 02:00-05:30 ET quiet hours (shared Foundry license)"
       ;;
   esac
 

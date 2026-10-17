@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 const script = fileURLToPath(new URL("../../scripts/ci/e2e-gate.sh", import.meta.url));
 
 const QUIET_HOURS_NOTICE =
-  "::notice::Skipped: outside 02:00-06:00 ET quiet hours (shared Foundry license)";
+  "::error::Foundry was not started. outside 02:00-05:30 ET quiet hours (shared Foundry license)";
 
 const DATE_STUB = `#!/bin/sh
 printf '%s\\n' "$TZ" >> "$E2E_STUB_DIR/date-tz"
@@ -81,7 +81,7 @@ async function runGate(mode, options = {}) {
     LANG: "C",
     GITHUB_OUTPUT: output,
     E2E_STUB_DIR: stub,
-    E2E_STUB_HOUR: options.hour ?? "03",
+    E2E_STUB_HOUR: options.hour ?? "0300",
     E2E_STUB_DATE_CODE: String(options.dateCode ?? 0),
     FOUNDRY_ADMIN_KEY: "super-secret-admin",
     ...options.env,
@@ -111,8 +111,8 @@ async function runGate(mode, options = {}) {
 }
 
 describe("e2e license gate", () => {
-  it.each(["02", "03", "04", "05"])(
-    "allows Foundry at hour %s when both hosts have zero users",
+  it.each(["0200", "0300", "0400", "0500", "0529"])(
+    "allows Foundry at %s when both hosts have zero users",
     async (hour) => {
       const result = await runGate("license", { hour });
 
@@ -120,7 +120,7 @@ describe("e2e license gate", () => {
       expect(result.ok).toBe("true");
       expect(result.stdout).toBe("");
       expect(result.dateTz).toBe("America/New_York");
-      expect(result.dateArgs).toBe("+%H");
+      expect(result.dateArgs).toBe("+%H%M");
       expect(result.curls).toEqual([
         "https://foundry.angryorcgames.com/api/status",
         "https://build.angryorcgames.com/api/status",
@@ -129,109 +129,114 @@ describe("e2e license gate", () => {
     },
   );
 
-  it.each(["01", "06", "23"])("skips hour %s without calling the status hosts", async (hour) => {
-    const result = await runGate("license", {
-      hour,
-      foundryCode: 22,
-      buildCode: 22,
-    });
+  it.each(["0100", "0530", "0559", "0600", "2300"])(
+    "fails closed at %s without calling the status hosts",
+    async (hour) => {
+      const result = await runGate("license", {
+        hour,
+        foundryCode: 22,
+        buildCode: 22,
+      });
 
-    expect(result.status).toBe(0);
-    expect(result.ok).toBe("false");
-    expect(result.stdout.trim()).toBe(QUIET_HOURS_NOTICE);
-    expect(result.curls).toEqual([]);
-  });
+      expect(result.status).toBe(1);
+      expect(result.ok).toBe("false");
+      expect(result.stdout.trim()).toBe(QUIET_HOURS_NOTICE);
+      expect(result.curls).toEqual([]);
+    },
+  );
 
   it("names foundry when somebody is signed in there", async () => {
     const result = await runGate("license", {
-      hour: "03",
+      hour: "0300",
       foundryBody: '{"users":1}\n',
     });
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::notice::Skipped: somebody is signed in on foundry.angryorcgames.com (shared Foundry license)",
+      "::error::Foundry was not started. somebody is signed in on foundry.angryorcgames.com (shared Foundry license)",
     );
   });
 
   it("names build when somebody is signed in there", async () => {
     const result = await runGate("license", {
-      hour: "04",
+      hour: "0400",
       buildBody: '{"users":1}\n',
     });
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::notice::Skipped: somebody is signed in on build.angryorcgames.com (shared Foundry license)",
+      "::error::Foundry was not started. somebody is signed in on build.angryorcgames.com (shared Foundry license)",
     );
   });
 
   it("names both hosts when both have a signed-in user", async () => {
     const result = await runGate("license", {
-      hour: "05",
+      hour: "0529",
       foundryBody: '{"users":2}\n',
       buildBody: '{"users":1}\n',
     });
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::notice::Skipped: somebody is signed in on foundry.angryorcgames.com and build.angryorcgames.com (shared Foundry license)",
+      "::error::Foundry was not started. somebody is signed in on foundry.angryorcgames.com and build.angryorcgames.com (shared Foundry license)",
     );
   });
 
   it("skips when a status request fails", async () => {
     const result = await runGate("license", {
-      hour: "02",
+      hour: "0200",
       foundryCode: 22,
     });
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::notice::Skipped: could not read user count from foundry.angryorcgames.com (shared Foundry license)",
+      "::error::Foundry was not started. could not read user count from foundry.angryorcgames.com (shared Foundry license)",
     );
   });
 
   it("skips when users is missing", async () => {
     const result = await runGate("license", {
-      hour: "03",
+      hour: "0300",
       foundryBody: '{"active":true}\n',
     });
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::notice::Skipped: could not read user count from foundry.angryorcgames.com (shared Foundry license)",
+      "::error::Foundry was not started. could not read user count from foundry.angryorcgames.com (shared Foundry license)",
     );
   });
 
   it("skips when the clock cannot be read", async () => {
     const result = await runGate("license", { dateCode: 1, foundryCode: 22 });
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::notice::Skipped: could not read America/New_York hour (shared Foundry license)",
+      "::error::Foundry was not started. could not read America/New_York clock (shared Foundry license)",
     );
     expect(result.curls).toEqual([]);
   });
 
   it("follows the machine clock in America/New_York", async () => {
-    const hour = execFileSync("date", ["+%H"], {
+    const clock = execFileSync("date", ["+%H%M"], {
       encoding: "utf8",
       env: { ...process.env, TZ: "America/New_York" },
     }).trim();
+    const hour = Number(clock.slice(0, 2));
+    const minute = Number(clock.slice(2, 4));
+    const inWindow = (hour >= 2 && hour <= 4) || (hour === 5 && minute < 30);
     const result = await runGate("license", { realDate: true });
-    const inWindow = ["02", "03", "04", "05"].includes(hour);
 
-    expect(result.status).toBe(0);
     if (inWindow) {
-      expect(result.ok).toBe("true");
       expect(result.curls).toHaveLength(2);
+      expect(result.status).toBe(result.ok === "true" ? 0 : 1);
     } else {
+      expect(result.status).toBe(1);
       expect(result.ok).toBe("false");
       expect(result.stdout.trim()).toBe(QUIET_HOURS_NOTICE);
       expect(result.curls).toEqual([]);
@@ -239,12 +244,12 @@ describe("e2e license gate", () => {
   });
 });
 
-const RERUN_NOTICE = "::notice::Re-run inside the 02:00-06:00 ET window. Foundry was not started.";
+const RERUN_NOTICE = "::error::Re-run inside the 02:00-05:30 ET window. Foundry was not started.";
 
 describe("required license gate", () => {
   it("fails closed outside the window and tells the caller to re-run", async () => {
     const result = await runGate("require", {
-      hour: "06",
+      hour: "0530",
       foundryCode: 22,
       buildCode: 22,
     });
@@ -252,14 +257,14 @@ describe("required license gate", () => {
     expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      `${RERUN_NOTICE} outside 02:00-06:00 ET quiet hours (shared Foundry license)`,
+      `${RERUN_NOTICE} outside 02:00-05:30 ET quiet hours (shared Foundry license)`,
     );
     expect(result.curls).toEqual([]);
   });
 
   it("fails closed when somebody is signed in", async () => {
     const result = await runGate("require", {
-      hour: "03",
+      hour: "0300",
       buildBody: '{"users":1}\n',
     });
 
@@ -271,7 +276,7 @@ describe("required license gate", () => {
   });
 
   it("allows the caller at hour 03 when both hosts have zero users", async () => {
-    const result = await runGate("require", { hour: "03" });
+    const result = await runGate("require", { hour: "0300" });
 
     expect(result.status).toBe(0);
     expect(result.ok).toBe("true");
@@ -346,6 +351,62 @@ describe("workflows that start Foundry", () => {
     expect(promote).not.toContain("foundry:e2e");
     expect(promote).not.toContain("foundry-cli.mjs");
     expect(nightly).not.toContain("e2e-gate.sh require");
+
+    const nightlyHeader = nightly.slice(0, nightly.indexOf("jobs:"));
+    expect(nightlyHeader).toContain("contents: read");
+    expect(nightlyHeader).not.toContain("checks: write");
+    expect(nightlyHeader).not.toContain("issues: write");
+    const nightlyPlan = nightly.slice(nightly.indexOf("  plan:\n"), nightly.indexOf("  e2e:\n"));
+    expect(nightlyPlan).toContain("issues: write");
+    expect(nightlyPlan).not.toContain("npm ");
+    const nightlyE2eJob = nightly.slice(
+      nightly.indexOf("  e2e:\n"),
+      nightly.indexOf("  report:\n"),
+    );
+    const nightlyE2ePerms = nightlyE2eJob.slice(0, nightlyE2eJob.indexOf("steps:"));
+    expect(nightlyE2ePerms).toContain("contents: read");
+    expect(nightlyE2ePerms).not.toContain("checks:");
+    expect(nightlyE2ePerms).not.toContain("issues:");
+    const nightlyReport = nightly.slice(
+      nightly.indexOf("  report:\n"),
+      nightly.indexOf("  closed:\n"),
+    );
+    expect(nightlyReport).toContain("checks: write");
+    expect(nightlyReport).not.toContain("matrix.target");
+    expect(nightlyReport).toContain("bash trusted-gate/scripts/ci/e2e-publish-results.sh");
+    const buildStep = nightlyE2eJob.slice(
+      nightlyE2eJob.indexOf("- name: Build the system package"),
+      nightlyE2eJob.indexOf("- name: Run packaged Foundry E2E"),
+    );
+    expect(buildStep).not.toContain("FOUNDRY_");
+    expect(buildStep).toContain('GITHUB_TOKEN: ""');
+    const foundryStep = nightlyE2eJob.slice(
+      nightlyE2eJob.indexOf("- name: Run packaged Foundry E2E"),
+      nightlyE2eJob.indexOf("- name: Verify tests executed"),
+    );
+    expect(foundryStep).toContain("FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}");
+    expect(foundryStep).toContain("--skip-package");
+    expect(foundryStep).toContain('GITHUB_TOKEN: ""');
+    expect(nightly).toContain(
+      "if: (always() || cancelled()) && needs.gate.result != 'success' && needs.gate.result != 'skipped'",
+    );
+
+    expect(staging).toContain("github.event.workflow_run.event == 'push'");
+    expect(staging).toContain(
+      "github.event.workflow_run.head_repository.full_name == github.repository",
+    );
+    expect(staging).toContain("github.event.workflow_run.head_branch == 'main'");
+    expect(staging).toContain("github.ref == 'refs/heads/main'");
+    expect(staging).not.toContain("head_sha ||");
+    expect(staging.indexOf("github.event.workflow_run.event == 'push'")).toBeLessThan(
+      staging.indexOf("github.event.workflow_run.head_sha"),
+    );
+
+    for (const workflow of [nightly, release, staging]) {
+      const checkouts = workflow.split("uses: actions/checkout@").length - 1;
+      const persisted = workflow.split("persist-credentials: false").length - 1;
+      expect(persisted).toBe(checkouts);
+    }
   });
 });
 

@@ -18,9 +18,13 @@ concurrency:
 jobs:
   staging:
     name: Build server deploy and smoke
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: staging
@@ -35,14 +39,24 @@ jobs:
           ref: ${{ github.sha }}
           path: trusted-gate
           sparse-checkout: scripts/ci
+          persist-credentials: false
 
       - name: License gate
         run: bash trusted-gate/scripts/ci/e2e-gate.sh require
 
-      - name: Checkout system under test
+      - name: Checkout workflow_run head
+        if: github.event_name == 'workflow_run'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Checkout dispatch commit
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Check required staging secrets
         env:

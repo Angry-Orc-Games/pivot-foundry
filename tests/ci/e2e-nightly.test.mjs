@@ -9,6 +9,12 @@ import { describe, expect, it } from "vitest";
 const targetsScript = fileURLToPath(new URL("../../scripts/ci/e2e-targets.sh", import.meta.url));
 const overlayScript = fileURLToPath(new URL("../../scripts/ci/e2e-overlay.sh", import.meta.url));
 const reportScript = fileURLToPath(new URL("../../scripts/ci/e2e-report.sh", import.meta.url));
+const recordScript = fileURLToPath(
+  new URL("../../scripts/ci/e2e-record-result.sh", import.meta.url),
+);
+const publishScript = fileURLToPath(
+  new URL("../../scripts/ci/e2e-publish-results.sh", import.meta.url),
+);
 
 const MAIN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SAME = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -306,12 +312,13 @@ describe("per-target license gate", () => {
       }
     }
     const start = steps.findIndex((step) => step.name === "Check Foundry secrets");
-    const end = steps.findIndex((step) => step.name === "Report Foundry E2E failure");
+    const end = steps.findIndex((step) => step.name === "Record E2E result");
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     for (const step of steps.slice(start, end)) {
       expect(step.guard, step.name).toContain("steps.recheck.outputs.ok == 'true'");
     }
+    expect(steps.find((step) => step.name === "Record E2E result")?.guard).toContain("always()");
     expect(steps.find((step) => step.name === "Run packaged Foundry E2E")?.guard).toContain(
       "steps.creds.outputs.available == 'true'",
     );
@@ -378,5 +385,73 @@ describe("nightly check run", () => {
     });
     expect(urls).toContain("/repos/Angry-Orc-Games/pivot-foundry/check-runs");
     expect(result.stdout + result.stderr).not.toContain(TOKEN);
+  });
+});
+
+describe("nightly failure results", () => {
+  it("records a closed gate as a failure", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+    const dest = join(dir, "main.json");
+    const result = await runScript(recordScript, [dest], {
+      ...process.env,
+      E2E_SHA: MAIN,
+      E2E_OK: "false",
+      E2E_JOB_STATUS: "failure",
+    });
+    const body = JSON.parse(await readFile(dest, "utf8"));
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(body).toEqual({
+      sha: MAIN,
+      conclusion: "failure",
+      summary: "License gate closed. Foundry was not started.",
+    });
+  });
+
+  it("posts a failure check when the run was cancelled before a result existed", async () => {
+    const ctx = await withStub();
+    const result = await runScript(publishScript, [], {
+      ...ctx.env,
+      E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-80" }]),
+      E2E_RESULTS_DIR: join(ctx.dir, "missing-results"),
+      E2E_MATRIX_RESULT: "cancelled",
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(1);
+    expect(body.conclusion).toBe("failure");
+    expect(body.head_sha).toBe(SAME);
+    expect(body.output.summary).toContain("cancelled or timed out");
+    expect(body.output.summary).not.toContain("Skipped");
+  });
+
+  it("posts the recorded conclusion for a finished SHA", async () => {
+    const ctx = await withStub();
+    await writeFile(
+      join(ctx.dir, "pr-80.json"),
+      JSON.stringify({
+        sha: SAME,
+        conclusion: "failure",
+        summary: "License gate closed. Foundry was not started.",
+      }),
+    );
+    const result = await runScript(publishScript, [], {
+      ...ctx.env,
+      E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-80" }]),
+      E2E_RESULTS_DIR: ctx.dir,
+      E2E_MATRIX_RESULT: "failure",
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(1);
+    expect(body).toMatchObject({
+      name: "Foundry E2E (nightly)",
+      head_sha: SAME,
+      conclusion: "failure",
+      output: { summary: "License gate closed. Foundry was not started." },
+    });
   });
 });
