@@ -12,6 +12,15 @@ export type HealthKind = "damage" | "healing" | "temp";
 export function validAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
+export function reconcileSurvival(source: SurvivalState): SurvivalState {
+  if (source.hp > 0 && source.status !== "alive" && source.status !== "unconfirmed") {
+    return { ...source, status: "alive", successes: 0, failures: 0 };
+  }
+  if (source.hp === 0 && source.status === "alive" && source.max > 0) {
+    return { ...source, status: "dying", successes: 0, failures: 0 };
+  }
+  return source;
+}
 export function validateSurvival(s: SurvivalState): void {
   if (
     ![s.hp, s.max, s.temp, s.successes, s.failures].every(validAmount) ||
@@ -28,12 +37,13 @@ export function validateSurvival(s: SurvivalState): void {
     throw new RangeError("Inconsistent survival state; GM correction required");
 }
 export function applyHealth(
-  source: SurvivalState,
+  raw: SurvivalState,
   kind: HealthKind,
   amount: number,
   critical = false,
   tempChoice?: "keep" | "replace",
 ): SurvivalState {
+  const source = reconcileSurvival(raw);
   validateSurvival(source);
   if (
     !validAmount(amount) ||
