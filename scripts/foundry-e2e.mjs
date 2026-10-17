@@ -137,6 +137,11 @@ export async function runE2E(args = {}) {
       return EXIT.identity;
     }
 
+    const subject = /^[0-9a-f]{40}$/.test(process.env.PIVOT_E2E_SUBJECT || "")
+      ? process.env.PIVOT_E2E_SUBJECT
+      : identity.commit;
+    console.log(`Foundry started for E2E commit ${subject}.`);
+
     console.log("Running Playwright against the packaged system.");
     execFileSync("npx", ["playwright", "test", "--config", "e2e/playwright.config.ts"], {
       cwd: paths.root,
