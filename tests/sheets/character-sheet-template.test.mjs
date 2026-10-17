@@ -46,8 +46,20 @@ describe("character sheet template structure", () => {
     expect(template).toContain('data-type="equipment"');
     expect(template).toContain('name="system.magic.awakened"');
     expect(template).toContain('name="system.magic.mp.value"');
-    expect(template).toContain('name="system.attributes.hp.value"');
-    expect(template).not.toContain("readonly");
+    expect(template).not.toContain('name="system.attributes.hp.value"');
+    const hpLine = template
+      .slice(
+        template.indexOf('class="pf-hp-line"'),
+        template.indexOf("</div>", template.indexOf('class="pf-hp-line"')),
+      )
+      .replace(/\s+/g, " ");
+    expect(hpLine).toContain(
+      '<span class="pf-hp-readout">{{system.attributes.hp.value}} / {{system.attributes.hp.max}}</span>',
+    );
+    expect(hpLine).not.toContain("<input");
+    expect(hpLine).not.toContain("name=");
+    expect(hpLine).toContain('data-action="survivalRoll"');
+    expect(hpLine).toContain('data-action="correctSurvival"');
     expect(template).toContain('name="system.notes.special"');
     expect(template).toContain('name="system.notes.runesThaumaturgy"');
     expect(template).toContain('name="system.identity.loyalty"');

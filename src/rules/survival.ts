@@ -12,16 +12,6 @@ export type HealthKind = "damage" | "healing" | "temp";
 export function validAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
-
-export function survivalStatusForHpEdit(
-  status: string | undefined,
-  hp: number,
-  max: number,
-): "alive" | "dying" | undefined {
-  if (hp === 0 && status === "alive" && max > 0) return "dying";
-  if (hp > 0 && (status === "dying" || status === "stable" || status === "dead")) return "alive";
-  return undefined;
-}
 export function validateSurvival(s: SurvivalState): void {
   if (
     ![s.hp, s.max, s.temp, s.successes, s.failures].every(validAmount) ||

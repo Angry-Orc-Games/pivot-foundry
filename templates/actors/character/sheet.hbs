@@ -471,16 +471,22 @@
           <div class="pf-meter-fill hp" style="width: {{hpPercent}}%;"></div>
         </div>
         <div class="pf-meter-fields">
-          <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
-              class="pf-inline pf-num"
-              name="system.attributes.hp.value"
-              aria-label="Current HP"
-              type="number"
-              min="0"
-              step="1"
-              value="{{system.attributes.hp.value}}"
+          <div class="pf-hp-line">
+            <span class="pf-hp-readout">{{system.attributes.hp.value}}
+              /
+              {{system.attributes.hp.max}}</span>
+            <button
+              type="button"
+              class="pf-sheet-button primary"
+              data-action="survivalRoll"
               {{disabledAttr}}
-            /></label>
+            >{{localize "PIVOT.Survival.RollTitle"}}</button>
+            {{#if isGM}}<button
+                type="button"
+                class="pf-sheet-button"
+                data-action="correctSurvival"
+              >{{localize "PIVOT.Survival.Correction"}}</button>{{/if}}
+          </div>
           <label><span>{{localize "PIVOT.Fields.HPMax"}}</span><input
               name="system.attributes.hp.max"
               type="number"
@@ -565,12 +571,6 @@
       <strong>{{system.attributes.hp.temp}}</strong>
     </div>
     <div class="pf-survival-actions">
-      <button
-        type="button"
-        class="pf-sheet-button primary"
-        data-action="survivalRoll"
-        {{disabledAttr}}
-      >{{localize "PIVOT.Survival.RollTitle"}}</button>
       <button type="button" class="pf-sheet-button" data-action="tempHp" {{disabledAttr}}>{{localize
           "PIVOT.Survival.Temp"
         }}</button>
@@ -586,11 +586,6 @@
         data-action="clearTempHp"
         {{disabledAttr}}
       >{{localize "PIVOT.Survival.ClearTemp"}}</button>
-      {{#if isGM}}<button
-          type="button"
-          class="pf-sheet-button"
-          data-action="correctSurvival"
-        >{{localize "PIVOT.Survival.Correction"}}</button>{{/if}}
     </div>
     <div class="pf-death-saves">
       <div class="pf-death-track">

@@ -862,7 +862,10 @@ async function assertPrintSheet(page, label) {
     const ability = document.querySelector("table.pf-skills td.pf-small");
     const score = document.querySelector(".pf-ab-score");
     const scoreStyle = score ? window.getComputedStyle(score) : null;
-    const hp = document.querySelector('input[name="system.attributes.hp.value"]');
+    const hpInput = document.querySelector('input[name="system.attributes.hp.value"]');
+    const hpReadout = document.querySelector(".pf-hp-readout");
+    const hpStyle = hpReadout ? window.getComputedStyle(hpReadout) : null;
+    const hpLine = document.querySelector(".pf-hp-line");
     const awakened = document.querySelector('input[name="system.magic.awakened"]');
     const awakenedStyle = awakened ? window.getComputedStyle(awakened) : null;
     const prime = document.querySelector(".pf-ab.pf-prime .pf-prime-toggle");
@@ -883,8 +886,11 @@ async function assertPrintSheet(page, label) {
       scoreShadow: scoreStyle ? scoreStyle.boxShadow : "",
       scoreBorder: scoreStyle ? scoreStyle.borderTopWidth : "",
       scoreFont: scoreStyle ? scoreStyle.fontFamily : "",
-      hpNamed: Boolean(hp),
-      hpReadonly: hp ? hp.readOnly : true,
+      hpInput: Boolean(hpInput),
+      hpText: hpReadout ? hpReadout.textContent.replace(/\s+/g, " ").trim() : "",
+      hpFont: hpStyle ? hpStyle.fontFamily : "",
+      hpBorder: hpStyle ? hpStyle.borderTopWidth : "",
+      hpDamageHeal: Boolean(hpLine?.querySelector('[data-action="survivalRoll"]')),
       awakenedAppearance: awakenedStyle ? awakenedStyle.appearance : "",
       awakenedBorder: awakenedStyle ? awakenedStyle.borderTopWidth : "",
       awakenedWidth: awakenedStyle ? awakenedStyle.width : "",
@@ -923,7 +929,14 @@ async function assertPrintSheet(page, label) {
     ],
     ["score flat", measured.scoreShadow === "none" && measured.scoreBorder === "0px"],
     ["score georgia", /Georgia/i.test(measured.scoreFont)],
-    ["hp named", measured.hpNamed === true && measured.hpReadonly === false],
+    [
+      "hp text",
+      measured.hpInput === false &&
+        measured.hpText === "47 / 71" &&
+        /Georgia/i.test(measured.hpFont) &&
+        measured.hpBorder === "0px" &&
+        measured.hpDamageHeal === true,
+    ],
     [
       "awakened box",
       measured.awakenedAppearance === "none" &&
