@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   prepareNpcSheetContext,
+  type ItemLike,
   type NpcActorLike,
   createPivotNpcSheetClass,
 } from "../../src/sheets/npc-sheet";
@@ -170,6 +171,57 @@ describe("prepareNpcSheetContext", () => {
         "system.creatureType": "undead",
         "system.overlay": "dire",
       });
+    });
+
+    it("prepares a titled context and edits or deletes the targeted item", async () => {
+      const SheetClass = createPivotNpcSheetClass(createMockFoundryRuntime()) as unknown as {
+        new (): {
+          id?: string;
+          document: NpcActorLike;
+          title: string;
+          _prepareContext(): Promise<{ rootId: string; actor: NpcActorLike }>;
+        };
+        onEditItem(
+          this: { document: NpcActorLike },
+          event: Event,
+          target: HTMLElement,
+        ): Promise<void>;
+        onDeleteItem(
+          this: { document: NpcActorLike },
+          event: Event,
+          target: HTMLElement,
+        ): Promise<void>;
+      };
+      const npc = sampleNpc();
+      const render = vi.fn();
+      const weapon = {
+        id: "weapon1",
+        name: "Greataxe",
+        type: "weapon",
+        system: { damage: "1d12" },
+        sheet: { render },
+      };
+      npc.items = [weapon as ItemLike];
+      const deleteEmbeddedDocuments = vi.fn(async () => undefined);
+      const sheet = new SheetClass();
+      sheet.id = "npc-sheet";
+      sheet.document = Object.assign(npc, { deleteEmbeddedDocuments });
+
+      expect(sheet.title).toBe("NPC: Angry Orc");
+      await expect(sheet._prepareContext()).resolves.toMatchObject({ rootId: "npc-sheet" });
+
+      const target = { dataset: { itemId: "weapon1" } } as unknown as HTMLElement;
+      await SheetClass.onEditItem.call(sheet, {} as Event, target);
+      expect(render).toHaveBeenCalledWith(true);
+
+      const event = { preventDefault: vi.fn() } as unknown as Event;
+      await SheetClass.onDeleteItem.call(sheet, event, target);
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(deleteEmbeddedDocuments).toHaveBeenCalledWith("Item", ["weapon1"]);
+
+      await SheetClass.onEditItem.call(sheet, {} as Event, { dataset: {} } as HTMLElement);
+      await SheetClass.onDeleteItem.call(sheet, event, { dataset: {} } as HTMLElement);
+      expect(deleteEmbeddedDocuments).toHaveBeenCalledTimes(1);
     });
   });
 });

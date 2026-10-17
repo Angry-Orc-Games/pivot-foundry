@@ -51,6 +51,12 @@ describe("validateEffectRule", () => {
     expect(() => validateEffectRule({ type: "weaponProficiency", category: "lasers" })).toThrow(
       /Unknown weapon category/,
     );
+    expect(() => validateEffectRule({ type: "armourProficiency", category: "cloth" })).toThrow(
+      /Unknown armour proficiency category/,
+    );
+    expect(() =>
+      validateEffectRule({ type: "abilityScoreBonus", ability: "luck", amount: 1 }),
+    ).toThrow(/Unknown ability/);
     expect(() => validateEffectRule({ type: "acBonus", formula: "1d4" })).toThrow();
     expect(() => validateEffectRule({ type: "acBonus", amount: 1.5 })).toThrow(/finite integer/);
   });
@@ -195,5 +201,44 @@ describe("describeEffectRule", () => {
       typeLabelKey: "PIVOT.Effects.SkillBonus",
       detail: "Perception +2",
     });
+    expect(describeEffectRule({ type: "abilityScoreBonus", ability: "str", amount: -1 })).toEqual({
+      typeLabelKey: "PIVOT.Effects.AbilityScoreBonus",
+      detail: "STR -1",
+    });
+    expect(describeEffectRule({ type: "armourProficiency", category: "shield" })).toEqual({
+      typeLabelKey: "PIVOT.Effects.ArmourProficiency",
+      detail: "Shields",
+    });
+    expect(describeEffectRule({ type: "weaponProficiency", category: "bows" })).toEqual({
+      typeLabelKey: "PIVOT.Effects.WeaponProficiency",
+      detail: "Bows",
+    });
+    expect(describeEffectRule({ type: "armourProficiency", category: "light" }).detail).toBe(
+      "Light",
+    );
+    expect(describeEffectRule({ type: "armourProficiency", category: "medium" }).detail).toBe(
+      "Medium",
+    );
+    expect(describeEffectRule({ type: "armourProficiency", category: "heavy" }).detail).toBe(
+      "Heavy",
+    );
+    for (const [category, detail] of [
+      ["meleeLight", "Melee: Light"],
+      ["meleeMedium", "Melee: Medium"],
+      ["meleeHeavy", "Melee: Heavy"],
+      ["meleeTwoHandedHeavy", "Melee: 2-Handed"],
+      ["crossbows", "Crossbows"],
+      ["thrown", "Thrown Weapons"],
+      ["improvised", "Improvised"],
+    ] as const) {
+      expect(describeEffectRule({ type: "weaponProficiency", category }).detail).toBe(detail);
+    }
+    expect(describeEffectRule({ type: "acBonus", amount: 1 })).toMatchObject({ detail: "+1" });
+    expect(describeEffectRule({ type: "initiativeBonus", amount: 2 })).toMatchObject({
+      detail: "+2",
+    });
+    expect(describeEffectRule({ type: "speedBonus", amount: 5 })).toMatchObject({ detail: "+5" });
+    expect(describeEffectRule({ type: "poolMaxBonus", amount: 1 })).toMatchObject({ detail: "+1" });
+    expect(describeEffectRule({ type: "mpMaxBonus", amount: 3 })).toMatchObject({ detail: "+3" });
   });
 });
