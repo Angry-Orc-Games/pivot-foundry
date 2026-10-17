@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -388,6 +388,101 @@ describe("nightly check run", () => {
   });
 });
 
+const PUBLISH_CURL = `#!/bin/sh
+url=
+prev=
+body=
+out=
+for arg in "$@"; do
+  if [ "$prev" = "--data-binary" ]; then
+    body=$arg
+  fi
+  if [ "$prev" = "-o" ]; then
+    out=$arg
+  fi
+  prev=$arg
+  case "$arg" in
+    http*) url=$arg ;;
+  esac
+done
+printf '%s\\n' "$url" >> "$E2E_STUB_DIR/curl-urls"
+if [ -n "$body" ]; then
+  printf '%s' "$body" > "$E2E_STUB_DIR/request-body"
+fi
+case "$url" in
+  */artifacts*)
+    cat "$E2E_STUB_DIR/artifacts.json"
+    ;;
+  */download)
+    cat "$E2E_STUB_DIR/artifact.zip" > "$out"
+    ;;
+  */check-runs)
+    if [ -n "$out" ]; then
+      printf '%s\\n' '{}' > "$out"
+    fi
+    ;;
+  *)
+    printf 'unexpected url %s\\n' "$url" >&2
+    exit 97
+    ;;
+esac
+`;
+
+async function publishFixture({ doc, artifacts, matrix = "failure" } = {}) {
+  const dir = await mkdtemp(join(tmpdir(), "e2e-publish-"));
+  const bin = join(dir, "bin");
+  const stub = join(dir, "stub");
+  await mkdir(bin);
+  await mkdir(stub);
+  await writeFile(join(bin, "curl"), PUBLISH_CURL);
+  await chmod(join(bin, "curl"), 0o755);
+  await writeFile(join(stub, "curl-urls"), "");
+  const listed =
+    artifacts ??
+    (doc
+      ? [
+          {
+            name: "e2e-result-pr-80",
+            expired: false,
+            archive_download_url: "https://artifact.test/download",
+            workflow_run: { id: 4242 },
+          },
+        ]
+      : []);
+  await writeFile(
+    join(stub, "artifacts.json"),
+    JSON.stringify({ total_count: listed.length, artifacts: listed }),
+  );
+  if (doc) {
+    const jsonPath = join(dir, "result.json");
+    await writeFile(jsonPath, JSON.stringify(doc));
+    execFileSync("python3", [
+      "-c",
+      "import sys, zipfile\n" +
+        "with zipfile.ZipFile(sys.argv[1], 'w') as bundle:\n" +
+        "    bundle.write(sys.argv[2], 'result.json')\n",
+      join(stub, "artifact.zip"),
+      jsonPath,
+    ]);
+  } else {
+    await writeFile(join(stub, "artifact.zip"), "");
+  }
+  const result = await runScript(publishScript, [], {
+    PATH: `${bin}:${process.env.PATH}`,
+    HOME: process.env.HOME,
+    LANG: "C",
+    GITHUB_API_URL: "https://api.github.test",
+    GITHUB_TOKEN: TOKEN,
+    E2E_STUB_DIR: stub,
+    E2E_REPOSITORY: "Angry-Orc-Games/pivot-foundry",
+    E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-80" }]),
+    E2E_RUN_ID: "4242",
+    E2E_MATRIX_RESULT: matrix,
+  });
+  const urls = await readFile(join(stub, "curl-urls"), "utf8");
+  return { dir, stub, result, urls };
+}
+
 describe("nightly failure results", () => {
   it("records a closed gate as a failure", async () => {
     const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
@@ -395,6 +490,7 @@ describe("nightly failure results", () => {
     const result = await runScript(recordScript, [dest], {
       ...process.env,
       E2E_SHA: MAIN,
+      E2E_RUN_ID: "4242",
       E2E_OK: "false",
       E2E_JOB_STATUS: "failure",
     });
@@ -404,54 +500,59 @@ describe("nightly failure results", () => {
     expect(result.status).toBe(0);
     expect(body).toEqual({
       sha: MAIN,
+      run_id: "4242",
       conclusion: "failure",
       summary: "License gate closed. Foundry was not started.",
     });
   });
 
   it("posts a failure check when the run was cancelled before a result existed", async () => {
-    const ctx = await withStub();
-    const result = await runScript(publishScript, [], {
-      ...ctx.env,
-      E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-80" }]),
-      E2E_RESULTS_DIR: join(ctx.dir, "missing-results"),
-      E2E_MATRIX_RESULT: "cancelled",
-    });
+    const ctx = await publishFixture({ artifacts: [], matrix: "cancelled" });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
     await rm(ctx.dir, { recursive: true, force: true });
 
-    expect(result.status).toBe(1);
+    expect(ctx.result.status).toBe(1);
     expect(body.conclusion).toBe("failure");
     expect(body.head_sha).toBe(SAME);
     expect(body.output.summary).toContain("cancelled or timed out");
     expect(body.output.summary).not.toContain("Skipped");
+    expect(ctx.urls).toContain("/actions/runs/4242/artifacts");
   });
 
-  it("posts the recorded conclusion for a finished SHA", async () => {
-    const ctx = await withStub();
-    await writeFile(
-      join(ctx.dir, "pr-80.json"),
-      JSON.stringify({
+  it("posts the recorded conclusion when the artifact matches this run and sha", async () => {
+    const ctx = await publishFixture({
+      doc: {
         sha: SAME,
+        run_id: "4242",
         conclusion: "failure",
         summary: "License gate closed. Foundry was not started.",
-      }),
-    );
-    const result = await runScript(publishScript, [], {
-      ...ctx.env,
-      E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-80" }]),
-      E2E_RESULTS_DIR: ctx.dir,
-      E2E_MATRIX_RESULT: "failure",
+      },
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
     await rm(ctx.dir, { recursive: true, force: true });
 
-    expect(result.status).toBe(1);
+    expect(ctx.result.status).toBe(1);
     expect(body).toMatchObject({
       name: "Foundry E2E (nightly)",
       head_sha: SAME,
       conclusion: "failure",
       output: { summary: "License gate closed. Foundry was not started." },
     });
+  });
+
+  it.each([
+    ["sha", { sha: MAIN, run_id: "4242", conclusion: "success", summary: "forged" }],
+    ["run_id", { sha: SAME, run_id: "9999", conclusion: "success", summary: "forged" }],
+    ["extra", { sha: SAME, run_id: "4242", conclusion: "success", summary: "forged", extra: true }],
+  ])("fails closed when the result %s does not match this run", async (_label, doc) => {
+    const ctx = await publishFixture({ doc });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(body.conclusion).toBe("failure");
+    expect(body.head_sha).toBe(SAME);
+    expect(body.output.summary).toContain("failed validation");
+    expect(body.output.summary).not.toContain("forged");
   });
 });

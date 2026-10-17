@@ -356,13 +356,30 @@ describe("workflows that start Foundry", () => {
     expect(nightlyHeader).toContain("contents: read");
     expect(nightlyHeader).not.toContain("checks: write");
     expect(nightlyHeader).not.toContain("issues: write");
-    const nightlyPlan = nightly.slice(nightly.indexOf("  plan:\n"), nightly.indexOf("  e2e:\n"));
+    const nightlyPlan = nightly.slice(
+      nightly.indexOf("  plan:\n"),
+      nightly.indexOf("  package:\n"),
+    );
     expect(nightlyPlan).toContain("issues: write");
     expect(nightlyPlan).not.toContain("npm ");
+    const packageJob = nightly.slice(nightly.indexOf("  package:\n"), nightly.indexOf("  e2e:\n"));
+    expect(packageJob).not.toContain("secrets.");
+    expect(packageJob).not.toContain("environment:");
+    expect(packageJob).toContain("npm run package:system");
+    expect(packageJob).toContain("name: e2e-package-");
+    expect(packageJob.indexOf("e2e-gate.sh license")).toBeLessThan(
+      packageJob.indexOf("matrix.target.sha"),
+    );
     const nightlyE2eJob = nightly.slice(
       nightly.indexOf("  e2e:\n"),
       nightly.indexOf("  report:\n"),
     );
+    expect(nightlyE2eJob).not.toContain("package:system");
+    expect(nightlyE2eJob).not.toContain("path: under-test");
+    expect(nightlyE2eJob).not.toContain("ref: ${{ matrix.target.sha }}");
+    expect(nightlyE2eJob).toContain("working-directory: trusted-gate");
+    expect(nightlyE2eJob).toContain("sparse-checkout-cone-mode: false");
+    expect(nightlyE2eJob).toContain("name: e2e-package-");
     const nightlyE2ePerms = nightlyE2eJob.slice(0, nightlyE2eJob.indexOf("steps:"));
     expect(nightlyE2ePerms).toContain("contents: read");
     expect(nightlyE2ePerms).not.toContain("checks:");
@@ -373,10 +390,12 @@ describe("workflows that start Foundry", () => {
     );
     expect(nightlyReport).toContain("checks: write");
     expect(nightlyReport).not.toContain("matrix.target");
+    expect(nightlyReport).not.toContain("download-artifact");
+    expect(nightlyReport).toContain("E2E_RUN_ID: ${{ github.run_id }}");
     expect(nightlyReport).toContain("bash trusted-gate/scripts/ci/e2e-publish-results.sh");
-    const buildStep = nightlyE2eJob.slice(
-      nightlyE2eJob.indexOf("- name: Build the system package"),
-      nightlyE2eJob.indexOf("- name: Run packaged Foundry E2E"),
+    const buildStep = packageJob.slice(
+      packageJob.indexOf("- name: Build the system package"),
+      packageJob.indexOf("- name: Upload packaged system"),
     );
     expect(buildStep).not.toContain("FOUNDRY_");
     expect(buildStep).toContain('GITHUB_TOKEN: ""');

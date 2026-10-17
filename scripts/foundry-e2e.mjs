@@ -30,6 +30,14 @@ import {
 const HTTP_TIMEOUT_MS = 120_000;
 const PLAYWRIGHT_TIMEOUT_MS = 15 * 60 * 1000;
 
+export function assertLaunchWindow(root, options = {}) {
+  execFileSync("bash", [join(root, "scripts/ci/e2e-gate.sh"), "require"], {
+    cwd: root,
+    stdio: options.stdio ?? "inherit",
+    env: options.env ?? process.env,
+  });
+}
+
 export async function runE2E(args = {}) {
   assertSafeTarget({
     target: process.env.PIVOT_FOUNDRY_TARGET || "e2e",
@@ -113,6 +121,7 @@ export async function runE2E(args = {}) {
     });
     mkdirSync(paths.foundryData, { recursive: true });
     installPackagedSystem(paths, zipPath);
+    assertLaunchWindow(paths.root);
 
     const port =
       Number(process.env.PIVOT_FOUNDRY_PORT) ||

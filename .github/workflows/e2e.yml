@@ -98,10 +98,82 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/ci/e2e-targets.sh
 
-  e2e:
-    name: Foundry E2E (${{ matrix.target.name }})
+  package:
+    name: Package system (${{ matrix.target.name }})
     needs: [gate, plan]
     if: needs.gate.outputs.ok == 'true' && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        target: ${{ fromJson(needs.plan.outputs.targets) }}
+    steps:
+      - name: Checkout trusted runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Recheck the license gate
+        id: recheck
+        run: bash scripts/ci/e2e-gate.sh license
+
+      - name: Setup Node
+        if: steps.recheck.outputs.ok == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install trusted dependencies
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+        run: npm ci
+
+      - name: Checkout system under test
+        if: steps.recheck.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ matrix.target.sha }}
+          path: under-test
+          persist-credentials: false
+
+      - name: Overlay the system onto the trusted runner
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+        run: bash scripts/ci/e2e-overlay.sh . under-test
+
+      - name: Build the system package
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+        run: npm run package:system
+
+      - name: Upload packaged system
+        if: steps.recheck.outputs.ok == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-package-${{ matrix.target.name }}
+          path: |
+            system.json
+            system.zip
+            artifact-identity.json
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    name: Foundry E2E (${{ matrix.target.name }})
+    needs: [gate, plan, package]
+    if: always() && needs.gate.outputs.ok == 'true' && needs.plan.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -113,16 +185,19 @@ jobs:
       matrix:
         target: ${{ fromJson(needs.plan.outputs.targets) }}
     steps:
-      - name: Checkout workflow commit
+      - name: Checkout trusted harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.sha }}
           path: trusted-gate
-          sparse-checkout: scripts/ci
           persist-credentials: false
-
-      - name: Keep trusted scripts
-        run: cp trusted-gate/scripts/ci/e2e-gate.sh trusted-gate/scripts/ci/e2e-record-result.sh "$RUNNER_TEMP/"
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/
+            /e2e/
+            /foundry/
+            /package.json
+            /package-lock.json
 
       - name: Recheck the license gate
         id: recheck
@@ -138,23 +213,17 @@ jobs:
           HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
         run: bash trusted-gate/scripts/ci/e2e-gate.sh secrets
 
-      - name: Checkout trusted runner
-        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-          clean: false
-
       - name: Setup Node
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: trusted-gate/package-lock.json
 
       - name: Install trusted dependencies
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
@@ -162,35 +231,24 @@ jobs:
 
       - name: Install Playwright browser
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
         run: npx playwright install chromium --with-deps
 
-      - name: Checkout system under test
+      - name: Download packaged system
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          ref: ${{ matrix.target.sha }}
-          path: under-test
-          persist-credentials: false
-
-      - name: Overlay the system onto the trusted runner
-        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: bash scripts/ci/e2e-overlay.sh . under-test
-
-      - name: Build the system package
-        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: npm run package:system
+          name: e2e-package-${{ matrix.target.name }}
+          path: trusted-gate
+          run-id: ${{ github.run_id }}
+          github-token: ${{ github.token }}
 
       - name: Run packaged Foundry E2E
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
@@ -208,6 +266,7 @@ jobs:
 
       - name: Verify tests executed
         if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
@@ -219,6 +278,7 @@ jobs:
 
       - name: Record E2E acceptance
         if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
@@ -230,9 +290,9 @@ jobs:
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}
           path: |
-            system.json
-            system.zip
-            artifact-identity.json
+            trusted-gate/system.json
+            trusted-gate/system.zip
+            trusted-gate/artifact-identity.json
           if-no-files-found: error
           retention-days: 14
 
@@ -242,28 +302,32 @@ jobs:
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}-diagnostics
           path: |
-            playwright-report
-            test-results
-            .foundry/instances/*/diagnostics
+            trusted-gate/playwright-report
+            trusted-gate/test-results
+            trusted-gate/.foundry/instances/*/diagnostics
           if-no-files-found: warn
           retention-days: 7
 
       - name: Record E2E result
         if: always() || cancelled()
+        working-directory: trusted-gate
         env:
           E2E_SHA: ${{ matrix.target.sha }}
+          E2E_RUN_ID: ${{ github.run_id }}
           E2E_OK: ${{ steps.recheck.outputs.ok }}
           E2E_AVAILABLE: ${{ steps.creds.outputs.available }}
           E2E_JOB_STATUS: ${{ job.status }}
           E2E_LOG: ${{ runner.temp }}/foundry-e2e.log
-        run: bash "$RUNNER_TEMP/e2e-record-result.sh" "e2e-result/${{ matrix.target.name }}.json"
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+        run: bash scripts/ci/e2e-record-result.sh "e2e-result/${{ matrix.target.name }}.json"
 
       - name: Upload E2E result
         if: always() || cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-result-${{ matrix.target.name }}
-          path: e2e-result/${{ matrix.target.name }}.json
+          path: trusted-gate/e2e-result/${{ matrix.target.name }}.json
           if-no-files-found: warn
           retention-days: 7
 
@@ -285,18 +349,10 @@ jobs:
           sparse-checkout: scripts/ci
           persist-credentials: false
 
-      - name: Download E2E results
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          pattern: e2e-result-*
-          path: e2e-results
-          merge-multiple: true
-        continue-on-error: true
-
       - name: Post Foundry E2E results
         env:
           E2E_TARGETS: ${{ needs.plan.outputs.targets }}
-          E2E_RESULTS_DIR: e2e-results
+          E2E_RUN_ID: ${{ github.run_id }}
           E2E_MATRIX_RESULT: ${{ needs.e2e.result }}
           E2E_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ github.token }}

@@ -3,6 +3,7 @@ set -euo pipefail
 
 dest=${1:?usage: e2e-record-result.sh <path>}
 sha=${E2E_SHA:?}
+run_id=${E2E_RUN_ID:?}
 ok=${E2E_OK:-}
 available=${E2E_AVAILABLE:-}
 job=${E2E_JOB_STATUS:-failure}
@@ -10,6 +11,10 @@ log=${E2E_LOG:-}
 
 if [[ ! $sha =~ ^[0-9a-f]{40}$ ]]; then
   printf '::error::Result SHA must be 40 hex characters\n' >&2
+  exit 1
+fi
+if [[ ! $run_id =~ ^[0-9]+$ ]]; then
+  printf '::error::Result run id must be numeric\n' >&2
   exit 1
 fi
 
@@ -27,6 +32,8 @@ else
   started="Foundry started for E2E commit ${sha}."
   if [[ -n $log && -f $log ]] && grep -F -q "$started" "$log"; then
     summary="${started} The run failed after Foundry started."
+  elif [[ -n $log && -f $log ]] && grep -F -q "outside 02:00-05:30" "$log"; then
+    summary="License gate closed before Foundry launched. Foundry was not started."
   else
     summary="Foundry did not start for ${sha}."
   fi
@@ -35,6 +42,7 @@ fi
 mkdir -p "$(dirname "$dest")"
 jq -nc \
   --arg sha "$sha" \
+  --arg run_id "$run_id" \
   --arg conclusion "$conclusion" \
   --arg summary "$summary" \
-  '{sha: $sha, conclusion: $conclusion, summary: $summary}' >"$dest"
+  '{sha: $sha, run_id: $run_id, conclusion: $conclusion, summary: $summary}' >"$dest"
