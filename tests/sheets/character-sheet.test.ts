@@ -162,6 +162,35 @@ describe("prepareCharacterSheetContext", () => {
     expect(boosted.derived.proficiencies.weapons.bows).toBe(true);
     expect(baseline.derived.initiative).toBe(4);
     expect(boosted.derived.initiative).toBe(5);
+    expect(baseline.scoreSourceText).toBe("");
+    expect(boosted.scoreSourceText).toBe("Score sources. Dex: base 14, Bow Training +2.");
+    expect(baseline.skillRows.find((row) => row.id === "athletics")?.ability).toBe("Str");
+    expect(baseline.skillRows.find((row) => row.id === "perception")?.ability).toBe("Wis");
+  });
+
+  it("lists body modifications apart from traits", () => {
+    const actor = sampleActor();
+    const withMods = {
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "mod-1",
+          name: "Gills",
+          type: "feature",
+          system: { category: "bodyModification" },
+        },
+        {
+          id: "trait-1",
+          name: "Darkvision",
+          type: "feature",
+          system: { category: "species" },
+        },
+      ],
+    };
+    const context = prepareCharacterSheetContext(withMods);
+    expect(context.items.bodyModifications.map((item) => item.name)).toEqual(["Gills"]);
+    expect(context.items.traits.map((item) => item.name)).toEqual(["Darkvision"]);
   });
 
   it("keeps non-enumerable Foundry document ids available for item row actions", () => {

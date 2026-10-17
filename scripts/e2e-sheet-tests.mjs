@@ -10,12 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "../templates/actors/character");
 const header = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "header.hbs"), "utf-8"));
 const vitals = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "vitals.hbs"), "utf-8"));
-const tabs = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "tabs.hbs"), "utf-8"));
 const sheet = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "sheet.hbs"), "utf-8"));
-const survival = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "survival.hbs"), "utf-8"));
-const inventory = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "inventory.hbs"), "utf-8"));
-const magic = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "magic.hbs"), "utf-8"));
-const notesTemplate = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "notes.hbs"), "utf-8"));
 
 // Load CSS
 const tokens = readFileSync(join(__dirname, "../styles/pf-tokens.css"), "utf-8");
@@ -350,7 +345,7 @@ function getContextData() {
       {
         id: "athletics",
         label: "Athletics",
-        ability: "STR",
+        ability: "Str",
         abilityPath: "system.skills.athletics.ability",
         proficientPath: "system.skills.athletics.proficient",
         deepeningPath: "system.skills.athletics.deepening",
@@ -366,7 +361,7 @@ function getContextData() {
       {
         id: "investigation",
         label: "Investigation",
-        ability: "INT",
+        ability: "Int",
         abilityPath: "system.skills.investigation.ability",
         proficientPath: "system.skills.investigation.proficient",
         deepeningPath: "system.skills.investigation.deepening",
@@ -382,7 +377,7 @@ function getContextData() {
       {
         id: "perception",
         label: "Perception",
-        ability: "WIS",
+        ability: "Wis",
         abilityPath: "system.skills.perception.ability",
         proficientPath: "system.skills.perception.proficient",
         deepeningPath: "system.skills.perception.deepening",
@@ -398,7 +393,7 @@ function getContextData() {
       {
         id: "acrobatics",
         label: "Acrobatics",
-        ability: "DEX",
+        ability: "Dex",
         abilityPath: "system.skills.acrobatics.ability",
         proficientPath: "system.skills.acrobatics.proficient",
         deepeningPath: "system.skills.acrobatics.deepening",
@@ -414,7 +409,7 @@ function getContextData() {
       {
         id: "deception",
         label: "Deception",
-        ability: "CHA",
+        ability: "Cha",
         abilityPath: "system.skills.deception.ability",
         proficientPath: "system.skills.deception.proficient",
         deepeningPath: "system.skills.deception.deepening",
@@ -430,7 +425,7 @@ function getContextData() {
       {
         id: "insight",
         label: "Insight",
-        ability: "WIS",
+        ability: "Wis",
         abilityPath: "system.skills.insight.ability",
         proficientPath: "system.skills.insight.proficient",
         deepeningPath: "system.skills.insight.deepening",
@@ -593,23 +588,13 @@ async function runTests() {
   const data = getContextData();
   const headerHTML = header(data);
   const vitalsHTML = vitals(data);
-  const tabsHTML = tabs(data);
   const sheetHTML = sheet(data);
-  const survivalHTML = survival(data);
-  const inventoryHTML = inventory(data);
-  const magicHTML = magic(data);
-  const notesHTML = notesTemplate(data);
 
   const content = `
     ${headerHTML}
     ${vitalsHTML}
-    ${tabsHTML}
     <div class="pf-tab-body">
       ${sheetHTML}
-      ${survivalHTML}
-      ${inventoryHTML}
-      ${magicHTML}
-      ${notesHTML}
     </div>
   `;
 
@@ -701,57 +686,70 @@ async function runTests() {
     }
   }
 
-  // Test 2: Tab switching
-  console.log("\nTest 2: Tab switching functionality");
+  // Test 2: Former tab sections are visible together, with no tab bar.
+  console.log("\nTest 2: One-page sections (survival, inventory, magic, notes)");
 
-  const tabIds = ["sheet", "survival", "inventory", "magic", "notes"];
-  const panelClassMap = {
-    sheet: "pf-sheet-content",
-    survival: "pf-survival-tab",
-    inventory: "pf-inventory-tab",
-    magic: "pf-magic-tab",
-    notes: "pf-notes-tab",
-  };
-  let allTabsWork = true;
-
-  for (const tabId of tabIds) {
-    const result = await page.evaluate(
-      /* eslint-disable no-undef */
-      ({ id, panelClass }) => {
-        const tabButton = document.querySelector(`[data-tab="${id}"]`);
-        if (!tabButton) return { error: `Tab button ${id} not found` };
-
-        tabButton.click();
-
-        // Wait a bit for JS to execute
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            const activeTab = document.querySelector(".pf-tabs a.active");
-            const activePanel = document.querySelector(`.${panelClass}.active`);
-
-            resolve({
-              tabId: id,
-              tabIsActive: activeTab?.dataset.tab === id,
-              panelIsActive: !!activePanel,
-              panelVisible: activePanel
-                ? window.getComputedStyle(activePanel).display !== "none"
-                : false,
-            });
-          }, 50);
-        });
-      },
-      /* eslint-enable no-undef */
-      { id: tabId, panelClass: panelClassMap[tabId] },
-    );
-
-    const pass = result.tabIsActive && result.panelIsActive && result.panelVisible;
-    allTabsWork = allTabsWork && pass;
-    console.log(`  ${pass ? "✓" : "✗"} ${tabId}: ${pass ? "PASS" : "FAIL"}`);
-    if (!pass) {
-      console.log(
-        `    Tab active: ${result.tabIsActive}, Panel active: ${result.panelIsActive}, Panel visible: ${result.panelVisible}`,
-      );
+  const sectionResult = await page.evaluate(() => {
+    /* eslint-disable no-undef */
+    const visible = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return false;
+      return window.getComputedStyle(el).display !== "none";
+    };
+    const headings = [...document.querySelectorAll("h3")].map((el) => el.textContent.trim());
+    const order = [
+      "Skills",
+      "Attacks",
+      "Feats",
+      "Magic",
+      "Flaws",
+      "Traits",
+      "Gear and funds",
+      "Survival",
+      "Loyalty and details",
+    ];
+    let last = -1;
+    let orderOk = true;
+    for (const heading of order) {
+      const index = headings.indexOf(heading);
+      if (index < 0 || index < last) orderOk = false;
+      last = index;
     }
+    return {
+      noTabBar: document.querySelector(".pf-tabs") === null,
+      sheet: visible(".pf-sheet-content"),
+      survival: visible(".pf-survival"),
+      inventory: visible(".pf-inventory"),
+      magic: visible(".pf-magic"),
+      notes: visible('textarea[name="system.notes.special"]'),
+      shortRest: visible('[data-action="shortRest"]'),
+      createWeapon: visible('[data-type="weapon"]'),
+      awakened: visible('[name="system.magic.awakened"]'),
+      orderOk,
+      headings,
+    };
+    /* eslint-enable no-undef */
+  });
+
+  const sectionChecks = [
+    ["no tab bar", sectionResult.noTabBar],
+    ["sheet", sectionResult.sheet],
+    ["survival", sectionResult.survival],
+    ["inventory", sectionResult.inventory],
+    ["magic", sectionResult.magic],
+    ["notes", sectionResult.notes],
+    ["short rest", sectionResult.shortRest],
+    ["create weapon", sectionResult.createWeapon],
+    ["awakened", sectionResult.awakened],
+    ["section order", sectionResult.orderOk],
+  ];
+  let allTabsWork = true;
+  for (const [label, pass] of sectionChecks) {
+    allTabsWork = allTabsWork && pass;
+    console.log(`  ${pass ? "✓" : "✗"} ${label}: ${pass ? "PASS" : "FAIL"}`);
+  }
+  if (!sectionResult.orderOk) {
+    console.log(`    Headings: ${sectionResult.headings.join(" | ")}`);
   }
 
   // Test 3: Contrast ratios
@@ -784,7 +782,7 @@ async function runTests() {
     return {
       skillName: getColorAndBg(".pf-skills label span"),
       skillModifier: getColorAndBg(".pf-skills .pf-small"),
-      activeTab: getColorAndBg(".pf-tabs a.active"),
+      sectionHeading: getColorAndBg(".pf-print h3"),
       abilityLabel: getColorAndBg(".pf-ab b"),
     };
     /* eslint-enable no-undef */
@@ -817,14 +815,91 @@ async function runTests() {
     }
   }
 
+  console.log("\nTest 4: Print sheet measurements");
+  const printFailed = !(await assertPrintSheet(page, "light"));
+  const darkHtml = generateHTML("theme-dark", content, 900);
+  await page.setContent(darkHtml);
+  await page.setViewportSize({ width: 980, height: 800 });
+  const darkFailed = !(await assertPrintSheet(page, "dark"));
+
   await browser.close();
 
   console.log("\n=== Tests Complete ===\n");
 
-  if (!allTabsWork || contrastFailed) {
+  if (!allTabsWork || contrastFailed || printFailed || darkFailed) {
     console.error("✗ Some tests FAILED");
     process.exit(1);
   }
+}
+
+async function assertPrintSheet(page, label) {
+  const measured = await page.evaluate(() => {
+    /* eslint-disable no-undef */
+    const styleOf = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return null;
+      const style = window.getComputedStyle(el);
+      return {
+        fontSize: style.fontSize,
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        textTransform: style.textTransform,
+        letterSpacing: style.letterSpacing,
+        borderBottomWidth: style.borderBottomWidth,
+        borderBottomStyle: style.borderBottomStyle,
+        listStyleType: style.listStyleType,
+        fontWeight: style.fontWeight,
+      };
+    };
+    const row = document.querySelector("table.pf-skills tr");
+    const speed = [...document.querySelectorAll(".pf-stat span")].find((el) =>
+      /m/i.test(el.textContent || ""),
+    );
+    const mark = document.querySelector(".pf-prof-mark");
+    const ability = document.querySelector("table.pf-skills td.pf-small");
+    return {
+      paper: styleOf(".pf-print-wrap"),
+      body: styleOf(".pf-print"),
+      small: styleOf(".pf-print .pf-small"),
+      heading: styleOf(".pf-print h3"),
+      attacks: styleOf("table.pf-attacks thead th"),
+      list: styleOf(".pf-print .pf-list"),
+      speedText: speed ? speed.textContent.replace(/\s+/g, " ").trim() : "",
+      speedTransform: speed ? window.getComputedStyle(speed).textTransform : "",
+      rowHeight: row ? row.getBoundingClientRect().height : 0,
+      mark: mark ? mark.textContent : "",
+      ability: ability ? ability.textContent.trim() : "",
+    };
+    /* eslint-enable no-undef */
+  });
+
+  const checks = [
+    ["paper background", measured.paper?.backgroundColor === "rgb(255, 255, 255)"],
+    ["paper ink", measured.paper?.color === "rgb(28, 26, 22)"],
+    ["body 12px", measured.body?.fontSize === "12px"],
+    ["small 10.5px", measured.small?.fontSize === "10.5px"],
+    ["heading uppercase", measured.heading?.textTransform === "uppercase"],
+    ["heading 12px", measured.heading?.fontSize === "12px"],
+    ["heading rust", measured.heading?.color === "rgb(138, 59, 18)"],
+    ["heading rule", measured.heading?.borderBottomStyle === "solid"],
+    ["attacks plain", measured.attacks?.backgroundColor === "rgba(0, 0, 0, 0)"],
+    ["attacks ink", measured.attacks?.color === "rgb(28, 26, 22)"],
+    ["attacks bold", Number(measured.attacks?.fontWeight) >= 700],
+    ["attacks not uppercase", measured.attacks?.textTransform === "none"],
+    ["bullets", measured.list?.listStyleType === "disc"],
+    ["speed lowercase", measured.speedText.includes("m") && !measured.speedText.includes("M")],
+    ["speed transform", measured.speedTransform === "none"],
+    ["skill marker", measured.mark === "●" || measured.mark === "○"],
+    ["ability case", measured.ability === "Str"],
+    ["skill row height", measured.rowHeight >= 16 && measured.rowHeight <= 22],
+  ];
+  let ok = true;
+  for (const [name, pass] of checks) {
+    ok = ok && pass;
+    console.log(`  ${pass ? "✓" : "✗"} ${label} ${name}`);
+  }
+  if (!ok) console.log(`    ${label} measured ${JSON.stringify(measured)}`);
+  return ok;
 }
 
 runTests().catch((err) => {

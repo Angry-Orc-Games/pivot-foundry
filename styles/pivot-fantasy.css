@@ -85,6 +85,11 @@
   overflow: hidden;
 }
 
+.pivot-fantasy.character .window-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 :is(.pivot-fantasy, .pf-sheet).sheet.item .window-content {
   overflow-x: hidden;
   overflow-y: auto;
@@ -831,6 +836,17 @@
   border-bottom: 1px solid var(--pf-accent);
 }
 
+.pf-sheet .pf-print table.pf-attacks thead th {
+  background: transparent;
+  color: var(--pf-sheet-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 1px 4px;
+  text-transform: none;
+  border-bottom: 1px solid var(--pf-sheet-rule);
+}
+
 .pf-sheet table tbody td {
   padding: 4px 8px;
   text-align: left;
@@ -1044,25 +1060,42 @@
    PRINT LAYOUT CSS - Ticket 3: Character Sheet Restructure
    =================================================================== */
 
-/* Print wrapper and print sheet */
+/* Print wrapper and print sheet. Parts stack into one paper card. */
 .pf-sheet .pf-print-wrap {
-  background: var(--pf-panel);
-  color: var(--pf-ink);
-  padding: var(--pf-space-4);
-  border: 1px solid var(--pf-line);
-  border-radius: var(--pf-radius-md);
+  background: var(--pf-sheet-paper);
+  color: var(--pf-sheet-ink);
   max-width: 900px;
-  margin: 0 auto var(--pf-space-3);
+  margin: 0 auto;
+  padding: 0 18px;
+  border-left: 1px solid var(--pf-line);
+  border-right: 1px solid var(--pf-line);
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+}
+
+.pf-sheet .pf-print-top {
+  border-top: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md) var(--pf-radius-md) 0 0;
+  padding-top: 18px;
+}
+
+.pf-sheet .pf-print-bottom {
+  border-bottom: 1px solid var(--pf-line);
+  border-radius: 0 0 var(--pf-radius-md) var(--pf-radius-md);
+  padding-bottom: 18px;
+  margin-bottom: var(--pf-space-3);
 }
 
 .pf-sheet .pf-print {
+  font-family: var(--pf-font-body);
   font-size: 12px;
   line-height: 1.35;
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
 }
 
 .pf-sheet .pf-print :is(h1, h2, h3) {
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
 }
 
 /* NPC sheet body sections */
@@ -1144,17 +1177,20 @@
 }
 
 .pf-sheet .pf-print h3 {
+  font-family: var(--pf-font-display);
   font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 1.5px solid var(--pf-accent);
-  color: var(--pf-accent);
-  margin: 12px 0 4px;
+  border-bottom: 1.5px solid var(--pf-sheet-accent);
+  color: var(--pf-sheet-accent);
+  margin: 10px 0 4px;
   padding-bottom: 1px;
 }
 
-.pf-sheet .pf-print ul {
-  margin: 0;
+.pf-sheet .pf-print ul,
+.pf-sheet .pf-print .pf-list {
+  margin: 4px 0;
   padding-left: 16px;
   list-style: disc;
 }
@@ -1198,8 +1234,10 @@
 }
 
 .pf-sheet .pf-tagline-view {
+  font-family: var(--pf-font-body);
+  font-size: 12px;
   font-style: italic;
-  color: var(--pf-ink-muted);
+  color: var(--pf-sheet-muted);
   margin-bottom: 4px;
 }
 
@@ -1262,24 +1300,27 @@
 }
 
 .pf-sheet .pf-stat {
-  background: var(--pf-panel);
-  border: 1.5px solid var(--pf-ink);
+  background: var(--pf-sheet-paper);
+  border: 1.5px solid var(--pf-sheet-ink);
   border-radius: var(--pf-radius-md);
   text-align: center;
   padding: 3px;
+  min-height: 0;
+  display: block;
 }
 
 .pf-sheet .pf-stat b {
   display: block;
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: var(--pf-ink-muted);
+  color: var(--pf-sheet-muted);
 }
 
 .pf-sheet .pf-stat span {
   font: 700 17px var(--pf-font-display);
   display: block;
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
+  text-transform: none;
 }
 
 .pf-sheet .pf-stat small {
@@ -1388,16 +1429,19 @@
 
 /* Skills table */
 .pf-sheet .pf-print table.pf-skills {
+  display: table;
   border-collapse: collapse;
   width: 100%;
   font-size: 11.5px;
+  line-height: 1.25;
 }
 
 .pf-sheet .pf-print table.pf-skills td {
   padding: 1px 4px;
-  border-bottom: 1px solid var(--pf-line);
+  border-bottom: 1px solid var(--pf-sheet-rule);
   text-align: left;
   vertical-align: middle;
+  line-height: 1.25;
 }
 
 .pf-sheet .pf-print table.pf-skills td.pf-r {
@@ -1419,6 +1463,20 @@
 .pf-sheet .pf-print table.pf-skills .pf-check span {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-prof-mark {
+  flex: 0 0 1.1em;
+  width: 1.1em;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-roll {
+  font-weight: 700;
+  line-height: 1.25;
+  min-height: 0;
+  text-decoration: none;
 }
 
 /* Lists */
@@ -1473,11 +1531,11 @@
 
 .pf-sheet .pf-print .pf-small {
   font-size: 10.5px;
-  color: var(--pf-ink-muted);
+  color: var(--pf-sheet-muted);
 }
 
 .pf-sheet .pf-print .pf-small b {
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
 }
 
 /* Screen reader only */

@@ -1,5 +1,5 @@
 {{! Vitals section: 4 stat cards, 6 ability boxes, Initiative/Passive Perception line }}
-<section class="pf-vitals">
+<section class="pf-vitals pf-print pf-print-wrap">
   <div class="pf-stats">
     {{! AC stat card }}
     <div class="pf-stat" title="{{derived.armourClass.breakdown}}">
@@ -76,6 +76,10 @@
       </div>
     {{/each}}
   </div>
+
+  {{#if scoreSourceText}}
+    <div class="pf-small">{{scoreSourceText}}</div>
+  {{/if}}
 
   {{! Initiative and Passive Perception compact line }}
   <div class="pf-small pf-init-pp">

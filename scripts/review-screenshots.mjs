@@ -10,7 +10,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "../templates/actors/character");
 const header = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "header.hbs"), "utf-8"));
 const vitals = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "vitals.hbs"), "utf-8"));
-const tabs = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "tabs.hbs"), "utf-8"));
 const sheet = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "sheet.hbs"), "utf-8"));
 
 // Load CSS
@@ -371,7 +370,7 @@ async function generateScreenshots() {
         {
           id: "athletics",
           label: "Athletics",
-          ability: "STR",
+          ability: "Str",
           abilityPath: "system.skills.athletics.ability",
           proficientPath: "system.skills.athletics.proficient",
           deepeningPath: "system.skills.athletics.deepening",
@@ -387,7 +386,7 @@ async function generateScreenshots() {
         {
           id: "investigation",
           label: "Investigation",
-          ability: "INT",
+          ability: "Int",
           abilityPath: "system.skills.investigation.ability",
           proficientPath: "system.skills.investigation.proficient",
           deepeningPath: "system.skills.investigation.deepening",
@@ -403,7 +402,7 @@ async function generateScreenshots() {
         {
           id: "perception",
           label: "Perception",
-          ability: "WIS",
+          ability: "Wis",
           abilityPath: "system.skills.perception.ability",
           proficientPath: "system.skills.perception.proficient",
           deepeningPath: "system.skills.perception.deepening",
@@ -419,7 +418,7 @@ async function generateScreenshots() {
         {
           id: "acrobatics",
           label: "Acrobatics",
-          ability: "DEX",
+          ability: "Dex",
           abilityPath: "system.skills.acrobatics.ability",
           proficientPath: "system.skills.acrobatics.proficient",
           deepeningPath: "system.skills.acrobatics.deepening",
@@ -435,7 +434,7 @@ async function generateScreenshots() {
         {
           id: "deception",
           label: "Deception",
-          ability: "CHA",
+          ability: "Cha",
           abilityPath: "system.skills.deception.ability",
           proficientPath: "system.skills.deception.proficient",
           deepeningPath: "system.skills.deception.deepening",
@@ -451,7 +450,7 @@ async function generateScreenshots() {
         {
           id: "insight",
           label: "Insight",
-          ability: "WIS",
+          ability: "Wis",
           abilityPath: "system.skills.insight.ability",
           proficientPath: "system.skills.insight.proficient",
           deepeningPath: "system.skills.insight.deepening",
@@ -513,9 +512,8 @@ async function generateScreenshots() {
 
     const headerHTML = header(data);
     const vitalsHTML = vitals(data);
-    const tabsHTML = tabs(data);
     const sheetHTML = sheet(data);
-    const content = headerHTML + vitalsHTML + tabsHTML + sheetHTML;
+    const content = headerHTML + vitalsHTML + sheetHTML;
 
     const html = generateHTML(scenario.theme, content, scenario.width);
 
@@ -538,12 +536,12 @@ async function generateScreenshots() {
       }
 
       // Tabs crop
-      const tabsElement = await page.locator(".pf-tabs");
-      if (tabsElement) {
-        await tabsElement.screenshot({
-          path: `artifacts/${scenario.name}-tabs.png`,
+      const loyaltyElement = page.locator(".pf-loyalty");
+      if ((await loyaltyElement.count()) > 0) {
+        await loyaltyElement.screenshot({
+          path: `artifacts/${scenario.name}-loyalty.png`,
         });
-        console.log(`  - ${scenario.name}-tabs.png`);
+        console.log(`  - ${scenario.name}-loyalty.png`);
       }
 
       // Ability cards crop (vitals section with ability boxes)

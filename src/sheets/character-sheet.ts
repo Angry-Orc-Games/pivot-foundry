@@ -24,7 +24,11 @@ import {
   type SkillSourceMap,
   type WeaponProficiencyMap,
 } from "../rules/character-derived";
-import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
+import {
+  aggregateCharacterEffects,
+  collectEmbeddedItemEffects,
+  parseStoredEffect,
+} from "../rules/effects";
 import {
   applyAttackCrit,
   d20PoolFormula,
@@ -129,6 +133,7 @@ export interface CharacterSheetContext {
     shields: string;
   };
   magicStreamsText: string;
+  scoreSourceText: string;
   form: {
     languagesText: string;
     instrumentsText: string;
@@ -190,6 +195,7 @@ export interface CharacterSheetContext {
     feats: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     flaws: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     traits: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    bodyModifications: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicStreams: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicAbilities: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
   };
@@ -262,41 +268,8 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       vitals: {
         template: `${SYSTEM_TEMPLATES_BASE}/vitals.hbs`,
       },
-      tabs: {
-        template: `${SYSTEM_TEMPLATES_BASE}/tabs.hbs`,
-      },
       sheet: {
         template: `${SYSTEM_TEMPLATES_BASE}/sheet.hbs`,
-        scrollable: [""],
-      },
-      survival: {
-        template: `${SYSTEM_TEMPLATES_BASE}/survival.hbs`,
-        scrollable: [""],
-      },
-      inventory: {
-        template: `${SYSTEM_TEMPLATES_BASE}/inventory.hbs`,
-        scrollable: [""],
-      },
-      magic: {
-        template: `${SYSTEM_TEMPLATES_BASE}/magic.hbs`,
-        scrollable: [""],
-      },
-      notes: {
-        template: `${SYSTEM_TEMPLATES_BASE}/notes.hbs`,
-        scrollable: [""],
-      },
-    };
-
-    static TABS = {
-      primary: {
-        tabs: [
-          { id: "sheet", label: "PIVOT.Tabs.Sheet" },
-          { id: "survival", label: "PIVOT.Tabs.Survival" },
-          { id: "inventory", label: "PIVOT.Tabs.Inventory" },
-          { id: "magic", label: "PIVOT.Tabs.Magic" },
-          { id: "notes", label: "PIVOT.Tabs.Notes" },
-        ],
-        initial: "sheet",
       },
     };
 
@@ -308,34 +281,47 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
         ...prepareCharacterSheetContext(actor, parentContext.editable !== false),
       };
     }
-
-    async _preparePartContext(
-      partId: string,
-      context: Record<string, unknown>,
-    ): Promise<Record<string, unknown>> {
-      const parent = Object.getPrototypeOf(Object.getPrototypeOf(this)) as {
-        _preparePartContext?: (
-          partId: string,
-          context: Record<string, unknown>,
-        ) => Promise<Record<string, unknown>>;
-      } | null;
-      const superMethod = parent?._preparePartContext;
-      const partContext =
-        typeof superMethod === "function"
-          ? await Reflect.apply(superMethod, this, [partId, context])
-          : context;
-      // Wrap header, vitals, and sheet parts in print layout wrapper
-      if (partId === "header" || partId === "vitals" || partId === "sheet") {
-        return {
-          ...(isRecord(partContext) ? partContext : {}),
-          classes: ["pf-print-wrap"],
-        };
-      }
-      return isRecord(partContext) ? partContext : {};
-    }
   }
 
   return PivotCharacterSheet;
+}
+
+const ABILITY_PRINT_CODE: Record<AbilityKey, string> = {
+  str: "Str",
+  dex: "Dex",
+  con: "Con",
+  int: "Int",
+  wis: "Wis",
+  cha: "Cha",
+};
+
+function abilityPrintCode(key: string): string {
+  return ABILITY_PRINT_CODE[key as AbilityKey] ?? key;
+}
+
+function formatScoreSources(
+  itemList: ItemLike[],
+  abilitySources: Record<AbilityKey, { score: number }>,
+): string {
+  const grouped = new Map<AbilityKey, string[]>();
+  for (const item of itemList) {
+    const effects = item.system?.effects;
+    if (!Array.isArray(effects)) continue;
+    for (const entry of effects) {
+      const parsed = parseStoredEffect(entry);
+      if (!parsed || parsed.type !== "abilityScoreBonus") continue;
+      const notes = grouped.get(parsed.ability) ?? [];
+      const sign = parsed.amount >= 0 ? `+${parsed.amount}` : String(parsed.amount);
+      notes.push(`${item.name} ${sign}`);
+      grouped.set(parsed.ability, notes);
+    }
+  }
+  const parts = abilities.flatMap(({ key }) => {
+    const sources = grouped.get(key);
+    if (!sources?.length) return [];
+    return [`${abilityPrintCode(key)}: base ${abilitySources[key].score}, ${sources.join(", ")}`];
+  });
+  return parts.length > 0 ? `Score sources. ${parts.join("; ")}.` : "";
 }
 
 export function prepareCharacterSheetContext(
@@ -476,10 +462,11 @@ export function prepareCharacterSheetContext(
   // Split features by category
   const feats = features.filter((item) => stringAt(item.system, ["category"], "") === "feat");
   const flaws = features.filter((item) => stringAt(item.system, ["category"], "") === "flaw");
+  const bodyModifications = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "bodyModification",
+  );
   const traits = features.filter((item) =>
-    ["species", "background", "bodyModification", "other"].includes(
-      stringAt(item.system, ["category"], ""),
-    ),
+    ["species", "background", "other"].includes(stringAt(item.system, ["category"], "")),
   );
 
   // Magic streams text
@@ -507,6 +494,7 @@ export function prepareCharacterSheetContext(
       shields: shieldProf,
     },
     magicStreamsText,
+    scoreSourceText: formatScoreSources(itemList, abilitySources),
     form: {
       languagesText: stringArrayAt(system, ["identity", "languages"]).join(", "),
       instrumentsText: stringArrayAt(system, ["proficiencies", "instruments"]).join(", "),
@@ -552,7 +540,7 @@ export function prepareCharacterSheetContext(
         return {
           id: skill.id,
           label: skill.label,
-          ability: source.ability.toUpperCase(),
+          ability: abilityPrintCode(source.ability),
           abilityPath: `system.skills.${skill.id}.ability`,
           proficientPath: `system.skills.${skill.id}.proficient`,
           deepeningPath: `system.skills.${skill.id}.deepening`,
@@ -603,6 +591,7 @@ export function prepareCharacterSheetContext(
       feats: withDisabledAttr(feats, disabledAttr),
       flaws: withDisabledAttr(flaws, disabledAttr),
       traits: withDisabledAttr(traits, disabledAttr),
+      bodyModifications: withDisabledAttr(bodyModifications, disabledAttr),
       magicStreams: withDisabledAttr(magicStreams, disabledAttr),
       magicAbilities: withDisabledAttr(magicAbilities, disabledAttr),
     },
