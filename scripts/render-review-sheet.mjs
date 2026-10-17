@@ -9,6 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = join(root, "docs/screenshots/character-sheet");
 const fontDir = "/tmp/fonts";
 
+const foundryForm = readFileSync(join(root, "scripts/foundry-v14-form-fixture.css"), "utf-8");
 const tokens = readFileSync(join(root, "styles/pf-tokens.css"), "utf-8");
 const css = readFileSync(join(root, "styles/pivot-fantasy.css"), "utf-8");
 const enJson = JSON.parse(readFileSync(join(root, "lang/en.json"), "utf-8"));
@@ -206,6 +207,7 @@ function pageHtml(theme, width, context) {
     * { box-sizing: border-box; }
     ${fontCss}
     body { margin: 0; background: ${theme === "dark" ? "#1b1814" : "#f3ede0"}; }
+    ${foundryForm}
     ${tokens}
     ${css}
     .pivot-fantasy { --font-primary: Signika, system-ui, sans-serif; }
@@ -213,7 +215,7 @@ function pageHtml(theme, width, context) {
   </style>
 </head>
 <body class="${theme === "dark" ? "theme-dark" : "theme-light"}">
-  <form class="pivot-fantasy pf-sheet sheet character ${appTheme}">
+  <form class="application pivot-fantasy pf-sheet sheet actor character ${appTheme}">
     <section class="window-content">
       ${header(context)}
       ${vitals(context)}

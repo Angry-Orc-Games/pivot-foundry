@@ -207,6 +207,8 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
   );
 
   class PivotCharacterSheet extends BaseSheet {
+    editorOpen: boolean | undefined;
+
     static DEFAULT_OPTIONS = {
       classes: ["pivot-fantasy", "pf-sheet", SYSTEM_ID, "sheet", "actor", "character"],
       position: { width: 820, height: 760 },
@@ -221,15 +223,11 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
-        toggleEditMode: function (
-          this: PivotCharacterSheet & {
-            options: { editable?: boolean };
-            render: (force?: boolean) => void;
-          },
-        ) {
-          // Toggle edit mode by inverting options.editable
-          const currentEditable = this.options.editable !== false;
-          this.options.editable = !currentEditable;
+        toggleEditMode: function (this: {
+          editorOpen?: boolean;
+          render: (force?: boolean) => void;
+        }) {
+          this.editorOpen = this.editorOpen === false;
           this.render();
         },
         survivalRoll: async function (this: { document: ActorLike }) {
@@ -276,9 +274,10 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
     async _prepareContext(options: Record<string, unknown>): Promise<Record<string, unknown>> {
       const parentContext = await callOptionalSuper(this, "_prepareContext", options);
       const actor = getSheetDocument(this);
+      const showEditor = sheetShowsEditor(parentContext.editable !== false, this.editorOpen);
       return {
         ...parentContext,
-        ...prepareCharacterSheetContext(actor, parentContext.editable !== false),
+        ...prepareCharacterSheetContext(actor, showEditor),
       };
     }
   }
@@ -322,6 +321,10 @@ function formatScoreSources(
     return [`${abilityPrintCode(key)}: base ${abilitySources[key].score}, ${sources.join(", ")}`];
   });
   return parts.length > 0 ? `Score sources. ${parts.join("; ")}.` : "";
+}
+
+export function sheetShowsEditor(ownerCanEdit: boolean, editorOpen: boolean | undefined): boolean {
+  return ownerCanEdit && editorOpen !== false;
 }
 
 export function prepareCharacterSheetContext(

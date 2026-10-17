@@ -5,6 +5,7 @@ import {
   buildD20ChatFlavor,
   buildRollModeDialogContent,
   createEmbeddedItemData,
+  createPivotCharacterSheetClass,
   naturalResultsFromRoll,
   nextResourceValue,
   normalizeSheetSubmitData,
@@ -716,5 +717,74 @@ describe("D20 roll attachments for Dice So Nice!", () => {
     expect(chatCreate).toHaveBeenCalledTimes(1);
     const messageData = chatCreate.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(messageData.content).toBe(renderedContent);
+  });
+});
+
+describe("character sheet edit toggle", () => {
+  function sheetClass(ownerEditable: boolean) {
+    return createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+            async _prepareContext() {
+              return { editable: ownerEditable };
+            }
+          },
+        },
+      },
+    } as never);
+  }
+
+  it("switches an owner between edit and view, and keeps a non-owner in view", async () => {
+    type SheetInstance = {
+      editorOpen?: boolean;
+      document: ActorLike;
+      render: () => void;
+      _prepareContext: (options: Record<string, unknown>) => Promise<{
+        editable: boolean;
+        disabledAttr: string;
+      }>;
+    };
+    const SheetClass = sheetClass(true);
+    const sheet = new SheetClass() as SheetInstance;
+    sheet.document = sampleActor();
+    sheet.render = () => undefined;
+    const toggle = (
+      SheetClass as unknown as {
+        DEFAULT_OPTIONS: { actions: { toggleEditMode: (this: SheetInstance) => void } };
+      }
+    ).DEFAULT_OPTIONS.actions.toggleEditMode;
+
+    const editing = await sheet._prepareContext({});
+    expect(editing.editable).toBe(true);
+    expect(editing.disabledAttr).toBe("");
+
+    toggle.call(sheet);
+    const viewing = await sheet._prepareContext({});
+    expect(sheet.editorOpen).toBe(false);
+    expect(viewing.editable).toBe(false);
+    expect(viewing.disabledAttr).toBe("disabled");
+
+    toggle.call(sheet);
+    const editingAgain = await sheet._prepareContext({});
+    expect(editingAgain.editable).toBe(true);
+    expect(editingAgain.disabledAttr).toBe("");
+
+    const LockedSheet = sheetClass(false);
+    const locked = new LockedSheet() as SheetInstance;
+    locked.document = sampleActor();
+    locked.render = () => undefined;
+    const lockedToggle = (
+      LockedSheet as unknown as {
+        DEFAULT_OPTIONS: { actions: { toggleEditMode: (this: SheetInstance) => void } };
+      }
+    ).DEFAULT_OPTIONS.actions.toggleEditMode;
+    lockedToggle.call(locked);
+    lockedToggle.call(locked);
+    const stillLocked = await locked._prepareContext({});
+    expect(stillLocked.editable).toBe(false);
+    expect(stillLocked.disabledAttr).toBe("disabled");
   });
 });

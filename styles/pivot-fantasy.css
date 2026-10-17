@@ -1611,3 +1611,108 @@
 .pf-sheet .pf-character-sheet {
   container-name: pf-sheet;
 }
+
+/* Beat Foundry v14 form chrome. The application root carries these classes. */
+.pivot-fantasy.sheet.actor.character .window-content {
+  background: #fff;
+  color: #1c1a16;
+  padding: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .window-content > .pf-print-wrap {
+  align-self: stretch;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print :is(input, select, textarea) {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  min-height: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print :is(input, select, textarea):disabled {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  opacity: 1;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-inline {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--pf-sheet-rule);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  padding: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-score {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font: 700 18px var(--pf-font-display);
+  height: auto;
+  padding: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-score::-webkit-inner-spin-button,
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-score::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-head {
+  align-items: baseline;
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-prime-toggle {
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  min-height: 1em;
+  min-width: 0.8em;
+  position: static;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-prime-toggle input.pf-sr {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-skills tr,
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-skills tr:nth-child(odd),
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-skills tr:nth-child(even) {
+  background: transparent;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-attacks thead,
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-attacks thead th {
+  background: transparent;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+}

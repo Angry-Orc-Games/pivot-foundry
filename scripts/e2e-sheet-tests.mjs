@@ -13,6 +13,7 @@ const vitals = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "vitals.hbs"),
 const sheet = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "sheet.hbs"), "utf-8"));
 
 // Load CSS
+const foundryForm = readFileSync(join(__dirname, "foundry-v14-form-fixture.css"), "utf-8");
 const tokens = readFileSync(join(__dirname, "../styles/pf-tokens.css"), "utf-8");
 const css = readFileSync(join(__dirname, "../styles/pivot-fantasy.css"), "utf-8");
 
@@ -502,6 +503,7 @@ function generateHTML(theme, content, width) {
       font-family: system-ui, -apple-system, sans-serif;
       background: ${theme === "theme-dark" ? "#0d0b09" : "#f0f0f0"};
     }
+    ${foundryForm}
     ${tokens}
     ${css}
     /* Test-specific styles */
@@ -547,12 +549,12 @@ function generateHTML(theme, content, width) {
     });
   </script>
 </head>
-<body class="${theme} pivot-fantasy">
-  <div class="pf-sheet" style="container-type: inline-size; width: ${width}px; margin: 0 auto;">
-    <div class="pf-character-sheet">
+<body class="${theme}">
+  <form class="application pivot-fantasy pf-sheet sheet actor character ${theme === "theme-dark" ? "theme-dark" : ""}" style="width: ${width}px;">
+    <section class="window-content" style="height: 600px; width: ${width}px;">
       ${content}
-    </div>
-  </div>
+    </section>
+  </form>
 </body>
 </html>
 `;
@@ -852,18 +854,40 @@ async function assertPrintSheet(page, label) {
       };
     };
     const row = document.querySelector("table.pf-skills tr");
+    const evenRow = document.querySelector("table.pf-skills tr:nth-child(even)");
     const speed = [...document.querySelectorAll(".pf-stat span")].find((el) =>
       /m/i.test(el.textContent || ""),
     );
     const mark = document.querySelector(".pf-prof-mark");
     const ability = document.querySelector("table.pf-skills td.pf-small");
+    const score = document.querySelector(".pf-ab-score");
+    const scoreStyle = score ? window.getComputedStyle(score) : null;
+    const hp = document.querySelector('input[name="system.attributes.hp.value"]');
+    const prime = document.querySelector(".pf-ab.pf-prime .pf-prime-toggle");
+    const primeInput = document.querySelector(".pf-prime-toggle input");
+    const contentWidth = document.querySelector(".window-content")?.clientWidth ?? 0;
+    const headerWidth = document.querySelector(".pf-hdr")?.getBoundingClientRect().width ?? 0;
+    const vitalsWidth = document.querySelector(".pf-vitals")?.getBoundingClientRect().width ?? 0;
     return {
       paper: styleOf(".pf-print-wrap"),
+      window: styleOf(".window-content"),
       body: styleOf(".pf-print"),
       small: styleOf(".pf-print .pf-small"),
       heading: styleOf(".pf-print h3"),
-      attacks: styleOf("table.pf-attacks thead th"),
+      attacks: styleOf("table.pf-attacks thead"),
+      attacksHead: styleOf("table.pf-attacks thead th"),
+      skillStripe: evenRow ? window.getComputedStyle(evenRow).backgroundColor : "",
       list: styleOf(".pf-print .pf-list"),
+      scoreShadow: scoreStyle ? scoreStyle.boxShadow : "",
+      scoreBorder: scoreStyle ? scoreStyle.borderTopWidth : "",
+      scoreFont: scoreStyle ? scoreStyle.fontFamily : "",
+      hpNamed: Boolean(hp),
+      hpReadonly: hp ? hp.readOnly : true,
+      primeText: prime ? prime.textContent.replace(/\s+/g, " ").trim() : "",
+      primeWidth: primeInput ? window.getComputedStyle(primeInput).width : "",
+      contentWidth,
+      headerWidth,
+      vitalsWidth,
       speedText: speed ? speed.textContent.replace(/\s+/g, " ").trim() : "",
       speedTransform: speed ? window.getComputedStyle(speed).textTransform : "",
       rowHeight: row ? row.getBoundingClientRect().height : 0,
@@ -875,6 +899,7 @@ async function assertPrintSheet(page, label) {
 
   const checks = [
     ["paper background", measured.paper?.backgroundColor === "rgb(255, 255, 255)"],
+    ["window paper", measured.window?.backgroundColor === "rgb(255, 255, 255)"],
     ["paper ink", measured.paper?.color === "rgb(28, 26, 22)"],
     ["body 12px", measured.body?.fontSize === "12px"],
     ["small 10.5px", measured.small?.fontSize === "10.5px"],
@@ -883,9 +908,24 @@ async function assertPrintSheet(page, label) {
     ["heading rust", measured.heading?.color === "rgb(138, 59, 18)"],
     ["heading rule", measured.heading?.borderBottomStyle === "solid"],
     ["attacks plain", measured.attacks?.backgroundColor === "rgba(0, 0, 0, 0)"],
-    ["attacks ink", measured.attacks?.color === "rgb(28, 26, 22)"],
-    ["attacks bold", Number(measured.attacks?.fontWeight) >= 700],
-    ["attacks not uppercase", measured.attacks?.textTransform === "none"],
+    ["attacks head plain", measured.attacksHead?.backgroundColor === "rgba(0, 0, 0, 0)"],
+    ["attacks ink", measured.attacksHead?.color === "rgb(28, 26, 22)"],
+    ["attacks bold", Number(measured.attacksHead?.fontWeight) >= 700],
+    ["attacks not uppercase", measured.attacksHead?.textTransform === "none"],
+    [
+      "skills unstriped",
+      measured.skillStripe === "rgba(0, 0, 0, 0)" || measured.skillStripe === "rgb(255, 255, 255)",
+    ],
+    ["score flat", measured.scoreShadow === "none" && measured.scoreBorder === "0px"],
+    ["score georgia", /Georgia/i.test(measured.scoreFont)],
+    ["hp named", measured.hpNamed === true && measured.hpReadonly === false],
+    ["primary star", measured.primeText === "★"],
+    ["primary control clipped", measured.primeWidth === "1px"],
+    [
+      "parts one width",
+      Math.abs(measured.headerWidth - measured.contentWidth) < 1 &&
+        Math.abs(measured.vitalsWidth - measured.contentWidth) < 1,
+    ],
     ["bullets", measured.list?.listStyleType === "disc"],
     ["speed lowercase", measured.speedText.includes("m") && !measured.speedText.includes("M")],
     ["speed transform", measured.speedTransform === "none"],

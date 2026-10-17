@@ -13,6 +13,9 @@ describe("character sheet template structure", () => {
     expect(template).toContain('data-roll-kind="save"');
     expect(template).toContain("{{scorePath}}");
     expect(template).toContain("{{primaryPath}}");
+    expect(template).toContain('aria-label="Primary {{label}}"');
+    expect(template).not.toContain(">Primary</span>");
+    expect(template).toContain("★");
     expect(template).toContain("{{short}}");
     expect(template).toContain("{{mod}}");
     expect(template).toContain("{{save}}");
@@ -43,6 +46,8 @@ describe("character sheet template structure", () => {
     expect(template).toContain('data-type="equipment"');
     expect(template).toContain('name="system.magic.awakened"');
     expect(template).toContain('name="system.magic.mp.value"');
+    expect(template).toContain('name="system.attributes.hp.value"');
+    expect(template).not.toContain("readonly");
     expect(template).toContain('name="system.notes.special"');
     expect(template).toContain('name="system.notes.runesThaumaturgy"');
     expect(template).toContain('name="system.identity.loyalty"');

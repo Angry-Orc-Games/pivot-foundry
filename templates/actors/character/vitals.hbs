@@ -39,14 +39,24 @@
   <div class="pf-abil">
     {{#each abilityRows}}
       <div class="{{abilityClass}}">
-        <button
-          type="button"
-          class="pf-roll pf-ab-name"
-          data-action="roll"
-          data-roll-kind="ability"
-          data-key="{{key}}"
-          data-label="{{label}}"
-        ><b>{{short}}{{#if primary}} ★{{/if}}</b></button>
+        <div class="pf-ab-head">
+          <button
+            type="button"
+            class="pf-roll pf-ab-name"
+            data-action="roll"
+            data-roll-kind="ability"
+            data-key="{{key}}"
+            data-label="{{label}}"
+          ><b>{{short}}</b></button>
+          <label class="pf-prime-toggle"><input
+              class="pf-sr"
+              type="checkbox"
+              name="{{primaryPath}}"
+              aria-label="Primary {{label}}"
+              {{checked primary}}
+              {{disabledAttr}}
+            />{{#if primary}}<span aria-hidden="true">★</span>{{/if}}</label>
+        </div>
         <span><input
             class="pf-inline pf-num pf-ab-score"
             name="{{scorePath}}"
@@ -67,12 +77,6 @@
           data-key="{{key}}"
           data-label="{{label}} save"
         ><small>Save {{save}}</small></button>
-        <label class="pf-prime-toggle"><input
-            type="checkbox"
-            name="{{primaryPath}}"
-            {{checked primary}}
-            {{disabledAttr}}
-          /><span class="pf-sr">Primary</span></label>
       </div>
     {{/each}}
   </div>
