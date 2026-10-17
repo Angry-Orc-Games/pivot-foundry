@@ -1224,6 +1224,10 @@
   margin: 0 0 4px 0;
 }
 
+.pf-sheet .pf-hdr.pf-print-wrap {
+  margin-bottom: 0;
+}
+
 /* View mode read-only text (full contrast) */
 .pf-sheet .pf-name-view {
   font-family: var(--pf-font-display);
@@ -1538,10 +1542,21 @@
   color: var(--pf-sheet-ink);
 }
 
-/* Screen reader only */
-.pf-sheet .pf-sr {
+.pf-sheet .pf-print .pf-check {
+  position: relative;
+}
+
+.pf-sheet .pf-print .pf-check input.pf-sr {
   position: absolute;
-  left: -9999px;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
 }
 
 /* Roll buttons in print context */

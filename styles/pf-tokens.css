@@ -68,6 +68,14 @@
   --pf-panel: var(--pf-sheet-paper);
   --pf-bg: var(--pf-sheet-paper);
   --pf-accent: var(--pf-sheet-accent);
+  --pf-accent-hover: #74310f;
   --pf-accent-soft: var(--pf-sheet-accent-soft);
   --pf-accent-ink: #fff;
+  --pf-chip: #ece3cf;
+  --pf-good: #2f6b3a;
+  --pf-good-soft: #dcebdc;
+  --pf-warn: #8a5e00;
+  --pf-warn-soft: #f6ead0;
+  --pf-bad: #a1281e;
+  --pf-bad-soft: #f5d9d5;
 }

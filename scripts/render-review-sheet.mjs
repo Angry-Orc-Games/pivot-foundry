@@ -244,7 +244,7 @@ async function ensureSignika() {
 const shots = [];
 for (const mode of ["view", "edit"]) {
   for (const theme of ["light", "dark"]) {
-    for (const width of [900, 675]) {
+    for (const width of [900, 675, 640]) {
       shots.push({ mode, theme, width, name: `${mode}-${theme}-${width}.png` });
     }
   }
