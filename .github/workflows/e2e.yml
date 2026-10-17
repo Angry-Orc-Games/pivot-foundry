@@ -168,7 +168,11 @@ jobs:
           ACTIONS_RUNTIME_URL: ""
           ACTIONS_RESULTS_URL: ""
           ACTIONS_CACHE_URL: ""
-        run: npm run package:system
+        run: |
+          docker run --rm --network none --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:/work" -w /work \
+            node:20-bookworm \
+            npm run package:system
 
       - name: Upload packaged system
         if: steps.recheck.outputs.ok == 'true'

@@ -375,6 +375,8 @@ describe("workflows that start Foundry", () => {
       nightly.indexOf("  report:\n"),
     );
     expect(packageJob).toContain('ACTIONS_RUNTIME_TOKEN: ""');
+    expect(packageJob).toContain("docker run --rm --network none");
+    expect(packageJob).toContain('-v "$GITHUB_WORKSPACE:/work"');
     expect(nightlyE2eJob).not.toContain("package:system");
     expect(nightlyE2eJob).not.toContain("path: under-test");
     expect(nightlyE2eJob).not.toContain("ref: ${{ matrix.target.sha }}");
