@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Exact commit SHA to test after reviewing an external PR
+        description: Exact 40-character commit SHA in this repository. Empty runs main and open e2e-nightly pull requests.
         required: false
       secrets_check_only:
         description: Verify foundry-e2e secrets are non-empty, then exit. Does not start Foundry, at any hour.
@@ -17,6 +17,9 @@ on:
 
 permissions:
   contents: read
+  checks: write
+  issues: write
+  pull-requests: read
 
 concurrency:
   group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || format('foundry-e2e-{0}', github.event.pull_request.number || github.ref) }}
@@ -31,8 +34,10 @@ jobs:
     outputs:
       ok: ${{ steps.decide.outputs.ok }}
     steps:
-      - name: Checkout
+      - name: Checkout trusted runner
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
 
       - name: Decide whether Foundry may start
         id: decide
@@ -45,8 +50,10 @@ jobs:
     timeout-minutes: 5
     environment: foundry-e2e
     steps:
-      - name: Checkout
+      - name: Checkout trusted runner
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
 
       - name: Check Foundry secrets
         env:
@@ -56,18 +63,80 @@ jobs:
           HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
         run: bash scripts/ci/e2e-gate.sh secrets
 
-  e2e:
-    name: Foundry E2E
+  plan:
+    name: Select E2E targets
     needs: gate
     if: needs.gate.outputs.ok == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: foundry-e2e
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
     steps:
-      - name: Checkout
+      - name: Checkout trusted runner
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: main
+
+      - name: List main and labeled pull requests
+        id: plan
+        env:
+          E2E_EVENT: ${{ github.event_name }}
+          E2E_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || '' }}
+          E2E_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/e2e-targets.sh
+
+  e2e:
+    name: Foundry E2E (${{ matrix.target.name }})
+    needs: [gate, plan]
+    if: needs.gate.outputs.ok == 'true' && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: foundry-e2e
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        target: ${{ fromJson(needs.plan.outputs.targets) }}
+    steps:
+      - name: Checkout trusted runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+
+      - name: Recheck the license gate
+        id: recheck
+        run: bash scripts/ci/e2e-gate.sh license
+
+      - name: Stop when the license gate closes
+        if: steps.recheck.outputs.ok != 'true'
+        env:
+          E2E_SHA: ${{ matrix.target.sha }}
+          E2E_REPOSITORY: ${{ github.repository }}
+          E2E_SUMMARY: Skipped before Foundry started. The license gate closed.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          bash scripts/ci/e2e-report.sh neutral
+          echo "::error::Stopped: the license gate closed before ${{ matrix.target.sha }}. No further Foundry runs will start."
+          exit 1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install trusted dependencies
+        run: npm ci
+
+      - name: Checkout system under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ matrix.target.sha }}
+          path: under-test
+
+      - name: Overlay the system onto the trusted runner
+        run: bash scripts/ci/e2e-overlay.sh . under-test
 
       - name: Check Foundry secrets
         id: creds
@@ -76,34 +145,7 @@ jobs:
           HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
           HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
           HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
-        run: |
-          missing=()
-          [ "$HAVE_ADMIN" = "true" ] || missing+=("FOUNDRY_ADMIN_KEY")
-          [ "$HAVE_LICENSE" = "true" ] || missing+=("FOUNDRY_LICENSE_KEY")
-          [ "$HAVE_CACHE" = "true" ] || missing+=("FOUNDRY_RELEASE_CACHE_URL")
-          [ "$HAVE_SHA" = "true" ] || missing+=("FOUNDRY_RELEASE_SHA256")
-
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': ${missing[*]}"
-            exit 1
-          fi
-
-          echo "available=true" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node
-        if: steps.creds.outputs.available == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        if: steps.creds.outputs.available == 'true'
-        run: npm ci
-
-      - name: Install Playwright browser
-        if: steps.creds.outputs.available == 'true'
-        run: npx playwright install chromium --with-deps
+        run: bash scripts/ci/e2e-gate.sh secrets
 
       - name: Run packaged Foundry E2E
         if: steps.creds.outputs.available == 'true'
@@ -114,7 +156,11 @@ jobs:
           FOUNDRY_RELEASE_SHA256: ${{ secrets.FOUNDRY_RELEASE_SHA256 }}
           PIVOT_REQUIRE_RELEASE_SHA256: "1"
           PIVOT_FOUNDRY_TARGET: e2e
-        run: npm run foundry:e2e
+          PIVOT_E2E_SUBJECT: ${{ matrix.target.sha }}
+        run: |
+          set -o pipefail
+          node scripts/foundry-cli.mjs e2e 2>&1 | tee "$RUNNER_TEMP/foundry-e2e.log"
+          grep -F "Foundry started for E2E commit ${{ matrix.target.sha }}." "$RUNNER_TEMP/foundry-e2e.log"
 
       - name: Verify tests executed
         if: steps.creds.outputs.available == 'true'
@@ -132,7 +178,7 @@ jobs:
         if: steps.creds.outputs.available == 'true' && success()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: pivot-foundry-e2e
+          name: pivot-foundry-e2e-${{ matrix.target.name }}
           path: |
             system.json
             system.zip
@@ -144,10 +190,34 @@ jobs:
         if: steps.creds.outputs.available == 'true' && failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: pivot-foundry-e2e-diagnostics
+          name: pivot-foundry-e2e-${{ matrix.target.name }}-diagnostics
           path: |
             playwright-report
             test-results
             .foundry/instances/*/diagnostics
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Report Foundry E2E success
+        if: success()
+        env:
+          E2E_SHA: ${{ matrix.target.sha }}
+          E2E_REPOSITORY: ${{ github.repository }}
+          E2E_SUMMARY: Foundry started for E2E commit ${{ matrix.target.sha }}.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/e2e-report.sh success
+
+      - name: Report Foundry E2E failure
+        if: failure() && steps.recheck.outputs.ok == 'true'
+        env:
+          E2E_SHA: ${{ matrix.target.sha }}
+          E2E_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          line="Foundry started for E2E commit ${E2E_SHA}."
+          if [[ -f "$RUNNER_TEMP/foundry-e2e.log" ]] && grep -F -q "$line" "$RUNNER_TEMP/foundry-e2e.log"; then
+            export E2E_SUMMARY="${line} The run failed after Foundry started."
+          else
+            export E2E_SUMMARY="Foundry did not start for ${E2E_SHA}."
+          fi
+          bash scripts/ci/e2e-report.sh failure
