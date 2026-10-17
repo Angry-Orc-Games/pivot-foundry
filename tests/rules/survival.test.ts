@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyHealth, resolveDeathSave, type SurvivalState } from "../../src/rules/survival";
+import {
+  applyHealth,
+  resolveDeathSave,
+  survivalStatusForHpEdit,
+  type SurvivalState,
+} from "../../src/rules/survival";
 const state = (patch: Partial<SurvivalState> = {}): SurvivalState => ({
   hp: 10,
   max: 20,
@@ -10,6 +15,14 @@ const state = (patch: Partial<SurvivalState> = {}): SurvivalState => ({
   ...patch,
 });
 describe("HP and survival", () => {
+  it("moves a direct HP edit onto a legal status", () => {
+    expect(survivalStatusForHpEdit("alive", 0, 10)).toBe("dying");
+    expect(survivalStatusForHpEdit("alive", 0, 0)).toBeUndefined();
+    expect(survivalStatusForHpEdit("dying", 0, 10)).toBeUndefined();
+    expect(survivalStatusForHpEdit("dead", 4, 10)).toBe("alive");
+    expect(survivalStatusForHpEdit("unconfirmed", 0, 10)).toBeUndefined();
+    expect(survivalStatusForHpEdit("alive", 4, 10)).toBeUndefined();
+  });
   it("uses temp before HP and preserves source", () => {
     const s = state();
     expect(applyHealth(s, "damage", 8)).toMatchObject({ temp: 0, hp: 7 });

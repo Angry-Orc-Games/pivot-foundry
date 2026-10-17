@@ -863,6 +863,8 @@ async function assertPrintSheet(page, label) {
     const score = document.querySelector(".pf-ab-score");
     const scoreStyle = score ? window.getComputedStyle(score) : null;
     const hp = document.querySelector('input[name="system.attributes.hp.value"]');
+    const awakened = document.querySelector('input[name="system.magic.awakened"]');
+    const awakenedStyle = awakened ? window.getComputedStyle(awakened) : null;
     const prime = document.querySelector(".pf-ab.pf-prime .pf-prime-toggle");
     const primeInput = document.querySelector(".pf-prime-toggle input");
     const contentWidth = document.querySelector(".window-content")?.clientWidth ?? 0;
@@ -883,6 +885,9 @@ async function assertPrintSheet(page, label) {
       scoreFont: scoreStyle ? scoreStyle.fontFamily : "",
       hpNamed: Boolean(hp),
       hpReadonly: hp ? hp.readOnly : true,
+      awakenedAppearance: awakenedStyle ? awakenedStyle.appearance : "",
+      awakenedBorder: awakenedStyle ? awakenedStyle.borderTopWidth : "",
+      awakenedWidth: awakenedStyle ? awakenedStyle.width : "",
       primeText: prime ? prime.textContent.replace(/\s+/g, " ").trim() : "",
       primeWidth: primeInput ? window.getComputedStyle(primeInput).width : "",
       contentWidth,
@@ -919,6 +924,12 @@ async function assertPrintSheet(page, label) {
     ["score flat", measured.scoreShadow === "none" && measured.scoreBorder === "0px"],
     ["score georgia", /Georgia/i.test(measured.scoreFont)],
     ["hp named", measured.hpNamed === true && measured.hpReadonly === false],
+    [
+      "awakened box",
+      measured.awakenedAppearance === "none" &&
+        measured.awakenedBorder === "1px" &&
+        measured.awakenedWidth === "18px",
+    ],
     ["primary star", measured.primeText === "★"],
     ["primary control clipped", measured.primeWidth === "1px"],
     [

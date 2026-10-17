@@ -15,3 +15,42 @@ it("clamps a current HP edit to the current maximum", () => {
   expect(guardHpMaximum(actor, changes)).toBeUndefined();
   expect(changes.system.attributes.hp.value).toBe(10);
 });
+
+it("sets dying when a current HP edit reaches zero", () => {
+  const actor = {
+    system: {
+      attributes: {
+        hp: { value: 4, max: 10 },
+        deathSaves: { status: "alive", successes: 1, failures: 2 },
+      },
+    },
+  };
+  const changes: {
+    system: {
+      attributes: {
+        hp: { value: number };
+        deathSaves?: { status?: string; successes?: number; failures?: number };
+      };
+    };
+  } = { system: { attributes: { hp: { value: 0 } } } };
+  expect(guardHpMaximum(actor, changes)).toBeUndefined();
+  expect(changes.system.attributes.hp.value).toBe(0);
+  expect(changes.system.attributes.deathSaves).toMatchObject({
+    status: "dying",
+    successes: 0,
+    failures: 0,
+  });
+});
+
+it("sets alive when a current HP edit rises above zero", () => {
+  const actor = {
+    system: {
+      attributes: { hp: { value: 0, max: 10 }, deathSaves: { status: "dead" } },
+    },
+  };
+  const changes: Record<string, unknown> = { "system.attributes.hp.value": 3 };
+  expect(guardHpMaximum(actor, changes)).toBeUndefined();
+  expect(changes["system.attributes.deathSaves.status"]).toBe("alive");
+  expect(changes["system.attributes.deathSaves.successes"]).toBe(0);
+  expect(changes["system.attributes.deathSaves.failures"]).toBe(0);
+});
