@@ -1994,3 +1994,150 @@
   justify-content: start;
   width: max-content;
 }
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(odd),
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(even) {
+  background: transparent;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(odd)
+  td,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(even)
+  td {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  color: #1c1a16;
+  text-align: left;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(odd)
+  td.pf-r,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(even)
+  td.pf-r {
+  text-align: right;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(button, a) {
+  background: transparent;
+  box-shadow: none;
+  color: #1c1a16;
+  display: inline;
+  flex: 0 0 auto;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(.pf-link, .pf-item-name, .pf-roll):hover {
+  color: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(input:not([type="checkbox"]), select, textarea) {
+  background: transparent;
+  box-shadow: none;
+  color: #1c1a16;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="checkbox"] {
+  background: #fff;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(.pf-sheet-button, .pf-edit-toggle) {
+  background: #8a3b12;
+  border: 1px solid #8a3b12;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 700;
+  min-height: 0;
+  padding: 2px 8px;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-meter {
+  background: #f1dccb;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-meter-fill {
+  background: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-status {
+  background: #f1dccb;
+}
