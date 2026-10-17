@@ -66,6 +66,10 @@ jobs:
         if: steps.creds.outputs.available == 'true'
         run: npx playwright install chromium --with-deps
 
+      - name: Run sheet E2E tests
+        if: steps.creds.outputs.available == 'true'
+        run: node scripts/e2e-sheet-tests.mjs
+
       - name: Run packaged Foundry E2E
         if: steps.creds.outputs.available == 'true'
         env:

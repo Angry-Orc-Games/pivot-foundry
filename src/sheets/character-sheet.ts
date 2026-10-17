@@ -14,7 +14,8 @@ import {
   weaponCategories,
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
-import { selectInitiativeCombatant } from "../rules/combat";
+import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { applyChatMessageMode } from "../runtime/ui";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -38,7 +39,7 @@ import {
   spendBoundedResource,
 } from "../rules/resources";
 
-const CHARACTER_TEMPLATE = `systems/${SYSTEM_ID}/templates/actors/character-sheet.hbs`;
+const SYSTEM_TEMPLATES_BASE = `systems/${SYSTEM_ID}/templates/actors/character`;
 
 type RecordValue = Record<string, unknown>;
 
@@ -102,6 +103,9 @@ export interface CombatantLike {
 }
 
 export interface CombatLike {
+  id?: string;
+  active?: boolean;
+  isActive?: boolean;
   combatants?: Iterable<CombatantLike> | { contents: CombatantLike[] };
 }
 
@@ -115,6 +119,16 @@ export interface CharacterSheetContext {
   deathSaveFailurePips: boolean[];
   isGM: boolean;
   system: RecordValue;
+  speciesLabel: string;
+  backgroundLabel: string;
+  tierLabel: string;
+  conMod: string;
+  proficiencyText: {
+    weapons: string;
+    armour: string;
+    shields: string;
+  };
+  magicStreamsText: string;
   form: {
     languagesText: string;
     instrumentsText: string;
@@ -142,8 +156,9 @@ export interface CharacterSheetContext {
     primaryPath: string;
     score: number;
     primary: boolean;
-    mod: number;
-    save: number;
+    mod: string;
+    save: string;
+    abilityClass: string;
     disabledAttr: "" | "disabled";
   }>;
   skillRows: Array<{
@@ -159,7 +174,7 @@ export interface CharacterSheetContext {
     deepening: number;
     expertise: boolean;
     bonus: number;
-    total: number;
+    total: string;
     disabledAttr: "" | "disabled";
   }>;
   items: {
@@ -172,6 +187,9 @@ export interface CharacterSheetContext {
     armour: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     equipment: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     features: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    feats: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    flaws: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    traits: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicStreams: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicAbilities: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
   };
@@ -184,8 +202,8 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
 
   class PivotCharacterSheet extends BaseSheet {
     static DEFAULT_OPTIONS = {
-      classes: [SYSTEM_ID, "sheet", "actor", "character"],
-      position: { width: 960, height: 760 },
+      classes: ["pivot-fantasy", "pf-sheet", SYSTEM_ID, "sheet", "actor", "character"],
+      position: { width: 820, height: 760 },
       tag: "form",
       window: {
         title: "PIVOT.Sheets.Character.Title",
@@ -197,6 +215,17 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
+        toggleEditMode: function (
+          this: PivotCharacterSheet & {
+            options: { editable?: boolean };
+            render: (force?: boolean) => void;
+          },
+        ) {
+          // Toggle edit mode by inverting options.editable
+          const currentEditable = this.options.editable !== false;
+          this.options.editable = !currentEditable;
+          this.render();
+        },
         survivalRoll: async function (this: { document: ActorLike }) {
           await damageRollDialog(this.document);
         },
@@ -227,22 +256,47 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
     };
 
     static PARTS = {
-      form: {
-        template: CHARACTER_TEMPLATE,
+      header: {
+        template: `${SYSTEM_TEMPLATES_BASE}/header.hbs`,
+      },
+      vitals: {
+        template: `${SYSTEM_TEMPLATES_BASE}/vitals.hbs`,
+      },
+      tabs: {
+        template: `${SYSTEM_TEMPLATES_BASE}/tabs.hbs`,
+      },
+      sheet: {
+        template: `${SYSTEM_TEMPLATES_BASE}/sheet.hbs`,
+        scrollable: [""],
+      },
+      survival: {
+        template: `${SYSTEM_TEMPLATES_BASE}/survival.hbs`,
+        scrollable: [""],
+      },
+      inventory: {
+        template: `${SYSTEM_TEMPLATES_BASE}/inventory.hbs`,
+        scrollable: [""],
+      },
+      magic: {
+        template: `${SYSTEM_TEMPLATES_BASE}/magic.hbs`,
+        scrollable: [""],
+      },
+      notes: {
+        template: `${SYSTEM_TEMPLATES_BASE}/notes.hbs`,
+        scrollable: [""],
       },
     };
 
     static TABS = {
       primary: {
         tabs: [
-          { id: "core", label: "PIVOT.Tabs.Core" },
-          { id: "skills", label: "PIVOT.Tabs.Skills" },
-          { id: "combat", label: "PIVOT.Tabs.Combat" },
-          { id: "equipment", label: "PIVOT.Tabs.Equipment" },
+          { id: "sheet", label: "PIVOT.Tabs.Sheet" },
+          { id: "survival", label: "PIVOT.Tabs.Survival" },
+          { id: "inventory", label: "PIVOT.Tabs.Inventory" },
           { id: "magic", label: "PIVOT.Tabs.Magic" },
-          { id: "features", label: "PIVOT.Tabs.Features" },
+          { id: "notes", label: "PIVOT.Tabs.Notes" },
         ],
-        initial: "core",
+        initial: "sheet",
       },
     };
 
@@ -253,6 +307,31 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
         ...parentContext,
         ...prepareCharacterSheetContext(actor, parentContext.editable !== false),
       };
+    }
+
+    async _preparePartContext(
+      partId: string,
+      context: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> {
+      const parent = Object.getPrototypeOf(Object.getPrototypeOf(this)) as {
+        _preparePartContext?: (
+          partId: string,
+          context: Record<string, unknown>,
+        ) => Promise<Record<string, unknown>>;
+      } | null;
+      const superMethod = parent?._preparePartContext;
+      const partContext =
+        typeof superMethod === "function"
+          ? await Reflect.apply(superMethod, this, [partId, context])
+          : context;
+      // Wrap header, vitals, and sheet parts in print layout wrapper
+      if (partId === "header" || partId === "vitals" || partId === "sheet") {
+        return {
+          ...(isRecord(partContext) ? partContext : {}),
+          classes: ["pf-print-wrap"],
+        };
+      }
+      return isRecord(partContext) ? partContext : {};
     }
   }
 
@@ -353,6 +432,59 @@ export function prepareCharacterSheetContext(
   ) as Record<AbilityKey, number>;
   const survival = readSurvival(actor);
 
+  // Helper to format signed numbers
+  const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));
+
+  // Extract species and background labels (from feature items or text fields)
+  const speciesCategoryItems = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "species",
+  );
+  const backgroundCategoryItems = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "background",
+  );
+  const speciesLabel =
+    speciesCategoryItems[0]?.name || stringAt(system, ["identity", "speciesText"], "");
+  const backgroundLabel =
+    backgroundCategoryItems[0]?.name || stringAt(system, ["identity", "backgroundText"], "");
+  // Read tier defensively (ticket 4 will add this field)
+  const tierNum = numberAt(system, ["identity", "backgroundTier"], 0);
+  const tierLabel = tierNum > 0 ? `Tier ${tierNum}` : "";
+
+  // Calculate Con modifier for HP footnote
+  const conMod = formatSigned(derived.abilities.con.mod);
+
+  // Build proficiency text
+  const weaponProfs = derived.proficiencies.weapons;
+  const weaponProfList: string[] = [];
+  if (weaponProfs.bows) weaponProfList.push("Bows");
+  if (weaponProfs.crossbows) weaponProfList.push("Crossbows");
+  if (weaponProfs.thrown) weaponProfList.push("Thrown");
+  if (weaponProfs.meleeLight) weaponProfList.push("Melee Light");
+  if (weaponProfs.meleeMedium) weaponProfList.push("Melee Medium");
+  if (weaponProfs.meleeHeavy) weaponProfList.push("Melee Heavy");
+  if (weaponProfs.meleeTwoHandedHeavy) weaponProfList.push("Melee Two-Handed");
+  if (weaponProfs.improvised) weaponProfList.push("Improvised");
+
+  const armourProfs = derived.proficiencies.armour;
+  const armourProfList: string[] = [];
+  if (armourProfs.light) armourProfList.push("Light");
+  if (armourProfs.medium) armourProfList.push("Medium");
+  if (armourProfs.heavy) armourProfList.push("Heavy");
+
+  const shieldProf = derived.proficiencies.shields ? "Yes" : "None";
+
+  // Split features by category
+  const feats = features.filter((item) => stringAt(item.system, ["category"], "") === "feat");
+  const flaws = features.filter((item) => stringAt(item.system, ["category"], "") === "flaw");
+  const traits = features.filter((item) =>
+    ["species", "background", "bodyModification", "other"].includes(
+      stringAt(item.system, ["category"], ""),
+    ),
+  );
+
+  // Magic streams text
+  const magicStreamsText = magicStreams.map((item) => item.name).join(", ");
+
   return {
     actor,
     survivalLabel: `PIVOT.Survival.${survival.status}`,
@@ -365,6 +497,16 @@ export function prepareCharacterSheetContext(
       (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
         ?.isGM === true,
     system,
+    speciesLabel,
+    backgroundLabel,
+    tierLabel,
+    conMod,
+    proficiencyText: {
+      weapons: weaponProfList.join(", ") || "None",
+      armour: armourProfList.join(", ") || "None",
+      shields: shieldProf,
+    },
+    magicStreamsText,
     form: {
       languagesText: stringArrayAt(system, ["identity", "languages"]).join(", "),
       instrumentsText: stringArrayAt(system, ["proficiencies", "instruments"]).join(", "),
@@ -392,38 +534,45 @@ export function prepareCharacterSheetContext(
       primaryPath: `system.abilities.${key}.primary`,
       score: abilitySources[key].score,
       primary: abilitySources[key].primary,
-      mod: derived.abilities[key].mod,
-      save: derived.saves[key],
+      mod: formatSigned(derived.abilities[key].mod),
+      save: formatSigned(derived.saves[key]),
+      abilityClass: abilitySources[key].primary ? "pf-ab pf-prime" : "pf-ab",
       disabledAttr,
     })),
-    skillRows: canonicalSkills.map((skill) => {
-      const source = skillSources[skill.id] ?? {
-        ability: "int",
-        proficient: false,
-        deepening: 0,
-        expertise: false,
-        bonus: 0,
-      };
-      const total = derived.skills[skill.id]?.total ?? 0;
-      return {
-        id: skill.id,
-        label: skill.label,
-        ability: source.ability.toUpperCase(),
-        abilityPath: `system.skills.${skill.id}.ability`,
-        proficientPath: `system.skills.${skill.id}.proficient`,
-        deepeningPath: `system.skills.${skill.id}.deepening`,
-        expertisePath: `system.skills.${skill.id}.expertise`,
-        bonusPath: `system.skills.${skill.id}.bonus`,
-        proficient: source.proficient,
-        deepening: source.deepening ?? 0,
-        expertise: source.expertise ?? false,
-        bonus: source.bonus ?? 0,
-        total,
-        disabledAttr,
-      };
-    }),
+    skillRows: canonicalSkills
+      .map((skill) => {
+        const source = skillSources[skill.id] ?? {
+          ability: "int",
+          proficient: false,
+          deepening: 0,
+          expertise: false,
+          bonus: 0,
+        };
+        const total = derived.skills[skill.id]?.total ?? 0;
+        return {
+          id: skill.id,
+          label: skill.label,
+          ability: source.ability.toUpperCase(),
+          abilityPath: `system.skills.${skill.id}.ability`,
+          proficientPath: `system.skills.${skill.id}.proficient`,
+          deepeningPath: `system.skills.${skill.id}.deepening`,
+          expertisePath: `system.skills.${skill.id}.expertise`,
+          bonusPath: `system.skills.${skill.id}.bonus`,
+          proficient: source.proficient,
+          deepening: source.deepening ?? 0,
+          expertise: source.expertise ?? false,
+          bonus: source.bonus ?? 0,
+          total: formatSigned(total),
+          disabledAttr: disabledAttr as "" | "disabled",
+        };
+      })
+      .sort((a, b) => {
+        // Proficient first, then alphabetical
+        if (a.proficient !== b.proficient) return a.proficient ? -1 : 1;
+        return a.label.localeCompare(b.label);
+      }),
     items: {
-      weapons: weapons.map((item) => ({
+      weapons: withDisabledAttr(weapons, disabledAttr).map((item) => ({
         ...item,
         id: itemDocumentId(item),
         disabledAttr,
@@ -451,6 +600,9 @@ export function prepareCharacterSheetContext(
         disabledAttr,
       ),
       features: withDisabledAttr(features, disabledAttr),
+      feats: withDisabledAttr(feats, disabledAttr),
+      flaws: withDisabledAttr(flaws, disabledAttr),
+      traits: withDisabledAttr(traits, disabledAttr),
       magicStreams: withDisabledAttr(magicStreams, disabledAttr),
       magicAbilities: withDisabledAttr(magicAbilities, disabledAttr),
     },
@@ -546,7 +698,7 @@ export function buildRollModeDialogContent(localize: (key: string) => string): s
       )}</label>`;
     })
     .join("");
-  return `<fieldset class="pivot-roll-mode-dialog"><legend>${escapeHtml(
+  return `<fieldset class="pf-roll-mode-dialog"><legend>${escapeHtml(
     localize("PIVOT.RollDialog.Title"),
   )}</legend>${options}</fieldset>`;
 }
@@ -868,10 +1020,17 @@ async function rollAction(
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
 
-  await resultRoll.toMessage({
+  const ChatMessage = getChatMessageConstructor();
+  if (!ChatMessage) return;
+
+  const messageData = {
     speaker: speakerForActor(context.actor),
     flavor,
-  });
+    content: await resultRoll.render(),
+    rolls: [poolRoll],
+  };
+  applyRollMode(messageData, getRollMode());
+  await ChatMessage.create(messageData);
 }
 
 /**
@@ -1149,14 +1308,55 @@ function getCombatants(combat: CombatLike): CombatantLike[] {
 }
 
 function getActiveCombat(): CombatLike | null {
-  const game = globalThis as typeof globalThis & { game?: { combat?: CombatLike | null } };
-  return game.game?.combat ?? null;
+  const game = globalThis as typeof globalThis & {
+    game?: {
+      combat?: CombatLike | null;
+      combats?: {
+        active?: CombatLike | null;
+        viewed?: CombatLike | null;
+        contents?: Iterable<CombatLike>;
+      };
+    };
+  };
+  return resolveActiveCombat(game.game) as CombatLike | null;
+}
+
+function getChatMessageConstructor():
+  | {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    }
+  | undefined {
+  const globals = globalThis as typeof globalThis & {
+    ChatMessage?: {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    };
+  };
+  return globals.ChatMessage;
+}
+
+function applyRollMode(messageData: Record<string, unknown>, rollMode?: string): void {
+  applyChatMessageMode(messageData, rollMode ?? getRollMode());
+}
+
+function getRollMode(): string {
+  const globals = globalThis as typeof globalThis & {
+    game?: {
+      settings?: {
+        get?: (scope: string, key: string) => unknown;
+      };
+    };
+  };
+  const mode = globals.game?.settings?.get?.("core", "rollMode");
+  return typeof mode === "string" ? mode : "roll";
 }
 
 function getRollConstructor():
   | (new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     })
@@ -1165,6 +1365,7 @@ function getRollConstructor():
     Roll?: new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     };
@@ -1190,6 +1391,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
   try {
     const result = await DialogV2.prompt({
       window: { title: localizeText("PIVOT.RollDialog.Title") },
+      classes: ["pivot-fantasy", "pf-sheet"],
       content: buildRollModeDialogContent(localizeText),
       ok: {
         label: localizeText("PIVOT.RollDialog.Roll"),

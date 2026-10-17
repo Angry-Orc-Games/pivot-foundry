@@ -31,12 +31,15 @@ it("writes natural20 recovery once even when chat reporting fails", async () => 
       async evaluate() {}
     },
   );
+  const failingCreate = vi.fn(async () => {
+    throw Error("chat");
+  });
   vi.stubGlobal("ChatMessage", {
-    create: vi.fn(async () => {
-      throw Error("chat");
-    }),
+    create: failingCreate,
+    applyRollMode: vi.fn(),
   });
   await deathSaveDialog(actor);
+  expect(failingCreate).toHaveBeenCalledTimes(1);
   expect(actor.update).toHaveBeenCalledTimes(1);
   expect(actor.update).toHaveBeenCalledWith(
     expect.objectContaining({

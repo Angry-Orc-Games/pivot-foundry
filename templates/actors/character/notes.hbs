@@ -1,0 +1,123 @@
+{{! Notes tab: identity details (player, age, height, eyes, hair, weight), special notes }}
+<article class="pf-notes-tab tab {{tabs.notes.cssClass}}" data-group="primary" data-tab="notes">
+  <div class="pf-grid two">
+    <section class="pf-card">
+      <h2>{{localize "PIVOT.Sections.Identity"}}</h2>
+      <div class="pf-field-grid">
+        <label><span>{{localize "PIVOT.Fields.Player"}}</span><input
+            name="system.identity.player"
+            type="text"
+            value="{{system.identity.player}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Background"}}</span><input
+            name="system.identity.backgroundText"
+            type="text"
+            value="{{system.identity.backgroundText}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Species"}}</span><input
+            name="system.identity.speciesText"
+            type="text"
+            value="{{system.identity.speciesText}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Languages"}}</span><input
+            name="system.identity.languagesText"
+            type="text"
+            value="{{form.languagesText}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Loyalty"}}</span><input
+            name="system.identity.loyalty"
+            type="text"
+            value="{{system.identity.loyalty}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Weight"}}</span><input
+            name="system.identity.weight.value"
+            type="number"
+            min="0"
+            step="0.1"
+            value="{{system.identity.weight.value}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Height"}}</span><input
+            name="system.identity.height"
+            type="text"
+            value="{{system.identity.height}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Age"}}</span><input
+            name="system.identity.age"
+            type="text"
+            value="{{system.identity.age}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Eyes"}}</span><input
+            name="system.identity.eyes"
+            type="text"
+            value="{{system.identity.eyes}}"
+            {{disabledAttr}}
+          /></label>
+        <label><span>{{localize "PIVOT.Fields.Hair"}}</span><input
+            name="system.identity.hair"
+            type="text"
+            value="{{system.identity.hair}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+      <div class="pf-specializations">
+        <label class="pf-wide-field"><span>{{localize
+              "PIVOT.Fields.AcademiaSpecializations"
+            }}</span><input
+            name="system.skillSpecializations.academiaText"
+            type="text"
+            value="{{form.academiaText}}"
+            {{disabledAttr}}
+          /></label>
+        <label class="pf-wide-field"><span>{{localize
+              "PIVOT.Fields.CraftingSpecializations"
+            }}</span><input
+            name="system.skillSpecializations.craftingText"
+            type="text"
+            value="{{form.craftingText}}"
+            {{disabledAttr}}
+          /></label>
+      </div>
+    </section>
+
+    <section class="pf-card">
+      <h2>{{localize "PIVOT.Sections.SpecialNotes"}}</h2>
+      <textarea
+        name="system.notes.special"
+        rows="12"
+        {{disabledAttr}}
+      >{{system.notes.special}}</textarea>
+    </section>
+  </div>
+
+  <section class="pf-card">
+    <div class="pf-section-header"><h2>{{localize "PIVOT.Sections.Features"}}</h2><button
+        type="button"
+        data-action="createItem"
+        data-type="feature"
+        aria-label="{{localize 'PIVOT.Actions.CreateFeature'}}"
+        title="{{localize 'PIVOT.Actions.CreateFeature'}}"
+        {{disabledAttr}}
+      >+</button></div>
+    {{#each items.features}}<div class="pf-list-item"><button
+          type="button"
+          class="pf-item-name"
+          data-action="openItem"
+          data-item-id="{{id}}"
+        >{{name}}</button><span>{{system.category}}</span><button
+          type="button"
+          data-action="deleteItem"
+          data-item-id="{{id}}"
+          aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+          title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+          {{disabledAttr}}
+        >x</button></div>{{/each}}
+  </section>
+</article>

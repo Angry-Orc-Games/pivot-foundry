@@ -1,9 +1,26 @@
+function diceMessageId(messageOrId: unknown): string | null {
+  if (typeof messageOrId === "string" && messageOrId.length > 0) return messageOrId;
+  if (
+    typeof messageOrId === "object" &&
+    messageOrId !== null &&
+    "id" in messageOrId &&
+    typeof messageOrId.id === "string" &&
+    messageOrId.id.length > 0
+  ) {
+    return messageOrId.id;
+  }
+  return null;
+}
+
 /**
  * Wait for Dice So Nice animation to complete for a chat message.
  * Returns immediately if DSN is not active.
  * Times out after 10 seconds to prevent stuck animations from blocking initiative.
  */
-export async function waitForDiceSoNiceAnimation(messageId: string): Promise<void> {
+export async function waitForDiceSoNiceAnimation(messageOrId: unknown): Promise<void> {
+  const messageId = diceMessageId(messageOrId);
+  if (!messageId) return;
+
   const gameGlobal = globalThis as typeof globalThis & {
     game?: {
       modules?: { get?: (id: string) => { active?: boolean } | undefined };

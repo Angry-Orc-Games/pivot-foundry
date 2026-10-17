@@ -14,7 +14,7 @@ describe("validateContentRecord", () => {
       contentId: "example-keen-senses",
       type: "feature",
       system: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         effects: [{ type: "skillBonus", skill: "perception", amount: 2 }],
       },
     });

@@ -1,10 +1,10 @@
-<section class="pivot-character-sheet" data-document-id="{{actor.id}}">
-  <header class="pivot-sheet-header">
-    <div class="pivot-title-block">
+<section class="pf-character-sheet" data-document-id="{{actor.id}}">
+  <header class="pf-sheet-header">
+    <div class="pf-title-block">
       <label for="{{rootId}}-name">{{localize "PIVOT.Fields.CharacterName"}}</label>
       <input id="{{rootId}}-name" name="name" type="text" value="{{actor.name}}" {{disabledAttr}} />
     </div>
-    <div class="pivot-header-stats">
+    <div class="pf-header-stats">
       <label>
         <span>{{localize "PIVOT.Fields.Level"}}</span>
         <input
@@ -30,11 +30,11 @@
     </div>
   </header>
 
-  <section class="pivot-panel pivot-abilities-panel">
+  <section class="pf-panel pf-abilities-panel">
     <h2>{{localize "PIVOT.Sections.Abilities"}}</h2>
-    <div class="pivot-abilities">
+    <div class="pf-abilities">
       {{#each abilityRows}}
-        <article class="pivot-ability">
+        <article class="pf-ability">
           <button
             type="button"
             data-action="roll"
@@ -51,7 +51,7 @@
               value="{{score}}"
               {{disabledAttr}}
             /></label>
-          <label class="pivot-check"><input
+          <label class="pf-check"><input
               name="{{primaryPath}}"
               type="checkbox"
               {{checked primary}}
@@ -60,7 +60,7 @@
             <span>{{localize "PIVOT.Fields.Primary"}}</span></label>
           <button
             type="button"
-            class="pivot-mod"
+            class="pf-mod"
             data-action="roll"
             data-roll-kind="save"
             data-key="{{key}}"
@@ -72,7 +72,7 @@
   </section>
 
   <nav
-    class="tabs pivot-tabs"
+    class="tabs pf-tabs"
     data-group="primary"
     aria-label="{{localize 'PIVOT.Sheets.Character.Navigation'}}"
   >
@@ -114,12 +114,12 @@
     >{{localize "PIVOT.Tabs.Features"}}</a>
   </nav>
 
-  <main class="pivot-tab-body">
+  <main class="pf-tab-body">
     <section class="tab {{tabs.core.cssClass}}" data-group="primary" data-tab="core">
-      <div class="pivot-grid two">
-        <section class="pivot-panel">
+      <div class="pf-grid two">
+        <section class="pf-panel">
           <h2>{{localize "PIVOT.Sections.Identity"}}</h2>
-          <div class="pivot-field-grid">
+          <div class="pf-field-grid">
             <label><span>{{localize "PIVOT.Fields.Player"}}</span><input
                 name="system.identity.player"
                 type="text"
@@ -183,8 +183,8 @@
                 {{disabledAttr}}
               /></label>
           </div>
-          <div class="pivot-specializations">
-            <label class="pivot-wide-field"><span>{{localize
+          <div class="pf-specializations">
+            <label class="pf-wide-field"><span>{{localize
                   "PIVOT.Fields.AcademiaSpecializations"
                 }}</span><input
                 name="system.skillSpecializations.academiaText"
@@ -192,7 +192,7 @@
                 value="{{form.academiaText}}"
                 {{disabledAttr}}
               /></label>
-            <label class="pivot-wide-field"><span>{{localize
+            <label class="pf-wide-field"><span>{{localize
                   "PIVOT.Fields.CraftingSpecializations"
                 }}</span><input
                 name="system.skillSpecializations.craftingText"
@@ -203,23 +203,23 @@
           </div>
         </section>
 
-        <section class="pivot-panel pivot-resources-panel">
+        <section class="pf-panel pf-resources-panel">
           <h2>{{localize "PIVOT.Sections.Resources"}}</h2>
-          <div class="pivot-stat-strip">
-            <div class="pivot-stat"><span>{{localize "PIVOT.Fields.ProfBonus"}}</span><strong
+          <div class="pf-stat-strip">
+            <div class="pf-stat"><span>{{localize "PIVOT.Fields.ProfBonus"}}</span><strong
               >+{{derived.proficiencyBonus}}</strong></div>
-            <div class="pivot-stat" title="{{derived.armourClass.breakdown}}"><span>{{localize
+            <div class="pf-stat" title="{{derived.armourClass.breakdown}}"><span>{{localize
                   "PIVOT.Fields.ArmourClass"
                 }}</span><strong>{{derived.armourClass.value}}</strong></div>
             <button
               type="button"
-              class="pivot-stat rollable"
+              class="pf-stat rollable"
               data-action="roll"
               data-roll-kind="initiative"
               data-label="{{localize 'PIVOT.Rolls.Initiative'}}"
             ><span>{{localize "PIVOT.Fields.Initiative"}}</span><strong
               >{{derived.initiative}}</strong></button>
-            <div class="pivot-stat"><span>{{localize "PIVOT.Fields.Speed"}}</span><input
+            <div class="pf-stat"><span>{{localize "PIVOT.Fields.Speed"}}</span><input
                 name="system.attributes.speed.value"
                 type="number"
                 min="0"
@@ -227,23 +227,22 @@
                 value="{{system.attributes.speed.value}}"
                 {{disabledAttr}}
               /></div>
-            <div class="pivot-stat"><span>{{localize
-                  "PIVOT.Fields.PassivePerception"
-                }}</span><strong>{{derived.passivePerception}}</strong></div>
+            <div class="pf-stat"><span>{{localize "PIVOT.Fields.PassivePerception"}}</span><strong
+              >{{derived.passivePerception}}</strong></div>
           </div>
 
-          <section class="pivot-vitality">
+          <section class="pf-vitality">
             <h3>{{localize "PIVOT.Sections.Vitality"}}</h3>
-            <div class="pivot-vitality-grid">
-              <div class="pivot-meter-block">
-                <div class="pivot-meter-heading">
+            <div class="pf-vitality-grid">
+              <div class="pf-meter-block">
+                <div class="pf-meter-heading">
                   <span>{{localize "PIVOT.Fields.HPMax"}}</span>
                   <strong>{{system.attributes.hp.value}} / {{system.attributes.hp.max}}</strong>
                 </div>
-                <div class="pivot-meter" aria-hidden="true">
-                  <div class="pivot-meter-fill hp" style="width: {{hpPercent}}%;"></div>
+                <div class="pf-meter" aria-hidden="true">
+                  <div class="pf-meter-fill hp" style="width: {{hpPercent}}%;"></div>
                 </div>
-                <div class="pivot-meter-fields">
+                <div class="pf-meter-fields">
                   <label><span>{{localize "PIVOT.Fields.HPCurrent"}}</span><input
                       readonly
                       aria-label="Current HP"
@@ -263,15 +262,15 @@
                     /></label>
                 </div>
               </div>
-              <div class="pivot-meter-block">
-                <div class="pivot-meter-heading">
+              <div class="pf-meter-block">
+                <div class="pf-meter-heading">
                   <span>{{localize "PIVOT.Fields.Pool"}}</span>
                   <strong>{{system.resources.pool.value}} / {{derived.pool.max}}</strong>
                 </div>
-                <div class="pivot-meter" aria-hidden="true">
-                  <div class="pivot-meter-fill pool" style="width: {{poolPercent}}%;"></div>
+                <div class="pf-meter" aria-hidden="true">
+                  <div class="pf-meter-fill pool" style="width: {{poolPercent}}%;"></div>
                 </div>
-                <div class="pivot-resource-actions">
+                <div class="pf-resource-actions">
                   <button
                     type="button"
                     data-action="adjustResource"
@@ -282,7 +281,7 @@
                     {{disabledAttr}}
                   >-</button>
                   <input
-                    class="pivot-pool-value"
+                    class="pf-pool-value"
                     name="system.resources.pool.value"
                     type="number"
                     min="0"
@@ -303,14 +302,14 @@
                 </div>
                 <button
                   type="button"
-                  class="pivot-sheet-button"
+                  class="pf-sheet-button"
                   data-action="recoverPoolLongRest"
                   aria-label="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
                   title="{{localize 'PIVOT.Actions.RecoverPoolLongRest'}}"
                   {{disabledAttr}}
                 >{{localize "PIVOT.Actions.RecoverPoolLongRest"}}</button>
               </div>
-              <label class="pivot-hit-die"><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
+              <label class="pf-hit-die"><span>{{localize "PIVOT.Fields.HitDie"}}</span><select
                   name="system.attributes.hitDie"
                   {{disabledAttr}}
                 >{{selectOptions
@@ -319,66 +318,66 @@
                   }}</select></label>
             </div>
           </section>
-          <div class="pivot-rest-actions">
+          <div class="pf-rest-actions">
             <button
               type="button"
-              class="pivot-sheet-button"
+              class="pf-sheet-button"
               data-action="shortRest"
               {{disabledAttr}}
             >{{localize "PIVOT.Actions.ShortRest"}}</button>
             <button
               type="button"
-              class="pivot-sheet-button"
+              class="pf-sheet-button"
               data-action="longRest"
               {{disabledAttr}}
             >{{localize "PIVOT.Actions.LongRest"}}</button>
           </div>
 
-          <section class="pivot-survival">
-            <div class="pivot-survival-header">
+          <section class="pf-survival">
+            <div class="pf-survival-header">
               <h3>{{localize "PIVOT.Sections.Survival"}}</h3>
-              <span class="pivot-status {{survivalStatus}}">{{localize survivalLabel}}</span>
+              <span class="pf-status {{survivalStatus}}">{{localize survivalLabel}}</span>
             </div>
-            <div class="pivot-temp-hp">
+            <div class="pf-temp-hp">
               <span>{{localize "PIVOT.Survival.Temp"}}</span>
               <strong>{{system.attributes.hp.temp}}</strong>
             </div>
-            <div class="pivot-survival-actions">
+            <div class="pf-survival-actions">
               <button
                 type="button"
-                class="pivot-sheet-button primary"
+                class="pf-sheet-button primary"
                 data-action="survivalRoll"
                 {{disabledAttr}}
               >{{localize "PIVOT.Survival.RollTitle"}}</button>
               <button
                 type="button"
-                class="pivot-sheet-button"
+                class="pf-sheet-button"
                 data-action="tempHp"
                 {{disabledAttr}}
               >{{localize "PIVOT.Survival.Temp"}}</button>
               <button
                 type="button"
-                class="pivot-sheet-button"
+                class="pf-sheet-button"
                 data-action="deathSave"
                 {{disabledAttr}}
               >{{localize "PIVOT.Survival.DeathSave"}}</button>
               <button
                 type="button"
-                class="pivot-sheet-button"
+                class="pf-sheet-button"
                 data-action="clearTempHp"
                 {{disabledAttr}}
               >{{localize "PIVOT.Survival.ClearTemp"}}</button>
               {{#if isGM}}<button
                   type="button"
-                  class="pivot-sheet-button"
+                  class="pf-sheet-button"
                   data-action="correctSurvival"
                 >{{localize "PIVOT.Survival.Correction"}}</button>{{/if}}
             </div>
-            <div class="pivot-death-saves">
-              <div class="pivot-death-track">
+            <div class="pf-death-saves">
+              <div class="pf-death-track">
                 <span>{{localize "PIVOT.Fields.Successes"}}</span>
                 <div
-                  class="pivot-pips"
+                  class="pf-pips"
                   role="img"
                   aria-label="{{localize
                     'PIVOT.Fields.Successes'
@@ -386,17 +385,17 @@
                 >
                   {{#each deathSaveSuccessPips}}
                     {{#if this}}
-                      <span class="pivot-pip success filled"></span>
+                      <span class="pf-pip success filled"></span>
                     {{else}}
-                      <span class="pivot-pip success"></span>
+                      <span class="pf-pip success"></span>
                     {{/if}}
                   {{/each}}
                 </div>
               </div>
-              <div class="pivot-death-track">
+              <div class="pf-death-track">
                 <span>{{localize "PIVOT.Fields.Failures"}}</span>
                 <div
-                  class="pivot-pips"
+                  class="pf-pips"
                   role="img"
                   aria-label="{{localize
                     'PIVOT.Fields.Failures'
@@ -404,34 +403,34 @@
                 >
                   {{#each deathSaveFailurePips}}
                     {{#if this}}
-                      <span class="pivot-pip failure filled"></span>
+                      <span class="pf-pip failure filled"></span>
                     {{else}}
-                      <span class="pivot-pip failure"></span>
+                      <span class="pf-pip failure"></span>
                     {{/if}}
                   {{/each}}
                 </div>
               </div>
             </div>
-            <p class="pivot-survival-note">{{localize "PIVOT.Survival.ManualConsequences"}}</p>
+            <p class="pf-survival-note">{{localize "PIVOT.Survival.ManualConsequences"}}</p>
           </section>
         </section>
       </div>
     </section>
 
     <section class="tab {{tabs.skills.cssClass}}" data-group="primary" data-tab="skills">
-      <div class="pivot-grid two">
-        <section class="pivot-panel">
+      <div class="pf-grid two">
+        <section class="pf-panel">
           <h2>{{localize "PIVOT.Sections.Skills"}}</h2>
-          <div class="pivot-skill-list">
+          <div class="pf-skill-list">
             {{#each skillRows}}
-              <div class="pivot-skill-row">
-                <label class="pivot-check"><input
+              <div class="pf-skill-row">
+                <label class="pf-check"><input
                     name="{{proficientPath}}"
                     type="checkbox"
                     {{checked proficient}}
                     {{disabledAttr}}
                   /><span>{{label}}</span></label>
-                <span class="pivot-skill-ability">{{ability}}</span>
+                <span class="pf-skill-ability">{{ability}}</span>
                 <input
                   name="{{deepeningPath}}"
                   type="number"
@@ -449,7 +448,7 @@
                   title="{{localize 'PIVOT.Fields.Bonus'}}"
                   {{disabledAttr}}
                 />
-                <label class="pivot-check compact"><input
+                <label class="pf-check compact"><input
                     name="{{expertisePath}}"
                     type="checkbox"
                     {{checked expertise}}
@@ -467,9 +466,9 @@
           </div>
         </section>
 
-        <section class="pivot-panel">
+        <section class="pf-panel">
           <h2>{{localize "PIVOT.Sections.Proficiencies"}}</h2>
-          <div class="pivot-check-grid">
+          <div class="pf-check-grid">
             <label><input
                 name="system.proficiencies.armour.light"
                 type="checkbox"
@@ -555,13 +554,13 @@
               />
               {{localize "PIVOT.Proficiencies.Improvised"}}</label>
           </div>
-          <label class="pivot-wide-field"><span>{{localize "PIVOT.Fields.Instruments"}}</span><input
+          <label class="pf-wide-field"><span>{{localize "PIVOT.Fields.Instruments"}}</span><input
               name="system.proficiencies.instrumentsText"
               type="text"
               value="{{form.instrumentsText}}"
               {{disabledAttr}}
             /></label>
-          <div class="pivot-currency">
+          <div class="pf-currency">
             <label><span>GP</span><input
                 name="system.currency.gp"
                 type="number"
@@ -598,8 +597,8 @@
     </section>
 
     <section class="tab {{tabs.combat.cssClass}}" data-group="primary" data-tab="combat">
-      <section class="pivot-panel">
-        <div class="pivot-section-header">
+      <section class="pf-panel">
+        <div class="pf-section-header">
           <h2>{{localize "PIVOT.Sections.Weapons"}}</h2>
           <button
             type="button"
@@ -610,15 +609,15 @@
             {{disabledAttr}}
           >+</button>
         </div>
-        <div class="pivot-table pivot-weapon-table">
-          <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Weapon"}}</span><span
+        <div class="pf-table pf-weapon-table">
+          <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Weapon"}}</span><span
             >BTH</span><span>BTD</span><span>{{localize "PIVOT.Fields.Damage"}}</span><span
             >{{localize "PIVOT.Fields.Range"}}</span><span></span></div>
           {{#each items.weapons}}
-            <div class="pivot-table-row" data-item-id="{{id}}">
+            <div class="pf-table-row" data-item-id="{{id}}">
               <button
                 type="button"
-                class="pivot-item-name"
+                class="pf-item-name"
                 data-action="openItem"
                 data-item-id="{{id}}"
               >{{name}}</button>
@@ -651,8 +650,8 @@
         </div>
       </section>
 
-      <section class="pivot-panel">
-        <div class="pivot-section-header">
+      <section class="pf-panel">
+        <div class="pf-section-header">
           <h2>{{localize "PIVOT.Sections.Armour"}}</h2>
           <button
             type="button"
@@ -663,19 +662,20 @@
             {{disabledAttr}}
           >+</button>
         </div>
-        <p class="pivot-breakdown">{{derived.armourClass.armourWorn}}
+        <p class="pf-breakdown">{{derived.armourClass.armourWorn}}
           |
           {{derived.armourClass.breakdown}}</p>
-        <div class="pivot-table pivot-armour-table">
-          <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span
-            >{{localize "PIVOT.Fields.Category"}}</span><span>{{localize
-                "PIVOT.Fields.Bonus"
-              }}</span><span>{{localize "PIVOT.Fields.Equipped"}}</span><span></span></div>
+        <div class="pf-table pf-armour-table">
+          <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span>{{localize
+                "PIVOT.Fields.Category"
+              }}</span><span>{{localize "PIVOT.Fields.Bonus"}}</span><span>{{localize
+                "PIVOT.Fields.Equipped"
+              }}</span><span></span></div>
           {{#each items.armour}}
-            <div class="pivot-table-row" data-item-id="{{id}}">
+            <div class="pf-table-row" data-item-id="{{id}}">
               <button
                 type="button"
-                class="pivot-item-name"
+                class="pf-item-name"
                 data-action="openItem"
                 data-item-id="{{id}}"
               >{{name}}</button><span>{{system.category}}</span><span>{{system.acBonus}}</span><span
@@ -697,8 +697,8 @@
     </section>
 
     <section class="tab {{tabs.equipment.cssClass}}" data-group="primary" data-tab="equipment">
-      <section class="pivot-panel">
-        <div class="pivot-section-header">
+      <section class="pf-panel">
+        <div class="pf-section-header">
           <h2>{{localize "PIVOT.Sections.Equipment"}}</h2>
           <strong>{{localize "PIVOT.Fields.WeightTotal"}}: {{derived.totalWeight}}</strong>
           <button
@@ -710,16 +710,17 @@
             {{disabledAttr}}
           >+</button>
         </div>
-        <div class="pivot-table pivot-equipment-table">
-          <div class="pivot-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span
-            >{{localize "PIVOT.Fields.Quantity"}}</span><span>{{localize
-                "PIVOT.Fields.Weight"
-              }}</span><span>{{localize "PIVOT.Fields.Carried"}}</span><span></span></div>
+        <div class="pf-table pf-equipment-table">
+          <div class="pf-table-head"><span>{{localize "PIVOT.Fields.Item"}}</span><span>{{localize
+                "PIVOT.Fields.Quantity"
+              }}</span><span>{{localize "PIVOT.Fields.Weight"}}</span><span>{{localize
+                "PIVOT.Fields.Carried"
+              }}</span><span></span></div>
           {{#each items.equipment}}
-            <div class="pivot-table-row" data-item-id="{{id}}">
+            <div class="pf-table-row" data-item-id="{{id}}">
               <button
                 type="button"
-                class="pivot-item-name"
+                class="pf-item-name"
                 data-action="openItem"
                 data-item-id="{{id}}"
               >{{name}}</button><span>{{system.quantity}}</span><span>{{system.weight}}</span><span
@@ -741,10 +742,10 @@
     </section>
 
     <section class="tab {{tabs.magic.cssClass}}" data-group="primary" data-tab="magic">
-      <div class="pivot-grid two">
-        <section class="pivot-panel">
+      <div class="pf-grid two">
+        <section class="pf-panel">
           <h2>{{localize "PIVOT.Sections.Magic"}}</h2>
-          <label class="pivot-check"><input
+          <label class="pf-check"><input
               name="system.magic.awakened"
               type="checkbox"
               {{checked system.magic.awakened}}
@@ -769,7 +770,7 @@
               value="{{system.magic.mp.value}}"
               {{disabledAttr}}
             /></label>
-          <div class="pivot-resource-actions">
+          <div class="pf-resource-actions">
             <button
               type="button"
               data-action="adjustResource"
@@ -791,10 +792,8 @@
             >+</button>
           </div>
         </section>
-        <section class="pivot-panel">
-          <div class="pivot-section-header"><h2>{{localize
-                "PIVOT.Sections.MagicStreams"
-              }}</h2><button
+        <section class="pf-panel">
+          <div class="pf-section-header"><h2>{{localize "PIVOT.Sections.MagicStreams"}}</h2><button
               type="button"
               data-action="createItem"
               data-type="magicStream"
@@ -802,9 +801,9 @@
               title="{{localize 'PIVOT.Actions.CreateMagicStream'}}"
               {{disabledAttr}}
             >+</button></div>
-          {{#each items.magicStreams}}<div class="pivot-list-item"><button
+          {{#each items.magicStreams}}<div class="pf-list-item"><button
                 type="button"
-                class="pivot-item-name"
+                class="pf-item-name"
                 data-action="openItem"
                 data-item-id="{{id}}"
               >{{name}}</button><span>{{localize "PIVOT.Fields.Echelon"}}
@@ -816,7 +815,7 @@
                 title="{{localize 'PIVOT.Actions.DeleteItem'}}"
                 {{disabledAttr}}
               >x</button></div>{{/each}}
-          <div class="pivot-section-header"><h2>{{localize
+          <div class="pf-section-header"><h2>{{localize
                 "PIVOT.Sections.MagicAbilities"
               }}</h2><button
               type="button"
@@ -826,7 +825,7 @@
               title="{{localize 'PIVOT.Actions.CreateMagicAbility'}}"
               {{disabledAttr}}
             >+</button></div>
-          {{#each items.magicAbilities}}<div class="pivot-list-item"><button
+          {{#each items.magicAbilities}}<div class="pf-list-item"><button
                 type="button"
                 data-action="roll"
                 data-roll-kind="magicAbility"
@@ -849,7 +848,7 @@
               >x</button></div>{{/each}}
         </section>
       </div>
-      <section class="pivot-panel">
+      <section class="pf-panel">
         <h2>{{localize "PIVOT.Sections.Runes"}}</h2>
         <textarea
           name="system.notes.runesThaumaturgy"
@@ -860,9 +859,9 @@
     </section>
 
     <section class="tab {{tabs.features.cssClass}}" data-group="primary" data-tab="features">
-      <div class="pivot-grid two">
-        <section class="pivot-panel">
-          <div class="pivot-section-header"><h2>{{localize "PIVOT.Sections.Features"}}</h2><button
+      <div class="pf-grid two">
+        <section class="pf-panel">
+          <div class="pf-section-header"><h2>{{localize "PIVOT.Sections.Features"}}</h2><button
               type="button"
               data-action="createItem"
               data-type="feature"
@@ -870,9 +869,9 @@
               title="{{localize 'PIVOT.Actions.CreateFeature'}}"
               {{disabledAttr}}
             >+</button></div>
-          {{#each items.features}}<div class="pivot-list-item"><button
+          {{#each items.features}}<div class="pf-list-item"><button
                 type="button"
-                class="pivot-item-name"
+                class="pf-item-name"
                 data-action="openItem"
                 data-item-id="{{id}}"
               >{{name}}</button><span>{{system.category}}</span><button
@@ -884,7 +883,7 @@
                 {{disabledAttr}}
               >x</button></div>{{/each}}
         </section>
-        <section class="pivot-panel">
+        <section class="pf-panel">
           <h2>{{localize "PIVOT.Sections.SpecialNotes"}}</h2>
           <textarea
             name="system.notes.special"

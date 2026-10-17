@@ -82,6 +82,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
         cost: schemaField(fields, {
           pool: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
           mp: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
+          bp: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
         }),
         uses: schemaField(fields, {
           value: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
