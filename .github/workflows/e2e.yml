@@ -1,26 +1,65 @@
 name: Foundry E2E
 
 on:
-  pull_request:
+  schedule:
+    # 07:00 UTC is 03:00 EDT and 02:00 EST, inside 02:00-06:00 America/New_York all year.
+    - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
       ref:
         description: Exact commit SHA to test after reviewing an external PR
+        required: false
+      secrets_check_only:
+        description: Verify foundry-e2e secrets are non-empty, then exit. Does not start Foundry, at any hour.
+        type: boolean
+        default: false
         required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: foundry-e2e-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || format('foundry-e2e-{0}', github.event.pull_request.number || github.ref) }}
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: License gate
+    if: github.event_name != 'workflow_dispatch' || inputs.secrets_check_only != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ok: ${{ steps.decide.outputs.ok }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Decide whether Foundry may start
+        id: decide
+        run: bash scripts/ci/e2e-gate.sh license
+
+  secrets:
+    name: Foundry secret presence
+    if: github.event_name == 'workflow_dispatch' && inputs.secrets_check_only == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: foundry-e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Check Foundry secrets
+        env:
+          HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
+          HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
+          HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
+          HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
+        run: bash scripts/ci/e2e-gate.sh secrets
+
   e2e:
     name: Foundry E2E
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+    needs: gate
+    if: needs.gate.outputs.ok == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: foundry-e2e

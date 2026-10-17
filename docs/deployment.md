@@ -25,19 +25,19 @@ If release preparation changes `system.json`, the new zip must pass E2E (and sta
 
 ## Implemented GitHub workflows
 
-| Workflow                                                                | Trigger                               | Secrets                              | Purpose                                                                                                                                                           |
-| ----------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                   | None                                 | Lint, format, types, Vitest, build, audit, package                                                                                                                |
-| [`e2e.yml`](../.github/workflows/e2e.yml)                               | Same-repo PRs and `workflow_dispatch` | `foundry-e2e`                        | Isolated Foundry E2E. If those secrets are missing, the job is visibly not run and does not fail the PR. Release publication still requires a successful E2E job. |
-| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Successful CI on `main`               | `staging`                            | Deploy tested zip, smoke https://build.angryorcgames.com                                                                                                          |
-| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval          | `production`                         | Promote the exact staging-accepted zip                                                                                                                            |
-| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                             | `foundry-e2e` then `contents: write` | Test the prepared zip, then publish                                                                                                                               |
+| Workflow                                                                | Trigger                                    | Secrets                              | Purpose                                                                                                                                                                                   |
+| ----------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                        | None                                 | Lint, format, types, Vitest, build, audit, package                                                                                                                                        |
+| [`e2e.yml`](../.github/workflows/e2e.yml)                               | 07:00 UTC schedule and `workflow_dispatch` | `foundry-e2e`                        | Real Foundry only from 02:00 to 06:00 America/New_York when prod and build show zero users. Missing secrets fail the job. `secrets_check_only` checks secrets and does not start Foundry. |
+| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Successful CI on `main`                    | `staging`                            | Deploy tested zip, smoke https://build.angryorcgames.com                                                                                                                                  |
+| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval               | `production`                         | Promote the exact staging-accepted zip                                                                                                                                                    |
+| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                                  | `foundry-e2e` then `contents: write` | Test the prepared zip, then publish                                                                                                                                                       |
 
 Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Staging uses `concurrency: foundry-staging` with `cancel-in-progress: false` so one run cannot deploy while another is testing.
 
-Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. To test a fork commit: review the exact SHA, then run **Foundry E2E** with `workflow_dispatch` and that ref.
+Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. To test a fork commit: review the exact SHA, then run **Foundry E2E** with `workflow_dispatch` and that ref. That run still starts Foundry only inside the quiet window when prod and build show zero users. `secrets_check_only` verifies the `foundry-e2e` secrets at any hour and does not start Foundry.
 
-Skipped E2E is visible as a skipped check and cannot satisfy release publication (`needs.e2e.result == success`).
+When the license gate does not pass, the Foundry job is skipped and the workflow stays green. Missing secrets after a passing gate fail the Foundry job.
 
 ## GitHub settings that cannot be set from files
 
@@ -97,7 +97,8 @@ Suggested branch-protection checks on `main`:
 - `Verify / Node 20`
 - `Verify / Node 22`
 - `Package Foundry System`
-- `Foundry E2E` (same-repo PRs only; forks stay CI-only)
+
+`Foundry E2E` is not a pull-request check. It runs at 07:00 UTC and on `workflow_dispatch`. Do not require it on pull requests.
 
 ## Staging
 
