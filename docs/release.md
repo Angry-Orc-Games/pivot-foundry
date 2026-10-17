@@ -34,10 +34,11 @@ git push origin v0.1.0
 1. `npm run verify`
 2. `npm run prepare:release` (rewrites version/download on the release copy of `system.json`)
 3. Builds that exact `system.zip` and `artifact-identity.json`
-4. Runs Foundry E2E against those bytes (`--skip-package`)
-5. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only if E2E succeeded
+4. Runs `scripts/ci/e2e-gate.sh require`. Outside 02:00-06:00 America/New_York, or when prod or build has a signed-in user, the job fails and Foundry does not start.
+5. Runs Foundry E2E against those bytes (`--skip-package`) only after the gate passes.
+6. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only if that E2E job succeeded.
 
-If step 2 changes artifact bytes, step 4 is what makes the new zip eligible. Skipped E2E cannot publish.
+If step 2 changes artifact bytes, step 5 is what makes the new zip eligible. A failed gate or a failed E2E job does not publish. Re-run the tag workflow inside the 02:00-06:00 ET window when nobody is signed in.
 
 Foundry installs use:
 

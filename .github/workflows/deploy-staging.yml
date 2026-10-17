@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: foundry-staging
+  group: foundry-e2e
   cancel-in-progress: false
 
 jobs:
@@ -33,6 +33,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: License gate
+        run: bash scripts/ci/e2e-gate.sh require
 
       - name: Check required staging secrets
         env:

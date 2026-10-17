@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mode=${1:?usage: e2e-gate.sh license|secrets}
+mode=${1:?usage: e2e-gate.sh license|require|secrets}
 
 write_output() {
   local key=$1
@@ -13,6 +13,17 @@ write_output() {
 
 notice() {
   printf '::notice::%s\n' "$1"
+}
+
+close_gate() {
+  local reason=$1
+  write_output ok false
+  if [[ $mode == require ]]; then
+    notice "Re-run inside the 02:00-06:00 ET window. Foundry was not started. ${reason}"
+    exit 1
+  fi
+  notice "Skipped: ${reason}"
+  exit 0
 }
 
 read_count() {
@@ -31,17 +42,13 @@ license_gate() {
   local -a busy=()
 
   if ! hour=$(TZ=America/New_York date +%H); then
-    notice "Skipped: could not read America/New_York hour (shared Foundry license)"
-    write_output ok false
-    exit 0
+    close_gate "could not read America/New_York hour (shared Foundry license)"
   fi
 
   case $hour in
     02|03|04|05) ;;
     *)
-      notice "Skipped: outside 02:00-06:00 ET quiet hours (shared Foundry license)"
-      write_output ok false
-      exit 0
+      close_gate "outside 02:00-06:00 ET quiet hours (shared Foundry license)"
       ;;
   esac
 
@@ -51,9 +58,7 @@ license_gate() {
     host=${entry%%|*}
     url=${entry#*|}
     if ! count=$(read_count "$url"); then
-      notice "Skipped: could not read user count from ${host} (shared Foundry license)"
-      write_output ok false
-      exit 0
+      close_gate "could not read user count from ${host} (shared Foundry license)"
     fi
     if ((count > 0)); then
       busy+=("$host")
@@ -61,14 +66,10 @@ license_gate() {
   done
 
   if ((${#busy[@]} == 2)); then
-    notice "Skipped: somebody is signed in on ${busy[0]} and ${busy[1]} (shared Foundry license)"
-    write_output ok false
-    exit 0
+    close_gate "somebody is signed in on ${busy[0]} and ${busy[1]} (shared Foundry license)"
   fi
   if ((${#busy[@]} == 1)); then
-    notice "Skipped: somebody is signed in on ${busy[0]} (shared Foundry license)"
-    write_output ok false
-    exit 0
+    close_gate "somebody is signed in on ${busy[0]} (shared Foundry license)"
   fi
 
   write_output ok true
@@ -90,7 +91,7 @@ check_secrets() {
 }
 
 case $mode in
-  license) license_gate ;;
+  license|require) license_gate ;;
   secrets) check_secrets ;;
   *)
     printf '::error::Unknown e2e-gate mode: %s\n' "$mode" >&2

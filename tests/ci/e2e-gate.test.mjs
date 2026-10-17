@@ -239,6 +239,89 @@ describe("e2e license gate", () => {
   });
 });
 
+const RERUN_NOTICE = "::notice::Re-run inside the 02:00-06:00 ET window. Foundry was not started.";
+
+describe("required license gate", () => {
+  it("fails closed outside the window and tells the caller to re-run", async () => {
+    const result = await runGate("require", {
+      hour: "06",
+      foundryCode: 22,
+      buildCode: 22,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      `${RERUN_NOTICE} outside 02:00-06:00 ET quiet hours (shared Foundry license)`,
+    );
+    expect(result.curls).toEqual([]);
+  });
+
+  it("fails closed when somebody is signed in", async () => {
+    const result = await runGate("require", {
+      hour: "03",
+      buildBody: '{"users":1}\n',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      `${RERUN_NOTICE} somebody is signed in on build.angryorcgames.com (shared Foundry license)`,
+    );
+  });
+
+  it("allows the caller at hour 03 when both hosts have zero users", async () => {
+    const result = await runGate("require", { hour: "03" });
+
+    expect(result.status).toBe(0);
+    expect(result.ok).toBe("true");
+    expect(result.stdout).toBe("");
+    expect(result.curls).toEqual([
+      "https://foundry.angryorcgames.com/api/status",
+      "https://build.angryorcgames.com/api/status",
+    ]);
+  });
+});
+
+describe("workflows that start Foundry", () => {
+  it("fails release and staging closed before Foundry, and leaves production promotion alone", async () => {
+    const release = await readFile(
+      fileURLToPath(new URL("../../.github/workflows/release.yml", import.meta.url)),
+      "utf8",
+    );
+    const staging = await readFile(
+      fileURLToPath(new URL("../../.github/workflows/deploy-staging.yml", import.meta.url)),
+      "utf8",
+    );
+    const promote = await readFile(
+      fileURLToPath(new URL("../../.github/workflows/promote-production.yml", import.meta.url)),
+      "utf8",
+    );
+    const nightly = await readFile(
+      fileURLToPath(new URL("../../.github/workflows/e2e.yml", import.meta.url)),
+      "utf8",
+    );
+
+    expect(release.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeGreaterThan(-1);
+    expect(release.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeLessThan(
+      release.indexOf("foundry:e2e"),
+    );
+    expect(release).toContain("needs.e2e.result == 'success'");
+    expect(release).toContain("group: foundry-e2e");
+
+    expect(staging.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeGreaterThan(-1);
+    expect(staging.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeLessThan(
+      staging.indexOf("foundry:e2e"),
+    );
+    expect(staging).toContain("group: foundry-e2e");
+
+    expect(promote).not.toContain("foundry:e2e");
+    expect(promote).not.toContain("foundry-cli.mjs");
+    expect(nightly).toContain("bash scripts/ci/e2e-gate.sh license");
+    expect(nightly).not.toContain("e2e-gate.sh require");
+  });
+});
+
 describe("e2e secret presence", () => {
   const present = {
     HAVE_ADMIN: "true",
