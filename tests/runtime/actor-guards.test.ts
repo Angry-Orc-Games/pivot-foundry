@@ -42,6 +42,25 @@ it("sets dying when a current HP edit reaches zero", () => {
   });
 });
 
+it("keeps a death status submitted with the HP change", () => {
+  const actor = {
+    system: {
+      attributes: {
+        hp: { value: 10, max: 10 },
+        deathSaves: { status: "alive", successes: 0, failures: 0 },
+      },
+    },
+  };
+  const changes: Record<string, unknown> = {
+    "system.attributes.hp.value": 0,
+    "system.attributes.deathSaves.status": "dead",
+    "system.attributes.deathSaves.failures": 3,
+  };
+  expect(guardHpMaximum(actor, changes)).toBeUndefined();
+  expect(changes["system.attributes.deathSaves.status"]).toBe("dead");
+  expect(changes["system.attributes.deathSaves.failures"]).toBe(3);
+});
+
 it("sets alive when a current HP edit rises above zero", () => {
   const actor = {
     system: {

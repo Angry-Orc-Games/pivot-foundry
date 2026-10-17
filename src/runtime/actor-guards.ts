@@ -1,6 +1,15 @@
 import { survivalStatusForHpEdit, validAmount } from "../rules/survival";
 import { warn } from "./ui";
 
+function submittedStatus(changes: Record<string, unknown>): string | undefined {
+  const dotted = changes["system.attributes.deathSaves.status"];
+  if (typeof dotted === "string") return dotted;
+  const nested = changes.system as
+    { attributes?: { deathSaves?: { status?: unknown } } } | undefined;
+  const status = nested?.attributes?.deathSaves?.status;
+  return typeof status === "string" ? status : undefined;
+}
+
 function persistedHp(
   changes: Record<string, unknown>,
   nestedHp: { value?: unknown } | undefined,
@@ -76,7 +85,7 @@ export function guardHpMaximum(
   const nextHp = persistedHp(changes, nestedHp);
   if (nextHp === undefined || !validAmount(nextHp) || !validAmount(nextMax)) return;
   const nextStatus = survivalStatusForHpEdit(
-    system?.attributes?.deathSaves?.status,
+    submittedStatus(changes) ?? system?.attributes?.deathSaves?.status,
     nextHp,
     nextMax,
   );
