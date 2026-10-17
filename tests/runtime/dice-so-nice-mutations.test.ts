@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { damageRollDialog } from "../../src/runtime/damage-roll";
 import { deathSaveDialog } from "../../src/runtime/death-saves";
 import { shortRestDialog } from "../../src/runtime/rest-dialogs";
-import { waitForDice3D } from "../../src/runtime/dice3d";
+import { waitForDiceSoNiceAnimation } from "../../src/runtime/dice-so-nice";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -106,6 +106,7 @@ describe("Initiative waits for Dice3D animation", () => {
     vi.stubGlobal("game", {
       settings: { get: () => "roll" },
       i18n: { localize: (key: string) => key },
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
         waitFor3DAnimationByMessageID: vi.fn(async () => {
           callOrder.push("dice3d");
@@ -138,6 +139,9 @@ describe("Initiative waits for Dice3D animation", () => {
         }
         async render() {
           return "<div>15</div>";
+        }
+        async toMessage(data: Record<string, unknown>) {
+          return { ...data, rolls: [this] };
         }
       },
     );
@@ -246,7 +250,7 @@ describe("Damage roll attachment", () => {
   });
 });
 
-describe("waitForDice3D timeout", () => {
+describe("Dice So Nice wait timeout", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -259,12 +263,13 @@ describe("waitForDice3D timeout", () => {
     const message = { id: "msg-timeout" };
 
     vi.stubGlobal("game", {
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
         waitFor3DAnimationByMessageID: vi.fn(() => neverResolves),
       },
     });
 
-    const waitPromise = waitForDice3D(message);
+    const waitPromise = waitForDiceSoNiceAnimation(message);
 
     // Fast-forward 10 seconds
     await vi.advanceTimersByTimeAsync(10000);
@@ -297,6 +302,7 @@ describe("Death save ordering", () => {
 
     vi.stubGlobal("game", {
       i18n: { localize: (key: string) => key },
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
         waitFor3DAnimationByMessageID: vi.fn(async () => {
           callOrder.push("dice3d");
@@ -474,6 +480,7 @@ describe("Short rest ordering", () => {
         localize: (key: string) => key,
         format: (key: string) => key,
       },
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
         waitFor3DAnimationByMessageID: vi.fn(async () => {
           callOrder.push("dice3d");
@@ -725,6 +732,9 @@ describe("Sheet initiative targets active combat", () => {
         }
         async render() {
           return "<div>15</div>";
+        }
+        async toMessage(data: Record<string, unknown>) {
+          return { ...data, rolls: [this] };
         }
       },
     );

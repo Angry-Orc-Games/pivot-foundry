@@ -1,152 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  installCombatInitiativeDice3DWait,
-  resetCombatInitiativeDice3DWaitForTests,
-  rollInitiativeWaitingForDice3D,
-} from "../../src/runtime/combat-initiative";
+import { createPivotCombatClass } from "../../src/runtime/combat-document";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-describe("rollInitiativeWaitingForDice3D", () => {
-  it("creates chat messages, waits for Dice3D, then updates combatants", async () => {
+describe("tracker Roll Initiative", () => {
+  it("creates chat messages, waits for Dice So Nice, then updates combatants", async () => {
     const callOrder: string[] = [];
-
-    const combat = {
-      combatant: { id: "c1" },
-      turns: [{ id: "c1" }],
-      combatants: {
-        get: (id: string) =>
-          id === "c1"
-            ? {
-                id: "c1",
-                isOwner: true,
-                name: "Hero",
-                hidden: false,
-                actor: { id: "actor-1" },
-                token: null,
-                getInitiativeRoll: () => ({
-                  total: 15,
-                  async evaluate() {
-                    return this;
-                  },
-                  async toMessage(data: Record<string, unknown>, opts: { create?: boolean }) {
-                    expect(opts.create).toBe(false);
-                    return { ...data, rolls: [{ total: 15 }], content: "15" };
-                  },
-                }),
-              }
-            : undefined,
-      },
-      updateEmbeddedDocuments: vi.fn(async (_name: string, updates: unknown[]) => {
-        callOrder.push("update");
-        expect(updates).toEqual([{ _id: "c1", initiative: 15 }]);
-        return updates;
-      }),
-      update: vi.fn(async () => combat),
-    };
-
-    const createdMessages: unknown[] = [];
-    vi.stubGlobal("ChatMessage", {
-      getSpeaker: () => ({ alias: "Hero" }),
-      implementation: {
-        create: vi.fn(async (messages: unknown[]) => {
-          callOrder.push("chat");
-          const list = Array.isArray(messages) ? messages : [messages];
-          const withIds = list.map((m, i) => ({ ...(m as object), id: `msg-${i}` }));
-          createdMessages.push(...withIds);
-          return withIds;
-        }),
-      },
-      create: vi.fn(async (messages: unknown[]) => {
-        callOrder.push("chat");
-        const list = Array.isArray(messages) ? messages : [messages];
-        const withIds = list.map((m, i) => ({ ...(m as object), id: `msg-${i}` }));
-        createdMessages.push(...withIds);
-        return withIds;
-      }),
-    });
 
     vi.stubGlobal("game", {
       i18n: { format: (_key: string, data: { name: string }) => `${data.name} rolls initiative` },
       settings: { get: () => "public" },
-    });
-
-    const wait = vi.fn(async () => {
-      callOrder.push("dice3d");
-    });
-
-    await rollInitiativeWaitingForDice3D(combat, "c1", {}, { waitForDice3D: wait });
-
-    expect(callOrder).toEqual(["chat", "dice3d", "update"]);
-    expect(wait).toHaveBeenCalled();
-    expect(combat.updateEmbeddedDocuments).toHaveBeenCalledWith("Combatant", [
-      { _id: "c1", initiative: 15 },
-    ]);
-  });
-});
-
-describe("installCombatInitiativeDice3DWait", () => {
-  it("patches Combat.prototype.rollInitiative to wait before updating", async () => {
-    const callOrder: string[] = [];
-
-    class FakeCombat {
-      combatant = { id: "c1" };
-      turns = [{ id: "c1" }];
-      combatants = {
-        get: (id: string) =>
-          id === "c1"
-            ? {
-                id: "c1",
-                isOwner: true,
-                name: "Hero",
-                hidden: false,
-                actor: { id: "a1" },
-                token: null,
-                getInitiativeRoll: () => ({
-                  total: 12,
-                  async evaluate() {
-                    return this;
-                  },
-                  async toMessage(data: Record<string, unknown>) {
-                    return { ...data, rolls: [{ total: 12 }] };
-                  },
-                }),
-              }
-            : undefined,
-      };
-      async updateEmbeddedDocuments(name: string, updates: unknown[]) {
-        void name;
-        void updates;
-        callOrder.push("update");
-        return [];
-      }
-      async update() {
-        return this;
-      }
-      async rollInitiative(ids: string | string[]) {
-        void ids;
-        callOrder.push("original");
-        return this;
-      }
-    }
-
-    resetCombatInitiativeDice3DWaitForTests();
-    vi.stubGlobal("Combat", FakeCombat);
-    vi.stubGlobal("ChatMessage", {
-      getSpeaker: () => ({ alias: "Hero" }),
-      create: vi.fn(async (messages: unknown[]) => {
-        callOrder.push("chat");
-        const list = Array.isArray(messages) ? messages : [messages];
-        return list.map((m, i) => ({ ...(m as object), id: `m${i}` }));
-      }),
-    });
-    vi.stubGlobal("game", {
-      i18n: { format: () => "init" },
-      settings: { get: () => "public" },
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
         waitFor3DAnimationByMessageID: vi.fn(async () => {
           callOrder.push("dice3d");
@@ -154,10 +22,50 @@ describe("installCombatInitiativeDice3DWait", () => {
       },
     });
 
-    installCombatInitiativeDice3DWait();
+    vi.stubGlobal("ChatMessage", {
+      getSpeaker: () => ({ alias: "Hero" }),
+      implementation: {
+        create: vi.fn(async (message: Record<string, unknown>) => {
+          callOrder.push("chat");
+          expect(message.rolls).toEqual([{ total: 15 }]);
+          return { ...message, id: "msg-0" };
+        }),
+      },
+    });
 
-    const combat = new FakeCombat();
-    await combat.rollInitiative("c1");
+    class BaseCombat {
+      combatants = [
+        {
+          id: "c1",
+          actor: { id: "actor-1", name: "Hero" },
+          token: null,
+          hidden: false,
+          isOwner: true,
+          getInitiativeRoll: () => ({
+            total: 15,
+            _evaluated: true,
+            async toMessage(data: Record<string, unknown>, opts: { create?: boolean }) {
+              expect(opts.create).toBe(false);
+              return { ...data, rolls: [{ total: 15 }] };
+            },
+          }),
+        },
+      ];
+      updateEmbeddedDocuments = vi.fn(async () => {
+        callOrder.push("update");
+      });
+      update = vi.fn(async () => undefined);
+      combatant = { id: "c1" };
+      turns = [{ id: "c1" }];
+      async rollInitiative() {
+        callOrder.push("original");
+        return this;
+      }
+    }
+
+    const PivotCombat = createPivotCombatClass(BaseCombat as never);
+    const combat = new PivotCombat();
+    await (combat as { rollInitiative: (ids: string) => Promise<unknown> }).rollInitiative("c1");
 
     expect(callOrder).toEqual(["chat", "dice3d", "update"]);
     expect(callOrder).not.toContain("original");
@@ -165,12 +73,8 @@ describe("installCombatInitiativeDice3DWait", () => {
 });
 
 describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
-  it("calls static create/createDocuments bound to the class (no detached `this`)", async () => {
+  it("calls static create bound to the class and honors roll mode", async () => {
     const order: string[] = [];
-    const applyMode = vi.fn();
-    const applyRollMode = vi.fn();
-    // Foundry v14: static methods read `this.implementation`; detached calls throw
-    // "Cannot read properties of undefined (reading 'implementation')".
     class BaseChatMessage {
       id?: string;
       static get implementation(): typeof BaseChatMessage {
@@ -189,13 +93,14 @@ describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
       static getSpeaker() {
         return { alias: "Hero" };
       }
-      static applyMode = applyMode;
-      static applyRollMode = applyRollMode;
     }
     class ChatMessageV14 extends BaseChatMessage {}
     vi.stubGlobal("ChatMessage", ChatMessageV14);
     vi.stubGlobal("game", {
-      settings: { get: (_s: string, k: string) => (k === "messageMode" ? "public" : undefined) },
+      settings: {
+        get: (_scope: string, key: string) => (key === "rollMode" ? "blindroll" : undefined),
+      },
+      modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
         waitFor3DAnimationByMessageID: vi.fn(async (id: string) => {
           expect(id).toBe("m0");
@@ -213,46 +118,38 @@ describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
       ...data,
       rolls: [{ total: 12 }],
     }));
-    const combatant = {
-      id: "c1",
-      isOwner: true,
-      name: "Hero",
-      hidden: false,
-      getInitiativeRoll: () => ({ total: 12, evaluate: async () => undefined, toMessage }),
-    };
-    const combat = {
-      combatant: null,
-      turns: [],
-      combatants: { get: (id: string) => (id === "c1" ? combatant : undefined) },
-      updateEmbeddedDocuments: vi.fn(async () => {
+    class BaseCombat {
+      combatants = [
+        {
+          id: "c1",
+          actor: { name: "Hero" },
+          hidden: false,
+          isOwner: true,
+          getInitiativeRoll: () => ({
+            total: 12,
+            _evaluated: true,
+            toMessage,
+          }),
+        },
+      ];
+      updateEmbeddedDocuments = vi.fn(async () => {
         order.push("update");
-      }),
-      update: vi.fn(async () => undefined),
-    };
-    // Exercise the real tracker path: patched Combat.prototype.rollInitiative.
-    class Combat {
-      async rollInitiative(): Promise<unknown> {
-        throw new Error("core");
-      }
+      });
+      update = vi.fn(async () => undefined);
+      combatant = null;
+      turns: Array<{ id?: string }> = [];
     }
-    vi.stubGlobal("Combat", Combat);
-    resetCombatInitiativeDice3DWaitForTests();
-    installCombatInitiativeDice3DWait();
-    await (
-      Combat.prototype.rollInitiative as (this: unknown, ids: string[]) => Promise<unknown>
-    ).call(combat, ["c1"]);
+
+    const PivotCombat = createPivotCombatClass(BaseCombat as never);
+    const combat = new PivotCombat();
+    await (combat as { rollInitiative: (ids: string[]) => Promise<unknown> }).rollInitiative([
+      "c1",
+    ]);
 
     expect(order).toEqual(["chat", "dice3d", "update"]);
-    expect(combat.updateEmbeddedDocuments).toHaveBeenCalledWith("Combatant", [
-      { _id: "c1", initiative: 12 },
-    ]);
-    const opts = toMessage.mock.calls[0]?.[1] ?? {};
-    expect(opts).not.toHaveProperty("rollMode");
-    expect(opts.messageMode).toBe("public");
-    expect(applyMode).toHaveBeenCalledWith(
-      expect.objectContaining({ rolls: [{ total: 12 }] }),
-      "public",
-    );
-    expect(applyRollMode).not.toHaveBeenCalled();
+    expect(
+      (combat as { updateEmbeddedDocuments: ReturnType<typeof vi.fn> }).updateEmbeddedDocuments,
+    ).toHaveBeenCalledWith("Combatant", [{ _id: "c1", initiative: 12 }]);
+    expect(toMessage.mock.calls[0]?.[1]).toEqual({ rollMode: "blindroll", create: false });
   });
 });

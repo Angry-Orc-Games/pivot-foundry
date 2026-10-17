@@ -8,13 +8,13 @@ import {
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotNpcDataModel } from "./data/npc-data";
 import { createPivotItemDataModels } from "./data/item-data";
+import { createPivotCombatClass } from "./runtime/combat-document";
 import type { PivotRegistrationRuntime } from "./foundry-runtime";
 import { runWorldMigrations, type WorldMigrationGame } from "./migrations/world-migrations";
 import { SYSTEM_ID } from "./config";
 import { createPivotCharacterSheetClass } from "./sheets/character-sheet";
 import { createPivotNpcSheetClass } from "./sheets/npc-sheet";
 import { createPivotItemSheetClass } from "./sheets/item-sheet";
-import { installCombatInitiativeDice3DWait } from "./runtime/combat-initiative";
 
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
@@ -95,6 +95,18 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
       },
     };
 
+    // Register Combat document class for DSN-aware initiative rolls
+    const globals = globalThis as typeof globalThis & { Combat?: unknown };
+    if (globals.Combat) {
+      const config = runtime.CONFIG as typeof runtime.CONFIG & {
+        Combat?: { documentClass?: unknown };
+      };
+      if (!config.Combat) {
+        config.Combat = {};
+      }
+      config.Combat.documentClass = createPivotCombatClass(globals.Combat as never);
+    }
+
     // Set CONFIG.Combat.initiative formula for Combat Tracker roll buttons
     // Formula uses @initiative which resolves from actor.getRollData() -> actor.system.initiative
     // Character.prepareDerivedData() sets initiative = dex mod + bonus + item effects
@@ -147,8 +159,6 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   });
 
   runtime.Hooks.once("ready", () => {
-    installCombatInitiativeDice3DWait();
-
     const globals = globalThis as typeof globalThis & {
       game?: WorldMigrationGame;
       ui?: {
