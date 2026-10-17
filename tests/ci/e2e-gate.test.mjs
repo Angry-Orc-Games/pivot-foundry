@@ -302,22 +302,49 @@ describe("workflows that start Foundry", () => {
       "utf8",
     );
 
-    expect(release.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeGreaterThan(-1);
-    expect(release.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeLessThan(
+    const releaseGate = release.slice(
+      release.indexOf("  gate:\n"),
+      release.indexOf("  package:\n"),
+    );
+    expect(releaseGate).toContain("ref: ${{ github.sha }}");
+    expect(releaseGate).toContain("sparse-checkout: scripts/ci");
+    expect(releaseGate).toContain("bash trusted-gate/scripts/ci/e2e-gate.sh require");
+    expect(releaseGate).not.toContain("refs/tags/");
+    expect(release.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
       release.indexOf("foundry:e2e"),
     );
+    expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
     expect(release).toContain("needs.e2e.result == 'success'");
     expect(release).toContain("group: foundry-e2e");
 
-    expect(staging.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeGreaterThan(-1);
-    expect(staging.indexOf("bash scripts/ci/e2e-gate.sh require")).toBeLessThan(
+    expect(staging.indexOf("ref: ${{ github.sha }}")).toBeLessThan(
+      staging.indexOf("github.event.workflow_run.head_sha"),
+    );
+    expect(staging.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
+      staging.indexOf("github.event.workflow_run.head_sha"),
+    );
+    expect(staging.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
       staging.indexOf("foundry:e2e"),
     );
+    expect(staging).toContain("sparse-checkout: scripts/ci");
     expect(staging).toContain("group: foundry-e2e");
+
+    const nightlyGate = nightly.slice(
+      nightly.indexOf("  gate:\n"),
+      nightly.indexOf("  secrets:\n"),
+    );
+    expect(nightlyGate).toContain("ref: ${{ github.sha }}");
+    expect(nightlyGate).toContain("sparse-checkout: scripts/ci");
+    expect(nightlyGate).toContain("bash trusted-gate/scripts/ci/e2e-gate.sh license");
+    expect(nightlyGate).not.toContain("inputs.ref");
+    expect(nightlyGate).not.toContain("matrix.target.sha");
+    const nightlyE2e = nightly.slice(nightly.indexOf("  e2e:\n"));
+    expect(nightlyE2e.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh license")).toBeLessThan(
+      nightlyE2e.indexOf("matrix.target.sha"),
+    );
 
     expect(promote).not.toContain("foundry:e2e");
     expect(promote).not.toContain("foundry-cli.mjs");
-    expect(nightly).toContain("bash scripts/ci/e2e-gate.sh license");
     expect(nightly).not.toContain("e2e-gate.sh require");
   });
 });

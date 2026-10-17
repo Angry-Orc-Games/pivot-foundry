@@ -34,14 +34,16 @@ jobs:
     outputs:
       ok: ${{ steps.decide.outputs.ok }}
     steps:
-      - name: Checkout trusted runner
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
 
       - name: Decide whether Foundry may start
         id: decide
-        run: bash scripts/ci/e2e-gate.sh license
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh license
 
   secrets:
     name: Foundry secret presence
@@ -50,10 +52,12 @@ jobs:
     timeout-minutes: 5
     environment: foundry-e2e
     steps:
-      - name: Checkout trusted runner
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
 
       - name: Check Foundry secrets
         env:
@@ -61,7 +65,7 @@ jobs:
           HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
           HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
           HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
-        run: bash scripts/ci/e2e-gate.sh secrets
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh secrets
 
   plan:
     name: Select E2E targets
@@ -72,10 +76,10 @@ jobs:
     outputs:
       targets: ${{ steps.plan.outputs.targets }}
     steps:
-      - name: Checkout trusted runner
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
 
       - name: List main and labeled pull requests
         id: plan
@@ -99,14 +103,16 @@ jobs:
       matrix:
         target: ${{ fromJson(needs.plan.outputs.targets) }}
     steps:
-      - name: Checkout trusted runner
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
 
       - name: Recheck the license gate
         id: recheck
-        run: bash scripts/ci/e2e-gate.sh license
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh license
 
       - name: Stop when the license gate closes
         if: steps.recheck.outputs.ok != 'true'
@@ -116,8 +122,24 @@ jobs:
           E2E_SUMMARY: Skipped before Foundry started. The license gate closed.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          bash scripts/ci/e2e-report.sh neutral
+          bash trusted-gate/scripts/ci/e2e-report.sh neutral
           echo "::notice::License gate closed before ${{ matrix.target.sha }}. Foundry will not start for this SHA."
+
+      - name: Check Foundry secrets
+        id: creds
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
+          HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
+          HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
+          HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh secrets
+
+      - name: Checkout trusted runner
+        if: steps.recheck.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Setup Node
         if: steps.recheck.outputs.ok == 'true'
@@ -144,16 +166,6 @@ jobs:
       - name: Overlay the system onto the trusted runner
         if: steps.recheck.outputs.ok == 'true'
         run: bash scripts/ci/e2e-overlay.sh . under-test
-
-      - name: Check Foundry secrets
-        id: creds
-        if: steps.recheck.outputs.ok == 'true'
-        env:
-          HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
-          HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
-          HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
-          HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
-        run: bash scripts/ci/e2e-gate.sh secrets
 
       - name: Run packaged Foundry E2E
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'

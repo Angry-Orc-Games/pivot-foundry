@@ -305,7 +305,7 @@ describe("per-target license gate", () => {
         if (cond) current.guard = cond[1];
       }
     }
-    const start = steps.findIndex((step) => step.name === "Setup Node");
+    const start = steps.findIndex((step) => step.name === "Check Foundry secrets");
     const end = steps.findIndex((step) => step.name === "Report Foundry E2E failure");
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);

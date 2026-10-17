@@ -29,13 +29,20 @@ jobs:
       PIVOT_FOUNDRY_BASE_URL: https://build.angryorcgames.com
       PIVOT_E2E_DESTRUCTIVE: "0"
     steps:
-      - name: Checkout
+      - name: Checkout workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
+
+      - name: License gate
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh require
+
+      - name: Checkout system under test
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-
-      - name: License gate
-        run: bash scripts/ci/e2e-gate.sh require
 
       - name: Check required staging secrets
         env:
