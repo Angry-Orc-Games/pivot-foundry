@@ -10,7 +10,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "../templates/actors/character");
 const header = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "header.hbs"), "utf-8"));
 const vitals = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "vitals.hbs"), "utf-8"));
-const tabs = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "tabs.hbs"), "utf-8"));
 const sheet = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "sheet.hbs"), "utf-8"));
 
 // Load CSS
@@ -475,9 +474,8 @@ async function validateAttacksTable() {
 
   const headerHTML = header(data);
   const vitalsHTML = vitals(data);
-  const tabsHTML = tabs(data);
   const sheetHTML = sheet(data);
-  const content = headerHTML + vitalsHTML + tabsHTML + sheetHTML;
+  const content = headerHTML + vitalsHTML + sheetHTML;
 
   const html = generateHTML("theme-light", content, 640);
 

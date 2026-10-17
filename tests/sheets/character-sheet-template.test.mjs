@@ -13,6 +13,14 @@ describe("character sheet template structure", () => {
     expect(template).toContain('data-roll-kind="save"');
     expect(template).toContain("{{scorePath}}");
     expect(template).toContain("{{primaryPath}}");
+    expect(template).toContain('aria-label="Primary {{label}}"');
+    expect(template).not.toContain(">Primary</span>");
+    expect(template).toContain("★");
+    expect(template).toContain("☆");
+    expect(template).toContain("pf-init-line");
+    expect(template.replace(/\s+/g, " ")).toContain(
+      "Initiative {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}",
+    );
     expect(template).toContain("{{short}}");
     expect(template).toContain("{{mod}}");
     expect(template).toContain("{{save}}");
@@ -29,15 +37,58 @@ describe("character sheet template structure", () => {
     expect(template).toContain("{{system.identity.focus}}");
   });
 
-  it("tabs partial includes Sheet, Survival, Inventory, Magic, Notes tabs", () => {
-    const templatePath = resolve(process.cwd(), "templates/actors/character/tabs.hbs");
+  it("sheet page keeps survival, inventory, magic, and notes on one page", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/sheet.hbs");
     const template = readFileSync(templatePath, "utf-8");
 
-    expect(template).toContain('data-tab="sheet"');
-    expect(template).toContain('data-tab="survival"');
-    expect(template).toContain('data-tab="inventory"');
-    expect(template).toContain('data-tab="magic"');
-    expect(template).toContain('data-tab="notes"');
+    expect(template).not.toContain("pf-tabs");
+    expect(template).not.toContain('data-tab="sheet"');
+    expect(template).toContain('data-action="shortRest"');
+    expect(template).toContain('data-action="longRest"');
+    expect(template).toContain('data-action="deathSave"');
+    expect(template).toContain('data-type="weapon"');
+    expect(template).toContain('data-type="armour"');
+    expect(template).toContain('data-type="equipment"');
+    expect(template).toContain('name="system.magic.awakened"');
+    expect(template).toContain('name="system.magic.mp.value"');
+    expect(template).not.toMatch(
+      /data-path="magic\.mp\.value"[\s\S]*<span>\{\{system\.magic\.mp\.value\}\}/,
+    );
+    expect(template).not.toContain('name="system.attributes.hp.value"');
+    const hpLine = template
+      .slice(
+        template.indexOf('class="pf-hp-line"'),
+        template.indexOf("</div>", template.indexOf('class="pf-hp-line"')),
+      )
+      .replace(/\s+/g, " ");
+    expect(hpLine).toContain(
+      '<span class="pf-hp-readout">{{system.attributes.hp.value}} / {{system.attributes.hp.max}}</span>',
+    );
+    expect(hpLine).not.toContain("<input");
+    expect(hpLine).not.toContain("name=");
+    expect(hpLine).toContain('data-action="survivalRoll"');
+    expect(hpLine).toContain('data-action="correctSurvival"');
+    expect(template).toContain('name="system.notes.special"');
+    expect(template).toContain('name="system.notes.runesThaumaturgy"');
+    expect(template).toContain('name="system.identity.loyalty"');
+    expect(template).toContain("<h3>Magic</h3>");
+    expect(template).toContain("<h3>Body modifications</h3>");
+    expect(template).toContain("<h3>Gear and funds</h3>");
+    expect(template).toContain("<h3>Loyalty and details</h3>");
+    expect(template).toContain('class="pf-survival"');
+    expect(template.indexOf("<h3>Gear and funds</h3>")).toBeLessThan(
+      template.indexOf('class="pf-survival"'),
+    );
+    expect(template.indexOf('class="pf-survival"')).toBeLessThan(
+      template.indexOf("<h3>Loyalty and details</h3>"),
+    );
+    expect(template.indexOf("<h3>Feats</h3>")).toBeLessThan(
+      template.indexOf("<h3>Body modifications</h3>"),
+    );
+    expect(template.indexOf("<h3>Body modifications</h3>")).toBeLessThan(
+      template.indexOf("<h3>Magic</h3>"),
+    );
+    expect(template.indexOf("<h3>Magic</h3>")).toBeLessThan(template.indexOf("<h3>Traits</h3>"));
   });
 
   it("sheet partial has two-column print layout", () => {

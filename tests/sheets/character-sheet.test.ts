@@ -5,6 +5,7 @@ import {
   buildD20ChatFlavor,
   buildRollModeDialogContent,
   createEmbeddedItemData,
+  createPivotCharacterSheetClass,
   naturalResultsFromRoll,
   nextResourceValue,
   normalizeSheetSubmitData,
@@ -104,6 +105,8 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.derived.abilities.str.mod).toBe(0);
     expect(context.derived.pool.max).toBe(1);
     expect(context.derived.magic.mp.max).toBe(0);
+    expect(context.derived.initiative).toBe(0);
+    expect(context.initiativeText).toBe("+0");
     expect(context.items.weapons).toEqual([]);
   });
 
@@ -113,6 +116,7 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.derived.proficiencyBonus).toBe(3);
     expect(context.derived.armourClass.value).toBe(16);
     expect(context.derived.initiative).toBe(4);
+    expect(context.initiativeText).toBe("+4");
     expect(context.derived.totalWeight).toBe(32);
     expect(context.items.weapons[0]?.summary).toMatchObject({
       bth: 6,
@@ -162,6 +166,35 @@ describe("prepareCharacterSheetContext", () => {
     expect(boosted.derived.proficiencies.weapons.bows).toBe(true);
     expect(baseline.derived.initiative).toBe(4);
     expect(boosted.derived.initiative).toBe(5);
+    expect(baseline.scoreSourceText).toBe("");
+    expect(boosted.scoreSourceText).toBe("Score sources. Dex: base 14, Bow Training +2.");
+    expect(baseline.skillRows.find((row) => row.id === "athletics")?.ability).toBe("Str");
+    expect(baseline.skillRows.find((row) => row.id === "perception")?.ability).toBe("Wis");
+  });
+
+  it("lists body modifications apart from traits", () => {
+    const actor = sampleActor();
+    const withMods = {
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "mod-1",
+          name: "Gills",
+          type: "feature",
+          system: { category: "bodyModification" },
+        },
+        {
+          id: "trait-1",
+          name: "Darkvision",
+          type: "feature",
+          system: { category: "species" },
+        },
+      ],
+    };
+    const context = prepareCharacterSheetContext(withMods);
+    expect(context.items.bodyModifications.map((item) => item.name)).toEqual(["Gills"]);
+    expect(context.items.traits.map((item) => item.name)).toEqual(["Darkvision"]);
   });
 
   it("keeps non-enumerable Foundry document ids available for item row actions", () => {
@@ -687,5 +720,74 @@ describe("D20 roll attachments for Dice So Nice!", () => {
     expect(chatCreate).toHaveBeenCalledTimes(1);
     const messageData = chatCreate.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(messageData.content).toBe(renderedContent);
+  });
+});
+
+describe("character sheet edit toggle", () => {
+  function sheetClass(ownerEditable: boolean) {
+    return createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+            async _prepareContext() {
+              return { editable: ownerEditable };
+            }
+          },
+        },
+      },
+    } as never);
+  }
+
+  it("switches an owner between edit and view, and keeps a non-owner in view", async () => {
+    type SheetInstance = {
+      editorOpen?: boolean;
+      document: ActorLike;
+      render: () => void;
+      _prepareContext: (options: Record<string, unknown>) => Promise<{
+        editable: boolean;
+        disabledAttr: string;
+      }>;
+    };
+    const SheetClass = sheetClass(true);
+    const sheet = new SheetClass() as SheetInstance;
+    sheet.document = sampleActor();
+    sheet.render = () => undefined;
+    const toggle = (
+      SheetClass as unknown as {
+        DEFAULT_OPTIONS: { actions: { toggleEditMode: (this: SheetInstance) => void } };
+      }
+    ).DEFAULT_OPTIONS.actions.toggleEditMode;
+
+    const editing = await sheet._prepareContext({});
+    expect(editing.editable).toBe(true);
+    expect(editing.disabledAttr).toBe("");
+
+    toggle.call(sheet);
+    const viewing = await sheet._prepareContext({});
+    expect(sheet.editorOpen).toBe(false);
+    expect(viewing.editable).toBe(false);
+    expect(viewing.disabledAttr).toBe("disabled");
+
+    toggle.call(sheet);
+    const editingAgain = await sheet._prepareContext({});
+    expect(editingAgain.editable).toBe(true);
+    expect(editingAgain.disabledAttr).toBe("");
+
+    const LockedSheet = sheetClass(false);
+    const locked = new LockedSheet() as SheetInstance;
+    locked.document = sampleActor();
+    locked.render = () => undefined;
+    const lockedToggle = (
+      LockedSheet as unknown as {
+        DEFAULT_OPTIONS: { actions: { toggleEditMode: (this: SheetInstance) => void } };
+      }
+    ).DEFAULT_OPTIONS.actions.toggleEditMode;
+    lockedToggle.call(locked);
+    lockedToggle.call(locked);
+    const stillLocked = await locked._prepareContext({});
+    expect(stillLocked.editable).toBe(false);
+    expect(stillLocked.disabledAttr).toBe("disabled");
   });
 });

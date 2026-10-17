@@ -85,6 +85,11 @@
   overflow: hidden;
 }
 
+.pivot-fantasy.character .window-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 :is(.pivot-fantasy, .pf-sheet).sheet.item .window-content {
   overflow-x: hidden;
   overflow-y: auto;
@@ -408,6 +413,14 @@
   display: grid;
   gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pf-hp-line {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-2);
+  grid-column: 1 / -1;
 }
 
 .pf-meter-fields label,
@@ -831,6 +844,17 @@
   border-bottom: 1px solid var(--pf-accent);
 }
 
+.pf-sheet .pf-print table.pf-attacks thead th {
+  background: transparent;
+  color: var(--pf-sheet-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 1px 4px;
+  text-transform: none;
+  border-bottom: 1px solid var(--pf-sheet-rule);
+}
+
 .pf-sheet table tbody td {
   padding: 4px 8px;
   text-align: left;
@@ -1044,25 +1068,42 @@
    PRINT LAYOUT CSS - Ticket 3: Character Sheet Restructure
    =================================================================== */
 
-/* Print wrapper and print sheet */
+/* Print wrapper and print sheet. Parts stack into one paper card. */
 .pf-sheet .pf-print-wrap {
-  background: var(--pf-panel);
-  color: var(--pf-ink);
-  padding: var(--pf-space-4);
-  border: 1px solid var(--pf-line);
-  border-radius: var(--pf-radius-md);
+  background: var(--pf-sheet-paper);
+  color: var(--pf-sheet-ink);
   max-width: 900px;
-  margin: 0 auto var(--pf-space-3);
+  margin: 0 auto;
+  padding: 0 18px;
+  border-left: 1px solid var(--pf-line);
+  border-right: 1px solid var(--pf-line);
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+}
+
+.pf-sheet .pf-print-top {
+  border-top: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md) var(--pf-radius-md) 0 0;
+  padding-top: 18px;
+}
+
+.pf-sheet .pf-print-bottom {
+  border-bottom: 1px solid var(--pf-line);
+  border-radius: 0 0 var(--pf-radius-md) var(--pf-radius-md);
+  padding-bottom: 18px;
+  margin-bottom: var(--pf-space-3);
 }
 
 .pf-sheet .pf-print {
+  font-family: var(--pf-font-body);
   font-size: 12px;
   line-height: 1.35;
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
 }
 
 .pf-sheet .pf-print :is(h1, h2, h3) {
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
 }
 
 /* NPC sheet body sections */
@@ -1144,17 +1185,20 @@
 }
 
 .pf-sheet .pf-print h3 {
+  font-family: var(--pf-font-display);
   font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 1.5px solid var(--pf-accent);
-  color: var(--pf-accent);
-  margin: 12px 0 4px;
+  border-bottom: 1.5px solid var(--pf-sheet-accent);
+  color: var(--pf-sheet-accent);
+  margin: 10px 0 4px;
   padding-bottom: 1px;
 }
 
-.pf-sheet .pf-print ul {
-  margin: 0;
+.pf-sheet .pf-print ul,
+.pf-sheet .pf-print .pf-list {
+  margin: 4px 0;
   padding-left: 16px;
   list-style: disc;
 }
@@ -1188,6 +1232,10 @@
   margin: 0 0 4px 0;
 }
 
+.pf-sheet .pf-hdr.pf-print-wrap {
+  margin-bottom: 0;
+}
+
 /* View mode read-only text (full contrast) */
 .pf-sheet .pf-name-view {
   font-family: var(--pf-font-display);
@@ -1198,8 +1246,10 @@
 }
 
 .pf-sheet .pf-tagline-view {
+  font-family: var(--pf-font-body);
+  font-size: 12px;
   font-style: italic;
-  color: var(--pf-ink-muted);
+  color: var(--pf-sheet-muted);
   margin-bottom: 4px;
 }
 
@@ -1262,24 +1312,27 @@
 }
 
 .pf-sheet .pf-stat {
-  background: var(--pf-panel);
-  border: 1.5px solid var(--pf-ink);
+  background: var(--pf-sheet-paper);
+  border: 1.5px solid var(--pf-sheet-ink);
   border-radius: var(--pf-radius-md);
   text-align: center;
   padding: 3px;
+  min-height: 0;
+  display: block;
 }
 
 .pf-sheet .pf-stat b {
   display: block;
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: var(--pf-ink-muted);
+  color: var(--pf-sheet-muted);
 }
 
 .pf-sheet .pf-stat span {
   font: 700 17px var(--pf-font-display);
   display: block;
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
+  text-transform: none;
 }
 
 .pf-sheet .pf-stat small {
@@ -1388,16 +1441,19 @@
 
 /* Skills table */
 .pf-sheet .pf-print table.pf-skills {
+  display: table;
   border-collapse: collapse;
   width: 100%;
   font-size: 11.5px;
+  line-height: 1.25;
 }
 
 .pf-sheet .pf-print table.pf-skills td {
   padding: 1px 4px;
-  border-bottom: 1px solid var(--pf-line);
+  border-bottom: 1px solid var(--pf-sheet-rule);
   text-align: left;
   vertical-align: middle;
+  line-height: 1.25;
 }
 
 .pf-sheet .pf-print table.pf-skills td.pf-r {
@@ -1419,6 +1475,20 @@
 .pf-sheet .pf-print table.pf-skills .pf-check span {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-prof-mark {
+  flex: 0 0 1.1em;
+  width: 1.1em;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.pf-sheet .pf-print table.pf-skills .pf-roll {
+  font-weight: 700;
+  line-height: 1.25;
+  min-height: 0;
+  text-decoration: none;
 }
 
 /* Lists */
@@ -1473,17 +1543,28 @@
 
 .pf-sheet .pf-print .pf-small {
   font-size: 10.5px;
-  color: var(--pf-ink-muted);
+  color: var(--pf-sheet-muted);
 }
 
 .pf-sheet .pf-print .pf-small b {
-  color: var(--pf-ink);
+  color: var(--pf-sheet-ink);
 }
 
-/* Screen reader only */
-.pf-sheet .pf-sr {
+.pf-sheet .pf-print .pf-check {
+  position: relative;
+}
+
+.pf-sheet .pf-print .pf-check input.pf-sr {
   position: absolute;
-  left: -9999px;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
 }
 
 /* Roll buttons in print context */
@@ -1537,4 +1618,526 @@
 /* Ensure container name is set on the character sheet root */
 .pf-sheet .pf-character-sheet {
   container-name: pf-sheet;
+}
+
+/* Beat Foundry v14 form chrome. The application root carries these classes. */
+.pivot-fantasy.sheet.actor.character .window-content {
+  background: #fff;
+  color: #1c1a16;
+  padding: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .window-content > .pf-print-wrap {
+  align-self: stretch;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print :is(input:not([type="checkbox"]), select, textarea) {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  min-height: 0;
+}
+
+.pivot-fantasy.sheet.actor.character
+  .pf-print
+  :is(input:not([type="checkbox"]), select, textarea):disabled {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  opacity: 1;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-check input[type="checkbox"]:not(.pf-sr) {
+  appearance: none;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: var(--pf-radius-sm);
+  box-shadow: none;
+  box-sizing: border-box;
+  display: grid;
+  flex: 0 0 18px;
+  height: 18px;
+  margin: 0;
+  min-height: 0;
+  place-content: center;
+  width: 18px;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-inline {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--pf-sheet-rule);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  padding: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-hp-readout {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+  font: 700 18px var(--pf-font-display);
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-score {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font: 700 18px var(--pf-font-display);
+  height: auto;
+  padding: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-score::-webkit-inner-spin-button,
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-score::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-ab-head {
+  align-items: baseline;
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-prime-toggle {
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  min-height: 1em;
+  min-width: 0.8em;
+  position: static;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print .pf-prime-toggle input.pf-sr {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-skills tr,
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-skills tr:nth-child(odd),
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-skills tr:nth-child(even) {
+  background: transparent;
+}
+
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-attacks thead,
+.pivot-fantasy.sheet.actor.character .pf-print table.pf-attacks thead th {
+  background: transparent;
+  box-shadow: none;
+  color: var(--pf-sheet-ink);
+}
+
+/* Beat Foundry v14 theme rules on table cells, headings, and buttons. */
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(odd)
+  td,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(even)
+  td {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  color: #1c1a16;
+  text-align: left;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(odd)
+  td.pf-small,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(even)
+  td.pf-small {
+  color: #555;
+  font-size: 10.5px;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(odd)
+  td.pf-r,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(even)
+  td.pf-r {
+  text-align: right;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  .pf-check,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  .pf-check
+  span {
+  color: #1c1a16;
+  text-align: left;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  button.pf-roll {
+  background: transparent;
+  color: #1c1a16;
+  display: inline;
+  flex: 0 0 auto;
+  padding: 0;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  td.pf-r
+  .pf-roll {
+  font-weight: 700;
+  text-align: right;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-init-line {
+  align-items: baseline;
+  color: #555;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  margin: 0 0 4px;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-init-line
+  .pf-roll {
+  color: inherit;
+  font: inherit;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-attacks
+  thead,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-attacks
+  thead
+  th {
+  background: #fff;
+  border-bottom: 1.5px solid #8a3b12;
+  box-shadow: none;
+  color: #8a3b12;
+  font-family: Georgia, "Iowan Old Style", serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="number"]::-webkit-inner-spin-button,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+  margin: 0;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-ab.pf-prime {
+  background: #f1dccb;
+  border-color: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-prime-mark {
+  color: #555;
+  font-size: 12px;
+  line-height: 1;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-ab.pf-prime
+  .pf-prime-mark {
+  color: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-section-header
+  button,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-resource-actions
+  button {
+  background: #8a3b12;
+  border: 1px solid #8a3b12;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 700;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 0;
+  min-width: 1.5em;
+  padding: 1px 6px;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-magic
+  .pf-resource-actions {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  width: max-content;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(odd),
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(even) {
+  background: transparent;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(odd)
+  td,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(even)
+  td {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  color: #1c1a16;
+  text-align: left;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(odd)
+  td.pf-r,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table
+  tbody
+  tr:nth-child(even)
+  td.pf-r {
+  text-align: right;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(button, a) {
+  background: transparent;
+  box-shadow: none;
+  color: #1c1a16;
+  display: inline;
+  flex: 0 0 auto;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(.pf-link, .pf-item-name, .pf-roll):hover {
+  color: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(input:not([type="checkbox"]), select, textarea) {
+  background: transparent;
+  box-shadow: none;
+  color: #1c1a16;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="checkbox"] {
+  background: #fff;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(.pf-sheet-button, .pf-edit-toggle) {
+  background: #8a3b12;
+  border: 1px solid #8a3b12;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 700;
+  min-height: 0;
+  padding: 2px 8px;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-meter {
+  background: #f1dccb;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-meter-fill {
+  background: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-status {
+  background: #f1dccb;
 }
