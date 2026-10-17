@@ -16,6 +16,11 @@ describe("character sheet template structure", () => {
     expect(template).toContain('aria-label="Primary {{label}}"');
     expect(template).not.toContain(">Primary</span>");
     expect(template).toContain("★");
+    expect(template).toContain("☆");
+    expect(template).toContain('class="pf-init-line"');
+    expect(template).toContain(
+      "Initiative {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}",
+    );
     expect(template).toContain("{{short}}");
     expect(template).toContain("{{mod}}");
     expect(template).toContain("{{save}}");
@@ -46,6 +51,9 @@ describe("character sheet template structure", () => {
     expect(template).toContain('data-type="equipment"');
     expect(template).toContain('name="system.magic.awakened"');
     expect(template).toContain('name="system.magic.mp.value"');
+    expect(template).not.toMatch(
+      /data-path="magic\.mp\.value"[\s\S]*<span>\{\{system\.magic\.mp\.value\}\}/,
+    );
     expect(template).not.toContain('name="system.attributes.hp.value"');
     const hpLine = template
       .slice(

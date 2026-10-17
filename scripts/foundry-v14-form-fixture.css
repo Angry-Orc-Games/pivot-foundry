@@ -42,3 +42,38 @@
 .application .window-content table tbody tr:nth-child(even) {
   background: rgba(0, 0, 0, 0.18);
 }
+
+/* Stand-in for Foundry v14 interface chrome that beats the sheet's short selectors. */
+body
+  .application.pivot-fantasy.sheet.actor.character
+  .window-content
+  table
+  tbody
+  tr:nth-child(odd)
+  td,
+body
+  .application.pivot-fantasy.sheet.actor.character
+  .window-content
+  table
+  tbody
+  tr:nth-child(even)
+  td {
+  background: #6b6b6b;
+  color: #c5c5c5;
+  text-align: center;
+}
+
+body .application.pivot-fantasy.sheet.actor.character .window-content table thead th {
+  background: #3a3a3a;
+  border-bottom: 0;
+  color: #f2f2f2;
+  text-transform: none;
+}
+
+body .application.pivot-fantasy.sheet.actor .window-content button {
+  background: #5a5a5a;
+  color: #d0d0d0;
+  display: flex;
+  text-decoration: underline;
+  width: 100%;
+}

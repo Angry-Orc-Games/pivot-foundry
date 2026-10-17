@@ -870,6 +870,23 @@ async function assertPrintSheet(page, label) {
     const awakenedStyle = awakened ? window.getComputedStyle(awakened) : null;
     const prime = document.querySelector(".pf-ab.pf-prime .pf-prime-toggle");
     const primeInput = document.querySelector(".pf-prime-toggle input");
+    const emptyStar = document.querySelector(".pf-ab:not(.pf-prime) .pf-prime-mark");
+    const primeBox = document.querySelector(".pf-ab.pf-prime");
+    const skillCell = document.querySelector("table.pf-skills td");
+    const skillName = document.querySelector("table.pf-skills .pf-check span:not(.pf-prof-mark)");
+    const skillCellStyle = skillCell ? window.getComputedStyle(skillCell) : null;
+    const skillNameStyle = skillName ? window.getComputedStyle(skillName) : null;
+    const modifier = document.querySelector("table.pf-skills td.pf-r .pf-roll");
+    const modifierStyle = modifier ? window.getComputedStyle(modifier) : null;
+    const initLine = document.querySelector(".pf-init-line");
+    const initButton = initLine?.querySelector("button") ?? null;
+    const initNote = initLine?.querySelector("span:last-child") ?? null;
+    const initButtonStyle = initButton ? window.getComputedStyle(initButton) : null;
+    const scoreSpin = score ? window.getComputedStyle(score, "::-webkit-inner-spin-button") : null;
+    const mp = document.querySelector('input[name="system.magic.mp.value"]');
+    const mpStyle = mp ? window.getComputedStyle(mp) : null;
+    const plus = document.querySelector('[data-type="magicStream"]');
+    const plusStyle = plus ? window.getComputedStyle(plus) : null;
     const contentWidth = document.querySelector(".window-content")?.clientWidth ?? 0;
     const headerWidth = document.querySelector(".pf-hdr")?.getBoundingClientRect().width ?? 0;
     const vitalsWidth = document.querySelector(".pf-vitals")?.getBoundingClientRect().width ?? 0;
@@ -896,6 +913,39 @@ async function assertPrintSheet(page, label) {
       awakenedWidth: awakenedStyle ? awakenedStyle.width : "",
       primeText: prime ? prime.textContent.replace(/\s+/g, " ").trim() : "",
       primeWidth: primeInput ? window.getComputedStyle(primeInput).width : "",
+      emptyStar: emptyStar ? emptyStar.textContent : "",
+      primeFill: primeBox ? window.getComputedStyle(primeBox).backgroundColor : "",
+      skillCellBg: skillCellStyle ? skillCellStyle.backgroundColor : "",
+      skillCellAlign: skillCellStyle ? skillCellStyle.textAlign : "",
+      skillNameAlign: skillNameStyle ? skillNameStyle.textAlign : "",
+      skillNameColor: skillNameStyle ? skillNameStyle.color : "",
+      skillNameOffset:
+        skillName && skillCell
+          ? skillName.getBoundingClientRect().left - skillCell.getBoundingClientRect().left
+          : 999,
+      abilityColor: ability ? window.getComputedStyle(ability).color : "",
+      modifierWeight: modifierStyle ? modifierStyle.fontWeight : "",
+      modifierDeco: modifierStyle ? modifierStyle.textDecorationLine : "",
+      modifierAlign: modifier ? window.getComputedStyle(modifier.parentElement).textAlign : "",
+      initText: initButton ? initButton.textContent.replace(/\s+/g, " ").trim() : "",
+      initDeco: initButtonStyle ? initButtonStyle.textDecorationLine : "",
+      initSameLine:
+        initButton && initNote
+          ? Math.abs(
+              initButton.getBoundingClientRect().top - initNote.getBoundingClientRect().top,
+            ) < 8
+          : false,
+      initNarrow:
+        initButton && initLine
+          ? initButton.getBoundingClientRect().width < initLine.getBoundingClientRect().width * 0.5
+          : false,
+      scoreAppearance: scoreStyle ? scoreStyle.appearance : "",
+      mpAppearance: mpStyle ? mpStyle.appearance : "",
+      scoreSpinDisplay: scoreSpin ? scoreSpin.display : "",
+      mpReadouts: document.querySelectorAll(".pf-magic .pf-resource-actions span").length,
+      plusBg: plusStyle ? plusStyle.backgroundColor : "",
+      plusColor: plusStyle ? plusStyle.color : "",
+      plusWidth: plus ? plus.getBoundingClientRect().width : 0,
       contentWidth,
       headerWidth,
       vitalsWidth,
@@ -918,14 +968,47 @@ async function assertPrintSheet(page, label) {
     ["heading 12px", measured.heading?.fontSize === "12px"],
     ["heading rust", measured.heading?.color === "rgb(138, 59, 18)"],
     ["heading rule", measured.heading?.borderBottomStyle === "solid"],
-    ["attacks plain", measured.attacks?.backgroundColor === "rgba(0, 0, 0, 0)"],
-    ["attacks head plain", measured.attacksHead?.backgroundColor === "rgba(0, 0, 0, 0)"],
-    ["attacks ink", measured.attacksHead?.color === "rgb(28, 26, 22)"],
+    ["attacks white", measured.attacksHead?.backgroundColor === "rgb(255, 255, 255)"],
+    ["attacks rust", measured.attacksHead?.color === "rgb(138, 59, 18)"],
+    ["attacks caps", measured.attacksHead?.textTransform === "uppercase"],
+    ["attacks rule", measured.attacksHead?.borderBottomStyle === "solid"],
     ["attacks bold", Number(measured.attacksHead?.fontWeight) >= 700],
-    ["attacks not uppercase", measured.attacksHead?.textTransform === "none"],
     [
       "skills unstriped",
       measured.skillStripe === "rgba(0, 0, 0, 0)" || measured.skillStripe === "rgb(255, 255, 255)",
+    ],
+    ["skill cell white", measured.skillCellBg === "rgb(255, 255, 255)"],
+    ["skill name left", measured.skillCellAlign === "left" && measured.skillNameAlign === "left"],
+    ["skill name ink", measured.skillNameColor === "rgb(28, 26, 22)"],
+    ["skill ability muted", measured.abilityColor === "rgb(85, 85, 85)"],
+    [
+      "skill modifier",
+      Number(measured.modifierWeight) >= 700 &&
+        measured.modifierDeco === "none" &&
+        measured.modifierAlign === "right",
+    ],
+    [
+      "initiative line",
+      measured.initText === "Initiative +7" &&
+        measured.initDeco === "none" &&
+        measured.initSameLine === true &&
+        measured.initNarrow === true,
+    ],
+    ["empty star", measured.emptyStar === "☆"],
+    ["primary fill", measured.primeFill === "rgb(241, 220, 203)"],
+    [
+      "number fields",
+      measured.scoreAppearance === "textfield" &&
+        measured.mpAppearance === "textfield" &&
+        measured.scoreSpinDisplay === "none",
+    ],
+    ["mp once", measured.mpReadouts === 0],
+    [
+      "add button",
+      measured.plusBg === "rgb(138, 59, 18)" &&
+        measured.plusColor === "rgb(255, 255, 255)" &&
+        measured.plusWidth > 0 &&
+        measured.plusWidth < 48,
     ],
     ["score flat", measured.scoreShadow === "none" && measured.scoreBorder === "0px"],
     ["score georgia", /Georgia/i.test(measured.scoreFont)],

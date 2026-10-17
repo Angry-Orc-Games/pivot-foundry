@@ -105,6 +105,8 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.derived.abilities.str.mod).toBe(0);
     expect(context.derived.pool.max).toBe(1);
     expect(context.derived.magic.mp.max).toBe(0);
+    expect(context.derived.initiative).toBe(0);
+    expect(context.initiativeText).toBe("+0");
     expect(context.items.weapons).toEqual([]);
   });
 
@@ -114,6 +116,7 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.derived.proficiencyBonus).toBe(3);
     expect(context.derived.armourClass.value).toBe(16);
     expect(context.derived.initiative).toBe(4);
+    expect(context.initiativeText).toBe("+4");
     expect(context.derived.totalWeight).toBe(32);
     expect(context.items.weapons[0]?.summary).toMatchObject({
       bth: 6,
