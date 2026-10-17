@@ -74,6 +74,35 @@ fi
 exit $?
 `;
 
+function git(cwd, args) {
+  const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+  if ((result.status ?? 1) !== 0) {
+    throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+  }
+  return (result.stdout ?? "").trim();
+}
+
+async function initReachabilityRepo() {
+  const dir = await mkdtemp(join(tmpdir(), "e2e-git-"));
+  git(dir, ["init", "-b", "main"]);
+  git(dir, ["config", "user.email", "dev@example.com"]);
+  git(dir, ["config", "user.name", "Dev"]);
+  await writeFile(join(dir, "readme.txt"), "main\n");
+  git(dir, ["add", "readme.txt"]);
+  git(dir, ["commit", "-m", "main"]);
+  const main = git(dir, ["rev-parse", "HEAD"]);
+  git(dir, ["checkout", "-b", "feature"]);
+  await writeFile(join(dir, "readme.txt"), "feature\n");
+  git(dir, ["add", "readme.txt"]);
+  git(dir, ["commit", "-m", "feature"]);
+  const same = git(dir, ["rev-parse", "HEAD"]);
+  git(dir, ["checkout", "main"]);
+  const tree = git(dir, ["rev-parse", "HEAD^{tree}"]);
+  const fork = git(dir, ["commit-tree", tree, "-m", "fork-only"]);
+  git(dir, ["update-ref", "refs/pull/7/head", fork]);
+  return { dir, main, same, fork };
+}
+
 function outputValue(text, key) {
   const marker = `${key}<<`;
   const start = text.indexOf(marker);
@@ -202,31 +231,42 @@ describe("nightly target list", () => {
     expect(body).not.toContain("issue");
   });
 
-  it("tests only a same-repo dispatch SHA", async () => {
+  it("tests a dispatch SHA only when a branch in this repository contains it", async () => {
+    const repo = await initReachabilityRepo();
     const ctx = await withStub({
       event: "workflow_dispatch",
-      ref: SAME,
-      commit: { sha: SAME },
+      ref: repo.same,
+      env: { E2E_GIT_DIR: repo.dir },
     });
-    const result = await runScript(targetsScript, [], ctx.env);
+    const feature = await runScript(targetsScript, [], ctx.env);
+    const mainResult = await runScript(targetsScript, [], { ...ctx.env, E2E_REF: repo.main });
     const urls = await readFile(join(ctx.stub, "curl-urls"), "utf8");
     await rm(ctx.dir, { recursive: true, force: true });
+    await rm(repo.dir, { recursive: true, force: true });
 
-    expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual([{ sha: SAME, name: "dispatch" }]);
+    expect(feature.status).toBe(0);
+    expect(JSON.parse(feature.stdout)).toEqual([{ sha: repo.same, name: "dispatch" }]);
+    expect(mainResult.status).toBe(0);
+    expect(JSON.parse(mainResult.stdout)).toEqual([{ sha: repo.main, name: "dispatch" }]);
     expect(urls).not.toContain("/pulls?");
+    expect(feature.stdout + feature.stderr).not.toContain(TOKEN);
   });
 
-  it("refuses a SHA that is not in this repository", async () => {
+  it("refuses a dispatch SHA that exists only as a fork pull-request head", async () => {
+    const repo = await initReachabilityRepo();
+    const present = spawnSync("git", ["-C", repo.dir, "cat-file", "-e", `${repo.fork}^{commit}`]);
     const ctx = await withStub({
       event: "workflow_dispatch",
-      ref: FORK,
+      ref: repo.fork,
+      env: { E2E_GIT_DIR: repo.dir },
     });
     const result = await runScript(targetsScript, [], ctx.env);
     await rm(ctx.dir, { recursive: true, force: true });
+    await rm(repo.dir, { recursive: true, force: true });
 
+    expect(present.status).toBe(0);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("not a commit");
+    expect(result.stderr).toContain("not reachable");
     expect(result.stdout).toBe("");
     expect(result.stderr).not.toContain(TOKEN);
   });
@@ -241,6 +281,40 @@ describe("nightly target list", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("40-character");
+  });
+});
+
+describe("per-target license gate", () => {
+  it("skips every Foundry step when the recheck closes", async () => {
+    const yaml = await readFile(
+      fileURLToPath(new URL("../../.github/workflows/e2e.yml", import.meta.url)),
+      "utf8",
+    );
+    const lines = yaml.slice(yaml.indexOf("  e2e:\n")).split("\n");
+    const steps = [];
+    let current = null;
+    for (const line of lines) {
+      const name = line.match(/^ {6}- name: (.+)$/);
+      if (name) {
+        current = { name: name[1], guard: "" };
+        steps.push(current);
+        continue;
+      }
+      if (current && current.guard === "") {
+        const cond = line.match(/^ {8}if: (.+)$/);
+        if (cond) current.guard = cond[1];
+      }
+    }
+    const start = steps.findIndex((step) => step.name === "Setup Node");
+    const end = steps.findIndex((step) => step.name === "Report Foundry E2E failure");
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    for (const step of steps.slice(start, end)) {
+      expect(step.guard, step.name).toContain("steps.recheck.outputs.ok == 'true'");
+    }
+    expect(steps.find((step) => step.name === "Run packaged Foundry E2E")?.guard).toContain(
+      "steps.creds.outputs.available == 'true'",
+    );
   });
 });
 

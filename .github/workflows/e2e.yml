@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Exact 40-character commit SHA in this repository. Empty runs main and open e2e-nightly pull requests.
+        description: Exact 40-character commit SHA reachable from a branch in this repository. Empty runs main and open e2e-nightly pull requests.
         required: false
       secrets_check_only:
         description: Verify foundry-e2e secrets are non-empty, then exit. Does not start Foundry, at any hour.
@@ -120,25 +120,30 @@ jobs:
           echo "::notice::License gate closed before ${{ matrix.target.sha }}. Foundry will not start for this SHA."
 
       - name: Setup Node
+        if: steps.recheck.outputs.ok == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
 
       - name: Install trusted dependencies
+        if: steps.recheck.outputs.ok == 'true'
         run: npm ci
 
       - name: Checkout system under test
+        if: steps.recheck.outputs.ok == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ matrix.target.sha }}
           path: under-test
 
       - name: Overlay the system onto the trusted runner
+        if: steps.recheck.outputs.ok == 'true'
         run: bash scripts/ci/e2e-overlay.sh . under-test
 
       - name: Check Foundry secrets
         id: creds
+        if: steps.recheck.outputs.ok == 'true'
         env:
           HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
           HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
@@ -147,7 +152,7 @@ jobs:
         run: bash scripts/ci/e2e-gate.sh secrets
 
       - name: Run packaged Foundry E2E
-        if: steps.creds.outputs.available == 'true'
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         env:
           FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
           FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
@@ -162,7 +167,7 @@ jobs:
           grep -F "Foundry started for E2E commit ${{ matrix.target.sha }}." "$RUNNER_TEMP/foundry-e2e.log"
 
       - name: Verify tests executed
-        if: steps.creds.outputs.available == 'true'
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         run: |
           if [ ! -d "playwright-report" ] && [ ! -d "test-results" ]; then
             echo "::error::E2E job completed but no Playwright test artifacts were created. Tests may not have executed."
@@ -170,11 +175,11 @@ jobs:
           fi
 
       - name: Record E2E acceptance
-        if: steps.creds.outputs.available == 'true' && success()
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true' && success()
         run: node scripts/record-acceptance.mjs e2e
 
       - name: Upload tested artifact
-        if: steps.creds.outputs.available == 'true' && success()
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true' && success()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}
@@ -186,7 +191,7 @@ jobs:
           retention-days: 14
 
       - name: Upload sanitized diagnostics
-        if: steps.creds.outputs.available == 'true' && failure()
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true' && failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}-diagnostics
@@ -198,7 +203,7 @@ jobs:
           retention-days: 7
 
       - name: Report Foundry E2E success
-        if: success()
+        if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         env:
           E2E_SHA: ${{ matrix.target.sha }}
           E2E_REPOSITORY: ${{ github.repository }}

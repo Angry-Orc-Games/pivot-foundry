@@ -16,6 +16,20 @@ is_sha() {
   [[ $1 =~ ^[0-9a-f]{40}$ ]]
 }
 
+reachable_from_branch() {
+  local root=$1
+  local sha=$2
+  local tip
+  git -C "$root" cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
+  while IFS= read -r tip; do
+    [[ -n $tip ]] || continue
+    if git -C "$root" merge-base --is-ancestor "$sha" "$tip" 2>/dev/null; then
+      return 0
+    fi
+  done < <(git -C "$root" for-each-ref --format='%(objectname)' refs/heads refs/remotes)
+  return 1
+}
+
 api_get() {
   local url=$1
   local dest=$2
@@ -48,14 +62,21 @@ if [[ $event == "workflow_dispatch" && -n $ref ]]; then
   if ! is_sha "$ref"; then
     fail "workflow_dispatch ref must be a 40-character commit SHA in this repository."
   fi
-  if ! api_get "$api/repos/$repo/commits/$ref" "$workdir/commit.json"; then
-    fail "Refusing ${ref}. It is not a commit in ${repo}, so Foundry secrets stay unused."
+  root=${E2E_GIT_DIR:-$PWD}
+  if [[ -z ${E2E_GIT_DIR:-} ]]; then
+    if ! git -C "$root" fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'; then
+      fail "Could not fetch branches for ${repo}, so Foundry secrets stay unused."
+    fi
+    if [[ $(git -C "$root" rev-parse --is-shallow-repository 2>/dev/null || printf 'false') == true ]]; then
+      if ! git -C "$root" fetch --no-tags --unshallow origin; then
+        fail "Could not unshallow ${repo}, so Foundry secrets stay unused."
+      fi
+    fi
   fi
-  sha=$(jq -er '.sha // empty' "$workdir/commit.json")
-  if ! is_sha "$sha"; then
-    fail "Refusing ${ref}. The commit lookup did not return a SHA."
+  if ! reachable_from_branch "$root" "$ref"; then
+    fail "Refusing ${ref}. It is not reachable from a branch in ${repo}, so Foundry secrets stay unused."
   fi
-  emit "$(jq -nc --arg sha "$sha" '[{sha:$sha,name:"dispatch"}]')"
+  emit "$(jq -nc --arg sha "$ref" '[{sha:$sha,name:"dispatch"}]')"
   exit 0
 fi
 
