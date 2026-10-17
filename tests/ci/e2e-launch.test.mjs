@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { assertSafeZipEntries } from "../../scripts/foundry-compose.mjs";
 import { assertLaunchWindow } from "../../scripts/foundry-e2e.mjs";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -90,5 +92,23 @@ describe("launch window", () => {
     expect(install).toBeGreaterThan(0);
     expect(gate).toBeGreaterThan(install);
     expect(launch).toBeGreaterThan(gate);
+  });
+
+  it("rejects a system zip that points outside the system directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-zip-"));
+    const zipPath = join(dir, "system.zip");
+    const payload = join(dir, "payload.txt");
+    await writeFile(payload, "nope");
+    execFileSync("python3", [
+      "-c",
+      "import sys, zipfile\n" +
+        "with zipfile.ZipFile(sys.argv[1], 'w') as bundle:\n" +
+        "    bundle.write(sys.argv[2], '../scripts/foundry-cli.mjs')\n",
+      zipPath,
+      payload,
+    ]);
+
+    expect(() => assertSafeZipEntries(zipPath)).toThrow(/unsafe path/);
+    await rm(dir, { recursive: true, force: true });
   });
 });

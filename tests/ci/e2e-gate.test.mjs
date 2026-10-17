@@ -374,14 +374,18 @@ describe("workflows that start Foundry", () => {
       nightly.indexOf("  e2e:\n"),
       nightly.indexOf("  report:\n"),
     );
+    expect(packageJob).toContain('ACTIONS_RUNTIME_TOKEN: ""');
     expect(nightlyE2eJob).not.toContain("package:system");
     expect(nightlyE2eJob).not.toContain("path: under-test");
     expect(nightlyE2eJob).not.toContain("ref: ${{ matrix.target.sha }}");
     expect(nightlyE2eJob).toContain("working-directory: trusted-gate");
     expect(nightlyE2eJob).toContain("sparse-checkout-cone-mode: false");
     expect(nightlyE2eJob).toContain("name: e2e-package-");
+    expect(nightlyE2eJob).toContain("path: package-artifact");
+    expect(nightlyE2eJob).toContain("Accept only the system zip");
     const nightlyE2ePerms = nightlyE2eJob.slice(0, nightlyE2eJob.indexOf("steps:"));
     expect(nightlyE2ePerms).toContain("contents: read");
+    expect(nightlyE2ePerms).toContain("actions: read");
     expect(nightlyE2ePerms).not.toContain("checks:");
     expect(nightlyE2ePerms).not.toContain("issues:");
     const nightlyReport = nightly.slice(
@@ -389,6 +393,7 @@ describe("workflows that start Foundry", () => {
       nightly.indexOf("  closed:\n"),
     );
     expect(nightlyReport).toContain("checks: write");
+    expect(nightlyReport).toContain("actions: read");
     expect(nightlyReport).not.toContain("matrix.target");
     expect(nightlyReport).not.toContain("download-artifact");
     expect(nightlyReport).toContain("E2E_RUN_ID: ${{ github.run_id }}");

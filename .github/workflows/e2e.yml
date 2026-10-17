@@ -134,6 +134,10 @@ jobs:
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_RUNTIME_URL: ""
+          ACTIONS_RESULTS_URL: ""
+          ACTIONS_CACHE_URL: ""
         run: npm ci
 
       - name: Checkout system under test
@@ -149,6 +153,10 @@ jobs:
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_RUNTIME_URL: ""
+          ACTIONS_RESULTS_URL: ""
+          ACTIONS_CACHE_URL: ""
         run: bash scripts/ci/e2e-overlay.sh . under-test
 
       - name: Build the system package
@@ -156,6 +164,10 @@ jobs:
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_RUNTIME_URL: ""
+          ACTIONS_RESULTS_URL: ""
+          ACTIONS_CACHE_URL: ""
         run: npm run package:system
 
       - name: Upload packaged system
@@ -178,6 +190,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read
     environment: foundry-e2e
     strategy:
       fail-fast: false
@@ -242,9 +255,21 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: e2e-package-${{ matrix.target.name }}
-          path: trusted-gate
+          path: package-artifact
           run-id: ${{ github.run_id }}
           github-token: ${{ github.token }}
+
+      - name: Accept only the system zip
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          find package-artifact -type f -printf '%P\n' | sort > "$RUNNER_TEMP/package-files"
+          printf '%s\n' artifact-identity.json system.json system.zip | sort > "$RUNNER_TEMP/package-expected"
+          if ! cmp -s "$RUNNER_TEMP/package-expected" "$RUNNER_TEMP/package-files"; then
+            echo "::error::Packaged artifact contained files other than the system zip. Foundry was not started."
+            exit 1
+          fi
+          cp package-artifact/system.zip package-artifact/system.json package-artifact/artifact-identity.json trusted-gate/
 
       - name: Run packaged Foundry E2E
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
@@ -339,6 +364,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
       checks: write
     steps:
       - name: Checkout workflow commit
