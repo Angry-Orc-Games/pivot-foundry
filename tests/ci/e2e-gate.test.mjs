@@ -376,7 +376,10 @@ describe("workflows that start Foundry", () => {
     );
     expect(packageJob).toContain('ACTIONS_RUNTIME_TOKEN: ""');
     expect(packageJob).toContain("docker run --rm --network none");
+    expect(packageJob).toContain("-e HOME=/tmp");
+    expect(packageJob).toContain("apt-get install -y --no-install-recommends zip unzip");
     expect(packageJob).toContain('-v "$GITHUB_WORKSPACE:/work"');
+    expect(packageJob).not.toContain("artifact-identity.json");
     expect(nightlyE2eJob).not.toContain("package:system");
     expect(nightlyE2eJob).not.toContain("path: under-test");
     expect(nightlyE2eJob).not.toContain("ref: ${{ matrix.target.sha }}");

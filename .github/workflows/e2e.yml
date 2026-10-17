@@ -159,6 +159,15 @@ jobs:
           ACTIONS_CACHE_URL: ""
         run: bash scripts/ci/e2e-overlay.sh . under-test
 
+      - name: Prepare the package image
+        if: steps.recheck.outputs.ok == 'true'
+        run: |
+          docker build -t pivot-e2e-package - <<'EOF'
+          FROM node:20-bookworm
+          RUN apt-get update && apt-get install -y --no-install-recommends zip unzip \
+            && rm -rf /var/lib/apt/lists/*
+          EOF
+
       - name: Build the system package
         if: steps.recheck.outputs.ok == 'true'
         env:
@@ -170,8 +179,10 @@ jobs:
           ACTIONS_CACHE_URL: ""
         run: |
           docker run --rm --network none --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e npm_config_cache=/tmp/npm-cache \
             -v "$GITHUB_WORKSPACE:/work" -w /work \
-            node:20-bookworm \
+            pivot-e2e-package \
             npm run package:system
 
       - name: Upload packaged system
@@ -182,7 +193,6 @@ jobs:
           path: |
             system.json
             system.zip
-            artifact-identity.json
           if-no-files-found: error
           retention-days: 7
 
@@ -268,12 +278,12 @@ jobs:
         run: |
           set -euo pipefail
           find package-artifact -type f -printf '%P\n' | sort > "$RUNNER_TEMP/package-files"
-          printf '%s\n' artifact-identity.json system.json system.zip | sort > "$RUNNER_TEMP/package-expected"
+          printf '%s\n' system.json system.zip | sort > "$RUNNER_TEMP/package-expected"
           if ! cmp -s "$RUNNER_TEMP/package-expected" "$RUNNER_TEMP/package-files"; then
             echo "::error::Packaged artifact contained files other than the system zip. Foundry was not started."
             exit 1
           fi
-          cp package-artifact/system.zip package-artifact/system.json package-artifact/artifact-identity.json trusted-gate/
+          cp package-artifact/system.zip package-artifact/system.json trusted-gate/
 
       - name: Run packaged Foundry E2E
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
