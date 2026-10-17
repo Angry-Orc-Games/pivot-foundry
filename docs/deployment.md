@@ -37,7 +37,7 @@ Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Sta
 
 Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. The nightly queue skips fork heads. `workflow_dispatch` `ref` accepts a 40-character SHA that already exists in this repository and tests it with the runner from `main`. `secrets_check_only` verifies the `foundry-e2e` secrets at any hour and does not start Foundry.
 
-When the first license gate does not pass, later jobs are skipped and the workflow stays green. Before each SHA the gate runs again. If it closes, that SHA gets a neutral `Foundry E2E (nightly)` check and the remaining SHAs do not start. Missing secrets after a passing gate fail that SHA.
+When the first license gate does not pass, later jobs are skipped and the workflow stays green. Before each SHA the gate runs again. If it closes, that SHA gets a neutral `Foundry E2E (nightly)` check and Foundry does not start. The next SHA rechecks before it can start Foundry. Missing secrets after a passing gate fail that SHA. A failed system test does not cancel the other SHAs.
 
 ## GitHub settings that cannot be set from files
 
