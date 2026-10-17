@@ -8,6 +8,7 @@ import {
 import { createPivotCharacterDataModel } from "./data/character-data";
 import { createPivotNpcDataModel } from "./data/npc-data";
 import { createPivotItemDataModels } from "./data/item-data";
+import { createPivotCombatClass } from "./runtime/combat-document";
 import type { PivotRegistrationRuntime } from "./foundry-runtime";
 import { runWorldMigrations, type WorldMigrationGame } from "./migrations/world-migrations";
 import { SYSTEM_ID } from "./config";
@@ -93,6 +94,18 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
         value: [],
       },
     };
+
+    // Register Combat document class for DSN-aware initiative rolls
+    const globals = globalThis as typeof globalThis & { Combat?: unknown };
+    if (globals.Combat) {
+      const config = runtime.CONFIG as typeof runtime.CONFIG & {
+        Combat?: { documentClass?: unknown };
+      };
+      if (!config.Combat) {
+        config.Combat = {};
+      }
+      config.Combat.documentClass = createPivotCombatClass(globals.Combat as never);
+    }
 
     // Set CONFIG.Combat.initiative formula for Combat Tracker roll buttons
     // Formula uses @initiative which resolves from actor.getRollData() -> actor.system.initiative

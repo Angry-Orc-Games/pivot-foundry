@@ -3,6 +3,7 @@ import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../ru
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
+import { waitForDiceSoNiceAnimation } from "../runtime/dice-so-nice";
 import {
   abilities,
   armourCategories,
@@ -603,6 +604,73 @@ export function nextResourceValue(
   return Math.max(0, current + delta);
 }
 
+export async function rollInitiativeWithDiceAnimation(options: {
+  actor: ActorLike;
+  roll: {
+    toMessage: (
+      data: Record<string, unknown>,
+      options?: { rollMode?: string; create?: boolean },
+    ) => Promise<unknown>;
+  };
+  total: number;
+  flavor: string;
+  combat: CombatLike | null | undefined;
+  notify: (level: "warn" | "error", message: string) => void;
+  localize: (key: string) => string;
+}): Promise<void> {
+  const { actor, roll, total, flavor, combat, notify, localize } = options;
+
+  // Get roll mode from game settings (defaults to "roll" = public)
+  const game = globalThis as typeof globalThis & {
+    game?: { settings?: { get?: (scope: string, key: string) => unknown } };
+  };
+  const rawMode = game.game?.settings?.get?.("core", "rollMode");
+  const rollMode = typeof rawMode === "string" ? rawMode : "roll";
+
+  // Build message data only (create:false); roll mode is applied by toMessage.
+  const chatData = (await roll.toMessage(
+    { speaker: speakerForActor(actor), flavor, flags: { "core.initiativeRoll": true } },
+    { rollMode, create: false },
+  )) as Record<string, unknown>;
+
+  const ChatMessage = (
+    globalThis as typeof globalThis & {
+      ChatMessage?: {
+        implementation?: {
+          create?: (data: Record<string, unknown>) => Promise<unknown>;
+          createDocuments?: (data: unknown[]) => Promise<unknown>;
+        };
+        create?: (data: Record<string, unknown>) => Promise<unknown>;
+        createDocuments?: (data: unknown[]) => Promise<unknown>;
+      };
+    }
+  ).ChatMessage;
+
+  // Create exactly one message (Foundry v14 class-bound create)
+  const Cls = ChatMessage?.implementation ?? ChatMessage;
+  let message: { id?: string } | undefined;
+  if (Cls?.create) {
+    message = (await Cls.create(chatData)) as { id?: string } | undefined;
+  } else if (Cls?.createDocuments) {
+    const created = await Cls.createDocuments([chatData]);
+    message = (Array.isArray(created) ? created[0] : undefined) as { id?: string } | undefined;
+  }
+
+  // Wait for Dice So Nice animation on that message
+  if (message?.id) {
+    await waitForDiceSoNiceAnimation(message.id);
+  }
+
+  // Update combatant initiative after animation
+  await applyInitiativeRollToCombat({
+    actorId: actorDocumentId(actor),
+    total,
+    combat,
+    notify,
+    localize,
+  });
+}
+
 export async function applyInitiativeRollToCombat(options: {
   actorId: string | undefined;
   total: number;
@@ -769,6 +837,18 @@ async function rollAction(
   const mode = await promptRollMode();
   if (!mode) return;
 
+  if (request.rollKind === "initiative") {
+    await rollSheetInitiative({
+      actor,
+      RollConstructor,
+      mode,
+      modifier: request.modifier,
+      label: request.label,
+      combat: getActiveCombat(),
+    });
+    return;
+  }
+
   const resolution = dicePoolForRollMode(mode);
   const poolRoll = new RollConstructor(d20PoolFormula(resolution.dieCount));
   await poolRoll.evaluate();
@@ -787,20 +867,70 @@ async function rollAction(
 
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
+
   await resultRoll.toMessage({
     speaker: speakerForActor(context.actor),
     flavor,
   });
+}
 
-  if (request.rollKind === "initiative") {
-    await applyInitiativeRollToCombat({
-      actorId: actorDocumentId(actor),
-      total,
-      combat: getActiveCombat(),
-      notify: notifyUser,
-      localize: localizeText,
-    });
-  }
+/**
+ * Initiative formula with real d20 terms so Dice So Nice animates every rolled die.
+ * Keep modifiers mirror selectKeptD20: highest -> kh1, lowest -> kl1, single -> plain.
+ */
+export function initiativeRollFormula(
+  resolution: { dieCount: number; pick: "single" | "highest" | "lowest" },
+  modifier: number,
+): string {
+  const keep = resolution.pick === "highest" ? "kh1" : resolution.pick === "lowest" ? "kl1" : "";
+  return `${d20PoolFormula(resolution.dieCount)}${keep}${formatSigned(modifier)}`;
+}
+
+type InitiativeRoll = {
+  evaluate: () => Promise<unknown>;
+  dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+  terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
+  toMessage: (
+    data: Record<string, unknown>,
+    options?: { rollMode?: string; create?: boolean },
+  ) => Promise<unknown>;
+};
+
+export async function rollSheetInitiative(options: {
+  actor: ActorLike;
+  RollConstructor: new (formula: string) => unknown;
+  mode: RollMode;
+  modifier: number;
+  label: string;
+  combat: CombatLike | null | undefined;
+}): Promise<{ kept: number; total: number }> {
+  const { actor, mode, modifier, label, combat } = options;
+  const resolution = dicePoolForRollMode(mode);
+  const roll = new options.RollConstructor(
+    initiativeRollFormula(resolution, modifier),
+  ) as InitiativeRoll;
+  await roll.evaluate();
+  const kept = selectKeptD20(naturalResultsFromRoll(roll), resolution);
+  const total = kept + modifier;
+  const flavor = buildD20ChatFlavor({
+    label,
+    mode,
+    kept,
+    modifier,
+    total,
+    attackCrit: null,
+    localize: localizeText,
+  });
+  await rollInitiativeWithDiceAnimation({
+    actor,
+    roll,
+    total,
+    flavor,
+    combat,
+    notify: notifyUser,
+    localize: localizeText,
+  });
+  return { kept, total };
 }
 
 async function adjustResourceAction(
