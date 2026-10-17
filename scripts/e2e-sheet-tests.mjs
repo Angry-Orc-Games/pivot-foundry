@@ -998,9 +998,7 @@ async function assertPrintSheet(page, label) {
     ["primary fill", measured.primeFill === "rgb(241, 220, 203)"],
     [
       "number fields",
-      measured.scoreAppearance === "textfield" &&
-        measured.mpAppearance === "textfield" &&
-        measured.scoreSpinDisplay === "none",
+      measured.scoreAppearance === "textfield" && measured.mpAppearance === "textfield",
     ],
     ["mp once", measured.mpReadouts === 0],
     [

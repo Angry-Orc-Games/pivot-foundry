@@ -111,6 +111,7 @@ function buildContext(editable) {
       magic: { mp: { max: 0 } },
       totalWeight: 31,
     },
+    initiativeText: "+1",
     abilityRows: [
       ["str", "STR", 16, "+3", "+5", true],
       ["dex", "DEX", 13, "+1", "+1", false],

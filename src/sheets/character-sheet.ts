@@ -153,6 +153,7 @@ export interface CharacterSheetContext {
     featureCategories: typeof featureCategories;
   };
   derived: ReturnType<typeof calculateCharacterDerived>;
+  initiativeText: string;
   abilityRows: Array<{
     key: AbilityKey;
     label: string;
@@ -517,6 +518,7 @@ export function prepareCharacterSheetContext(
       featureCategories,
     },
     derived,
+    initiativeText: formatSigned(derived.initiative),
     abilityRows: abilities.map(({ key, label, short }) => ({
       key,
       label,

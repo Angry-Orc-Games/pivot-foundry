@@ -1750,3 +1750,247 @@
   box-shadow: none;
   color: var(--pf-sheet-ink);
 }
+
+/* Beat Foundry v14 theme rules on table cells, headings, and buttons. */
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(odd)
+  td,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(even)
+  td {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  color: #1c1a16;
+  text-align: left;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(odd)
+  td.pf-small,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(even)
+  td.pf-small {
+  color: #555;
+  font-size: 10.5px;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(odd)
+  td.pf-r,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  tbody
+  tr:nth-child(even)
+  td.pf-r {
+  text-align: right;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  .pf-check,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  .pf-check
+  span {
+  color: #1c1a16;
+  text-align: left;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  button.pf-roll {
+  background: transparent;
+  color: #1c1a16;
+  display: inline;
+  flex: 0 0 auto;
+  padding: 0;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  td.pf-r
+  .pf-roll {
+  font-weight: 700;
+  text-align: right;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-init-line {
+  align-items: baseline;
+  color: #555;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  margin: 0 0 4px;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-init-line
+  .pf-roll {
+  color: inherit;
+  font: inherit;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-attacks
+  thead,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-attacks
+  thead
+  th {
+  background: #fff;
+  border-bottom: 1.5px solid #8a3b12;
+  box-shadow: none;
+  color: #8a3b12;
+  font-family: Georgia, "Iowan Old Style", serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="number"]::-webkit-inner-spin-button,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+  margin: 0;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-ab.pf-prime {
+  background: #f1dccb;
+  border-color: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-prime-mark {
+  color: #555;
+  font-size: 12px;
+  line-height: 1;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-ab.pf-prime
+  .pf-prime-mark {
+  color: #8a3b12;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-section-header
+  button,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-resource-actions
+  button {
+  background: #8a3b12;
+  border: 1px solid #8a3b12;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 700;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 0;
+  min-width: 1.5em;
+  padding: 1px 6px;
+  text-decoration: none;
+  width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-magic
+  .pf-resource-actions {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  width: max-content;
+}

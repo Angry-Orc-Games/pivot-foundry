@@ -55,7 +55,9 @@
               aria-label="Primary {{label}}"
               {{checked primary}}
               {{disabledAttr}}
-            />{{#if primary}}<span aria-hidden="true">★</span>{{/if}}</label>
+            /><span class="pf-prime-mark" aria-hidden="true">{{#if
+                primary
+              }}★{{else}}☆{{/if}}</span></label>
         </div>
         <span><input
             class="pf-inline pf-num pf-ab-score"
@@ -85,20 +87,18 @@
     <div class="pf-small">{{scoreSourceText}}</div>
   {{/if}}
 
-  {{! Initiative and Passive Perception compact line }}
-  <div class="pf-small pf-init-pp">
-    Initiative
+  <div class="pf-small pf-init-line">
     <button
       type="button"
       class="pf-roll"
       data-action="roll"
       data-roll-kind="initiative"
       data-label="{{localize 'PIVOT.Rolls.Initiative'}}"
-    >{{derived.initiative}}</button>
-    · Passive Perception
-    {{derived.passivePerception}}
+    >Initiative
+      {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}</button>
+    <span aria-hidden="true">·</span>
+    <span>Passive Perception {{derived.passivePerception}}</span>
   </div>
 
-  {{! Footnote about primary abilities }}
   <div class="pf-small">★ Primary abilities add Proficiency Bonus to saves.</div>
 </section>

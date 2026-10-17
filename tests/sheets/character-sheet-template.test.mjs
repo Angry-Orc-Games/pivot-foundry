@@ -17,8 +17,8 @@ describe("character sheet template structure", () => {
     expect(template).not.toContain(">Primary</span>");
     expect(template).toContain("★");
     expect(template).toContain("☆");
-    expect(template).toContain('class="pf-init-line"');
-    expect(template).toContain(
+    expect(template).toContain("pf-init-line");
+    expect(template.replace(/\s+/g, " ")).toContain(
       "Initiative {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}",
     );
     expect(template).toContain("{{short}}");
