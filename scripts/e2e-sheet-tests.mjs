@@ -954,6 +954,31 @@ async function assertPrintSheet(page, label) {
       rowHeight: row ? row.getBoundingClientRect().height : 0,
       mark: mark ? mark.textContent : "",
       ability: ability ? ability.textContent.trim() : "",
+      paperOffenders: (() => {
+        const allowed = new Set([
+          "rgba(0, 0, 0, 0)",
+          "rgb(255, 255, 255)",
+          "rgb(241, 220, 203)",
+          "rgb(138, 59, 18)",
+        ]);
+        const offenders = [];
+        for (const el of document.querySelectorAll(".window-content, .window-content *")) {
+          const style = window.getComputedStyle(el);
+          const bg = style.backgroundColor;
+          const cls = typeof el.className === "string" ? el.className : "";
+          const label = `${el.tagName.toLowerCase()}${cls ? "." + cls.trim().split(/\s+/).slice(0, 2).join(".") : ""}`;
+          if (!allowed.has(bg)) {
+            offenders.push(`${label} ${bg}`);
+          }
+          if (
+            (el.tagName === "BUTTON" || el.tagName === "A") &&
+            style.textDecorationLine.includes("underline")
+          ) {
+            offenders.push(`${label} underline`);
+          }
+        }
+        return offenders.slice(0, 12);
+      })(),
     };
     /* eslint-enable no-undef */
   });
@@ -1037,6 +1062,7 @@ async function assertPrintSheet(page, label) {
     ["skill marker", measured.mark === "●" || measured.mark === "○"],
     ["ability case", measured.ability === "Str"],
     ["skill row height", measured.rowHeight >= 16 && measured.rowHeight <= 22],
+    ["paper surfaces", measured.paperOffenders?.length === 0],
   ];
   let ok = true;
   for (const [name, pass] of checks) {
