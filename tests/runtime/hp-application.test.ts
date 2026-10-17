@@ -130,3 +130,18 @@ it("applies 3 damage, capped healing, and an exact correction, then keeps them o
   expect(shownHp(reloaded(actor))).toBe("4 / 10");
   expect(prepareCharacterSheetContext(actor as ActorLike).survivalStatus).not.toBe("dying");
 });
+
+it("does not revive a dead character when HP is already positive", async () => {
+  const actor = fullHpCharacter();
+  const attributes = actor.system.attributes as {
+    hp: { value: number };
+    deathSaves: { status: string };
+  };
+  attributes.hp.value = 4;
+  attributes.deathSaves.status = "dead";
+  expect((await new HealthTransactions().apply("dead", [actor], "healing", 3))[0]?.outcome).toBe(
+    "failed",
+  );
+  expect(shownHp(actor)).toBe("4 / 10");
+  expect(attributes.deathSaves.status).toBe("dead");
+});
