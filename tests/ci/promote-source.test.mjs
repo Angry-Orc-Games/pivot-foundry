@@ -260,19 +260,33 @@ describe("promote source bytes", () => {
     expect(result.status).not.toBe(0);
   });
 
-  it("refuses an artifact commit that is not the run head", async () => {
+  it("loads the status for the packaged commit when it is not the workflow head", async () => {
+    const packaged = "b".repeat(40);
     const stub = await withStub();
     const dir = await stagingDir();
-    await writeFile(
-      join(dir, "artifact-identity.json"),
-      JSON.stringify({ commit: "b".repeat(40) }),
-    );
+    await writeFile(join(dir, "artifact-identity.json"), JSON.stringify({ commit: packaged }));
     const result = runPromote(stub, ["bytes", dir]);
+    const urls = await readFile(join(stub, "urls"), "utf8");
+    await rm(stub, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(urls).toContain(`/commits/${packaged}/statuses`);
+    expect(urls).not.toContain(`/commits/${head}/statuses`);
+  });
+
+  it("refuses an artifact commit that is not 40 hex", async () => {
+    const stub = await withStub();
+    const dir = await stagingDir();
+    await writeFile(join(dir, "artifact-identity.json"), JSON.stringify({ commit: "main" }));
+    const result = runPromote(stub, ["bytes", dir]);
+    const urls = await readFile(join(stub, "urls"), "utf8");
     await rm(stub, { recursive: true, force: true });
     await rm(dir, { recursive: true, force: true });
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("artifact commit");
+    expect(urls).not.toContain("/statuses");
   });
 
   it.each([

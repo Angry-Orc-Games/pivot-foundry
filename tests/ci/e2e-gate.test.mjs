@@ -455,6 +455,8 @@ describe("workflows that start Foundry", () => {
     expect(promote.indexOf("promote-source.sh bytes")).toBeLessThan(
       promote.indexOf("deploy-package.mjs"),
     );
+    expect(promote.indexOf("deploy-package.mjs")).toBeLessThan(promote.indexOf("/api/status"));
+    expect(promote.indexOf("/api/status")).toBeLessThan(promote.indexOf("test:e2e:production"));
     expect(promote).toContain("set -o pipefail");
     expect(promote).toContain("PIVOT_STAGING_ARTIFACT_SHA256");
     expect(promote).not.toContain("identity.staging");

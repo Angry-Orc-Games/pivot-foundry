@@ -139,6 +139,36 @@ jobs:
           GH_TOKEN: ""
         run: npx playwright install chromium --with-deps
 
+      - name: Wait for production to serve the promoted package
+        env:
+          PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
+          PIVOT_PRODUCTION_MANIFEST_URL: ${{ secrets.PIVOT_PRODUCTION_MANIFEST_URL }}
+        run: |
+          set -o pipefail
+          URL="${PIVOT_PRODUCTION_MANIFEST_URL:-https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json}"
+          export WANT="${PIVOT_PACKAGE_VERSION:?}"
+          for _ in $(seq 1 36); do
+            if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
+              let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
+                if (!d.trim()) process.exit(1);
+                const s = JSON.parse(d);
+                process.exit(s.active === true ? 0 : 1);
+              });'; then
+              if curl -fsS --max-time 10 "$URL" | node -e '
+                let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
+                  if (!d.trim()) process.exit(1);
+                  const manifest = JSON.parse(d);
+                  process.exit(manifest.version === process.env.WANT ? 0 : 1);
+                });'; then
+                echo "Production is serving ${WANT}."
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error::Production did not serve the promoted package within 180s."
+          exit 1
+
       - name: Non-destructive production health check
         working-directory: trusted-gate
         env:

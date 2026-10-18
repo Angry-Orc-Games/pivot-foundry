@@ -54,14 +54,13 @@ if [[ $mode != bytes ]]; then
 fi
 
 dir=${2:?}
-head=$(jq -er '.head_sha' "$work/run.json")
 commit=$(jq -er '.commit // empty' "$dir/artifact-identity.json")
-if [[ $commit != "$head" ]]; then
-  printf '::error::artifact commit does not match the staging run\n' >&2
+if [[ ! $commit =~ ^[0-9a-f]{40}$ ]]; then
+  printf '::error::artifact commit is not 40 hex characters\n' >&2
   exit 1
 fi
 
-fetch "$api/repos/$repo/commits/$head/statuses?per_page=100" "$work/statuses.json"
+fetch "$api/repos/$repo/commits/$commit/statuses?per_page=100" "$work/statuses.json"
 zip_sha=$(sha256sum -- "$dir/system.zip" | awk 'NR==1 { print $1 }')
 expected="${server}/${repo}/actions/runs/${run_id}"
 
