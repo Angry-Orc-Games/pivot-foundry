@@ -171,7 +171,19 @@ export function prepareDevSystemDir(paths) {
   }
 }
 
+export function assertSafeZipEntries(zipPath) {
+  const listing = execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8" });
+  for (const entry of listing.split(/\r?\n/)) {
+    if (!entry) continue;
+    const parts = entry.split(/[/\\]/);
+    if (entry.startsWith("/") || entry.startsWith("\\") || parts.includes("..")) {
+      throw new Error(`system.zip contains an unsafe path: ${entry}`);
+    }
+  }
+}
+
 export function installPackagedSystem(paths, zipPath) {
+  assertSafeZipEntries(zipPath);
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
   rmSync(systemDir, { force: true, recursive: true });
   mkdirSync(systemDir, { recursive: true });

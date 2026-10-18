@@ -1,84 +1,306 @@
 name: Foundry E2E
 
 on:
-  pull_request:
+  schedule:
+    # 07:00 UTC is 03:00 EDT and 02:00 EST, inside 02:00-05:30 America/New_York all year.
+    - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
       ref:
-        description: Exact commit SHA to test after reviewing an external PR
+        description: Exact 40-character commit SHA reachable from a branch in this repository. Empty runs main and open e2e-nightly pull requests.
+        required: false
+      secrets_check_only:
+        description: Verify foundry-e2e secrets are non-empty, then exit. Does not start Foundry, at any hour.
+        type: boolean
+        default: false
         required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: foundry-e2e-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || 'foundry-e2e' }}
+  cancel-in-progress: false
 
 jobs:
-  e2e:
-    name: Foundry E2E
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+  gate:
+    name: License gate
+    if: github.event_name != 'workflow_dispatch' || inputs.secrets_check_only != true
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: foundry-e2e
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ok: ${{ steps.decide.outputs.ok }}
     steps:
-      - name: Checkout
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+
+      - name: Decide whether Foundry may start
+        id: decide
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh license
+
+  secrets:
+    name: Foundry secret presence
+    if: github.event_name == 'workflow_dispatch' && inputs.secrets_check_only == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    environment: foundry-e2e
+    steps:
+      - name: Checkout workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
+          persist-credentials: false
 
       - name: Check Foundry secrets
-        id: creds
         env:
           HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
           HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
           HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
           HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
-        run: |
-          missing=()
-          [ "$HAVE_ADMIN" = "true" ] || missing+=("FOUNDRY_ADMIN_KEY")
-          [ "$HAVE_LICENSE" = "true" ] || missing+=("FOUNDRY_LICENSE_KEY")
-          [ "$HAVE_CACHE" = "true" ] || missing+=("FOUNDRY_RELEASE_CACHE_URL")
-          [ "$HAVE_SHA" = "true" ] || missing+=("FOUNDRY_RELEASE_SHA256")
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh secrets
 
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': ${missing[*]}"
-            exit 1
-          fi
+  plan:
+    name: Select E2E targets
+    needs: gate
+    if: needs.gate.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - name: Checkout workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
-          echo "available=true" >> "$GITHUB_OUTPUT"
+      - name: List main and labeled pull requests
+        id: plan
+        env:
+          E2E_EVENT: ${{ github.event_name }}
+          E2E_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || '' }}
+          E2E_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/e2e-targets.sh
+
+  package:
+    name: Package system (${{ matrix.target.name }})
+    needs: [gate, plan]
+    if: needs.gate.outputs.ok == 'true' && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        target: ${{ fromJson(needs.plan.outputs.targets) }}
+    steps:
+      - name: Checkout trusted runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Recheck the license gate
+        id: recheck
+        run: bash scripts/ci/e2e-gate.sh license
 
       - name: Setup Node
-        if: steps.creds.outputs.available == 'true'
+        if: steps.recheck.outputs.ok == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
-        if: steps.creds.outputs.available == 'true'
+      - name: Install trusted dependencies
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_RUNTIME_URL: ""
+          ACTIONS_RESULTS_URL: ""
+          ACTIONS_CACHE_URL: ""
+        run: npm ci
+
+      - name: Checkout system under test
+        if: steps.recheck.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ matrix.target.sha }}
+          path: under-test
+          persist-credentials: false
+
+      - name: Overlay the system onto the trusted runner
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_RUNTIME_URL: ""
+          ACTIONS_RESULTS_URL: ""
+          ACTIONS_CACHE_URL: ""
+        run: bash scripts/ci/e2e-overlay.sh . under-test
+
+      - name: Prepare the package image
+        if: steps.recheck.outputs.ok == 'true'
+        run: |
+          docker build -t pivot-e2e-package - <<'EOF'
+          FROM node:20-bookworm
+          RUN apt-get update && apt-get install -y --no-install-recommends zip unzip \
+            && rm -rf /var/lib/apt/lists/*
+          EOF
+
+      - name: Build the system package
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_RUNTIME_URL: ""
+          ACTIONS_RESULTS_URL: ""
+          ACTIONS_CACHE_URL: ""
+        run: |
+          docker run --rm --network none --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e npm_config_cache=/tmp/npm-cache \
+            -v "$GITHUB_WORKSPACE:/work" -w /work \
+            pivot-e2e-package \
+            npm run package:system
+
+      - name: Upload packaged system
+        if: steps.recheck.outputs.ok == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-package-${{ matrix.target.name }}
+          path: |
+            system.json
+            system.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    name: Foundry E2E (${{ matrix.target.name }})
+    needs: [gate, plan, package]
+    if: always() && needs.gate.outputs.ok == 'true' && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    environment: foundry-e2e
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        target: ${{ fromJson(needs.plan.outputs.targets) }}
+    steps:
+      - name: Checkout trusted harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/
+            /e2e/
+            /foundry/
+            /package.json
+            /package-lock.json
+
+      - name: Recheck the license gate
+        id: recheck
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh license
+
+      - name: Check Foundry secrets
+        id: creds
+        if: steps.recheck.outputs.ok == 'true'
+        env:
+          HAVE_ADMIN: ${{ secrets.FOUNDRY_ADMIN_KEY != '' }}
+          HAVE_LICENSE: ${{ secrets.FOUNDRY_LICENSE_KEY != '' }}
+          HAVE_CACHE: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL != '' }}
+          HAVE_SHA: ${{ secrets.FOUNDRY_RELEASE_SHA256 != '' }}
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh secrets
+
+      - name: Setup Node
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: trusted-gate/package-lock.json
+
+      - name: Install trusted dependencies
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: npm ci
 
       - name: Install Playwright browser
-        if: steps.creds.outputs.available == 'true'
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: npx playwright install chromium --with-deps
 
+      - name: Download packaged system
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: e2e-package-${{ matrix.target.name }}
+          path: package-artifact
+          run-id: ${{ github.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Accept only the system zip
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip
+
       - name: Run packaged Foundry E2E
-        if: steps.creds.outputs.available == 'true'
+        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
         env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
           FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
           FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
           FOUNDRY_RELEASE_CACHE_URL: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL }}
           FOUNDRY_RELEASE_SHA256: ${{ secrets.FOUNDRY_RELEASE_SHA256 }}
           PIVOT_REQUIRE_RELEASE_SHA256: "1"
           PIVOT_FOUNDRY_TARGET: e2e
-        run: npm run foundry:e2e
+          PIVOT_E2E_SUBJECT: ${{ matrix.target.sha }}
+        run: |
+          set -o pipefail
+          node scripts/foundry-cli.mjs e2e --skip-package 2>&1 | tee "$RUNNER_TEMP/foundry-e2e.log"
+          grep -F "Foundry started for E2E commit ${{ matrix.target.sha }}." "$RUNNER_TEMP/foundry-e2e.log"
 
       - name: Verify tests executed
-        if: steps.creds.outputs.available == 'true'
+        if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: |
           if [ ! -d "playwright-report" ] && [ ! -d "test-results" ]; then
             echo "::error::E2E job completed but no Playwright test artifacts were created. Tests may not have executed."
@@ -86,29 +308,111 @@ jobs:
           fi
 
       - name: Record E2E acceptance
-        if: steps.creds.outputs.available == 'true' && success()
+        if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: node scripts/record-acceptance.mjs e2e
 
       - name: Upload tested artifact
-        if: steps.creds.outputs.available == 'true' && success()
+        if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: pivot-foundry-e2e
+          name: pivot-foundry-e2e-${{ matrix.target.name }}
           path: |
-            system.json
-            system.zip
-            artifact-identity.json
+            trusted-gate/system.json
+            trusted-gate/system.zip
+            trusted-gate/artifact-identity.json
           if-no-files-found: error
           retention-days: 14
 
       - name: Upload sanitized diagnostics
-        if: steps.creds.outputs.available == 'true' && failure()
+        if: failure() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: pivot-foundry-e2e-diagnostics
+          name: pivot-foundry-e2e-${{ matrix.target.name }}-diagnostics
           path: |
-            playwright-report
-            test-results
-            .foundry/instances/*/diagnostics
+            trusted-gate/playwright-report
+            trusted-gate/test-results
+            trusted-gate/.foundry/instances/*/diagnostics
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Record E2E result
+        if: always() || cancelled()
+        working-directory: trusted-gate
+        env:
+          E2E_SHA: ${{ matrix.target.sha }}
+          E2E_RUN_ID: ${{ github.run_id }}
+          E2E_OK: ${{ steps.recheck.outputs.ok }}
+          E2E_AVAILABLE: ${{ steps.creds.outputs.available }}
+          E2E_JOB_STATUS: ${{ job.status }}
+          E2E_LOG: ${{ runner.temp }}/foundry-e2e.log
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+        run: bash scripts/ci/e2e-record-result.sh "e2e-result/${{ matrix.target.name }}.json"
+
+      - name: Upload E2E result
+        if: always() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-result-${{ matrix.target.name }}
+          path: trusted-gate/e2e-result/${{ matrix.target.name }}.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  report:
+    name: Publish Foundry E2E results
+    needs: [gate, plan, e2e]
+    if: (always() || cancelled()) && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+    steps:
+      - name: Checkout workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+
+      - name: Post Foundry E2E results
+        env:
+          E2E_TARGETS: ${{ needs.plan.outputs.targets }}
+          E2E_RUN_ID: ${{ github.run_id }}
+          E2E_MATRIX_RESULT: ${{ needs.e2e.result }}
+          E2E_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash trusted-gate/scripts/ci/e2e-publish-results.sh
+
+  closed:
+    name: Record a closed gate
+    needs: gate
+    if: (always() || cancelled()) && needs.gate.result != 'success' && needs.gate.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Write the run summary
+        env:
+          GATE_RESULT: ${{ needs.gate.result }}
+        run: |
+          if [ "$GATE_RESULT" = "cancelled" ]; then
+            echo "::error::Foundry E2E was cancelled or timed out. Foundry was not started."
+            {
+              echo "## Foundry E2E cancelled"
+              echo "Foundry was not started. The run was cancelled or timed out before a per-SHA result could be posted."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::License gate closed. Foundry was not started."
+            {
+              echo "## License gate closed"
+              echo "Foundry was not started. The clock is outside 02:00-05:30 America/New_York, a status host could not be read, or somebody is signed in."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

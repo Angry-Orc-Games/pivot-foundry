@@ -13,6 +13,7 @@ on:
 permissions:
   contents: read
   actions: read
+  statuses: read
 
 concurrency:
   group: foundry-production
@@ -30,55 +31,95 @@ jobs:
       PIVOT_E2E_DESTRUCTIVE: "0"
       PIVOT_ALLOW_PRODUCTION_DEPLOY: "1"
     steps:
-      - name: Checkout
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/
+            /e2e/
+            /foundry/
+            /package.json
+            /package-lock.json
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: trusted-gate/package-lock.json
 
       - name: Install dependencies
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: npm ci
+
+      - name: Verify the staging run
+        env:
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash trusted-gate/scripts/ci/promote-source.sh run
 
       - name: Download staging-accepted artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: pivot-foundry-staging-accepted
+          path: package-artifact
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.staging_run_id }}
 
-      - name: Verify staging acceptance and checksum
-        run: node -e '
-          const fs = require("fs");
-          const crypto = require("crypto");
-          const identity = JSON.parse(fs.readFileSync("artifact-identity.json","utf8"));
-          const sha = crypto.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex");
-          if (identity.artifact.sha256 !== sha) { console.error("Artifact bytes changed"); process.exit(6); }
-          if (identity.staging?.result !== "passed" || identity.staging?.sha256 !== sha) {
-          console.error("Missing staging acceptance for this exact artifact");
-          process.exit(6);
-          }
-          console.log("Promoting", identity.commit, identity.packageVersion, sha);
-          '
+      - name: Accept the packaged files
+        run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip artifact-identity.json
+
+      - name: Read package version
+        id: package-version
+        run: |
+          version=$(bash trusted-gate/scripts/ci/package-version.sh trusted-gate/system.json)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the staging artifact bytes
+        id: staging-bytes
+        env:
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha=$(bash trusted-gate/scripts/ci/promote-source.sh bytes trusted-gate)
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Confirm production runtime compatibility
+        working-directory: trusted-gate
         env:
           PIVOT_PRODUCTION_MANIFEST_URL: ${{ secrets.PIVOT_PRODUCTION_MANIFEST_URL }}
         run: |
+          set -o pipefail
           URL="${PIVOT_PRODUCTION_MANIFEST_URL:-https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json}"
-          curl -fsS "$URL" | node -e '
-            let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => {
-              const current = JSON.parse(data || "{}");
-              const next = JSON.parse(require("fs").readFileSync("system.json","utf8"));
-              if (next.compatibility?.minimum && Number(next.compatibility.minimum) > 14) {
-                console.error("Refusing to promote a package that requires Foundry newer than 14 without a separate runtime upgrade.");
-                process.exit(4);
-              }
-              console.log("Current production package", current.version || "unknown", "->", next.version);
-            });
-          '
+          manifest=$(mktemp)
+          if ! curl -fsS --max-time 30 -o "$manifest" "$URL"; then
+            echo "::error::Could not read the production manifest."
+            exit 1
+          fi
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const data = readFileSync(process.argv[1], "utf8");
+            if (!data.trim()) {
+              console.error("Production manifest was empty.");
+              process.exit(1);
+            }
+            const current = JSON.parse(data);
+            const next = JSON.parse(readFileSync("system.json", "utf8"));
+            const minimum = String(next.compatibility?.minimum ?? "");
+            const major = minimum.match(/^(\d+)(?:\.\d+)*$/);
+            if (minimum && (!major || Number(major[1]) > 14)) {
+              console.error("Refusing to promote a package that requires Foundry newer than 14 without a separate runtime upgrade.");
+              process.exit(4);
+            }
+            console.log("Current production package", current.version || "unknown", "->", next.version);
+          ' "$manifest"
 
       - name: Deploy exact artifact to production
         env:
@@ -89,13 +130,53 @@ jobs:
           FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR }}
           FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE }}
           PIVOT_DEPLOY_PUBLIC_URL: https://foundry.angryorcgames.com
+          PIVOT_STAGING_ARTIFACT_SHA256: ${{ steps.staging-bytes.outputs.sha256 }}
+        working-directory: trusted-gate
         run: node scripts/deploy-package.mjs production
 
       - name: Install Playwright browser
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: npx playwright install chromium --with-deps
 
+      - name: Wait for production to serve the promoted package
+        env:
+          PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
+          PIVOT_PRODUCTION_MANIFEST_URL: ${{ secrets.PIVOT_PRODUCTION_MANIFEST_URL }}
+        run: |
+          set -o pipefail
+          URL="${PIVOT_PRODUCTION_MANIFEST_URL:-https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json}"
+          export WANT="${PIVOT_PACKAGE_VERSION:?}"
+          for _ in $(seq 1 36); do
+            if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
+              let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
+                if (!d.trim()) process.exit(1);
+                const s = JSON.parse(d);
+                process.exit(s.active === true ? 0 : 1);
+              });'; then
+              if curl -fsS --max-time 10 "$URL" | node -e '
+                let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
+                  if (!d.trim()) process.exit(1);
+                  const manifest = JSON.parse(d);
+                  process.exit(manifest.version === process.env.WANT ? 0 : 1);
+                });'; then
+                echo "Production is serving ${WANT}."
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error::Production did not serve the promoted package within 180s."
+          exit 1
+
       - name: Non-destructive production health check
+        working-directory: trusted-gate
+        env:
+          PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
         run: npm run test:e2e:production
 
       - name: Record production acceptance
+        working-directory: trusted-gate
         run: node scripts/record-acceptance.mjs production
