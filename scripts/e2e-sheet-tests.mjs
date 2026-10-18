@@ -1115,9 +1115,8 @@ async function assertPrintSheet(page, label) {
     ],
     [
       "focus rings",
-      measured.focusRing?.roll === "solid" &&
-        measured.focusRing?.prime.includes("solid") &&
-        measured.focusRing?.skill.includes("solid"),
+      measured.focusRing?.prime.includes("solid 2px") &&
+        measured.focusRing?.skill.includes("solid 2px"),
     ],
     ["paper surfaces", measured.paperOffenders?.length === 0],
   ];

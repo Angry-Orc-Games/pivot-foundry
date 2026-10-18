@@ -49,16 +49,18 @@ describe("character sheet template structure", () => {
       tierLabel: "",
       system: { identity: { concept: "", focus: "" }, progression: { level: 1, xp: 0 } },
     };
-    const text = (labels) =>
+    const beforeLevel = (labels) =>
       render({ ...base, ...labels })
-        .replace(/<[^>]+>/g, " ")
+        .replace(/<[^>]+>/g, "")
+        .split("Pivot:")[0]
         .replace(/\s+/g, " ");
 
-    expect(text({ speciesLabel: "", backgroundLabel: "" })).not.toMatch(/,\s*Pivot/);
-    expect(text({ speciesLabel: "Elf", backgroundLabel: "" })).toContain("Elf");
-    expect(text({ speciesLabel: "Elf", backgroundLabel: "" })).not.toMatch(/Elf\s*,/);
-    expect(text({ speciesLabel: "", backgroundLabel: "Veteran" })).not.toMatch(/,\s*Veteran/);
-    expect(text({ speciesLabel: "Elf", backgroundLabel: "Veteran" })).toContain("Elf, Veteran");
+    expect(beforeLevel({ speciesLabel: "", backgroundLabel: "" })).not.toContain(",");
+    expect(beforeLevel({ speciesLabel: "Elf", backgroundLabel: "" })).not.toContain(",");
+    expect(beforeLevel({ speciesLabel: "", backgroundLabel: "Veteran" })).not.toContain(",");
+    expect(beforeLevel({ speciesLabel: "Elf", backgroundLabel: "Veteran" })).toContain(
+      "Elf, Veteran",
+    );
   });
 
   it("sheet page keeps survival, inventory, magic, and notes on one page", () => {

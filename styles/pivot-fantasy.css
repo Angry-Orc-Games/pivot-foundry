@@ -1477,7 +1477,7 @@
   min-width: 0;
 }
 
-.pf-sheet .pf-print table.pf-skills .pf-prof-mark {
+.pf-sheet .pf-print table.pf-skills .pf-check .pf-prof-mark {
   flex: 0 0 1.1em;
   width: 1.1em;
   text-align: center;
@@ -1892,6 +1892,7 @@
   thead
   th {
   background: #fff;
+  border: 0;
   border-bottom: 1.5px solid #8a3b12;
   box-shadow: none;
   color: #8a3b12;
@@ -2140,4 +2141,13 @@
   .pf-print
   .pf-status {
   background: #f1dccb;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  :is(.pf-prime-toggle, .pf-skills .pf-check):has(input:focus-visible) {
+  outline: var(--pf-focus-outline);
+  outline-offset: var(--pf-focus-offset);
 }
