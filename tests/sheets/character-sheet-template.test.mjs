@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import Handlebars from "handlebars";
 import { describe, expect, it } from "vitest";
+
+Handlebars.registerHelper("localize", (key) => key);
 
 describe("character sheet template structure", () => {
   it("vitals partial includes ability rows", () => {
@@ -35,6 +38,27 @@ describe("character sheet template structure", () => {
     expect(template).toContain("{{speciesLabel}}");
     expect(template).toContain("{{backgroundLabel}}");
     expect(template).toContain("{{system.identity.focus}}");
+  });
+
+  it("header prints a comma only between species and background", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/header.hbs");
+    const render = Handlebars.compile(readFileSync(templatePath, "utf-8"));
+    const base = {
+      actor: { name: "Rest" },
+      editable: false,
+      tierLabel: "",
+      system: { identity: { concept: "", focus: "" }, progression: { level: 1, xp: 0 } },
+    };
+    const text = (labels) =>
+      render({ ...base, ...labels })
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ");
+
+    expect(text({ speciesLabel: "", backgroundLabel: "" })).not.toMatch(/,\s*Pivot/);
+    expect(text({ speciesLabel: "Elf", backgroundLabel: "" })).toContain("Elf");
+    expect(text({ speciesLabel: "Elf", backgroundLabel: "" })).not.toMatch(/Elf\s*,/);
+    expect(text({ speciesLabel: "", backgroundLabel: "Veteran" })).not.toMatch(/,\s*Veteran/);
+    expect(text({ speciesLabel: "Elf", backgroundLabel: "Veteran" })).toContain("Elf, Veteran");
   });
 
   it("sheet page keeps survival, inventory, magic, and notes on one page", () => {

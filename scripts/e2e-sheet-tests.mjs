@@ -954,6 +954,45 @@ async function assertPrintSheet(page, label) {
       rowHeight: row ? row.getBoundingClientRect().height : 0,
       mark: mark ? mark.textContent : "",
       ability: ability ? ability.textContent.trim() : "",
+      skillNameLefts: [...document.querySelectorAll(".pf-skills .pf-check span:not(.pf-prof-mark)")]
+        .slice(0, 2)
+        .map((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return Math.round(range.getBoundingClientRect().left);
+        }),
+      attackBorder: (() => {
+        const head = document.querySelector(".pf-attacks th");
+        if (!head) return null;
+        const style = window.getComputedStyle(head);
+        return {
+          top: style.borderTopWidth,
+          right: style.borderRightWidth,
+          bottom: style.borderBottomStyle,
+          left: style.borderLeftWidth,
+        };
+      })(),
+      focusRing: (() => {
+        const readLabel = (input) => {
+          if (!input) return "";
+          const wasDisabled = input.disabled;
+          input.disabled = false;
+          input.focus({ focusVisible: true });
+          const outline = window.getComputedStyle(input.closest("label")).outline;
+          input.blur();
+          input.disabled = wasDisabled;
+          return outline;
+        };
+        const roll = document.querySelector("button.pf-roll");
+        if (roll) roll.focus({ focusVisible: true });
+        const rollOutline = roll ? window.getComputedStyle(roll).outlineStyle : "";
+        if (roll) roll.blur();
+        return {
+          prime: readLabel(document.querySelector(".pf-prime-toggle input")),
+          skill: readLabel(document.querySelector(".pf-skills .pf-check input")),
+          roll: rollOutline,
+        };
+      })(),
       paperOffenders: (() => {
         const allowed = new Set([
           "rgba(0, 0, 0, 0)",
@@ -1062,6 +1101,24 @@ async function assertPrintSheet(page, label) {
     ["skill marker", measured.mark === "●" || measured.mark === "○"],
     ["ability case", measured.ability === "Str"],
     ["skill row height", measured.rowHeight >= 16 && measured.rowHeight <= 22],
+    [
+      "skill names aligned",
+      measured.skillNameLefts?.length === 2 &&
+        measured.skillNameLefts[0] === measured.skillNameLefts[1],
+    ],
+    [
+      "attacks header rule",
+      measured.attackBorder?.top === "0px" &&
+        measured.attackBorder?.right === "0px" &&
+        measured.attackBorder?.left === "0px" &&
+        measured.attackBorder?.bottom === "solid",
+    ],
+    [
+      "focus rings",
+      measured.focusRing?.roll === "solid" &&
+        measured.focusRing?.prime.includes("solid") &&
+        measured.focusRing?.skill.includes("solid"),
+    ],
     ["paper surfaces", measured.paperOffenders?.length === 0],
   ];
   let ok = true;
