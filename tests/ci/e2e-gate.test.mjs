@@ -438,6 +438,27 @@ describe("workflows that start Foundry", () => {
     expect(staging).toContain("github.event.workflow_run.head_branch == 'main'");
     expect(staging).toContain("github.ref == 'refs/heads/main'");
     expect(staging).not.toContain("head_sha");
+    expect(staging).not.toContain("secrets.PIVOT_PACKAGE_VERSION");
+    expect(promote).not.toContain("secrets.PIVOT_PACKAGE_VERSION");
+    expect(release).not.toContain("secrets.PIVOT_PACKAGE_VERSION");
+    expect(nightly).not.toContain("secrets.PIVOT_PACKAGE_VERSION");
+    expect(staging).toContain("package-version.sh");
+    expect(staging).toContain("steps.package-version.outputs.version");
+    expect(staging).toContain("record-staging-sha.sh");
+    expect(staging).toContain("statuses: write");
+    expect(staging).toContain("set -o pipefail");
+    expect(promote).toContain("promote-source.sh run");
+    expect(promote).toContain("promote-source.sh bytes");
+    expect(promote.indexOf("promote-source.sh run")).toBeLessThan(
+      promote.indexOf("download-artifact"),
+    );
+    expect(promote.indexOf("promote-source.sh bytes")).toBeLessThan(
+      promote.indexOf("deploy-package.mjs"),
+    );
+    expect(promote).toContain("set -o pipefail");
+    expect(promote).toContain("PIVOT_STAGING_ARTIFACT_SHA256");
+    expect(promote).not.toContain("identity.staging");
+    expect(promote).not.toContain('JSON.parse(data || "{}")');
 
     for (const workflow of [nightly, release, staging, promote]) {
       const checkouts = workflow.split("uses: actions/checkout@").length - 1;
