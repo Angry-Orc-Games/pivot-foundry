@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -459,6 +459,14 @@ describe("workflows that start Foundry", () => {
     expect(promote).toContain("PIVOT_STAGING_ARTIFACT_SHA256");
     expect(promote).not.toContain("identity.staging");
     expect(promote).not.toContain('JSON.parse(data || "{}")');
+
+    const workflowDir = fileURLToPath(new URL("../../.github/workflows/", import.meta.url));
+    const writers = [];
+    for (const name of (await readdir(workflowDir)).sort()) {
+      const text = await readFile(join(workflowDir, name), "utf8");
+      if (text.includes("statuses: write")) writers.push(name);
+    }
+    expect(writers).toEqual(["deploy-staging.yml"]);
 
     for (const workflow of [nightly, release, staging, promote]) {
       const checkouts = workflow.split("uses: actions/checkout@").length - 1;

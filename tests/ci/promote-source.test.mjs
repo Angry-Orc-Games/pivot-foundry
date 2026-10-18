@@ -88,6 +88,7 @@ function statusEntry(sha = zipSha, id = runId) {
     state: "success",
     description: `sha256:${sha}`,
     target_url: targetUrl(id),
+    creator: { login: "github-actions[bot]" },
   };
 }
 
@@ -278,6 +279,15 @@ describe("promote source bytes", () => {
     ["sha", () => statusEntry("c".repeat(64))],
     ["run", () => statusEntry(zipSha, "9999")],
     ["state", () => ({ ...statusEntry(), state: "failure" })],
+    ["creator", () => ({ ...statusEntry(), creator: { login: "octocat" } })],
+    [
+      "creator missing",
+      () => {
+        const status = statusEntry();
+        delete status.creator;
+        return status;
+      },
+    ],
   ])("refuses a status whose %s does not match", async (_label, entry) => {
     const stub = await withStub({ "statuses.json": JSON.stringify([entry()]) });
     const dir = await stagingDir();
