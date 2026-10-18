@@ -334,6 +334,7 @@ describe("workflows that start Foundry", () => {
       staging.indexOf("foundry:e2e"),
     );
     expect(staging.indexOf("accept-artifact.sh")).toBeLessThan(staging.indexOf("foundry:e2e"));
+    expect(staging).toContain("export PIVOT_E2E_SUBJECT");
     expect(staging).toContain("path: package-artifact");
     expect(staging).toContain("working-directory: trusted-gate");
     expect(staging).toContain("group: foundry-e2e");

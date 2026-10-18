@@ -134,7 +134,17 @@ jobs:
           PIVOT_FOUNDRY_BASE_URL: ""
         working-directory: trusted-gate
         run: |
-          # foundry:e2e rebuilds the zip; restore the exact CI bytes afterward if needed.
+          # Keep the packaged commit. The harness checkout is github.sha, which is not the CI head.
+          PIVOT_E2E_SUBJECT=$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const identity = JSON.parse(readFileSync("artifact-identity.json","utf8"));
+            if (!/^[0-9a-f]{40}$/.test(identity.commit || "")) {
+              console.error("Artifact identity has no commit");
+              process.exit(6);
+            }
+            process.stdout.write(identity.commit);
+          ')
+          export PIVOT_E2E_SUBJECT
           CI_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
           npm run foundry:e2e -- --skip-package
           NOW_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
