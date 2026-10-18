@@ -61,7 +61,7 @@ These are required for isolated E2E tests that run in Docker containers:
 
 - `FOUNDRY_ADMIN_KEY` — Admin password for the temporary Foundry instance
 - `FOUNDRY_LICENSE_KEY` — Foundry VTT license key for activation
-- `FOUNDRY_RELEASE_CACHE_URL` — Timed download URL for the Foundry v14 Node.js zip (expires ~5 minutes)
+- `FOUNDRY_RELEASE_CACHE_URL` — Durable private basic-auth URL for the Foundry v14 Node.js zip
 - `FOUNDRY_RELEASE_SHA256` — SHA-256 checksum of the Foundry release archive for verification
 
 ### Secrets for `staging` Environment
@@ -72,7 +72,7 @@ The staging environment requires **all** of the following secrets. The workflow 
 
 - `FOUNDRY_ADMIN_KEY` — Admin password for the temporary E2E Foundry instance
 - `FOUNDRY_LICENSE_KEY` — Foundry VTT license key
-- `FOUNDRY_RELEASE_CACHE_URL` — Timed download URL for Foundry v14 Node.js zip
+- `FOUNDRY_RELEASE_CACHE_URL` — Durable private basic-auth URL for the Foundry v14 Node.js zip
 - `FOUNDRY_RELEASE_SHA256` — SHA-256 checksum of the Foundry release archive
 
 **Deploy SSH credentials and paths:**
@@ -113,7 +113,7 @@ After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` 
 
 Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` only when `artifact-identity.json` `commit` equals the CI commit (`github.event.workflow_run.head_sha`, or `github.sha` on a manual dispatch). The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 
-Keep the staging Foundry **runtime** on 14.368 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
+Keep the staging Foundry **runtime** on 14.361 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
 
 ## Production
 

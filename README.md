@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml?query=branch%3Amain)
 [![Release](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml/badge.svg)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml)
-![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14.368-blue)
+![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14.361-blue)
 ![Node](https://img.shields.io/badge/Node-20%2F22%20verify%20%7C%2024%20Foundry%20container-339933)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
@@ -55,7 +55,7 @@ Not implemented yet:
 - Node.js 20 or 22 for repository checks (`npm run verify`)
 - Docker Engine + Compose v2 for the Foundry v14 runtime
 - npm
-- A licensed Foundry Virtual Tabletop **14.368** Node.js zip (cached privately; never committed)
+- A licensed Foundry Virtual Tabletop **14.361** Node.js zip (cached privately; never committed)
 - Playwright Chromium for browser acceptance tests (`npx playwright install chromium`)
 
 Version pins live in [`foundry/versions.json`](foundry/versions.json). The Foundry process uses Node 24 inside the pinned Felddy container.
@@ -94,13 +94,13 @@ First-time setup (repository root):
 
 ```sh
 cp .env.foundry.local.example .env.foundry.local
-# set FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, and a 14.368 Node.js zip source
+# set FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, and a 14.361 Node.js zip source
 npm run build
 npm run foundry:check-env
 npm run foundry:up
 ```
 
-Foundry is at <http://127.0.0.1:30000> on loopback only. Put the licensed zip in `foundry-dist/` as `foundryvtt-14.368.zip` (preferred) or use `FOUNDRY_RELEASE_ARCHIVE` / a private cache URL. A Foundry timed URL works once and expires in about five minutes.
+Foundry is at <http://127.0.0.1:30000> on loopback only. Put the licensed zip in `foundry-dist/` as `foundryvtt-14.361.zip` (preferred) or use `FOUNDRY_RELEASE_ARCHIVE` / a private cache URL. A Foundry timed URL works once and expires in about five minutes.
 
 ```sh
 npm run foundry:status

@@ -1,19 +1,19 @@
 {
-  "foundryVersion": "14.368",
+  "foundryVersion": "14.361",
   "foundryNodeMajor": 24,
   "systemId": "pivot-fantasy",
   "systemTitle": "Pivot Fantasy",
   "e2eWorldId": "pivot-e2e",
   "e2eWorldTitle": "Pivot Fantasy E2E",
-  "archiveFileName": "FoundryVTT-Node-14.368.zip",
-  "cacheFileName": "foundryvtt-14.368.zip",
+  "archiveFileName": "FoundryVTT-Node-14.361.zip",
+  "cacheFileName": "foundryvtt-14.361.zip",
   "releaseSha256": "",
   "container": {
     "image": "ghcr.io/felddy/foundryvtt",
     "tag": "14.367",
     "digest": "sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac",
-    "supportsFoundryVersion": "14.368",
-    "notes": "Checked 2026-09-18: ghcr.io/felddy/foundryvtt had no 14.368 tag. :14 and :14.367 both resolved to this digest. The wrapper installs Foundry 14.368 from CONTAINER_CACHE as foundryvtt-14.368.zip."
+    "supportsFoundryVersion": "14.361",
+    "notes": "Image tag stays 14.367 at digest sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac. Checked 2026-10-18 against felddy/foundryvtt-docker v14.367.0 src/entrypoint.sh: a FOUNDRY_VERSION other than 14.367 logs a warning and continues. Install uses CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip and does not reject a 14.361 Node zip."
   },
   "node": {
     "verify": ["20", "22"],
