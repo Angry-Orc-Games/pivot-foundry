@@ -1,6 +1,9 @@
+import { Buffer } from "node:buffer";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ReadableStream } from "node:stream/web";
+import { TextEncoder } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
@@ -13,7 +16,7 @@ const secretUrl = `https://${encodeURIComponent(user)}:${encodeURIComponent(pass
 const expectedAuthorization = `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
 
 function authorization(init) {
-  return new Headers(init.headers).get("authorization");
+  return init.headers.authorization ?? null;
 }
 
 function webBody(text) {
@@ -26,8 +29,12 @@ function webBody(text) {
 }
 
 function httpResponse({ status = 200, location, body = "zip-bytes" } = {}) {
-  const headers = new Headers();
-  if (location) headers.set("location", location);
+  const headers = {
+    get(name) {
+      if (name.toLowerCase() === "location") return location ?? null;
+      return null;
+    },
+  };
   const ok = status >= 200 && status < 300;
   return {
     status,
@@ -139,9 +146,16 @@ describe("foundry release download", () => {
     };
     const dir = await mkdtemp(join(tmpdir(), "pivot-foundry-dist-"));
 
-    await expect(downloadTo(secretUrl, join(dir, "foundry.zip"), fetchImpl)).rejects.toThrow(
-      /https to http/,
-    );
+    let message = "";
+    try {
+      await downloadTo(secretUrl, join(dir, "foundry.zip"), fetchImpl);
+    } catch (error) {
+      message = error.message;
+    }
+
+    expect(message).toMatch(/https to http/);
+    expect(message).not.toContain(user);
+    expect(message).not.toContain(pass);
     expect(calls).toHaveLength(1);
   });
 
