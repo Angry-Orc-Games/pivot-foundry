@@ -90,7 +90,8 @@ The staging environment requires **all** of the following secrets. The workflow 
 - `PIVOT_STAGING_GM_PASSWORD` — Game Master password
 - `PIVOT_STAGING_PLAYER_USER` — Player username for smoke tests
 - `PIVOT_STAGING_PLAYER_PASSWORD` — Player password
-- `PIVOT_PACKAGE_VERSION` — (Optional) Expected package version for verification
+
+Smoke tests read the expected package version from the `version` field of the accepted `system.json`.
 
 ### Secrets for `production` Environment
 
@@ -110,7 +111,7 @@ Suggested branch-protection checks on `main`:
 
 After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` runs the license gate, downloads that `system.zip`, runs isolated E2E against those bytes, deploys them, then runs `npm run test:e2e:staging` against https://build.angryorcgames.com. A pull-request CI run does not start this job. A closed gate fails the job before Foundry starts and before the deploy. Re-run it inside the 02:00-05:30 ET window.
 
-Reset only a designated local/E2E world. The staging job does not wipe other server data. Production promotion reads `artifact-identity.json.staging.sha256`, not “the latest successful staging run” by itself.
+Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` on the packaged commit. The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 
 Keep the staging Foundry **runtime** on 14.368 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
 
@@ -118,8 +119,8 @@ Keep the staging Foundry **runtime** on 14.368 (or the same verified build as pr
 
 Run **Promote production** and pass the staging workflow run id. The `production` environment must require a human approval. The job:
 
-1. Downloads `pivot-foundry-staging-accepted`
-2. Verifies commit, version, SHA-256, and staging acceptance
+1. Refuses the typed run id unless the Actions API says it is a successful Deploy staging run on `main` in this repository
+2. Downloads `pivot-foundry-staging-accepted`, checks the artifact commit against that run, and checks `system.zip` against the `pivot-staging-artifact` status recorded outside the download
 3. Refuses packages that require a newer Foundry major than 14
 4. Backs up the configured target directory
 5. Replaces the package and restarts only the configured service

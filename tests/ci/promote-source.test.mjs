@@ -17,29 +17,46 @@ const repo = "Angry-Orc-Games/pivot-foundry";
 const server = "https://github.com";
 const head = "a".repeat(40);
 const runId = "4242";
-const zipBytes = Buffer.from("exact-staging-zip");
+const zipBytes = "exact-staging-zip";
 const zipSha = createHash("sha256").update(zipBytes).digest("hex");
 
 const CURL_STUB = `#!/bin/sh
 url=
+method=GET
+out=
+prev=
 for arg in "$@"; do
   printf '%s\\n' "$arg" >> "$PROMOTE_STUB_DIR/args"
+  if [ "$prev" = "-X" ]; then method=$arg; fi
+  if [ "$prev" = "-o" ]; then out=$arg; fi
   case "$arg" in
     http*) url=$arg ;;
   esac
+  prev=$arg
 done
 printf '\\n' >> "$PROMOTE_STUB_DIR/args"
 printf '%s\\n' "$url" >> "$PROMOTE_STUB_DIR/urls"
+emit() {
+  if [ -n "$out" ]; then
+    cat > "$out"
+  else
+    cat
+  fi
+}
+if [ "$method" = "POST" ]; then
+  code=$(cat "$PROMOTE_STUB_DIR/post.code")
+  exit "$code"
+fi
 case "$url" in
   */actions/runs/*)
     code=$(cat "$PROMOTE_STUB_DIR/run.code")
     if [ "$code" -ne 0 ]; then exit "$code"; fi
-    cat "$PROMOTE_STUB_DIR/run.json"
+    emit < "$PROMOTE_STUB_DIR/run.json"
     ;;
-  */statuses/*)
+  */statuses*)
     code=$(cat "$PROMOTE_STUB_DIR/statuses.code")
     if [ "$code" -ne 0 ]; then exit "$code"; fi
-    cat "$PROMOTE_STUB_DIR/statuses.json"
+    emit < "$PROMOTE_STUB_DIR/statuses.json"
     ;;
   *)
     code=$(cat "$PROMOTE_STUB_DIR/post.code")

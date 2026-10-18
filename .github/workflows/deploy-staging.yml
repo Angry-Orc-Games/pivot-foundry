@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   actions: read
+  statuses: write
 
 concurrency:
   group: foundry-e2e
@@ -102,6 +103,12 @@ jobs:
       - name: Accept the packaged files
         run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip artifact-identity.json
 
+      - name: Read package version
+        id: package-version
+        run: |
+          version=$(bash trusted-gate/scripts/ci/package-version.sh trusted-gate/system.json)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Verify artifact identity
         working-directory: trusted-gate
         run: node --input-type=module -e '
@@ -164,10 +171,12 @@ jobs:
 
       - name: Wait for the build server to come back after restart
         run: |
+          set -o pipefail
           for _ in $(seq 1 36); do
             if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
               let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
-                const s = JSON.parse(d || "{}");
+                if (!d.trim()) process.exit(1);
+                const s = JSON.parse(d);
                 process.exit(s.active === true ? 0 : 1);
               });'; then
               echo "Build server is active."
@@ -184,13 +193,19 @@ jobs:
           PIVOT_STAGING_GM_PASSWORD: ${{ secrets.PIVOT_STAGING_GM_PASSWORD }}
           PIVOT_STAGING_PLAYER_USER: ${{ secrets.PIVOT_STAGING_PLAYER_USER }}
           PIVOT_STAGING_PLAYER_PASSWORD: ${{ secrets.PIVOT_STAGING_PLAYER_PASSWORD }}
-          PIVOT_PACKAGE_VERSION: ${{ secrets.PIVOT_PACKAGE_VERSION }}
+          PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
         working-directory: trusted-gate
         run: npm run test:e2e:staging
 
       - name: Record staging acceptance
         working-directory: trusted-gate
         run: node scripts/record-acceptance.mjs staging
+
+      - name: Record the staging artifact sha
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/record-staging-sha.sh "$PWD"
 
       - name: Upload staging-accepted artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
