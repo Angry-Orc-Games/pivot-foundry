@@ -7,15 +7,20 @@ api=${GITHUB_API_URL:?}
 server=${GITHUB_SERVER_URL:?}
 token=${GITHUB_TOKEN:?}
 run_id=${GITHUB_RUN_ID:?}
+ci_sha=${PIVOT_CI_SHA:?}
 
 if [[ ! $run_id =~ ^[0-9]+$ ]]; then
   printf '::error::run id is not numeric\n' >&2
   exit 1
 fi
+if [[ ! $ci_sha =~ ^[0-9a-f]{40}$ ]]; then
+  printf '::error::CI sha is not 40 hex characters\n' >&2
+  exit 1
+fi
 
 commit=$(jq -er '.commit // empty' "$dir/artifact-identity.json")
-if [[ ! $commit =~ ^[0-9a-f]{40}$ ]]; then
-  printf '::error::artifact commit is not 40 hex characters\n' >&2
+if [[ $commit != "$ci_sha" ]]; then
+  printf '::error::artifact commit does not match the CI sha\n' >&2
   exit 1
 fi
 

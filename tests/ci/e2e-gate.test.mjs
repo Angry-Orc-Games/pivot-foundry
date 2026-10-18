@@ -329,7 +329,10 @@ describe("workflows that start Foundry", () => {
     expect(release).toContain("needs.e2e.result == 'success'");
     expect(release).toContain("group: foundry-e2e");
 
-    expect(staging).not.toContain("github.event.workflow_run.head_sha");
+    expect(staging).not.toContain("ref: ${{ github.event.workflow_run.head_sha }}");
+    expect(staging).toContain(
+      "PIVOT_CI_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}",
+    );
     expect(staging.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
       staging.indexOf("foundry:e2e"),
     );
@@ -437,7 +440,7 @@ describe("workflows that start Foundry", () => {
     );
     expect(staging).toContain("github.event.workflow_run.head_branch == 'main'");
     expect(staging).toContain("github.ref == 'refs/heads/main'");
-    expect(staging).not.toContain("head_sha");
+    expect(staging).not.toContain("ref: ${{ github.event.workflow_run.head_sha }}");
     expect(staging).not.toContain("secrets.PIVOT_PACKAGE_VERSION");
     expect(promote).not.toContain("secrets.PIVOT_PACKAGE_VERSION");
     expect(release).not.toContain("secrets.PIVOT_PACKAGE_VERSION");

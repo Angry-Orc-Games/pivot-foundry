@@ -111,7 +111,7 @@ Suggested branch-protection checks on `main`:
 
 After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` runs the license gate, downloads that `system.zip`, runs isolated E2E against those bytes, deploys them, then runs `npm run test:e2e:staging` against https://build.angryorcgames.com. A pull-request CI run does not start this job. A closed gate fails the job before Foundry starts and before the deploy. Re-run it inside the 02:00-05:30 ET window.
 
-Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` on the packaged commit. The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
+Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` only when `artifact-identity.json` `commit` equals the CI commit (`github.event.workflow_run.head_sha`, or `github.sha` on a manual dispatch). The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 
 Keep the staging Foundry **runtime** on 14.368 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
 

@@ -112,7 +112,9 @@ jobs:
             }
             const current = JSON.parse(data);
             const next = JSON.parse(readFileSync("system.json", "utf8"));
-            if (next.compatibility?.minimum && Number(next.compatibility.minimum) > 14) {
+            const minimum = String(next.compatibility?.minimum ?? "");
+            const major = minimum.match(/^(\d+)(?:\.\d+)*$/);
+            if (minimum && (!major || Number(major[1]) > 14)) {
               console.error("Refusing to promote a package that requires Foundry newer than 14 without a separate runtime upgrade.");
               process.exit(4);
             }

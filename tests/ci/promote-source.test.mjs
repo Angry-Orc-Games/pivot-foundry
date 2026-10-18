@@ -152,6 +152,7 @@ function runRecord(stub, dir, env = {}) {
       GITHUB_REPOSITORY: repo,
       GITHUB_TOKEN: "test-token",
       GITHUB_RUN_ID: runId,
+      PIVOT_CI_SHA: head,
       ...env,
     },
   });
@@ -343,6 +344,19 @@ describe("record staging sha", () => {
       target_url: targetUrl(),
     });
     expect(args).toContain(`/repos/${repo}/statuses/${head}`);
+  });
+
+  it("refuses to post when the artifact commit is not the CI sha", async () => {
+    const stub = await withStub();
+    const dir = await stagingDir();
+    const result = runRecord(stub, dir, { PIVOT_CI_SHA: "b".repeat(40) });
+    const urls = await readFile(join(stub, "urls"), "utf8");
+    await rm(stub, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("artifact commit");
+    expect(urls.trim()).toBe("");
   });
 
   it("fails closed when the status API write fails", async () => {

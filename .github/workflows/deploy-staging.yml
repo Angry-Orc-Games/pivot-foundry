@@ -205,6 +205,7 @@ jobs:
         working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PIVOT_CI_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: bash scripts/ci/record-staging-sha.sh "$PWD"
 
       - name: Upload staging-accepted artifact
