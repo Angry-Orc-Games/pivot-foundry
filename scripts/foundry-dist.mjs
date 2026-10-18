@@ -53,7 +53,7 @@ export async function ensureDistribution(paths, result, { requireChecksum = fals
   return { path: dest, sha256: digest };
 }
 
-async function downloadTo(url, dest) {
+export async function downloadTo(url, dest) {
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok || !response.body) {
     throw new Error(`Foundry download failed with status ${response.status}.`);
