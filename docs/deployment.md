@@ -120,7 +120,7 @@ Keep the staging Foundry **runtime** on 14.368 (or the same verified build as pr
 Run **Promote production** and pass the staging workflow run id. The `production` environment must require a human approval. The job:
 
 1. Refuses the typed run id unless the Actions API says it is a successful Deploy staging run on `main` in this repository
-2. Downloads `pivot-foundry-staging-accepted`, checks the artifact commit against that run, and checks `system.zip` against the `pivot-staging-artifact` status recorded outside the download
+2. Downloads `pivot-foundry-staging-accepted`, checks the artifact commit against that run, and checks `system.zip` against the `pivot-staging-artifact` status. That status must be from `github-actions[bot]`, its description must be the zip digest, and its target URL must be that staging run. `deploy-staging.yml` is the only workflow with `statuses: write`.
 3. Refuses packages that require a newer Foundry major than 14
 4. Backs up the configured target directory
 5. Replaces the package and restarts only the configured service

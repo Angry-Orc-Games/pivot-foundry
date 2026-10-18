@@ -72,6 +72,7 @@ if ! jq -e --arg sha "$zip_sha" --arg url "$expected" '
     | .state == "success"
       and .description == ("sha256:" + $sha)
       and .target_url == $url
+      and .creator.login == "github-actions[bot]"
   )
 ' "$work/statuses.json" >/dev/null; then
   printf '::error::staging sha256 was not recorded for this run\n' >&2
