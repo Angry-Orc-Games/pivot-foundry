@@ -319,19 +319,23 @@ describe("workflows that start Foundry", () => {
       release.indexOf("foundry:e2e"),
     );
     expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
+    const releaseE2e = release.slice(release.indexOf("  e2e:\n"), release.indexOf("  publish:\n"));
+    expect(releaseE2e).toContain("path: package-artifact");
+    expect(releaseE2e).toContain("accept-artifact.sh");
+    expect(releaseE2e).not.toContain("refs/tags/");
+    expect(releaseE2e.indexOf("accept-artifact.sh")).toBeLessThan(
+      releaseE2e.indexOf("foundry:e2e"),
+    );
     expect(release).toContain("needs.e2e.result == 'success'");
     expect(release).toContain("group: foundry-e2e");
 
-    expect(staging.indexOf("ref: ${{ github.sha }}")).toBeLessThan(
-      staging.indexOf("github.event.workflow_run.head_sha"),
-    );
-    expect(staging.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
-      staging.indexOf("github.event.workflow_run.head_sha"),
-    );
+    expect(staging).not.toContain("github.event.workflow_run.head_sha");
     expect(staging.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
       staging.indexOf("foundry:e2e"),
     );
-    expect(staging).toContain("sparse-checkout: scripts/ci");
+    expect(staging.indexOf("accept-artifact.sh")).toBeLessThan(staging.indexOf("foundry:e2e"));
+    expect(staging).toContain("path: package-artifact");
+    expect(staging).toContain("working-directory: trusted-gate");
     expect(staging).toContain("group: foundry-e2e");
 
     const nightlyGate = nightly.slice(
@@ -348,6 +352,12 @@ describe("workflows that start Foundry", () => {
       nightlyE2e.indexOf("matrix.target.sha"),
     );
 
+    expect(promote).toContain("path: package-artifact");
+    expect(promote).toContain("accept-artifact.sh");
+    expect(promote).toContain("persist-credentials: false");
+    expect(promote.indexOf("accept-artifact.sh")).toBeLessThan(
+      promote.indexOf("deploy-package.mjs"),
+    );
     expect(promote).not.toContain("foundry:e2e");
     expect(promote).not.toContain("foundry-cli.mjs");
     expect(nightly).not.toContain("e2e-gate.sh require");
@@ -426,12 +436,9 @@ describe("workflows that start Foundry", () => {
     );
     expect(staging).toContain("github.event.workflow_run.head_branch == 'main'");
     expect(staging).toContain("github.ref == 'refs/heads/main'");
-    expect(staging).not.toContain("head_sha ||");
-    expect(staging.indexOf("github.event.workflow_run.event == 'push'")).toBeLessThan(
-      staging.indexOf("github.event.workflow_run.head_sha"),
-    );
+    expect(staging).not.toContain("head_sha");
 
-    for (const workflow of [nightly, release, staging]) {
+    for (const workflow of [nightly, release, staging, promote]) {
       const checkouts = workflow.split("uses: actions/checkout@").length - 1;
       const persisted = workflow.split("persist-credentials: false").length - 1;
       expect(persisted).toBe(checkouts);

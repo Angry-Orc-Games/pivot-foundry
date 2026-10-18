@@ -275,15 +275,7 @@ jobs:
 
       - name: Accept only the system zip
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        run: |
-          set -euo pipefail
-          find package-artifact -type f -printf '%P\n' | sort > "$RUNNER_TEMP/package-files"
-          printf '%s\n' system.json system.zip | sort > "$RUNNER_TEMP/package-expected"
-          if ! cmp -s "$RUNNER_TEMP/package-expected" "$RUNNER_TEMP/package-files"; then
-            echo "::error::Packaged artifact contained files other than the system zip. Foundry was not started."
-            exit 1
-          fi
-          cp package-artifact/system.zip package-artifact/system.json trusted-gate/
+        run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip
 
       - name: Run packaged Foundry E2E
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
