@@ -290,7 +290,7 @@ export async function waitForHttp(baseUrl, timeoutMs, options = {}) {
     try {
       const response = await fetch(baseUrl, {
         redirect: "manual",
-        signal: AbortSignal.timeout(remaining),
+        signal: globalThis.AbortSignal.timeout(remaining),
       });
       if (response.status > 0) return response.status;
       lastError = `status ${response.status}`;
