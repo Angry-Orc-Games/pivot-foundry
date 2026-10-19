@@ -148,7 +148,20 @@ while IFS= read -r row; do
       while ((attempt < 3)); do
         attempt=$((attempt + 1))
         rm -rf "$work/unpack" "$work/artifact.zip"
-        if [[ $url == https://* ]] && curl -fsS "${auth[@]}" -o "$work/artifact.zip" "$url" && unpack_artifact "$work/artifact.zip" "$work/unpack"; then
+        downloaded=false
+        if [[ $url == https://* ]]; then
+          http_code=$(curl -fsS -L "${auth[@]}" -o "$work/artifact.zip" -w "%{http_code}" "$url" || true)
+          size=0
+          if [[ -f $work/artifact.zip ]]; then
+            size=$(wc -c <"$work/artifact.zip" | tr -d ' ')
+          fi
+          if [[ -s $work/artifact.zip ]] && unpack_artifact "$work/artifact.zip" "$work/unpack"; then
+            downloaded=true
+          else
+            printf '::warning::Foundry E2E artifact download was empty or not a zip. HTTP %s, %s bytes\n' "${http_code:-000}" "$size" >&2
+          fi
+        fi
+        if [[ $downloaded == true ]]; then
           mapfile -t jsons < <(find "$work/unpack" -type f -name '*.json' | sort)
           json_count=${#jsons[@]}
           if ((json_count == 1)); then
