@@ -36,10 +36,15 @@ function eulaPage({ agreementVisible }) {
       return "unavailable";
     },
     getByRole(role, options = {}) {
-      const name = String(options.name ?? "");
+      const rawName = options.name;
+      const name = String(rawName ?? "");
       if (role === "checkbox" && name.includes("I agree to these terms")) {
+        const shown = () => agreementVisible && !agreed;
         return {
-          isVisible: async () => agreementVisible && !agreed,
+          isVisible: async () => shown(),
+          waitFor: async () => {
+            if (!shown()) throw new Error("agreement hidden");
+          },
           check: async () => {
             clicks.push("check");
           },
@@ -57,6 +62,20 @@ function eulaPage({ agreementVisible }) {
         return {
           waitFor: async () => {
             clicks.push("cleared");
+          },
+        };
+      }
+      if (role === "button" && rawName instanceof RegExp && rawName.test("Create World")) {
+        return {
+          waitFor: async () => {
+            if (agreementVisible && !agreed) throw new Error("setup hidden");
+          },
+        };
+      }
+      if (role === "heading" && name === "Setup") {
+        return {
+          waitFor: async () => {
+            throw new Error("setup heading hidden");
           },
         };
       }
@@ -236,6 +255,13 @@ function delayedScreen({ eulaAfterMs = null, setupAfterMs = null } = {}) {
           waitFor: async () => {
             await waitUntil(setupAfterMs);
             sawSetup = true;
+          },
+        };
+      }
+      if (role === "heading" && name === "Setup") {
+        return {
+          waitFor: async () => {
+            throw new Error("setup heading hidden");
           },
         };
       }
