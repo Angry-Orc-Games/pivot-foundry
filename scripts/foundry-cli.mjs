@@ -22,6 +22,7 @@ import {
   dockerAvailable,
   followLogs,
   inspectOwnership,
+  prepareContainerCache,
   prepareDataDir,
   prepareDevSystemDir,
   pullImage,
@@ -217,6 +218,7 @@ async function up() {
   });
   prepareDevSystemDir(paths);
   prepareDataDir(paths.foundryData);
+  prepareContainerCache(paths);
   if (role === "dev" && !existsSync(join(paths.root, "dist", "pivot.mjs"))) {
     console.log("Warning: dist/pivot.mjs is missing. Run npm run build before opening a world.");
   }

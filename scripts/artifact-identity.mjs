@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { loadVersions, repoRoot } from "./foundry-env.mjs";
+import { loadVersions, pinnedImageRef, repoRoot } from "./foundry-env.mjs";
 
 export function fileSha256(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
@@ -36,7 +36,7 @@ export function writeArtifactIdentity(root = repoRoot, extra = {}) {
     },
     foundry: {
       version: versions.foundryVersion,
-      image: `${versions.container.image}:${versions.container.tag}@${versions.container.digest}`,
+      image: pinnedImageRef(versions),
     },
     createdAt: new Date().toISOString(),
     ...extra,
