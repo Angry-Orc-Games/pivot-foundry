@@ -19,7 +19,10 @@ if [[ ! $run_id =~ ^[0-9]+$ ]]; then
 fi
 
 conclusion=failure
-if [[ $ok != true ]]; then
+if [[ ${E2E_SKIPPED:-} == true ]]; then
+  conclusion=neutral
+  summary="Skipped because somebody is signed in. Foundry was not started."
+elif [[ $ok != true ]]; then
   if [[ -z $ok ]]; then
     summary="Foundry E2E failed before the license recheck completed. Foundry was not started."
   else
