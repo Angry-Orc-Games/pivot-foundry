@@ -27,16 +27,29 @@ function closedPort() {
   });
 }
 
-function runWait(url, timeoutMs) {
+const cliSource = `
+import { waitForHttp } from ${JSON.stringify(composeModule)};
+try {
+  await waitForHttp(process.argv[1], Number(process.argv[2]));
+  console.log("STATUS_OK");
+} catch (error) {
+  console.error(error.message || String(error));
+  process.exitCode = error.code === "TIMEOUT" ? 10 : 1;
+} finally {
+  console.log("FINALLY_MARKER");
+}
+`;
+
+function runWait(url, timeoutMs, source = childSource, killAfterMs = 12_000) {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ["--input-type=module", "-e", childSource, url, String(timeoutMs)],
+      ["--input-type=module", "-e", source, url, String(timeoutMs)],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     let stdout = "";
     let stderr = "";
-    const killer = globalThis.setTimeout(() => child.kill("SIGKILL"), 12_000);
+    const killer = globalThis.setTimeout(() => child.kill("SIGKILL"), killAfterMs);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -102,4 +115,26 @@ describe("waitForHttp process lifetime", () => {
     expect(result.stdout).toContain("FINALLY_MARKER");
     expect(Date.now() - started).toBeGreaterThan(2000);
   }, 15_000);
+
+  it("rejects when the server accepts and never answers", async () => {
+    const server = createServer(() => {});
+    const port = await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => resolve(server.address().port));
+    });
+    const started = Date.now();
+    let result;
+    try {
+      result = await runWait(`http://127.0.0.1:${port}/`, 1500, cliSource, 5_000);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    expect(result.code).toBe(10);
+    expect(result.signal).toBeNull();
+    expect(result.output).toContain(`Foundry did not answer HTTP at 127.0.0.1:${port} within 1.5s`);
+    expect(result.output).toContain("FINALLY_MARKER");
+    expect(result.output).not.toContain("unsettled top-level await");
+    expect(Date.now() - started).toBeLessThan(4000);
+  }, 8_000);
 });
