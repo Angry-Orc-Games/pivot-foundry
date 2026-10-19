@@ -1,6 +1,7 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -70,20 +71,32 @@ function eulaPage({ agreementVisible }) {
   };
 }
 
-async function withEnv(env, run) {
-  const previous = new Map();
-  for (const [key, value] of Object.entries(env)) {
-    previous.set(key, process.env[key]);
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
+function assignEnv(key, value) {
+  if (key === "FOUNDRY_E2E_ACCEPT_EULA") {
+    if (value === undefined) delete process.env.FOUNDRY_E2E_ACCEPT_EULA;
+    else process.env.FOUNDRY_E2E_ACCEPT_EULA = value;
+  } else if (key === "FOUNDRY_LICENSE_KEY") {
+    if (value === undefined) delete process.env.FOUNDRY_LICENSE_KEY;
+    else process.env.FOUNDRY_LICENSE_KEY = value;
+  } else if (key === "PIVOT_E2E_SETUP_FAILURE") {
+    if (value === undefined) delete process.env.PIVOT_E2E_SETUP_FAILURE;
+    else process.env.PIVOT_E2E_SETUP_FAILURE = value;
   }
+}
+
+async function withEnv(env, run) {
+  const previous = {
+    FOUNDRY_E2E_ACCEPT_EULA: process.env.FOUNDRY_E2E_ACCEPT_EULA,
+    FOUNDRY_LICENSE_KEY: process.env.FOUNDRY_LICENSE_KEY,
+    PIVOT_E2E_SETUP_FAILURE: process.env.PIVOT_E2E_SETUP_FAILURE,
+  };
+  for (const [key, value] of Object.entries(env)) assignEnv(key, value);
   try {
     return await run();
   } finally {
-    for (const [key, value] of previous) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    assignEnv("FOUNDRY_E2E_ACCEPT_EULA", previous.FOUNDRY_E2E_ACCEPT_EULA);
+    assignEnv("FOUNDRY_LICENSE_KEY", previous.FOUNDRY_LICENSE_KEY);
+    assignEnv("PIVOT_E2E_SETUP_FAILURE", previous.PIVOT_E2E_SETUP_FAILURE);
   }
 }
 
@@ -153,6 +166,20 @@ describe("Foundry EULA opt-in", () => {
     );
 
     expect(page.clicks).toEqual([]);
+  });
+
+  it("does not enable the EULA opt-in in workflows or the env example", async () => {
+    const workflowDir = fileURLToPath(new URL("../.github/workflows/", import.meta.url));
+    const names = await readdir(workflowDir);
+    for (const name of names) {
+      const text = await readFile(join(workflowDir, name), "utf8");
+      expect(text, name).not.toMatch(/FOUNDRY_E2E_ACCEPT_EULA/);
+    }
+    const example = await readFile(
+      fileURLToPath(new URL("../.env.foundry.local.example", import.meta.url)),
+      "utf8",
+    );
+    expect(example).not.toContain("FOUNDRY_E2E_ACCEPT_EULA");
   });
 
   it("classifies the setup marker as a setup failure, not a test failure", async () => {

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeArtifactIdentity } from "./artifact-identity.mjs";
@@ -32,6 +32,13 @@ import {
 
 const HTTP_TIMEOUT_MS = 120_000;
 const PLAYWRIGHT_TIMEOUT_MS = 15 * 60 * 1000;
+
+export function e2eFailureExit(error, setupText = "") {
+  if (error?.code === "TIMEOUT") return EXIT.timeout;
+  if (error?.code === "STARTUP_FAILED" || error?.code === "DATA_DIR") return EXIT.runtime;
+  if (String(setupText).includes("FOUNDRY_E2E_ACCEPT_EULA")) return EXIT.setup;
+  return EXIT.tests;
+}
 
 export function assertLaunchWindow(root, options = {}) {
   execFileSync("bash", [join(root, "scripts/ci/e2e-gate.sh"), "require"], {
@@ -161,6 +168,10 @@ export async function runE2E(args = {}) {
 
     console.log(`Foundry started for E2E commit ${subject || identity.commit}.`);
 
+    const setupMarker = join(paths.diagnosticsDir, "setup-failure.txt");
+    mkdirSync(paths.diagnosticsDir, { recursive: true });
+    process.env.PIVOT_E2E_SETUP_FAILURE = setupMarker;
+
     console.log("Running Playwright against the packaged system.");
     execFileSync("npx", ["playwright", "test", "--config", "e2e/playwright.config.ts"], {
       cwd: paths.root,
@@ -181,12 +192,9 @@ export async function runE2E(args = {}) {
     console.log("Foundry E2E passed.");
     return EXIT.ok;
   } catch (error) {
-    const exitCode =
-      error.code === "TIMEOUT"
-        ? EXIT.timeout
-        : error.code === "STARTUP_FAILED" || error.code === "DATA_DIR"
-          ? EXIT.runtime
-          : EXIT.tests;
+    const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+    const setupText = marker && existsSync(marker) ? readFileSync(marker, "utf8") : "";
+    const exitCode = e2eFailureExit(error, setupText);
     console.error(error.message || error);
     try {
       collectDiagnostics(paths);

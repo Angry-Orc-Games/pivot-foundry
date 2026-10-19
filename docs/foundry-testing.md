@@ -27,7 +27,7 @@ npm run package:system
 4. Install the extracted zip into a disposable instance
 5. Start the owned Compose instance on loopback
 6. Wait for the Foundry shell, then `game.ready`
-7. Run Playwright (one worker)
+7. Run Playwright (one worker). The End User License Agreement is not signed unless `FOUNDRY_E2E_ACCEPT_EULA` is exactly `1`. Workflows leave that variable unset. An agreement on screen with the variable off stops the run as a setup failure and does not click Agree.
 8. Write sanitized diagnostics on failure
 9. Stop and remove the disposable instance even if the run is interrupted
 
