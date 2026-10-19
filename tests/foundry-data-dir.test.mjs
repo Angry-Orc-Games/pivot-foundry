@@ -1,4 +1,5 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -135,5 +136,37 @@ exit 1
     expect(error?.message).toMatch(/insufficient permissions on \/data/);
     expect(error?.message).not.toContain("super-secret-license");
     expect(Date.now() - started).toBeLessThan(800);
+  });
+});
+
+describe("chowned Foundry data", () => {
+  it("replaces a chowned packaged system and removes the data dir afterward", async () => {
+    const { installPackagedSystem } = await import("../scripts/foundry-compose.mjs");
+    const root = await mkdtemp(join(tmpdir(), "pivot-data-lock-"));
+    const dataDir = join(root, "foundry-data");
+    const systemsDir = join(dataDir, "Data", "systems");
+    const systemDir = join(systemsDir, "pivot-fantasy");
+    const zipDir = join(root, "zip-src");
+    const zipPath = join(root, "system.zip");
+    mkdirSync(systemDir, { recursive: true });
+    await writeFile(join(systemDir, "old.txt"), "stale");
+    mkdirSync(zipDir, { recursive: true });
+    await writeFile(join(zipDir, "system.json"), '{"id":"pivot-fantasy","title":"replaced"}\n');
+    execFileSync("zip", ["-q", zipPath, "system.json"], { cwd: zipDir });
+    chmodSync(systemDir, 0o555);
+    chmodSync(systemsDir, 0o555);
+
+    try {
+      installPackagedSystem({ foundryData: dataDir }, zipPath);
+      expect(readFileSync(join(systemDir, "system.json"), "utf8")).toContain('"title":"replaced"');
+      expect(existsSync(join(systemDir, "old.txt"))).toBe(false);
+      chmodSync(dataDir, 0o555);
+      const { removeFoundryTree } = await import("../scripts/foundry-compose.mjs");
+      removeFoundryTree(dataDir);
+      expect(existsSync(dataDir)).toBe(false);
+    } finally {
+      execFileSync("sudo", ["-n", "chmod", "-R", "a+rwx", root], { stdio: "ignore" });
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
