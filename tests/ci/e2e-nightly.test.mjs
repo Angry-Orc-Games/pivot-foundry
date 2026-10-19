@@ -506,6 +506,35 @@ describe("nightly failure results", () => {
     });
   });
 
+  it("records an unsigned EULA as a setup failure even after Foundry started", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+    const dest = join(dir, "main.json");
+    const log = join(dir, "foundry-e2e.log");
+    const setup =
+      "Foundry setup failed. The End User License Agreement is on screen. Set FOUNDRY_E2E_ACCEPT_EULA=1 to sign it for this run. Tests were not run.";
+    await writeFile(
+      log,
+      `Foundry started for E2E commit ${SAME}.\nServer started and listening\n${setup}\n`,
+    );
+    const result = await runScript(recordScript, [dest], {
+      ...process.env,
+      E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
+      E2E_OK: "true",
+      E2E_AVAILABLE: "true",
+      E2E_JOB_STATUS: "failure",
+      E2E_LOG: log,
+    });
+    const body = JSON.parse(await readFile(dest, "utf8"));
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(body.conclusion).toBe("failure");
+    expect(body.summary).toBe(setup);
+    expect(body.summary).not.toContain("failed after Foundry started");
+    expect(body.summary).not.toContain("did not start");
+  });
+
   it("posts a failure check when the run was cancelled before a result existed", async () => {
     const ctx = await publishFixture({ artifacts: [], matrix: "cancelled" });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
