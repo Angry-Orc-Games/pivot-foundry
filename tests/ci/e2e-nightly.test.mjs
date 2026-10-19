@@ -1,5 +1,6 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -735,4 +736,196 @@ describe("published result from the real writer", () => {
     expect(body.output.summary).not.toContain("failed validation");
     expect(body.output.text).toBe("started=false");
   });
+});
+
+function listenOn(server, port, host) {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen({ port, host }, () => resolve(server.address().port));
+  });
+}
+
+describe("artifact download redirect", () => {
+  it("follows a 302 to another host and posts the EULA summary as started", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-redirect-"));
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-keyout",
+        join(dir, "ca.key"),
+        "-out",
+        join(dir, "ca.crt"),
+        "-days",
+        "1",
+        "-nodes",
+        "-subj",
+        "/CN=e2e-test-ca",
+      ],
+      { stdio: "ignore" },
+    );
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-newkey",
+        "rsa:2048",
+        "-keyout",
+        join(dir, "srv.key"),
+        "-out",
+        join(dir, "srv.csr"),
+        "-nodes",
+        "-subj",
+        "/CN=api.localtest.me",
+      ],
+      { stdio: "ignore" },
+    );
+    await writeFile(
+      join(dir, "ext.cnf"),
+      "subjectAltName=DNS:api.localtest.me,DNS:blob.localtest.me\n",
+    );
+    execFileSync(
+      "openssl",
+      [
+        "x509",
+        "-req",
+        "-in",
+        join(dir, "srv.csr"),
+        "-CA",
+        join(dir, "ca.crt"),
+        "-CAkey",
+        join(dir, "ca.key"),
+        "-CAcreateserial",
+        "-out",
+        join(dir, "srv.crt"),
+        "-days",
+        "1",
+        "-extfile",
+        join(dir, "ext.cnf"),
+      ],
+      { stdio: "ignore" },
+    );
+    const doc = {
+      sha: SAME,
+      run_id: "4242",
+      conclusion: "failure",
+      summary: SETUP_FAILURE,
+      started: true,
+    };
+    const jsonPath = join(dir, "pr-114.json");
+    await writeFile(jsonPath, JSON.stringify(doc));
+    execFileSync("python3", [
+      "-c",
+      "import sys, zipfile\n" +
+        "with zipfile.ZipFile(sys.argv[1], 'w') as bundle:\n" +
+        "    bundle.write(sys.argv[2], 'pr-114.json')\n",
+      join(dir, "artifact.zip"),
+      jsonPath,
+    ]);
+    const zip = await readFile(join(dir, "artifact.zip"));
+    const tls = {
+      key: await readFile(join(dir, "srv.key")),
+      cert: await readFile(join(dir, "srv.crt")),
+    };
+    const blobHits = [];
+    const downloadAuth = [];
+    let posted = "";
+    let apiPort = 0;
+    const blobHandler = (req, res) => {
+      blobHits.push(req.headers.authorization);
+      res.writeHead(200, { "content-type": "application/zip" });
+      res.end(zip);
+    };
+    const blob6 = createServer(tls, blobHandler);
+    const blob4 = createServer(tls, blobHandler);
+    const blobPort = await listenOn(blob6, 0, "::1");
+    await listenOn(blob4, blobPort, "127.0.0.1");
+    const apiHandler = (req, res) => {
+      const chunks = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        const path = new URL(req.url ?? "/", "https://api.localtest.me").pathname;
+        if (path.endsWith("/artifacts")) {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              total_count: 1,
+              artifacts: [
+                {
+                  name: "e2e-result-pr-114",
+                  expired: false,
+                  archive_download_url: `https://api.localtest.me:${apiPort}/download`,
+                  workflow_run: { id: 4242 },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+        if (path === "/download") {
+          downloadAuth.push(req.headers.authorization);
+          res.writeHead(302, {
+            location: `https://blob.localtest.me:${blobPort}/artifact.zip`,
+          });
+          res.end();
+          return;
+        }
+        if (path.endsWith("/check-runs")) {
+          posted = chunks.map((chunk) => chunk.toString("utf8")).join("");
+          res.writeHead(201, { "content-type": "application/json" });
+          res.end("{}");
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+    };
+    const api6 = createServer(tls, apiHandler);
+    const api4 = createServer(tls, apiHandler);
+    apiPort = await listenOn(api6, 0, "::1");
+    await listenOn(api4, apiPort, "127.0.0.1");
+    const servers = [blob6, blob4, api6, api4];
+    let result;
+    try {
+      result = await new Promise((resolve) => {
+        const child = spawn("bash", [publishScript], {
+          env: {
+            PATH: process.env.PATH,
+            HOME: process.env.HOME,
+            LANG: "C",
+            SSL_CERT_FILE: join(dir, "ca.crt"),
+            GITHUB_API_URL: `https://api.localtest.me:${apiPort}`,
+            GITHUB_TOKEN: TOKEN,
+            E2E_REPOSITORY: "Angry-Orc-Games/pivot-foundry",
+            E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-114" }]),
+            E2E_RUN_ID: "4242",
+            E2E_MATRIX_RESULT: "failure",
+          },
+        });
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (chunk) => {
+          stdout += chunk;
+        });
+        child.stderr.on("data", (chunk) => {
+          stderr += chunk;
+        });
+        child.on("close", (status) => resolve({ status: status ?? 1, stdout, stderr }));
+      });
+    } finally {
+      for (const server of servers) server.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+
+    const body = JSON.parse(posted);
+    expect(blobHits.length).toBeGreaterThan(0);
+    expect(blobHits.every((header) => header === undefined)).toBe(true);
+    expect(downloadAuth).toContain(`Bearer ${TOKEN}`);
+    expect(body.output.summary).toBe(SETUP_FAILURE);
+    expect(body.output.text).toBe("started=true");
+    expect(`${result.stdout}${result.stderr}${posted}`).not.toContain(TOKEN);
+  }, 15000);
 });
