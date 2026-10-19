@@ -180,3 +180,87 @@ describe("registerMpClampHooks", () => {
     }
   });
 });
+
+const FOUNDRY_OWNER = 3;
+
+type ClientUser = { id: string; active: boolean; isGM: boolean };
+
+function clientGame(selfId: string, users: ClientUser[]) {
+  const activeGms = users
+    .filter((user) => user.active && user.isGM)
+    .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+  const activeGm = activeGms[0];
+  return {
+    user: { id: selfId, isGM: users.find((user) => user.id === selfId)?.isGM === true },
+    users: {
+      activeGM: activeGm ? { id: activeGm.id, isSelf: activeGm.id === selfId } : null,
+      contents: users,
+    },
+  };
+}
+
+function deleteItemAs(selfId: string, users: ClientUser[], ownership: Record<string, number>) {
+  const listeners = new Map<string, (...args: unknown[]) => void>();
+  registerMpClampHooks({
+    on: (event, callback) => {
+      listeners.set(event, callback as (...args: unknown[]) => void);
+    },
+  });
+  const updates: Record<string, unknown>[] = [];
+  const actor = {
+    type: "character",
+    system: awakenedMagic(8),
+    items: [] as unknown[],
+    ownership,
+    update: (data: Record<string, unknown>) => {
+      updates.push(data);
+    },
+  };
+  const globals = globalThis as { game?: ReturnType<typeof clientGame> };
+  const previous = globals.game;
+  globals.game = clientGame(selfId, users);
+  try {
+    listeners.get("deleteItem")?.({ parent: actor });
+  } finally {
+    globals.game = previous;
+  }
+  return updates;
+}
+
+describe("MP clamp writer", () => {
+  const gmAndOwner: ClientUser[] = [
+    { id: "gm-1", active: true, isGM: true },
+    { id: "owner-a", active: true, isGM: false },
+  ];
+
+  it("does not call update from a non-GM client while a GM is connected", () => {
+    const updates = deleteItemAs("owner-a", gmAndOwner, {
+      default: 0,
+      "gm-1": FOUNDRY_OWNER,
+      "owner-a": FOUNDRY_OWNER,
+    });
+    expect(updates).toEqual([]);
+  });
+
+  it("calls update once from the active GM", () => {
+    const updates = deleteItemAs("gm-1", gmAndOwner, { default: 0, "gm-1": FOUNDRY_OWNER });
+    expect(updates).toEqual([{ "system.magic.mp.value": 5 }]);
+  });
+
+  it("calls update from exactly one owner when no GM is connected", () => {
+    const users: ClientUser[] = [
+      { id: "owner-b", active: true, isGM: false },
+      { id: "owner-a", active: true, isGM: false },
+      { id: "watcher", active: true, isGM: false },
+    ];
+    const ownership = { default: 0, "owner-a": FOUNDRY_OWNER, "owner-b": FOUNDRY_OWNER };
+    const firstOwner = deleteItemAs("owner-a", users, ownership);
+    const secondOwner = deleteItemAs("owner-b", users, ownership);
+    const watcher = deleteItemAs("watcher", users, ownership);
+    const writes = [firstOwner, secondOwner, watcher].filter((updates) => updates.length > 0);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toEqual([{ "system.magic.mp.value": 5 }]);
+    expect(firstOwner).toHaveLength(1);
+    expect(secondOwner).toEqual([]);
+  });
+});
