@@ -166,6 +166,9 @@ describe("foundry version pins", () => {
     expect(versions.foundryNodeMajor).toBe(24);
     expect(versions.container.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(pinnedImageRef(versions)).toContain("@sha256:");
+    expect(pinnedImageRef(versions).split("@")[0]).toBe(
+      `${versions.container.image}:${versions.foundryVersion}`,
+    );
     expect(versions.container.supportsFoundryVersion).toBe("14.361");
   });
 
