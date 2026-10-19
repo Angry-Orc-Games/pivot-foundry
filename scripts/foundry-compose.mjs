@@ -163,18 +163,19 @@ export function pullImage(versions) {
 export function prepareDataDir(dataDir, io = {}) {
   const run = io.execFileSync ?? execFileSync;
   const stat = io.statSync ?? statSync;
-  run("mkdir", ["-p", dataDir]);
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  run("mkdir", ["-p", dataDir], quiet);
   const info = stat(dataDir);
   if (info.uid === 1000 && info.gid === 1000) return { usedSudo: false };
 
   const own = ["-R", "1000:1000", dataDir];
   try {
-    run("chown", own);
+    run("chown", own, quiet);
     return { usedSudo: false };
   } catch (error) {
     if (!chownNeedsSudo(error)) throw error;
     try {
-      run("sudo", ["-n", "chown", ...own]);
+      run("sudo", ["-n", "chown", ...own], quiet);
     } catch (sudoError) {
       const wrapped = new Error(
         `Could not give uid 1000 write access to ${dataDir}. The Foundry container runs as 1000:1000.`,
