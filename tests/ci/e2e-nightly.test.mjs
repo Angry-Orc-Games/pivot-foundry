@@ -645,3 +645,73 @@ describe("nightly failure results", () => {
     expect(body.output.summary).not.toContain("forged");
   });
 });
+
+const SETUP_FAILURE =
+  "Foundry setup failed. The End User License Agreement is on screen. Set FOUNDRY_E2E_ACCEPT_EULA=1 to sign it for this run. Tests were not run.";
+
+async function recordPublishedResult(logText) {
+  const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+  const dest = join(dir, "pr-114.json");
+  const log = join(dir, "foundry-e2e.log");
+  await writeFile(log, logText);
+  const recorded = await runScript(recordScript, [dest], {
+    ...process.env,
+    E2E_SHA: SAME,
+    E2E_RUN_ID: "4242",
+    E2E_OK: "true",
+    E2E_AVAILABLE: "true",
+    E2E_JOB_STATUS: "failure",
+    E2E_LOG: log,
+  });
+  const doc = JSON.parse(await readFile(dest, "utf8"));
+  const ctx = await publishFixture({ doc });
+  const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+  await rm(dir, { recursive: true, force: true });
+  await rm(ctx.dir, { recursive: true, force: true });
+  return { recorded, doc, body };
+}
+
+describe("published result from the real writer", () => {
+  it("publishes a setup failure after listening as started with the EULA summary intact", async () => {
+    const { recorded, doc, body } = await recordPublishedResult(
+      [
+        "Server started and listening",
+        `Foundry started for E2E commit ${SAME}.`,
+        SETUP_FAILURE,
+        "FOUNDRY_LICENSE_KEY=ABCD-EFGH-IJKL-MNOP-QRST-UVWX",
+      ].join("\n"),
+    );
+
+    expect(recorded.status).toBe(0);
+    expect(doc.started).toBe(true);
+    expect(doc.summary).toBe(SETUP_FAILURE);
+    expect(JSON.stringify(doc)).not.toContain("ABCD-EFGH");
+    expect(body.output.summary).toBe(SETUP_FAILURE);
+    expect(body.output.summary).not.toContain("failed validation");
+    expect(body.output.text).toBe("started=true");
+    expect(body.output.summary + body.output.text).not.toContain("ABCD-EFGH");
+  });
+
+  it("publishes a test failure after listening as started", async () => {
+    const { doc, body } = await recordPublishedResult(
+      ["Server started and listening", "Error: expect(locator).toBeVisible() failed"].join("\n"),
+    );
+
+    expect(doc.started).toBe(true);
+    expect(doc.summary).toContain("The run failed after Foundry started.");
+    expect(doc.summary).not.toContain("End User License Agreement");
+    expect(body.output.summary).toBe(doc.summary);
+    expect(body.output.text).toBe("started=true");
+  });
+
+  it("publishes a readiness timeout before listening as not started", async () => {
+    const timeout = "Foundry did not log Server started and listening within 120s";
+    const { doc, body } = await recordPublishedResult(`${timeout}\n`);
+
+    expect(doc.started).toBe(false);
+    expect(doc.summary).toBe(timeout);
+    expect(body.output.summary).toBe(timeout);
+    expect(body.output.summary).not.toContain("failed validation");
+    expect(body.output.text).toBe("started=false");
+  });
+});
