@@ -1883,7 +1883,12 @@
   .window-content
   .pf-print
   table.pf-attacks
-  thead,
+  thead {
+  background: #fff;
+  border: 0;
+  box-shadow: none;
+}
+
 :is(body, body.theme-dark, body.theme-light)
   .pivot-fantasy.sheet.actor.character
   .window-content
@@ -1893,15 +1898,15 @@
   th {
   background: #fff;
   border: 0;
-  border-bottom: 1.5px solid #8a3b12;
+  border-bottom: 1px solid #ddd;
   box-shadow: none;
-  color: #8a3b12;
-  font-family: Georgia, "Iowan Old Style", serif;
-  font-size: 12px;
+  color: #1c1a16;
+  font-family: var(--pf-font-body);
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-align: left;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :is(body, body.theme-dark, body.theme-light)
@@ -2131,7 +2136,15 @@
   .pivot-fantasy.sheet.actor.character
   .window-content
   .pf-print
-  .pf-meter-fill {
+  .pf-meter-fill.hp {
+  background: #a1281e;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-meter-fill.pool {
   background: #8a3b12;
 }
 
@@ -2139,8 +2152,41 @@
   .pivot-fantasy.sheet.actor.character
   .window-content
   .pf-print
-  .pf-status {
-  background: #f1dccb;
+  .pf-status.alive {
+  background: #dcebdc;
+  color: #2f6b3a;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-status.dying {
+  background: #f5d9d5;
+  color: #a1281e;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-status.stable {
+  background: #f6ead0;
+  color: #9a6a00;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-status.dead,
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  .pf-status.unconfirmed {
+  background: #ece3cf;
+  color: #555;
 }
 
 :is(body, body.theme-dark, body.theme-light)

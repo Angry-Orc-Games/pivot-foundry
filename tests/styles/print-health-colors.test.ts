@@ -48,12 +48,21 @@ function render(theme: "theme-light" | "theme-dark") {
     const el = view.document.querySelector(selector);
     if (!el) throw new Error(`missing ${selector}`);
     const style = view.getComputedStyle(el);
+    const resolveVars = (value: string) => {
+      let current = value;
+      for (let step = 0; step < 4 && current.includes("var("); step += 1) {
+        current = current.replace(/var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)/g, (_match, name) => {
+          return style.getPropertyValue(name).trim();
+        });
+      }
+      return current;
+    };
     return {
       background: style.backgroundColor,
       color: style.color,
       fontSize: style.fontSize,
       fontWeight: style.fontWeight,
-      fontFamily: style.fontFamily,
+      fontFamily: resolveVars(style.fontFamily),
       textAlign: style.textAlign,
       textTransform: style.textTransform,
       letterSpacing: style.letterSpacing,

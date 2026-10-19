@@ -999,6 +999,13 @@ async function assertPrintSheet(page, label) {
           "rgb(255, 255, 255)",
           "rgb(241, 220, 203)",
           "rgb(138, 59, 18)",
+          "rgb(220, 235, 220)",
+          "rgb(47, 107, 58)",
+          "rgb(246, 234, 208)",
+          "rgb(154, 106, 0)",
+          "rgb(245, 217, 213)",
+          "rgb(161, 40, 30)",
+          "rgb(236, 227, 207)",
         ]);
         const offenders = [];
         for (const el of document.querySelectorAll(".window-content, .window-content *")) {
@@ -1033,8 +1040,9 @@ async function assertPrintSheet(page, label) {
     ["heading rust", measured.heading?.color === "rgb(138, 59, 18)"],
     ["heading rule", measured.heading?.borderBottomStyle === "solid"],
     ["attacks white", measured.attacksHead?.backgroundColor === "rgb(255, 255, 255)"],
-    ["attacks rust", measured.attacksHead?.color === "rgb(138, 59, 18)"],
-    ["attacks caps", measured.attacksHead?.textTransform === "uppercase"],
+    ["attacks ink", measured.attacksHead?.color === "rgb(28, 26, 22)"],
+    ["attacks plain", measured.attacksHead?.textTransform === "none"],
+    ["attacks size", measured.attacksHead?.fontSize === "11.5px"],
     ["attacks rule", measured.attacksHead?.borderBottomStyle === "solid"],
     ["attacks bold", Number(measured.attacksHead?.fontWeight) >= 700],
     [
