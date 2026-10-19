@@ -331,6 +331,42 @@ describe("M004 world migration", () => {
 
     expect(cloak.stored.equipped).toBe(false);
   });
+
+  it("leaves a weapon created after M004 unequipped on the next ready pass", async () => {
+    const items: MigratableDocument[] = [];
+    const actor: MigratableDocument = {
+      name: "Arwen",
+      type: "character",
+      toObject: () => ({
+        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+      }),
+      update: async () => undefined,
+      items,
+    };
+    const dependencies = {
+      game: { user: { isGM: true }, actors: [actor], items: [] },
+    };
+
+    await runWorldMigrations(dependencies);
+
+    const sword = persistingItem("Longsword", {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      effects: [strengthEffect],
+      equipped: false,
+    });
+    const ring = persistingEquipment("Ring of Protection", {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      effects: [strengthEffect],
+      equipped: false,
+      carried: true,
+    });
+    items.push(sword, ring);
+
+    await runWorldMigrations(dependencies);
+
+    expect(sword.stored.equipped).toBe(false);
+    expect(ring.stored.equipped).toBe(false);
+  });
 });
 
 function persistingEquipment(name: string, initial: Record<string, unknown>) {
