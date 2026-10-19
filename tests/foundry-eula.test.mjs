@@ -308,6 +308,22 @@ describe("late Foundry EULA screen", () => {
     expect(page.sawSetup()).toBe(true);
     expect(page.clicks).toEqual([]);
   });
+
+  it("throws SETUP when neither the agreement nor the setup screen appears", async () => {
+    const page = delayedScreen();
+    let error;
+    try {
+      await handleFoundryEula(page, { FOUNDRY_E2E_ACCEPT_EULA: undefined });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error?.code).toBe("SETUP");
+    expect(error?.message).toBe(
+      "Foundry setup did not show the license agreement or the setup screen.",
+    );
+    expect(page.clicks).toEqual([]);
+  });
 });
 
 describe("setup failure classification", () => {
