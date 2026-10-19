@@ -18,7 +18,8 @@ export interface MigratableDocument {
   type?: string;
   system?: unknown;
   _source?: { system?: unknown };
-  toObject?: () => { system?: unknown };
+  toObject?: () => { system?: unknown; flags?: unknown };
+  flags?: unknown;
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   update?: (data: Record<string, unknown>) => Promise<unknown>;
 }
@@ -79,7 +80,7 @@ export async function runWorldMigrations(
     const stored = readStoredSystem(document);
     return {
       document,
-      plan: combineItemMigrations(stored, document.type),
+      plan: combineItemMigrations(stored, document.type, readStoredFlags(document)),
       notice: weaponEquippedNotice(document, stored),
     };
   });
@@ -92,7 +93,7 @@ export async function runWorldMigrations(
       const stored = readStoredSystem(item);
       planned.push({
         document: item,
-        plan: combineItemMigrations(stored, item.type),
+        plan: combineItemMigrations(stored, item.type, readStoredFlags(item)),
         notice: weaponEquippedNotice(item, stored, actor.name),
       });
     }
@@ -137,6 +138,19 @@ export function readStoredSystem(document: MigratableDocument): unknown {
   }
 
   return document.system;
+}
+
+export function readStoredFlags(document: MigratableDocument): unknown {
+  if (typeof document.toObject === "function") {
+    try {
+      const object = document.toObject();
+      if (object && typeof object === "object" && "flags" in object) return object.flags;
+    } catch {
+      // Fall through to the document flag bag.
+    }
+  }
+
+  return document.flags;
 }
 
 async function persistMigration(
@@ -223,12 +237,12 @@ export function planAllActorMigrations(source: unknown, type?: string): Migratio
   };
 }
 
-function combineItemMigrations(source: unknown, itemType?: string): MigrationPlan {
+function combineItemMigrations(source: unknown, itemType?: string, flags?: unknown): MigrationPlan {
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
-  const third = planWeaponEquippedMigration(source, itemType);
+  const third = planWeaponEquippedMigration(source, itemType, flags);
   if (!third.ok) return third;
   if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
   return {
@@ -247,11 +261,14 @@ function weaponEquippedNotice(
   stored: unknown,
   actorName?: string,
 ): string | undefined {
-  const plan = planWeaponEquippedMigration(stored, document.type);
+  const plan = planWeaponEquippedMigration(stored, document.type, readStoredFlags(document));
   if (!plan.ok || !plan.changed) return undefined;
+  const equipped = plan.update["system.equipped"] === true;
+  const itemType = document.type === "equipment" ? "equipment" : "weapon";
   return weaponEquippedMigrationNotice(
     document.name ?? document.id ?? "unknown",
     actorName,
-    plan.update["system.equipped"] === true,
+    equipped,
+    itemType,
   );
 }

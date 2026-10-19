@@ -1,12 +1,21 @@
+import { SYSTEM_ID } from "../config";
 import type { MigrationPlan } from "./m001";
 
 export const WEAPON_EQUIPPED_MIGRATION_ID = "M004";
+export const M004_EQUIPPED_FLAG = `flags.${SYSTEM_ID}.m004`;
 
 export function planWeaponEquippedMigration(
   storedSystem: unknown,
   itemType?: string,
+  storedFlags?: unknown,
 ): MigrationPlan {
-  if (itemType !== "weapon" || !isPlainObject(storedSystem) || "equipped" in storedSystem) {
+  if (!isPlainObject(storedSystem)) return { ok: true, changed: false };
+
+  if (itemType === "equipment") {
+    return planEquipmentEquippedMigration(storedSystem, storedFlags);
+  }
+
+  if (itemType !== "weapon" || "equipped" in storedSystem) {
     return { ok: true, changed: false };
   }
 
@@ -22,12 +31,37 @@ export function weaponEquippedMigrationNotice(
   itemName: string,
   actorName: string | undefined,
   equipped: boolean,
+  itemType: "weapon" | "equipment" = "weapon",
 ): string {
   const actor = actorName ? ` on '${actorName}'` : "";
   if (equipped) {
-    return `M004: equipped weapon '${itemName}'${actor} so its bonuses keep applying`;
+    return `M004: equipped ${itemType} '${itemName}'${actor} so its bonuses keep applying`;
   }
   return `M004: set weapon '${itemName}'${actor} unequipped because it has no effect bonuses`;
+}
+
+function planEquipmentEquippedMigration(
+  storedSystem: Record<string, unknown>,
+  storedFlags: unknown,
+): MigrationPlan {
+  if (hasM004Marker(storedFlags)) return { ok: true, changed: false };
+  const hasEffects = Array.isArray(storedSystem.effects) && storedSystem.effects.length > 0;
+  if (!hasEffects || storedSystem.equipped !== false) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      "system.equipped": true,
+      [M004_EQUIPPED_FLAG]: true,
+    },
+  };
+}
+
+function hasM004Marker(storedFlags: unknown): boolean {
+  if (!isPlainObject(storedFlags)) return false;
+  const scope = storedFlags[SYSTEM_ID];
+  if (!isPlainObject(scope)) return false;
+  return scope.m004 === true;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
