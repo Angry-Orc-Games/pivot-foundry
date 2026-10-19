@@ -1,5 +1,6 @@
 import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
+import { planMpClampMigration } from "./m005";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planSchemaV2ActorMigration,
@@ -79,13 +80,20 @@ export async function runWorldMigrations(
     actors.flatMap((actor) => (actor.id ? [[actor.id, actor] as const] : [])),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
-  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
-    game.items,
-  ).map((document) => ({ document, plan: combineItemMigrations(readStoredSystem(document)) }));
+  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
+    listDocuments(game.items).map((document) => ({
+      document,
+      plan: combineItemMigrations(readStoredSystem(document)),
+    }));
   for (const actor of actors) {
+    const mpClamp = planMpClampMigration(actor);
     planned.push({
       document: actor,
-      plan: planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
+      plan: combinePlans(
+        planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
+        mpClamp.plan,
+      ),
+      notice: mpClamp.notice,
     });
     for (const item of listDocuments(actor.items))
       planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
@@ -105,6 +113,10 @@ export async function runWorldMigrations(
     if (result.updated > 0) wrote.add(entry.document);
     updated += result.updated;
     failed += result.failed;
+    if (result.updated > 0 && entry.notice) {
+      dependencies.notify?.("info", entry.notice);
+      dependencies.log?.(entry.notice);
+    }
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || token.actor?.type !== "character") continue;
@@ -122,7 +134,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID}`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -254,6 +266,20 @@ export function planAllActorMigrations(
       ...(survival.changed ? survival.update : {}),
       ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
+    },
+  };
+}
+
+function combinePlans(first: MigrationPlan, second: MigrationPlan): MigrationPlan {
+  if (!first.ok) return first;
+  if (!second.ok) return second;
+  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      ...(first.changed ? first.update : {}),
+      ...(second.changed ? second.update : {}),
     },
   };
 }
