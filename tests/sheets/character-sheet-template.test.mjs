@@ -288,9 +288,9 @@ describe("character sheet template structure", () => {
     expect(locked?.value).toBe("0");
   });
 
-  it("keeps the proficiency dot usable in view mode", () => {
+  function skillSheet(disabledAttr) {
     const { sheet } = renderTemplates();
-    const document = new JSDOM(
+    return new JSDOM(
       sheet({
         skillRows: [
           {
@@ -300,29 +300,64 @@ describe("character sheet template structure", () => {
             proficient: false,
             proficientPath: "system.skills.medicine.proficient",
             total: "+2",
-            disabledAttr: "disabled",
+            disabledAttr,
           },
         ],
-        items: { traits: [{ id: "trait-1", name: "Keen", disabledAttr: "disabled" }] },
+        items: { traits: [] },
         form: {},
         proficiencyText: {},
         system: { magic: {}, notes: {}, identity: {}, currency: {} },
         derived: { armourClass: {}, magic: { mp: {} } },
-        disabledAttr: "disabled",
+        disabledAttr,
       }),
     ).window.document;
-    const checkbox = document.querySelector('input[name="system.skills.medicine.proficient"]');
-    expect(checkbox?.disabled).toBe(false);
+  }
+
+  it("locks the proficiency dot when the sheet is not editable", () => {
+    const locked = skillSheet("disabled");
+    const checkbox = locked.querySelector('input[name="system.skills.medicine.proficient"]');
+    expect(checkbox?.disabled).toBe(true);
     expect(checkbox?.closest("label")?.getAttribute("title")).toBe(
       "PIVOT.Actions.ToggleProficiency",
     );
-    const name = document.querySelector("button.pf-skill-name");
-    const modifier = document.querySelector("td.pf-r button");
-    name?.click();
-    modifier?.click();
+    locked.querySelector("button.pf-skill-name")?.click();
+    locked.querySelector("td.pf-r button")?.click();
     expect(checkbox?.checked).toBe(false);
+
+    const editing = skillSheet("");
+    expect(editing.querySelector('input[name="system.skills.medicine.proficient"]')?.disabled).toBe(
+      false,
+    );
     const english = JSON.parse(readFileSync(resolve(process.cwd(), "lang/en.json"), "utf-8"));
     expect(english["PIVOT.Actions.ToggleProficiency"]).toBe("Toggle proficiency");
+  });
+
+  it("does not paint a locked proficiency dot as clickable", () => {
+    const css = [
+      readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pivot-fantasy.css"), "utf-8"),
+    ].join("\n");
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head><style>${css}</style></head><body></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const rules = [...dom.window.document.styleSheets].flatMap((styleSheet) => {
+      try {
+        return [...styleSheet.cssRules];
+      } catch {
+        return [];
+      }
+    });
+    const lockedHover = rules.find(
+      (rule) =>
+        typeof rule.selectorText === "string" &&
+        rule.selectorText.includes("pf-check") &&
+        rule.selectorText.includes(":disabled") &&
+        rule.selectorText.includes(":hover"),
+    );
+    expect(lockedHover?.style?.cursor).toBe("default");
+    expect(lockedHover?.style?.color).toBe("rgb(28, 26, 22)");
   });
 
   it("shows a muted line when the character has no traits", () => {
