@@ -8,7 +8,12 @@ import {
   stringField,
   type TypeDataModelConstructor,
 } from "../foundry-runtime";
-import { ECHELON_VALUES, migrateStoredEchelon, normalizeEchelon } from "../rules/echelon";
+import {
+  ECHELON_VALUES,
+  migrateStoredEchelon,
+  normalizeEchelon,
+  rememberLegacyEchelon,
+} from "../rules/echelon";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 
 type TypeDataModelWithSchema = TypeDataModelConstructor & {
@@ -147,9 +152,12 @@ function echelonField(fields: FoundryRuntime["data"]["fields"]): DataField {
 
 function migrateEchelonSource(source: Record<string, unknown>): Record<string, unknown> {
   if (!("echelon" in source)) return source;
-  const next = migrateStoredEchelon(source.echelon);
-  if (next === source.echelon) return source;
-  return { ...source, echelon: next };
+  const original = source.echelon;
+  const next = migrateStoredEchelon(original);
+  if (next === original) return source;
+  rememberLegacyEchelon(source, original);
+  source.echelon = next;
+  return source;
 }
 
 function withItemInfrastructure(

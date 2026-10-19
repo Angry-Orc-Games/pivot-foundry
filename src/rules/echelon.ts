@@ -12,6 +12,7 @@ export const M006_NUMERIC_ECHELON_MAP = {
 
 const numericEchelon: Partial<Record<number, Echelon>> = M006_NUMERIC_ECHELON_MAP;
 const echelonValues: ReadonlySet<string> = new Set(ECHELON_VALUES);
+const legacyEchelon = new WeakMap<object, unknown>();
 
 export function normalizeEchelon(value: unknown): Echelon | undefined {
   if (typeof value === "string") {
@@ -24,4 +25,23 @@ export function normalizeEchelon(value: unknown): Echelon | undefined {
 
 export function migrateStoredEchelon(value: unknown): Echelon {
   return normalizeEchelon(value) ?? "core";
+}
+
+export function rememberLegacyEchelon(source: object, original: unknown): void {
+  legacyEchelon.set(source, original);
+}
+
+export function hasLegacyEchelon(source: object): boolean {
+  return legacyEchelon.has(source);
+}
+
+export function peekLegacyEchelon(source: object): unknown {
+  return legacyEchelon.get(source);
+}
+
+export function takeLegacyEchelon(source: object): unknown {
+  if (!legacyEchelon.has(source)) return undefined;
+  const original = legacyEchelon.get(source);
+  legacyEchelon.delete(source);
+  return original;
 }
