@@ -1,6 +1,16 @@
 import { armourCategories, featureCategories, SYSTEM_ID, weaponCategories } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
+import { type Echelon } from "../rules/echelon";
 import { describeEffectRule, parseStoredEffect, type EffectRule } from "../rules/effects";
+
+const ECHELON_CHOICES: Record<Echelon, string> = {
+  core: "Core",
+  "1": "Echelon 1",
+  "2": "Echelon 2",
+  "3": "Echelon 3",
+  "4": "Echelon 4",
+  "5": "Echelon 5",
+};
 
 const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 
@@ -30,6 +40,7 @@ export interface ItemSheetContext {
     weaponCategories: typeof weaponCategories;
     armourCategories: typeof armourCategories;
     featureCategories: typeof featureCategories;
+    echelonChoices: Record<Echelon, string>;
   };
 }
 
@@ -103,6 +114,7 @@ export function prepareItemSheetContext(
       weaponCategories,
       armourCategories,
       featureCategories,
+      echelonChoices: ECHELON_CHOICES,
     },
   };
 }

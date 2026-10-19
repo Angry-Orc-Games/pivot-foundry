@@ -77,4 +77,19 @@ describe("magic echelon data model", () => {
       }
     }
   });
+
+  it("rewrites a legacy echelon before the string field validates it", () => {
+    const models = createPivotItemDataModels(foundry());
+    for (const type of ["magicAbility", "magicStream"] as const) {
+      const migrateData = (
+        models[type] as unknown as {
+          migrateData: (source: Record<string, unknown>) => { echelon?: unknown };
+        }
+      ).migrateData;
+      expect(migrateData({ echelon: 1 })).toMatchObject({ echelon: "1" });
+      expect(migrateData({ echelon: 0 })).toMatchObject({ echelon: "core" });
+      expect(migrateData({ echelon: "Core" })).toMatchObject({ echelon: "core" });
+      expect(migrateData({ echelon: "2" })).toEqual({ echelon: "2" });
+    }
+  });
 });

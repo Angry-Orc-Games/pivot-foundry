@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import en from "../../lang/en.json";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
 
@@ -32,6 +33,10 @@ function persistedItem(name: string, type: string, echelon: unknown): PersistedI
 }
 
 describe("M006 magic echelon migration", () => {
+  it("uses the English notice text from the language file", () => {
+    expect(en["PIVOT.Migration.M006CoreReview"]).toBe(CORE_REVIEW_NOTICE);
+  });
+
   it("keeps stored 1 as Echelon 1, maps every other legacy value, and notices the GM once", async () => {
     const spark = persistedItem("Spark", "magicAbility", 1);
     const already = persistedItem("Already", "magicAbility", "1");
