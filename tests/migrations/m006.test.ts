@@ -156,6 +156,7 @@ describe("M006 magic echelon migration", () => {
     expect(reviews[0]).not.toContain("Already");
     expect(logs).toContain(reviews[0]);
     expect(numeric.updates).toEqual([{ "system.echelon": "1" }]);
+    expect(numeric.updateOptions).toEqual([{ diff: false }]);
     expect(textual.updates).toEqual([]);
 
     await runWorldMigrations({
@@ -215,7 +216,10 @@ function cleanedMagicItem(
   name: string,
   type: "magicAbility" | "magicStream",
   rawEchelon: unknown,
-): MigratableDocument & { updates: Record<string, unknown>[] } {
+): MigratableDocument & {
+  updates: Record<string, unknown>[];
+  updateOptions: Array<{ diff?: boolean } | undefined>;
+} {
   const models = createPivotItemDataModels(migrationFoundry());
   const migrateData = (
     models[type] as unknown as {
@@ -229,14 +233,17 @@ function cleanedMagicItem(
   });
   if (typeof system.echelon === "number") system.echelon = String(system.echelon);
   const updates: Record<string, unknown>[] = [];
+  const updateOptions: Array<{ diff?: boolean } | undefined> = [];
   return {
     name,
     type,
     updates,
+    updateOptions,
     _source: { system },
     toObject: () => ({ system: { ...system } }),
-    update: async (data) => {
+    update: async (data, options) => {
       updates.push(data);
+      updateOptions.push(options);
       if ("system.echelon" in data) system.echelon = data["system.echelon"];
     },
   };

@@ -90,9 +90,10 @@ export async function runWorldMigrations(
     game.items,
   ).map((document) => {
     const stored = readStoredSystem(document);
-    const line = coreReviewLine(document, stored);
+    const raw = rawSystem(document);
+    const line = coreReviewLine(document, stored, undefined, raw);
     if (line) coreReview.push(line);
-    return { document, plan: combineItemMigrations(stored) };
+    return { document, plan: combineItemMigrations(stored, raw) };
   });
   for (const actor of actors) {
     planned.push({
@@ -102,9 +103,10 @@ export async function runWorldMigrations(
     const actorName = actor.name ?? actor.id ?? "unknown";
     for (const item of listDocuments(actor.items)) {
       const stored = readStoredSystem(item);
-      const line = coreReviewLine(item, stored, actorName);
+      const raw = rawSystem(item);
+      const line = coreReviewLine(item, stored, actorName, raw);
       if (line) coreReview.push(line);
-      planned.push({ document: item, plan: combineItemMigrations(stored) });
+      planned.push({ document: item, plan: combineItemMigrations(stored, raw) });
     }
   }
   for (const token of sceneTokens) {
@@ -116,9 +118,10 @@ export async function runWorldMigrations(
     const actorName = token.actor.name ?? token.actor.id ?? "unknown";
     for (const item of listDocuments(token.actor.items)) {
       const stored = readStoredSystem(item);
-      const line = coreReviewLine(item, stored, actorName);
+      const raw = rawSystem(item);
+      const line = coreReviewLine(item, stored, actorName, raw);
       if (line) coreReview.push(line);
-      planned.push({ document: item, plan: combineItemMigrations(stored) });
+      planned.push({ document: item, plan: combineItemMigrations(stored, raw) });
     }
   }
   if (coreReview.length > 0) {
@@ -195,7 +198,10 @@ async function persistMigration(
   try {
     if (!document.update) throw new Error("Document cannot be updated");
     // Migrations may repair survival fields; they write as a trusted survival writer.
-    await document.update(plan.update, { ...SURVIVAL_WRITE_OPTIONS });
+    await document.update(plan.update, {
+      ...SURVIVAL_WRITE_OPTIONS,
+      ...(plan.diff === false ? { diff: false } : {}),
+    });
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -285,17 +291,24 @@ export function planAllActorMigrations(
   };
 }
 
-function combineItemMigrations(source: unknown): MigrationPlan {
+function rawSystem(document: MigratableDocument): object | undefined {
+  const system = document._source?.system;
+  if (typeof system === "object" && system !== null && !Array.isArray(system)) return system;
+  return undefined;
+}
+
+function combineItemMigrations(source: unknown, raw?: object): MigrationPlan {
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
-  const echelon = planMagicEchelonMigration(source);
+  const echelon = planMagicEchelonMigration(source, raw);
   if (!echelon.ok) return echelon;
   if (!first.changed && !second.changed && !echelon.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
+    ...(echelon.changed && echelon.diff === false ? { diff: false as const } : {}),
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
