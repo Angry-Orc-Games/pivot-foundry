@@ -201,6 +201,31 @@ describe("M004 world migration", () => {
     expect(dagger.stored.equipped).toBe(false);
   });
 
+  it("equips a weapon whose equipped false comes only from the schema default", async () => {
+    const raw: Record<string, unknown> = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      effects: [strengthEffect],
+    };
+    let prepared: Record<string, unknown> = { ...raw, equipped: false };
+    const weapon: MigratableDocument = {
+      name: "Flame Tongue",
+      type: "weapon",
+      _source: { system: raw },
+      toObject: () => ({ system: prepared }),
+      update: async (data) => {
+        if ("system.equipped" in data)
+          prepared = { ...prepared, equipped: data["system.equipped"] };
+      },
+    };
+
+    const report = await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [], items: [weapon] },
+    });
+
+    expect(report).toEqual({ skipped: false, updated: 1, failed: 0 });
+    expect(prepared.equipped).toBe(true);
+  });
+
   it("equips carried equipment with effects once, then leaves a later unequip alone", async () => {
     const ring = persistingEquipment("Ring of Protection", {
       schemaVersion: CURRENT_SCHEMA_VERSION,
