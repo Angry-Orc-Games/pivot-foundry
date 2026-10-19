@@ -1456,16 +1456,26 @@
   line-height: 1.25;
 }
 
+.pf-sheet .pf-print table.pf-skills td:first-child {
+  white-space: nowrap;
+}
+
 .pf-sheet .pf-print table.pf-skills td.pf-r {
   text-align: right;
 }
 
 .pf-sheet .pf-print table.pf-skills .pf-check {
-  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 20px;
+  height: 20px;
+  justify-content: center;
+  min-height: 20px;
+  min-width: 20px;
   vertical-align: middle;
   white-space: nowrap;
+  width: 20px;
 }
 
 .pf-sheet .pf-print table.pf-skills button.pf-skill-name {
@@ -1849,6 +1859,17 @@
   padding: 0;
   text-decoration: none;
   width: auto;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  :is(button.pf-skill-name, td.pf-r button.pf-roll):hover {
+  color: #8a3b12;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 :is(body, body.theme-dark, body.theme-light)

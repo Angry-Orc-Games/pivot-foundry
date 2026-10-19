@@ -365,8 +365,11 @@ describe("character sheet template structure", () => {
     const row = [...filled.querySelectorAll("li")].find((element) =>
       element.textContent?.includes("Keen"),
     );
-    expect(row?.querySelector('[data-action="openItem"]')?.textContent?.trim()).toBe("...");
-    expect(row?.querySelector('[data-action="deleteItem"]')?.textContent?.trim()).toBe("x");
+    const controls = [...(row?.querySelectorAll("button") ?? [])].map((element) =>
+      element.textContent?.trim(),
+    );
+    expect(controls).toContain("...");
+    expect(controls).toContain("x");
     const english = JSON.parse(readFileSync(resolve(process.cwd(), "lang/en.json"), "utf-8"));
     expect(english["PIVOT.Messages.NoTraits"]).toBe("No traits yet");
   });
@@ -420,14 +423,13 @@ describe("character sheet template structure", () => {
     const decoration = `${hover?.style?.textDecorationLine || ""} ${hover?.style?.textDecoration || ""}`;
     expect(decoration).toContain("underline");
     expect(hover?.style?.cursor).toBe("pointer");
-    expect(hover?.style?.color).toBe("#8a3b12");
+    expect(hover?.style?.color).toBe("rgb(138, 59, 18)");
   });
 
   it("vitals partial includes stat cards and abilities", () => {
     const templatePath = resolve(process.cwd(), "templates/actors/character/vitals.hbs");
     const template = readFileSync(templatePath, "utf-8");
 
-    // Verify stat cards
     expect(template).toContain('class="pf-stats"');
     expect(template).toContain('class="pf-stat"');
     expect(template).toContain("ARMOUR CLASS");

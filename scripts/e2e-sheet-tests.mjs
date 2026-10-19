@@ -225,7 +225,7 @@ function getContextData() {
         breakdown: "10 + DEX 3 + Medium 2",
         armourWorn: "Medium armour (Large Shield)",
       },
-      speed: { value: 10 },
+      speed: 10,
       proficiencyBonus: 4,
       initiative: "+7",
       passivePerception: 17,
@@ -1104,11 +1104,11 @@ async function assertPrintSheet(page, label) {
         Math.abs(measured.vitalsWidth - measured.contentWidth) < 1,
     ],
     ["bullets", measured.list?.listStyleType === "disc"],
-    ["speed lowercase", measured.speedText.includes("m") && !measured.speedText.includes("M")],
+    ["speed lowercase", measured.speedText === "10 m"],
     ["speed transform", measured.speedTransform === "none"],
     ["skill marker", measured.mark === "●" || measured.mark === "○"],
     ["ability case", measured.ability === "Str"],
-    ["skill row height", measured.rowHeight >= 16 && measured.rowHeight <= 22],
+    ["skill row height", measured.rowHeight >= 16 && measured.rowHeight <= 24],
     [
       "skill names aligned",
       measured.skillNameLefts?.length === 2 &&

@@ -103,7 +103,7 @@ function buildContext(editable) {
         armourWorn: "Medium armour + Large Shield",
         breakdown: "10 + 3 + 3",
       },
-      speed: { value: 10 },
+      speed: 10,
       proficiencyBonus: 2,
       initiative: 1,
       passivePerception: 14,

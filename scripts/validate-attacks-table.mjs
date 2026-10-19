@@ -211,7 +211,7 @@ async function validateAttacksTable() {
         breakdown: "10 + DEX 3 + Medium 2",
         armourWorn: "Medium armour (Large Shield)",
       },
-      speed: { value: 10 },
+      speed: 10,
       proficiencyBonus: 4,
       initiative: "+7",
       passivePerception: 17,

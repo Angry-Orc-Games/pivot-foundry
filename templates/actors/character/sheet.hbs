@@ -7,12 +7,11 @@
         {{#each skillRows}}
           <tr>
             <td>
-              <label class="pf-check"><input
+              <label class="pf-check" title="{{localize 'PIVOT.Actions.ToggleProficiency'}}"><input
                   class="pf-sr"
                   type="checkbox"
                   name="{{proficientPath}}"
                   {{checked proficient}}
-                  {{disabledAttr}}
                   role="checkbox"
                   aria-label="Proficient in {{label}}"
                 /><span class="pf-prof-mark" aria-hidden="true">{{#if
@@ -265,32 +264,36 @@
           title="{{localize 'PIVOT.Actions.CreateTrait'}}"
           {{disabledAttr}}
         >+</button></div>
-      <ul class="pf-list">
-        {{#each items.traits}}
-          <li><button
-              type="button"
-              class="pf-link"
-              data-action="openItem"
-              data-item-id="{{id}}"
-            >{{name}}</button>
-            <button
-              type="button"
-              data-action="openItem"
-              data-item-id="{{id}}"
-              aria-label="{{localize 'PIVOT.Actions.EditItem'}}"
-              title="{{localize 'PIVOT.Actions.EditItem'}}"
-              {{disabledAttr}}
-            >...</button>
-            <button
-              type="button"
-              data-action="deleteItem"
-              data-item-id="{{id}}"
-              aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
-              title="{{localize 'PIVOT.Actions.DeleteItem'}}"
-              {{disabledAttr}}
-            >x</button></li>
-        {{/each}}
-      </ul>
+      {{#if items.traits.length}}
+        <ul class="pf-list">
+          {{#each items.traits}}
+            <li><button
+                type="button"
+                class="pf-link"
+                data-action="openItem"
+                data-item-id="{{id}}"
+              >{{name}}</button>
+              <button
+                type="button"
+                data-action="openItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.EditItem'}}"
+                title="{{localize 'PIVOT.Actions.EditItem'}}"
+                {{disabledAttr}}
+              >...</button>
+              <button
+                type="button"
+                data-action="deleteItem"
+                data-item-id="{{id}}"
+                aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+                {{disabledAttr}}
+              >x</button></li>
+          {{/each}}
+        </ul>
+      {{else}}
+        <p class="pf-small">{{localize "PIVOT.Messages.NoTraits"}}</p>
+      {{/if}}
     </div>
   </div>
 
@@ -522,6 +525,14 @@
               min="0"
               step="1"
               value="{{system.attributes.hp.max}}"
+              {{disabledAttr}}
+            /></label>
+          <label><span>{{localize "PIVOT.Fields.Speed"}}</span><input
+              name="system.attributes.speed.value"
+              type="number"
+              min="0"
+              step="1"
+              value="{{system.attributes.speed.value}}"
               {{disabledAttr}}
             /></label>
         </div>

@@ -15,14 +15,12 @@
       <small>{{system.attributes.hitDie}} + Con {{conMod}}</small>
     </div>
 
-    {{! Speed stat card }}
     <div class="pf-stat">
       <b>SPEED</b>
-      <span>{{#if derived.speed.value}}{{derived.speed.value}} m{{else}}—{{/if}}</span>
+      <span>{{derived.speed}} m</span>
       <small>Prof. bonus +{{derived.proficiencyBonus}}</small>
     </div>
 
-    {{! Pool stat card }}
     <div class="pf-stat">
       <b>POOL</b>
       <span>{{system.resources.pool.value}}
