@@ -44,6 +44,15 @@ describe("clampMpOnActorUpdate", () => {
     expect(changes["system.magic.mp.value"]).toBe(5);
   });
 
+  it("clamps the stored current MP when a dotted update lowers max", () => {
+    const actor = { type: "character", system: awakenedMagic(8, 3), items: [] };
+    const changes: Record<string, unknown> = { "system.magic.mp.maxBonus": 0 };
+
+    clampMpOnActorUpdate(actor, changes);
+
+    expect(changes.system).toMatchObject({ magic: { mp: { value: 5 } } });
+  });
+
   it("clamps the stored current MP when an update lowers max", () => {
     const actor = { type: "character", system: awakenedMagic(8, 3), items: [] };
     const changes: Record<string, unknown> = { system: { magic: { mp: { maxBonus: 0 } } } };
@@ -163,8 +172,11 @@ describe("registerMpClampHooks", () => {
       },
     };
 
-    listeners.get("deleteItem")?.({ parent: actor });
-
-    expect(updates).toEqual([{ "system.magic.mp.value": 5 }]);
+    for (const event of ["createItem", "updateItem", "deleteItem"]) {
+      updates.length = 0;
+      actor.system = awakenedMagic(8);
+      listeners.get(event)?.({ parent: actor });
+      expect(updates).toEqual([{ "system.magic.mp.value": 5 }]);
+    }
   });
 });

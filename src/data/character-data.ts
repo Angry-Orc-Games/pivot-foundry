@@ -2,6 +2,7 @@ import { abilities, canonicalSkills } from "../config";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 import { abilityModifier } from "../rules/modifiers";
 import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
+import { characterMpMaximum, clampMp } from "../rules/resources";
 import {
   arrayField,
   booleanField,
@@ -40,10 +41,11 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       // Access parent actor to get items and aggregate their effects
       let effectsInitiativeBonus = 0;
       let dexScoreBonus = 0;
+      let itemList: { system?: unknown }[] = [];
       try {
         const parent = (this as { parent?: { items?: Iterable<unknown> } }).parent;
         if (parent?.items && Symbol.iterator in Object(parent.items)) {
-          const itemList = Array.from(parent.items) as { system?: unknown }[];
+          itemList = Array.from(parent.items) as { system?: unknown }[];
           const effects = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
           effectsInitiativeBonus = effects.initiativeBonus ?? 0;
           // Also collect ability score bonus effects (like the character sheet does)
@@ -64,6 +66,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       // Matches character-derived.ts: abilities.dex.mod + initiativeBonus + effects.initiativeBonus
       // where dex.mod is computed from the effective (base + abilityScoreBonus) score
       this.initiative = dexMod + initiativeBonus + effectsInitiativeBonus;
+      clampDisplayedMp(selfAsRecord, itemList);
     }
 
     static defineSchema(): Record<string, DataField> {
@@ -214,6 +217,14 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
   }
 
   return PivotCharacterData;
+}
+
+function clampDisplayedMp(system: Record<string, unknown>, items: { system?: unknown }[]): void {
+  const magic = system.magic;
+  if (typeof magic !== "object" || magic === null || Array.isArray(magic)) return;
+  const mp = (magic as { mp?: { value?: unknown } }).mp;
+  if (!mp || typeof mp.value !== "number") return;
+  mp.value = clampMp(mp.value, characterMpMaximum(system, items));
 }
 
 function abilitySchema(fields: FoundryRuntime["data"]["fields"]): DataField {
