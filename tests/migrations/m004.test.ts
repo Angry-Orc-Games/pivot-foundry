@@ -19,7 +19,7 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": true },
+      update: { "system.equipped": true, [M004_FLAG]: true },
     });
   });
 
@@ -29,14 +29,14 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": false },
+      update: { "system.equipped": false, [M004_FLAG]: true },
     });
     expect(
       planWeaponEquippedMigration({ schemaVersion: CURRENT_SCHEMA_VERSION }, "weapon"),
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": false },
+      update: { "system.equipped": false, [M004_FLAG]: true },
     });
     expect(
       planWeaponEquippedMigration(
@@ -46,11 +46,11 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": false },
+      update: { "system.equipped": false, [M004_FLAG]: true },
     });
   });
 
-  it("does not change a weapon that already stores equipped", () => {
+  it("equips an effect weapon whose stored false is only the schema default, and keeps a marked choice", () => {
     expect(
       planWeaponEquippedMigration(
         {
@@ -60,25 +60,46 @@ describe("planWeaponEquippedMigration", () => {
         },
         "weapon",
       ),
+    ).toEqual({
+      ok: true,
+      changed: true,
+      update: { "system.equipped": true, [M004_FLAG]: true },
+    });
+    expect(
+      planWeaponEquippedMigration(
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          effects: [strengthEffect],
+          equipped: false,
+        },
+        "weapon",
+        { [SYSTEM_ID]: { m004: true } },
+      ),
     ).toEqual({ ok: true, changed: false });
     expect(
       planWeaponEquippedMigration(
         { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [], equipped: true },
         "weapon",
       ),
-    ).toEqual({ ok: true, changed: false });
+    ).toEqual({
+      ok: true,
+      changed: true,
+      update: { [M004_FLAG]: true },
+    });
   });
 
-  it("is idempotent once equipped has been stored", () => {
+  it("is idempotent once the M004 marker is stored", () => {
     const stored = { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [strengthEffect] };
     const first = planWeaponEquippedMigration(stored, "weapon");
     expect(first).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": true },
+      update: { "system.equipped": true, [M004_FLAG]: true },
     });
 
-    const second = planWeaponEquippedMigration({ ...stored, equipped: true }, "weapon");
+    const second = planWeaponEquippedMigration({ ...stored, equipped: true }, "weapon", {
+      [SYSTEM_ID]: { m004: true },
+    });
     expect(second).toEqual({ ok: true, changed: false });
   });
 
@@ -312,14 +333,17 @@ function persistingEquipment(name: string, initial: Record<string, unknown>) {
 
 function persistingItem(name: string, initial: Record<string, unknown>) {
   let stored = { ...initial };
+  let marked = false;
   const document = {
     name,
     type: "weapon",
-    toObject: () => ({ system: stored }),
+    toObject: () => ({
+      system: stored,
+      flags: marked ? { [SYSTEM_ID]: { m004: true } } : {},
+    }),
     update: async (data: Record<string, unknown>) => {
-      if ("system.equipped" in data) {
-        stored = { ...stored, equipped: data["system.equipped"] };
-      }
+      if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
+      if (data[M004_FLAG] === true) marked = true;
     },
     get stored() {
       return stored;

@@ -11,20 +11,14 @@ export function planWeaponEquippedMigration(
 ): MigrationPlan {
   if (!isPlainObject(storedSystem)) return { ok: true, changed: false };
 
+  if (hasM004Marker(storedFlags)) return { ok: true, changed: false };
+
   if (itemType === "equipment") {
     return planEquipmentEquippedMigration(storedSystem, storedFlags);
   }
 
-  if (itemType !== "weapon" || "equipped" in storedSystem) {
-    return { ok: true, changed: false };
-  }
-
-  const equipped = Array.isArray(storedSystem.effects) && storedSystem.effects.length > 0;
-  return {
-    ok: true,
-    changed: true,
-    update: { "system.equipped": equipped },
-  };
+  if (itemType !== "weapon") return { ok: true, changed: false };
+  return planUnmarkedWeaponMigration(storedSystem);
 }
 
 export function weaponEquippedMigrationNotice(
@@ -38,6 +32,14 @@ export function weaponEquippedMigrationNotice(
     return `M004: equipped ${itemType} '${itemName}'${actor} so its bonuses keep applying`;
   }
   return `M004: set weapon '${itemName}'${actor} unequipped because it has no effect bonuses`;
+}
+
+function planUnmarkedWeaponMigration(storedSystem: Record<string, unknown>): MigrationPlan {
+  const hasEffects = Array.isArray(storedSystem.effects) && storedSystem.effects.length > 0;
+  const equipped = hasEffects || storedSystem.equipped === true;
+  const update: Record<string, unknown> = { [M004_EQUIPPED_FLAG]: true };
+  if (storedSystem.equipped !== equipped) update["system.equipped"] = equipped;
+  return { ok: true, changed: true, update };
 }
 
 function planEquipmentEquippedMigration(

@@ -262,7 +262,7 @@ function weaponEquippedNotice(
   actorName?: string,
 ): string | undefined {
   const plan = planWeaponEquippedMigration(stored, document.type, readStoredFlags(document));
-  if (!plan.ok || !plan.changed) return undefined;
+  if (!plan.ok || !plan.changed || !("system.equipped" in plan.update)) return undefined;
   const equipped = plan.update["system.equipped"] === true;
   const itemType = document.type === "equipment" ? "equipment" : "weapon";
   return weaponEquippedMigrationNotice(
