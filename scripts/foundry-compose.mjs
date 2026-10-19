@@ -285,15 +285,22 @@ export async function waitForHttp(baseUrl, timeoutMs, options = {}) {
       error.code = "STARTUP_FAILED";
       throw error;
     }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
     try {
-      const response = await fetch(baseUrl, { redirect: "manual" });
+      const response = await fetch(baseUrl, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(remaining),
+      });
       if (response.status > 0) return response.status;
       lastError = `status ${response.status}`;
     } catch (error) {
       lastError = describeFetchFailure(error);
     }
+    const pause = Math.min(1000, deadline - Date.now());
+    if (pause <= 0) break;
     await new Promise((resolve) => {
-      globalThis.setTimeout(resolve, 1000);
+      globalThis.setTimeout(resolve, pause);
     });
   }
   const error = new Error(
@@ -304,6 +311,7 @@ export async function waitForHttp(baseUrl, timeoutMs, options = {}) {
 }
 
 function describeFetchFailure(error) {
+  if (isRequestTimeout(error)) return "request timed out";
   const code = error?.cause?.code;
   if (typeof code === "string" && code) return code;
   const message = String(error?.message || "request failed");
@@ -311,6 +319,11 @@ function describeFetchFailure(error) {
   const line = message.split("\n")[0];
   if (line.includes("://") || line.includes("@")) return "request failed";
   return line.slice(0, 160);
+}
+
+function isRequestTimeout(error) {
+  const names = [error?.name, error?.cause?.name];
+  return names.includes("TimeoutError") || names.includes("AbortError");
 }
 
 function httpTarget(baseUrl) {
