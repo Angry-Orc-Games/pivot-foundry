@@ -1461,10 +1461,17 @@
 }
 
 .pf-sheet .pf-print table.pf-skills .pf-check {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
+  vertical-align: middle;
   white-space: nowrap;
+}
+
+.pf-sheet .pf-print table.pf-skills button.pf-skill-name {
+  font-weight: 400;
+  margin-left: 4px;
+  text-align: left;
 }
 
 .pf-sheet .pf-print table.pf-skills .pf-check input {
@@ -2193,7 +2200,12 @@
   .pivot-fantasy.sheet.actor.character
   .window-content
   .pf-print
-  :is(.pf-prime-toggle, .pf-skills .pf-check):has(input:focus-visible) {
+  :is(.pf-prime-toggle, .pf-skills .pf-check):has(input:focus-visible),
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  button.pf-skill-name:focus-visible {
   outline: var(--pf-focus-outline);
   outline-offset: var(--pf-focus-offset);
 }

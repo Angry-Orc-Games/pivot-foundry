@@ -17,8 +17,14 @@
                   aria-label="Proficient in {{label}}"
                 /><span class="pf-prof-mark" aria-hidden="true">{{#if
                     proficient
-                  }}●{{else}}○{{/if}}</span><span>{{label}}{{#if expertise}}
-                    (Expertise){{/if}}</span></label>
+                  }}●{{else}}○{{/if}}</span></label><button
+                type="button"
+                class="pf-roll pf-skill-name"
+                data-action="roll"
+                data-roll-kind="skill"
+                data-key="{{id}}"
+                data-label="{{label}}"
+              >{{label}}{{#if expertise}} (Expertise){{/if}}</button>
             </td>
             <td class="pf-small">{{ability}}</td>
             <td class="pf-r"><button
@@ -250,7 +256,15 @@
         </ul>
       {{/if}}
 
-      <h3>Traits</h3>
+      <div class="pf-section-header"><h3>Traits</h3><button
+          type="button"
+          data-action="createItem"
+          data-type="feature"
+          data-category="other"
+          aria-label="{{localize 'PIVOT.Actions.CreateTrait'}}"
+          title="{{localize 'PIVOT.Actions.CreateTrait'}}"
+          {{disabledAttr}}
+        >+</button></div>
       <ul class="pf-list">
         {{#each items.traits}}
           <li><button
@@ -258,7 +272,23 @@
               class="pf-link"
               data-action="openItem"
               data-item-id="{{id}}"
-            >{{name}}</button></li>
+            >{{name}}</button>
+            <button
+              type="button"
+              data-action="openItem"
+              data-item-id="{{id}}"
+              aria-label="{{localize 'PIVOT.Actions.EditItem'}}"
+              title="{{localize 'PIVOT.Actions.EditItem'}}"
+              {{disabledAttr}}
+            >...</button>
+            <button
+              type="button"
+              data-action="deleteItem"
+              data-item-id="{{id}}"
+              aria-label="{{localize 'PIVOT.Actions.DeleteItem'}}"
+              title="{{localize 'PIVOT.Actions.DeleteItem'}}"
+              {{disabledAttr}}
+            >x</button></li>
         {{/each}}
       </ul>
     </div>

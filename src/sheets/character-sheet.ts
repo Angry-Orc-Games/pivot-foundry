@@ -800,7 +800,7 @@ export async function applyInitiativeRollToCombat(options: {
   return "updated";
 }
 
-export function createEmbeddedItemData(type: string): Record<string, unknown> {
+export function createEmbeddedItemData(type: string, category?: string): Record<string, unknown> {
   const nameByType: Record<string, string> = {
     weapon: "New Weapon",
     armour: "New Armour",
@@ -809,11 +809,13 @@ export function createEmbeddedItemData(type: string): Record<string, unknown> {
     magicStream: "New Magic Stream",
     magicAbility: "New Magic Ability",
   };
-
-  return {
-    name: nameByType[type] ?? "New Item",
+  const data: Record<string, unknown> = {
+    name:
+      type === "feature" && category === "other" ? "New Trait" : (nameByType[type] ?? "New Item"),
     type,
   };
+  if (category) data.system = { category };
+  return data;
 }
 
 function getSheetDocument(sheet: object): ActorLike {
@@ -1003,7 +1005,7 @@ async function createItemAction(
   if (!type) return;
   const [item] =
     ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
-      createEmbeddedItemData(type),
+      createEmbeddedItemData(type, target.dataset.category),
     ])) as ItemLike[] | undefined) ?? [];
   item?.sheet?.render?.(true);
 }

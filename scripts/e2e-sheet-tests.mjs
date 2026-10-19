@@ -873,7 +873,7 @@ async function assertPrintSheet(page, label) {
     const emptyStar = document.querySelector(".pf-ab:not(.pf-prime) .pf-prime-mark");
     const primeBox = document.querySelector(".pf-ab.pf-prime");
     const skillCell = document.querySelector("table.pf-skills td");
-    const skillName = document.querySelector("table.pf-skills .pf-check span:not(.pf-prof-mark)");
+    const skillName = document.querySelector("table.pf-skills .pf-skill-name");
     const skillCellStyle = skillCell ? window.getComputedStyle(skillCell) : null;
     const skillNameStyle = skillName ? window.getComputedStyle(skillName) : null;
     const modifier = document.querySelector("table.pf-skills td.pf-r .pf-roll");
@@ -954,7 +954,7 @@ async function assertPrintSheet(page, label) {
       rowHeight: row ? row.getBoundingClientRect().height : 0,
       mark: mark ? mark.textContent : "",
       ability: ability ? ability.textContent.trim() : "",
-      skillNameLefts: [...document.querySelectorAll(".pf-skills .pf-check span:not(.pf-prof-mark)")]
+      skillNameLefts: [...document.querySelectorAll(".pf-skills .pf-skill-name")]
         .slice(0, 2)
         .map((el) => {
           const range = document.createRange();
