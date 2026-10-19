@@ -34,6 +34,16 @@ export function weaponEquippedMigrationNotice(
   return `M004: set weapon '${itemName}'${actor} unequipped because it has no effect bonuses`;
 }
 
+export function initializeEquippedMarker(item: {
+  type?: string;
+  flags?: unknown;
+  updateSource?: (data: Record<string, unknown>) => unknown;
+}): void {
+  if (item.type !== "weapon" && item.type !== "equipment") return;
+  if (!item.updateSource || hasM004Marker(item.flags)) return;
+  item.updateSource({ [M004_EQUIPPED_FLAG]: true });
+}
+
 function planUnmarkedWeaponMigration(storedSystem: Record<string, unknown>): MigrationPlan {
   const hasEffects = Array.isArray(storedSystem.effects) && storedSystem.effects.length > 0;
   const equipped = hasEffects || storedSystem.equipped === true;

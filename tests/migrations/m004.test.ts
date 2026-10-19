@@ -1,13 +1,31 @@
 import { describe, expect, it } from "vitest";
 
 import { SYSTEM_ID } from "../../src/config";
-import { planWeaponEquippedMigration } from "../../src/migrations/m004";
+import { initializeEquippedMarker, planWeaponEquippedMigration } from "../../src/migrations/m004";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
 
 const M004_FLAG = `flags.${SYSTEM_ID}.m004`;
 
 const strengthEffect = { type: "abilityScoreBonus", ability: "str", amount: 2 };
+
+describe("initializeEquippedMarker", () => {
+  it("marks a new weapon or equipment item and leaves equipped alone", () => {
+    const updates: Record<string, unknown>[] = [];
+    const updateSource = (data: Record<string, unknown>) => {
+      updates.push(data);
+    };
+    initializeEquippedMarker({ type: "weapon", updateSource });
+    initializeEquippedMarker({ type: "equipment", updateSource });
+    initializeEquippedMarker({ type: "armour", updateSource });
+    initializeEquippedMarker({
+      type: "weapon",
+      flags: { [SYSTEM_ID]: { m004: true } },
+      updateSource,
+    });
+    expect(updates).toEqual([{ [M004_FLAG]: true }, { [M004_FLAG]: true }]);
+  });
+});
 
 describe("planWeaponEquippedMigration", () => {
   it("equips a weapon that has effects and no equipped key", () => {
@@ -360,6 +378,8 @@ describe("M004 world migration", () => {
       equipped: false,
       carried: true,
     });
+    initializeEquippedMarker(sword);
+    initializeEquippedMarker(ring);
     items.push(sword, ring);
 
     await runWorldMigrations(dependencies);
@@ -385,6 +405,12 @@ function persistingEquipment(name: string, initial: Record<string, unknown>) {
       updates.push(data);
       if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
       if (data[M004_FLAG] === true) marked = true;
+    },
+    updateSource(data: Record<string, unknown>) {
+      if (data[M004_FLAG] === true) marked = true;
+    },
+    get flags() {
+      return marked ? { [SYSTEM_ID]: { m004: true } } : {};
     },
     setEquipped(value: boolean) {
       stored = { ...stored, equipped: value };
@@ -412,6 +438,12 @@ function persistingItem(name: string, initial: Record<string, unknown>) {
     update: async (data: Record<string, unknown>) => {
       if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
       if (data[M004_FLAG] === true) marked = true;
+    },
+    updateSource(data: Record<string, unknown>) {
+      if (data[M004_FLAG] === true) marked = true;
+    },
+    get flags() {
+      return marked ? { [SYSTEM_ID]: { m004: true } } : {};
     },
     get stored() {
       return stored;

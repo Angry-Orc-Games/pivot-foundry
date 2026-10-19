@@ -171,6 +171,12 @@ describe("registerPivotFantasySystem", () => {
   it("registers data models, token resources, and v14 document sheets during init", () => {
     const { foundry, registeredSheets } = createMockFoundry();
     const hooks = new Map<string, () => void>();
+    let preCreateItem:
+      | ((item: {
+          type?: string;
+          updateSource?: (data: Record<string, unknown>) => unknown;
+        }) => void)
+      | undefined;
     const CONFIG = {
       Actor: { dataModels: {}, trackableAttributes: {} },
       Item: { dataModels: {} },
@@ -178,6 +184,9 @@ describe("registerPivotFantasySystem", () => {
 
     registerPivotFantasySystem({
       Hooks: {
+        on(event, callback) {
+          if (event === "preCreateItem") preCreateItem = callback;
+        },
         once(event, callback) {
           hooks.set(event, callback);
         },
@@ -213,5 +222,14 @@ describe("registerPivotFantasySystem", () => {
       DEFAULT_OPTIONS?: { actions?: Record<string, unknown> };
     };
     expect(npcSheetClass.DEFAULT_OPTIONS?.actions).toHaveProperty("editItem");
+
+    const updates: Record<string, unknown>[] = [];
+    preCreateItem?.({
+      type: "weapon",
+      updateSource(data) {
+        updates.push(data);
+      },
+    });
+    expect(updates).toEqual([{ "flags.pivot-fantasy.m004": true }]);
   });
 });
