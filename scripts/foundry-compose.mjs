@@ -1,5 +1,5 @@
-import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
 
@@ -160,6 +160,39 @@ export function pullImage(versions) {
   execFileSync("docker", ["pull", pinnedImageRef(versions)], { stdio: "inherit" });
 }
 
+export function prepareDataDir(dataDir, io = {}) {
+  const run = io.execFileSync ?? execFileSync;
+  const stat = io.statSync ?? statSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  run("mkdir", ["-p", dataDir], quiet);
+  const info = stat(dataDir);
+  if (info.uid === 1000 && info.gid === 1000) return { usedSudo: false };
+
+  const own = ["-R", "1000:1000", dataDir];
+  try {
+    run("chown", own, quiet);
+    return { usedSudo: false };
+  } catch (error) {
+    if (!chownNeedsSudo(error)) throw error;
+    try {
+      run("sudo", ["-n", "chown", ...own], quiet);
+    } catch (sudoError) {
+      const wrapped = new Error(
+        `Could not give uid 1000 write access to ${dataDir}. The Foundry container runs as 1000:1000.`,
+      );
+      wrapped.code = "DATA_DIR";
+      wrapped.cause = sudoError;
+      throw wrapped;
+    }
+    return { usedSudo: true };
+  }
+}
+
+function chownNeedsSudo(error) {
+  const text = `${error?.stderr || ""}\n${error?.message || ""}`;
+  return /Operation not permitted|Permission denied|EPERM/.test(text);
+}
+
 export function prepareDevSystemDir(paths) {
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
   mkdirSync(systemDir, { recursive: true });
@@ -200,23 +233,11 @@ export function followLogs(paths) {
 
 export function collectDiagnostics(paths) {
   mkdirSync(paths.diagnosticsDir, { recursive: true });
-  try {
-    const logs = execFileSync(
-      "docker",
-      ["compose", ...composeArgs(paths), "logs", "--no-color", "--tail", "400"],
-      {
-        cwd: paths.root,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    writeFileSync(join(paths.diagnosticsDir, "foundry.log"), redactDiagnostics(logs));
-  } catch (error) {
-    writeFileSync(
-      join(paths.diagnosticsDir, "foundry.log"),
-      redactDiagnostics(String(error.stdout || error.stderr || error.message)),
-    );
-  }
+  const container = composeNames(paths).container;
+  const result = spawnSync("docker", ["logs", "--tail", "400", container], { encoding: "utf8" });
+  const logs = `${result.stdout || ""}${result.stderr || ""}`;
+  const text = logs || result.error?.message || "";
+  writeFileSync(join(paths.diagnosticsDir, "foundry.log"), redactDiagnostics(text));
 }
 
 export function redactDiagnostics(text) {
@@ -224,27 +245,72 @@ export function redactDiagnostics(text) {
     .replaceAll(/FOUNDRY_LICENSE_KEY=\S+/g, "FOUNDRY_LICENSE_KEY=<redacted>")
     .replaceAll(/FOUNDRY_ADMIN_KEY=\S+/g, "FOUNDRY_ADMIN_KEY=<redacted>")
     .replaceAll(/FOUNDRY_RELEASE_URL=\S+/g, "FOUNDRY_RELEASE_URL=<redacted>")
+    .replaceAll(/FOUNDRY_RELEASE_CACHE_URL=\S+/g, "FOUNDRY_RELEASE_CACHE_URL=<redacted>")
+    .replaceAll(/([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, "$1<redacted>@")
     .replaceAll(/[A-Z0-9]{4}(?:-[A-Z0-9]{4}){5}/g, "<redacted-license>");
 }
 
-export async function waitForHttp(baseUrl, timeoutMs) {
+export function describeStartupFailure(logs, status = "") {
+  const text = String(logs || "");
+  if (
+    /Volume write test failed|Volume read test failed|insufficient permissions on \/data/.test(text)
+  ) {
+    return "Foundry container aborted: insufficient permissions on /data";
+  }
+  const state = String(status || "").trim();
+  if (/^(exited|dead)\b/.test(state)) {
+    return `Foundry container stopped (${state})`;
+  }
+  return null;
+}
+
+export function containerStartupProblem(paths) {
+  const container = composeNames(paths).container;
+  const logs = spawnSync("docker", ["logs", "--tail", "200", container], { encoding: "utf8" });
+  const state = spawnSync(
+    "docker",
+    ["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", container],
+    { encoding: "utf8" },
+  );
+  return describeStartupFailure(`${logs.stdout || ""}${logs.stderr || ""}`, state.stdout || "");
+}
+
+export async function waitForHttp(baseUrl, timeoutMs, options = {}) {
   const deadline = Date.now() + timeoutMs;
+  let lastError = "no response";
   while (Date.now() < deadline) {
+    const aborted = options.inspect?.();
+    if (aborted) {
+      const error = new Error(aborted);
+      error.code = "STARTUP_FAILED";
+      throw error;
+    }
     try {
       const response = await fetch(baseUrl, { redirect: "manual" });
       if (response.status > 0) return response.status;
-    } catch {
-      // Keep polling. A refused connection is the gap before the server binds.
+      lastError = `status ${response.status}`;
+    } catch (error) {
+      lastError = describeFetchFailure(error);
     }
     await new Promise((resolve) => {
       globalThis.setTimeout(resolve, 1000);
     });
   }
   const error = new Error(
-    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s`,
+    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s (${lastError})`,
   );
   error.code = "TIMEOUT";
   throw error;
+}
+
+function describeFetchFailure(error) {
+  const code = error?.cause?.code;
+  if (typeof code === "string" && code) return code;
+  const message = String(error?.message || "request failed");
+  if (message.includes("credentials")) return "credentials in URL";
+  const line = message.split("\n")[0];
+  if (line.includes("://") || line.includes("@")) return "request failed";
+  return line.slice(0, 160);
 }
 
 function httpTarget(baseUrl) {
