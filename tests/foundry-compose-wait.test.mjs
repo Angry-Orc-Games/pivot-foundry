@@ -36,7 +36,7 @@ function runWait(url, timeoutMs) {
     );
     let stdout = "";
     let stderr = "";
-    const killer = setTimeout(() => child.kill("SIGKILL"), 12_000);
+    const killer = globalThis.setTimeout(() => child.kill("SIGKILL"), 12_000);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -46,11 +46,11 @@ function runWait(url, timeoutMs) {
       stderr += chunk;
     });
     child.once("error", (error) => {
-      clearTimeout(killer);
+      globalThis.clearTimeout(killer);
       reject(error);
     });
     child.once("exit", (code, signal) => {
-      clearTimeout(killer);
+      globalThis.clearTimeout(killer);
       resolve({ code, signal, stdout, stderr, output: `${stdout}\n${stderr}` });
     });
   });
@@ -66,9 +66,7 @@ describe("waitForHttp process lifetime", () => {
     expect(result.code).not.toBe(13);
     expect(result.signal).toBeNull();
     expect(result.code).not.toBe(0);
-    expect(result.output).toContain(
-      `Foundry did not answer HTTP at 127.0.0.1:${port} within 2s`,
-    );
+    expect(result.output).toContain(`Foundry did not answer HTTP at 127.0.0.1:${port} within 2s`);
     expect(result.output).toContain("FINALLY_MARKER");
     expect(result.output).not.toContain("super-secret-key");
     expect(result.output).not.toContain("unsettled top-level await");
@@ -84,7 +82,7 @@ describe("waitForHttp process lifetime", () => {
       response.writeHead(204);
       response.end();
     });
-    const opener = setTimeout(() => {
+    const opener = globalThis.setTimeout(() => {
       server.listen(port, "127.0.0.1");
     }, 2200);
 
@@ -92,7 +90,7 @@ describe("waitForHttp process lifetime", () => {
     try {
       result = await pending;
     } finally {
-      clearTimeout(opener);
+      globalThis.clearTimeout(opener);
       if (server.listening) {
         await new Promise((resolve) => server.close(resolve));
       }
