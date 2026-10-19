@@ -185,7 +185,9 @@ describe("registerPivotFantasySystem", () => {
     registerPivotFantasySystem({
       Hooks: {
         on(event, callback) {
-          if (event === "preCreateItem") preCreateItem = callback;
+          if (event === "preCreateItem") {
+            preCreateItem = callback as NonNullable<typeof preCreateItem>;
+          }
         },
         once(event, callback) {
           hooks.set(event, callback);
