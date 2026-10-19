@@ -21,6 +21,7 @@ import {
   containerStartupProblem,
   inspectOwnership,
   installPackagedSystem,
+  prepareContainerCache,
   prepareDataDir,
   pullImage,
   requireDocker,
@@ -135,6 +136,7 @@ export async function runE2E(args = {}) {
       world: "",
     });
     prepareDataDir(paths.foundryData);
+    prepareContainerCache(paths);
     compose(paths, ["up", "-d", "--remove-orphans"]);
     started = true;
     const runtime = writeRuntime(paths, names, port);

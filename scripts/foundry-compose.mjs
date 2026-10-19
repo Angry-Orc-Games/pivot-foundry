@@ -1,5 +1,13 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
 
@@ -40,7 +48,7 @@ export function writeComposeEnv(paths, result, { port, hotReload, preserveConfig
     `PIVOT_FOUNDRY_INSTANCE=${paths.instanceId}`,
     `PIVOT_REPO_ROOT=${paths.root}`,
     `PIVOT_FOUNDRY_DATA_DIR=${paths.foundryData}`,
-    `PIVOT_FOUNDRY_DIST_DIR=${paths.distDir}`,
+    `PIVOT_FOUNDRY_CONTAINER_CACHE=${paths.containerCacheDir}`,
     `PIVOT_PRESERVE_CONFIG=${preserveConfig ? "true" : "false"}`,
     `PIVOT_HOT_RELOAD=${hotReload ? "true" : "false"}`,
     `PIVOT_FOUNDRY_WORLD=${world || ""}`,
@@ -162,13 +170,38 @@ export function pullImage(versions) {
 
 export function prepareDataDir(dataDir, io = {}) {
   const run = io.execFileSync ?? execFileSync;
-  const stat = io.statSync ?? statSync;
   const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
   run("mkdir", ["-p", dataDir], quiet);
-  const info = stat(dataDir);
-  if (info.uid === 1000 && info.gid === 1000) return { usedSudo: false };
+  return chownFoundryTree(dataDir, io);
+}
 
-  const own = ["-R", "1000:1000", dataDir];
+export function prepareContainerCache(paths, io = {}) {
+  const copy = io.copyFileSync ?? copyFileSync;
+  const exists = io.existsSync ?? existsSync;
+  const source = join(paths.distDir, paths.versions.cacheFileName);
+  if (!exists(source)) {
+    const error = new Error(`Missing verified Foundry archive ${paths.versions.cacheFileName}.`);
+    error.code = "DATA_DIR";
+    throw error;
+  }
+
+  const cacheDir = paths.containerCacheDir;
+  const run = io.execFileSync ?? execFileSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  run("mkdir", ["-p", cacheDir], quiet);
+  copy(source, join(cacheDir, paths.versions.cacheFileName));
+  chownFoundryTree(cacheDir, io, { force: true });
+  return cacheDir;
+}
+
+function chownFoundryTree(dir, io = {}, { force = false } = {}) {
+  const run = io.execFileSync ?? execFileSync;
+  const stat = io.statSync ?? statSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  const info = stat(dir);
+  if (!force && info.uid === 1000 && info.gid === 1000) return { usedSudo: false };
+
+  const own = ["-R", "1000:1000", dir];
   try {
     run("chown", own, quiet);
     return { usedSudo: false };
@@ -178,7 +211,7 @@ export function prepareDataDir(dataDir, io = {}) {
       run("sudo", ["-n", "chown", ...own], quiet);
     } catch (sudoError) {
       const wrapped = new Error(
-        `Could not give uid 1000 write access to ${dataDir}. The Foundry container runs as 1000:1000.`,
+        `Could not give uid 1000 write access to ${dir}. The Foundry container runs as 1000:1000.`,
       );
       wrapped.code = "DATA_DIR";
       wrapped.cause = sudoError;
@@ -250,6 +283,9 @@ export function redactDiagnostics(text) {
     .replaceAll(/[A-Z0-9]{4}(?:-[A-Z0-9]{4}){5}/g, "<redacted-license>");
 }
 
+const TERMINAL_STARTUP =
+  /Read-only file system|Failure \d+ detected|Exiting immediately|indefinite sleep|Unable to install Foundry/;
+
 export function describeStartupFailure(logs, status = "") {
   const text = String(logs || "");
   if (
@@ -257,6 +293,14 @@ export function describeStartupFailure(logs, status = "") {
   ) {
     return "Foundry container aborted: insufficient permissions on /data";
   }
+  if (/Aborting/.test(text)) return "Foundry container aborted";
+  if (
+    /No Foundry(?: Virtual Tabletop)? installation detected/.test(text) &&
+    TERMINAL_STARTUP.test(text)
+  ) {
+    return "Foundry container aborted: No Foundry installation detected";
+  }
+  if (TERMINAL_STARTUP.test(text)) return "Foundry container aborted";
   const state = String(status || "").trim();
   if (/^(exited|dead)\b/.test(state)) {
     return `Foundry container stopped (${state})`;
