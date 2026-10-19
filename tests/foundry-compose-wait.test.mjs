@@ -67,6 +67,7 @@ describe("waitForHttp process lifetime", () => {
     expect(result.signal).toBeNull();
     expect(result.code).not.toBe(0);
     expect(result.output).toContain(`Foundry did not answer HTTP at 127.0.0.1:${port} within 2s`);
+    expect(result.output).toContain("(credentials in URL)");
     expect(result.output).toContain("FINALLY_MARKER");
     expect(result.output).not.toContain("super-secret-key");
     expect(result.output).not.toContain("unsettled top-level await");
