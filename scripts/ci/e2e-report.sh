@@ -21,19 +21,42 @@ if [[ ! $sha =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-body=$(
-  jq -nc \
-    --arg sha "$sha" \
-    --arg conclusion "$conclusion" \
-    --arg summary "$summary" \
-    '{
-      name: "Foundry E2E (nightly)",
-      head_sha: $sha,
-      status: "completed",
-      conclusion: $conclusion,
-      output: { title: "Foundry E2E (nightly)", summary: $summary }
-    }'
-)
+started=${E2E_STARTED:-}
+case $started in
+  true | false) ;;
+  *) started="" ;;
+esac
+
+if [[ -n $started ]]; then
+  body=$(
+    jq -nc \
+      --arg sha "$sha" \
+      --arg conclusion "$conclusion" \
+      --arg summary "$summary" \
+      --arg text "started=${started}" \
+      '{
+        name: "Foundry E2E (nightly)",
+        head_sha: $sha,
+        status: "completed",
+        conclusion: $conclusion,
+        output: { title: "Foundry E2E (nightly)", summary: $summary, text: $text }
+      }'
+  )
+else
+  body=$(
+    jq -nc \
+      --arg sha "$sha" \
+      --arg conclusion "$conclusion" \
+      --arg summary "$summary" \
+      '{
+        name: "Foundry E2E (nightly)",
+        head_sha: $sha,
+        status: "completed",
+        conclusion: $conclusion,
+        output: { title: "Foundry E2E (nightly)", summary: $summary }
+      }'
+  )
+fi
 
 curl -fsS -X POST \
   -H "Authorization: Bearer ${token}" \

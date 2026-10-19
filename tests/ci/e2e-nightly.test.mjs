@@ -503,6 +503,7 @@ describe("nightly failure results", () => {
       run_id: "4242",
       conclusion: "failure",
       summary: "License gate closed. Foundry was not started.",
+      started: false,
     });
   });
 
@@ -580,6 +581,7 @@ describe("nightly failure results", () => {
         run_id: "4242",
         conclusion: "failure",
         summary: "License gate closed. Foundry was not started.",
+        started: false,
       },
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -597,7 +599,7 @@ describe("nightly failure results", () => {
   it("posts the listening signal from a recorded result", async () => {
     const summary = `Server started and listening. Foundry started for E2E commit ${SAME}. The run failed after Foundry started.`;
     const ctx = await publishFixture({
-      doc: { sha: SAME, run_id: "4242", conclusion: "failure", summary },
+      doc: { sha: SAME, run_id: "4242", conclusion: "failure", summary, started: true },
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
     await rm(ctx.dir, { recursive: true, force: true });
@@ -632,7 +634,6 @@ describe("nightly failure results", () => {
   it.each([
     ["sha", { sha: MAIN, run_id: "4242", conclusion: "success", summary: "forged" }],
     ["run_id", { sha: SAME, run_id: "9999", conclusion: "success", summary: "forged" }],
-    ["extra", { sha: SAME, run_id: "4242", conclusion: "success", summary: "forged", extra: true }],
   ])("fails closed when the result %s does not match this run", async (_label, doc) => {
     const ctx = await publishFixture({ doc });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -643,6 +644,26 @@ describe("nightly failure results", () => {
     expect(body.head_sha).toBe(SAME);
     expect(body.output.summary).toContain("failed validation");
     expect(body.output.summary).not.toContain("forged");
+  });
+
+  it("appends a validation error to a readable summary instead of replacing it", async () => {
+    const ctx = await publishFixture({
+      doc: {
+        sha: SAME,
+        run_id: "4242",
+        conclusion: "success",
+        summary: "forged",
+        extra: true,
+      },
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(body.conclusion).toBe("failure");
+    expect(body.output.summary.startsWith("forged")).toBe(true);
+    expect(body.output.summary).toContain("Foundry E2E result failed validation for this run.");
+    expect(body.output.summary).not.toContain("not reported as started");
   });
 });
 
