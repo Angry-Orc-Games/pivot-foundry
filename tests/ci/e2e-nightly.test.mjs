@@ -366,6 +366,7 @@ describe("nightly check run", () => {
     const result = await runScript(reportScript, ["success"], {
       ...ctx.env,
       E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
       E2E_SUMMARY: `Foundry started for E2E commit ${SAME}.`,
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -378,9 +379,10 @@ describe("nightly check run", () => {
       head_sha: SAME,
       status: "completed",
       conclusion: "success",
+      details_url: "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
       output: {
         title: "Foundry E2E (nightly)",
-        summary: `Foundry started for E2E commit ${SAME}.`,
+        summary: `Foundry started for E2E commit ${SAME}.\nhttps://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242`,
       },
     });
     expect(urls).toContain("/repos/Angry-Orc-Games/pivot-foundry/check-runs");
@@ -514,7 +516,13 @@ describe("nightly failure results", () => {
     expect(ctx.result.status).toBe(1);
     expect(body.conclusion).toBe("failure");
     expect(body.head_sha).toBe(SAME);
+    expect(body.details_url).toBe(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
     expect(body.output.summary).toContain("cancelled or timed out");
+    expect(body.output.summary).toContain(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
     expect(body.output.summary).not.toContain("Skipped");
     expect(ctx.urls).toContain("/actions/runs/4242/artifacts");
   });
@@ -536,8 +544,12 @@ describe("nightly failure results", () => {
       name: "Foundry E2E (nightly)",
       head_sha: SAME,
       conclusion: "failure",
-      output: { summary: "License gate closed. Foundry was not started." },
+      details_url: "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
     });
+    expect(body.output.summary).toContain("License gate closed. Foundry was not started.");
+    expect(body.output.summary).toContain(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
   });
 
   it.each([
