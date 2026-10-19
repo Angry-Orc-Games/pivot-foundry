@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import en from "../../lang/en.json";
+import { createPivotItemDataModels } from "../../src/data/item-data";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
 
@@ -130,4 +131,113 @@ describe("M006 magic echelon migration", () => {
     expect(spark.updates).toHaveLength(updatesAfterFirstRun);
     expect(spark.stored.echelon).toBe("1");
   });
+
+  it("notices numeric echelon 1 after model cleanup and ignores an echelon already stored as a string", async () => {
+    const numeric = cleanedMagicItem("Spark", "magicAbility", 1);
+    const textual = cleanedMagicItem("Already", "magicAbility", "1");
+    const notices: string[] = [];
+    const logs: string[] = [];
+    const notify = (_level: "info" | "warn" | "error", message: string) => {
+      notices.push(message);
+    };
+    const log = (message: string) => {
+      logs.push(message);
+    };
+
+    await runWorldMigrations({
+      game: { user: { isGM: true }, items: [numeric, textual], actors: [] },
+      notify,
+      log,
+    });
+
+    const reviews = notices.filter((message) => message.includes(CORE_REVIEW_NOTICE));
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0]?.split("\n")).toEqual([CORE_REVIEW_NOTICE, "Spark"]);
+    expect(reviews[0]).not.toContain("Already");
+    expect(logs).toContain(reviews[0]);
+    expect(numeric.updates).toEqual([{ "system.echelon": "1" }]);
+    expect(textual.updates).toEqual([]);
+
+    await runWorldMigrations({
+      game: { user: { isGM: true }, items: [numeric, textual], actors: [] },
+      notify,
+      log,
+    });
+    expect(notices.filter((message) => message.includes(CORE_REVIEW_NOTICE))).toHaveLength(1);
+    expect(textual.updates).toEqual([]);
+  });
 });
+
+class MigrationTypeDataModel {
+  readonly parent?: unknown;
+}
+
+function migrationFoundry() {
+  class NumberField {
+    readonly kind = "number";
+    constructor(readonly options?: unknown) {}
+  }
+  class StringField {
+    readonly kind = "string";
+    constructor(readonly options?: unknown) {}
+  }
+  class BooleanField {
+    readonly kind = "boolean";
+    constructor(readonly options?: unknown) {}
+  }
+  class SchemaField {
+    readonly kind = "schema";
+    constructor(readonly fields: Record<string, object>) {}
+  }
+  class ArrayField {
+    readonly kind = "array";
+    constructor(readonly inner: object) {}
+  }
+  return {
+    abstract: { TypeDataModel: MigrationTypeDataModel },
+    data: { fields: { NumberField, StringField, BooleanField, SchemaField, ArrayField } },
+    applications: {
+      api: { HandlebarsApplicationMixin: (base: typeof MigrationTypeDataModel) => base },
+      apps: { DocumentSheetConfig: { registerSheet: () => undefined } },
+      sheets: {
+        ActorSheetV2: class {
+          readonly mockSheet = "actor";
+        },
+        ItemSheetV2: class {
+          readonly mockSheet = "item";
+        },
+      },
+    },
+  };
+}
+
+function cleanedMagicItem(
+  name: string,
+  type: "magicAbility" | "magicStream",
+  rawEchelon: unknown,
+): MigratableDocument & { updates: Record<string, unknown>[] } {
+  const models = createPivotItemDataModels(migrationFoundry());
+  const migrateData = (
+    models[type] as unknown as {
+      migrateData: (source: Record<string, unknown>) => Record<string, unknown>;
+    }
+  ).migrateData;
+  const system = migrateData({
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    effects: [],
+    echelon: rawEchelon,
+  });
+  if (typeof system.echelon === "number") system.echelon = String(system.echelon);
+  const updates: Record<string, unknown>[] = [];
+  return {
+    name,
+    type,
+    updates,
+    _source: { system },
+    toObject: () => ({ system: { ...system } }),
+    update: async (data) => {
+      updates.push(data);
+      if ("system.echelon" in data) system.echelon = data["system.echelon"];
+    },
+  };
+}
