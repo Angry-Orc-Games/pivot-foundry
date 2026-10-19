@@ -318,7 +318,7 @@ describe("workflows that start Foundry", () => {
     expect(release.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
       release.indexOf("foundry:e2e"),
     );
-    expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
+    expect(release).not.toContain("refs/tags/");
     const releaseE2e = release.slice(release.indexOf("  e2e:\n"), release.indexOf("  publish:\n"));
     expect(releaseE2e).toContain("path: package-artifact");
     expect(releaseE2e).toContain("accept-artifact.sh");
