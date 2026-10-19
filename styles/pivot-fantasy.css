@@ -1877,6 +1877,22 @@
   .window-content
   .pf-print
   table.pf-skills
+  label.pf-check:has(input:disabled),
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  label.pf-check:has(input:disabled):hover {
+  color: #1c1a16;
+  cursor: default;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
   td.pf-r
   .pf-roll {
   font-weight: 700;
