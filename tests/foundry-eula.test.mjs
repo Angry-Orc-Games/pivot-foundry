@@ -168,12 +168,21 @@ describe("Foundry EULA opt-in", () => {
     expect(page.clicks).toEqual([]);
   });
 
-  it("does not enable the EULA opt-in in workflows or the env example", async () => {
+  it("keeps the EULA opt-in off unless a dispatch sets accept_eula", async () => {
     const workflowDir = fileURLToPath(new URL("../.github/workflows/", import.meta.url));
     const names = await readdir(workflowDir);
+    const acceptEula =
+      "FOUNDRY_E2E_ACCEPT_EULA: ${{ github.event_name == 'workflow_dispatch' && inputs.accept_eula == true && '1' || '' }}";
     for (const name of names) {
       const text = await readFile(join(workflowDir, name), "utf8");
-      expect(text, name).not.toMatch(/FOUNDRY_E2E_ACCEPT_EULA/);
+      if (name !== "e2e.yml") {
+        expect(text, name).not.toMatch(/FOUNDRY_E2E_ACCEPT_EULA/);
+        continue;
+      }
+      expect(text).toContain("accept_eula:");
+      expect(text).toMatch(/accept_eula:[\s\S]*?type: boolean[\s\S]*?default: false/);
+      expect(text).toContain(acceptEula);
+      expect(text).not.toMatch(/FOUNDRY_E2E_ACCEPT_EULA:\s*"1"/);
     }
     const example = await readFile(
       fileURLToPath(new URL("../.env.foundry.local.example", import.meta.url)),
