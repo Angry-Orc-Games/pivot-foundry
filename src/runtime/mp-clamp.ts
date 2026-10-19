@@ -7,10 +7,25 @@ type ActorLike = {
   type?: string;
   system?: unknown;
   items?: Iterable<ItemLike> | { contents: Iterable<ItemLike> };
+  ownership?: Record<string, number>;
   _source?: { system?: unknown };
   toObject?: () => { system?: unknown };
   update?: (data: Record<string, unknown>) => unknown;
 };
+
+type ClientUser = { id?: string; active?: boolean; isGM?: boolean };
+
+type ClientGame = {
+  user?: { id?: string; isGM?: boolean };
+  users?:
+    | Iterable<ClientUser>
+    | {
+        activeGM?: { id?: string; isSelf?: boolean } | null;
+        contents?: Iterable<ClientUser>;
+      };
+};
+
+const FOUNDRY_OWNERSHIP_OWNER = 3;
 
 export function clampMpOnActorUpdate(actor: ActorLike, changes: Record<string, unknown>): void {
   if (actor.type !== "character") return;
@@ -22,8 +37,9 @@ export function clampMpOnActorUpdate(actor: ActorLike, changes: Record<string, u
   writeMpValue(changes, clamped);
 }
 
-export function clampStoredMp(actor: ActorLike): void {
+export function clampStoredMp(actor: ActorLike, game: ClientGame | undefined = readGame()): void {
   if (actor.type !== "character" || !actor.update) return;
+  if (!thisClientPersistsMpClamp(actor, game)) return;
   const stored = readStoredSystem(actor);
   const current = readMpValue(stored);
   if (current === undefined) return;
@@ -44,6 +60,70 @@ export function registerMpClampHooks(hooks: Pick<FoundryHooks, "on">): void {
   hooks.on?.("createItem", onItem);
   hooks.on?.("updateItem", onItem);
   hooks.on?.("deleteItem", onItem);
+}
+
+function readGame(): ClientGame | undefined {
+  return (globalThis as { game?: ClientGame }).game;
+}
+
+function thisClientPersistsMpClamp(actor: ActorLike, game: ClientGame | undefined): boolean {
+  if (!game) return true;
+  const activeGmSelf = activeGmIsSelf(game);
+  if (activeGmSelf !== undefined) return activeGmSelf;
+  const listed = listClientUsers(game);
+  const activeGms = listed.filter(isActiveGm).sort(byId);
+  const activeGm = activeGms[0];
+  if (activeGm) return activeGm.id === game.user?.id;
+  const owners = listed.filter((user) => isActiveOwner(actor, user)).sort(byId);
+  const writer = owners[0];
+  return writer !== undefined && writer.id === game.user?.id;
+}
+
+function activeGmIsSelf(game: ClientGame): boolean | undefined {
+  const users = game.users;
+  if (!users || typeof users !== "object" || Array.isArray(users) || !("activeGM" in users)) {
+    return undefined;
+  }
+  if (!users.activeGM) return undefined;
+  return users.activeGM.isSelf === true;
+}
+
+function listClientUsers(game: ClientGame): ClientUser[] {
+  const users = game.users;
+  if (!users) return [];
+  if (isRecord(users) && "contents" in users && users.contents) return Array.from(users.contents);
+  if (typeof users === "object" && Symbol.iterator in Object(users)) {
+    return Array.from(users as Iterable<ClientUser>);
+  }
+  return [];
+}
+
+function isActiveGm(user: ClientUser): boolean {
+  return user.active === true && user.isGM === true && typeof user.id === "string";
+}
+
+function isActiveOwner(actor: ActorLike, user: ClientUser): boolean {
+  return (
+    user.active === true &&
+    typeof user.id === "string" &&
+    ownershipLevel(actor, user.id) >= FOUNDRY_OWNERSHIP_OWNER
+  );
+}
+
+function ownershipLevel(actor: ActorLike, userId: string): number {
+  const ownership = actor.ownership;
+  if (!ownership) return 0;
+  const specific = ownership[userId];
+  if (typeof specific === "number") return specific;
+  return typeof ownership.default === "number" ? ownership.default : 0;
+}
+
+function byId(left: ClientUser, right: ClientUser): number {
+  const a = left.id ?? "";
+  const b = right.id ?? "";
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 function readStoredSystem(document: {
