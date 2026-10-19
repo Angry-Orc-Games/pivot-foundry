@@ -273,12 +273,36 @@ export function assertSafeZipEntries(zipPath) {
   }
 }
 
-export function installPackagedSystem(paths, zipPath) {
-  assertSafeZipEntries(zipPath);
+export function removeFoundryTree(target, io = {}) {
+  const remove = io.rmSync ?? rmSync;
+  const run = io.execFileSync ?? execFileSync;
+  try {
+    remove(target, { force: true, recursive: true });
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    run("sudo", ["-n", "rm", "-rf", target], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  }
+}
+
+export function installPackagedSystem(paths, zipPath, io = {}) {
+  const assertSafe = io.assertSafeZipEntries ?? assertSafeZipEntries;
+  assertSafe(zipPath);
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
-  rmSync(systemDir, { force: true, recursive: true });
-  mkdirSync(systemDir, { recursive: true });
-  execFileSync("unzip", ["-q", "-o", zipPath, "-d", systemDir], { stdio: "inherit" });
+  const mkdir = io.mkdirSync ?? mkdirSync;
+  const run = io.execFileSync ?? execFileSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  removeFoundryTree(systemDir, io);
+  try {
+    mkdir(systemDir, { recursive: true });
+    run("unzip", ["-q", "-o", zipPath, "-d", systemDir], { stdio: "inherit" });
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    run("sudo", ["-n", "mkdir", "-p", systemDir], quiet);
+    run("sudo", ["-n", "unzip", "-q", "-o", zipPath, "-d", systemDir], quiet);
+  }
 }
 
 export function followLogs(paths) {
