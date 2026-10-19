@@ -245,6 +245,47 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.deathSaveSuccessPips).toEqual([true, true, false]);
     expect(context.deathSaveFailurePips).toEqual([true, false, false]);
   });
+
+  it("shows alive after prepare when stored HP is positive and status is dying", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 10, max: 10, temp: 0 },
+          deathSaves: { status: "dying", successes: 1, failures: 2 },
+        },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("alive");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
+    expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
+    expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+  });
+
+  it("keeps zero HP dying, zero HP stable, and dead characters on the sheet", () => {
+    const actor = sampleActor();
+    const statusFor = (hp: number, status: string) =>
+      prepareCharacterSheetContext({
+        ...actor,
+        system: {
+          ...actor.system,
+          attributes: {
+            ...(actor.system.attributes as Record<string, unknown>),
+            hp: { value: hp, max: 10, temp: 0 },
+            deathSaves: { status, successes: 2, failures: 1 },
+          },
+        },
+      }).survivalStatus;
+
+    expect(statusFor(0, "dying")).toBe("dying");
+    expect(statusFor(0, "stable")).toBe("stable");
+    expect(statusFor(10, "dead")).toBe("dead");
+    expect(statusFor(0, "dead")).toBe("dead");
+  });
 });
 
 describe("sheet interaction helpers", () => {
