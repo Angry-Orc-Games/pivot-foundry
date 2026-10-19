@@ -51,12 +51,16 @@ valid_result() {
 unpack_artifact() {
   local archive=$1
   local dest=$2
-  python3 - "$archive" "$dest" <<'PY'
+  python3 - "$archive" "$dest" <<'PY' || return $?
 import sys
 import zipfile
 
 archive, dest = sys.argv[1], sys.argv[2]
-with zipfile.ZipFile(archive) as bundle:
+try:
+    bundle = zipfile.ZipFile(archive)
+except zipfile.BadZipFile:
+    sys.exit(1)
+with bundle:
     for info in bundle.infolist():
         parts = info.filename.split("/")
         if info.filename.startswith("/") or info.filename.startswith("\\") or ".." in parts:

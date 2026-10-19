@@ -33,6 +33,8 @@ else
   started="Foundry started for E2E commit ${sha}."
   if [[ -n $log && -f $log ]] && grep -F -q "$setup_failure" "$log"; then
     summary="$setup_failure"
+  elif [[ -n $log && -f $log ]] && grep -F -q "Server started and listening" "$log"; then
+    summary="Server started and listening. ${started} The run failed after Foundry started."
   elif [[ -n $log && -f $log ]] && grep -F -q "$started" "$log"; then
     summary="${started} The run failed after Foundry started."
   elif [[ -n $log && -f $log ]] && grep -F -q "outside 02:00-05:30" "$log"; then

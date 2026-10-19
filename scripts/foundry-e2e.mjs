@@ -25,7 +25,10 @@ import {
   prepareDataDir,
   pullImage,
   requireDocker,
+  readContainerLogs,
+  startedAnnouncement,
   waitForHttp,
+  waitForListening,
   writeComposeEnv,
   writeRuntime,
 } from "./foundry-compose.mjs";
@@ -166,7 +169,12 @@ export async function runE2E(args = {}) {
       return EXIT.identity;
     }
 
-    console.log(`Foundry started for E2E commit ${subject || identity.commit}.`);
+    const listeningLogs = await waitForListening(() => readContainerLogs(paths), HTTP_TIMEOUT_MS, {
+      inspect: () => containerStartupProblem(paths),
+    });
+    for (const line of startedAnnouncement(listeningLogs, subject || identity.commit)) {
+      console.log(line);
+    }
 
     const setupMarker = join(paths.diagnosticsDir, "setup-failure.txt");
     mkdirSync(paths.diagnosticsDir, { recursive: true });
