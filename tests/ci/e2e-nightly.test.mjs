@@ -535,6 +535,31 @@ describe("nightly failure results", () => {
     expect(body.summary).not.toContain("did not start");
   });
 
+  it("treats Server started and listening as Foundry having started", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+    const dest = join(dir, "main.json");
+    const log = join(dir, "foundry-e2e.log");
+    await writeFile(log, "Server started and listening on port 30000\n");
+    const result = await runScript(recordScript, [dest], {
+      ...process.env,
+      E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
+      E2E_OK: "true",
+      E2E_AVAILABLE: "true",
+      E2E_JOB_STATUS: "failure",
+      E2E_LOG: log,
+    });
+    const body = JSON.parse(await readFile(dest, "utf8"));
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(body.conclusion).toBe("failure");
+    expect(body.summary).toContain("Server started and listening");
+    expect(body.summary).toContain(`Foundry started for E2E commit ${SAME}.`);
+    expect(body.summary).not.toContain("did not start");
+    expect(body.summary).not.toContain("not reported as started");
+  });
+
   it("posts a failure check when the run was cancelled before a result existed", async () => {
     const ctx = await publishFixture({ artifacts: [], matrix: "cancelled" });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -567,6 +592,41 @@ describe("nightly failure results", () => {
       conclusion: "failure",
       output: { summary: "License gate closed. Foundry was not started." },
     });
+  });
+
+  it("posts the listening signal from a recorded result", async () => {
+    const summary = `Server started and listening. Foundry started for E2E commit ${SAME}. The run failed after Foundry started.`;
+    const ctx = await publishFixture({
+      doc: { sha: SAME, run_id: "4242", conclusion: "failure", summary },
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(body.output.summary).toBe(summary);
+    expect(body.output.summary).not.toContain("not reported as started");
+  });
+
+  it("posts a validation failure when the result download is not a zip", async () => {
+    const ctx = await publishFixture({
+      artifacts: [
+        {
+          name: "e2e-result-pr-80",
+          expired: false,
+          archive_download_url: "https://artifact.test/download",
+          workflow_run: { id: 4242 },
+        },
+      ],
+    });
+    const bodyText = await readFile(join(ctx.stub, "request-body"), "utf8").catch(() => "");
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(bodyText).not.toBe("");
+    const body = JSON.parse(bodyText);
+    expect(body.conclusion).toBe("failure");
+    expect(body.output.summary).toContain("failed validation");
+    expect(ctx.result.stderr).not.toContain("BadZipFile");
   });
 
   it.each([
