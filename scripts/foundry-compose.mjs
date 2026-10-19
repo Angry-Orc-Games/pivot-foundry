@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
@@ -200,23 +200,11 @@ export function followLogs(paths) {
 
 export function collectDiagnostics(paths) {
   mkdirSync(paths.diagnosticsDir, { recursive: true });
-  try {
-    const logs = execFileSync(
-      "docker",
-      ["compose", ...composeArgs(paths), "logs", "--no-color", "--tail", "400"],
-      {
-        cwd: paths.root,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    writeFileSync(join(paths.diagnosticsDir, "foundry.log"), redactDiagnostics(logs));
-  } catch (error) {
-    writeFileSync(
-      join(paths.diagnosticsDir, "foundry.log"),
-      redactDiagnostics(String(error.stdout || error.stderr || error.message)),
-    );
-  }
+  const container = composeNames(paths).container;
+  const result = spawnSync("docker", ["logs", "--tail", "400", container], { encoding: "utf8" });
+  const logs = `${result.stdout || ""}${result.stderr || ""}`;
+  const text = logs || result.error?.message || "";
+  writeFileSync(join(paths.diagnosticsDir, "foundry.log"), redactDiagnostics(text));
 }
 
 export function redactDiagnostics(text) {
@@ -224,27 +212,41 @@ export function redactDiagnostics(text) {
     .replaceAll(/FOUNDRY_LICENSE_KEY=\S+/g, "FOUNDRY_LICENSE_KEY=<redacted>")
     .replaceAll(/FOUNDRY_ADMIN_KEY=\S+/g, "FOUNDRY_ADMIN_KEY=<redacted>")
     .replaceAll(/FOUNDRY_RELEASE_URL=\S+/g, "FOUNDRY_RELEASE_URL=<redacted>")
+    .replaceAll(/FOUNDRY_RELEASE_CACHE_URL=\S+/g, "FOUNDRY_RELEASE_CACHE_URL=<redacted>")
+    .replaceAll(/([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, "$1<redacted>@")
     .replaceAll(/[A-Z0-9]{4}(?:-[A-Z0-9]{4}){5}/g, "<redacted-license>");
 }
 
 export async function waitForHttp(baseUrl, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
+  let lastError = "no response";
   while (Date.now() < deadline) {
     try {
       const response = await fetch(baseUrl, { redirect: "manual" });
       if (response.status > 0) return response.status;
-    } catch {
-      // Keep polling. A refused connection is the gap before the server binds.
+      lastError = `status ${response.status}`;
+    } catch (error) {
+      lastError = describeFetchFailure(error);
     }
     await new Promise((resolve) => {
       globalThis.setTimeout(resolve, 1000);
     });
   }
   const error = new Error(
-    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s`,
+    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s (${lastError})`,
   );
   error.code = "TIMEOUT";
   throw error;
+}
+
+function describeFetchFailure(error) {
+  const code = error?.cause?.code;
+  if (typeof code === "string" && code) return code;
+  const message = String(error?.message || "request failed");
+  if (message.includes("credentials")) return "credentials in URL";
+  const line = message.split("\n")[0];
+  if (line.includes("://") || line.includes("@")) return "request failed";
+  return line.slice(0, 160);
 }
 
 function httpTarget(baseUrl) {
