@@ -1,6 +1,11 @@
 import { planSurvivalMigration } from "./m002";
 import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
 import {
+  planWeaponEquippedMigration,
+  WEAPON_EQUIPPED_MIGRATION_ID,
+  weaponEquippedMigrationNotice,
+} from "./m004";
+import {
   planActorMigration,
   planItemMigration,
   SCHEMA_MIGRATION_ID,
@@ -66,13 +71,16 @@ export async function runWorldMigrations(
     ),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
-  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
-    game.items,
-  ).map((document) => {
+  const planned: Array<{
+    document: MigratableDocument;
+    plan: MigrationPlan;
+    notice?: string;
+  }> = listDocuments(game.items).map((document) => {
     const stored = readStoredSystem(document);
     return {
       document,
-      plan: combineItemMigrations(stored),
+      plan: combineItemMigrations(stored, document.type),
+      notice: weaponEquippedNotice(document, stored),
     };
   });
   for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
@@ -81,14 +89,16 @@ export async function runWorldMigrations(
       plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
     });
     for (const item of listDocuments(actor.items)) {
+      const stored = readStoredSystem(item);
       planned.push({
         document: item,
-        plan: combineItemMigrations(readStoredSystem(item)),
+        plan: combineItemMigrations(stored, item.type),
+        notice: weaponEquippedNotice(item, stored, actor.name),
       });
     }
   }
   for (const entry of planned) {
-    const result = await persistMigration(entry.document, entry.plan, dependencies);
+    const result = await persistMigration(entry.document, entry.plan, dependencies, entry.notice);
     updated += result.updated;
     failed += result.failed;
   }
@@ -97,7 +107,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
+        id: `${SCHEMA_MIGRATION_ID} / M002 / M003 / ${WEAPON_EQUIPPED_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -133,6 +143,7 @@ async function persistMigration(
   document: MigratableDocument,
   plan: MigrationPlan,
   dependencies: WorldMigrationDependencies,
+  notice?: string,
 ): Promise<{ updated: number; failed: number }> {
   if (!plan.ok) {
     reportFailure(document, plan.error, dependencies);
@@ -143,6 +154,10 @@ async function persistMigration(
   try {
     if (!document.update) throw new Error("Document cannot be updated");
     await document.update(plan.update);
+    if (notice) {
+      dependencies.notify?.("info", notice);
+      dependencies.log?.(notice);
+    }
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -208,18 +223,35 @@ export function planAllActorMigrations(source: unknown, type?: string): Migratio
   };
 }
 
-function combineItemMigrations(source: unknown): MigrationPlan {
+function combineItemMigrations(source: unknown, itemType?: string): MigrationPlan {
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  const third = planWeaponEquippedMigration(source, itemType);
+  if (!third.ok) return third;
+  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
+      ...(third.changed ? third.update : {}),
     },
   };
+}
+
+function weaponEquippedNotice(
+  document: MigratableDocument,
+  stored: unknown,
+  actorName?: string,
+): string | undefined {
+  const plan = planWeaponEquippedMigration(stored, document.type);
+  if (!plan.ok || !plan.changed) return undefined;
+  return weaponEquippedMigrationNotice(
+    document.name ?? document.id ?? "unknown",
+    actorName,
+    plan.update["system.equipped"] === true,
+  );
 }

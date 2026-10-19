@@ -137,6 +137,7 @@ describe("M004 world migration", () => {
       "M004: equipped weapon 'World Sword' so its bonuses keep applying",
       "M004: equipped weapon 'Flame Tongue' on 'Arwen' so its bonuses keep applying",
       "M004: set weapon 'Dagger' on 'Arwen' unequipped because it has no effect bonuses",
+      "PIVOT.Migration.Complete",
     ]);
     expect(notifications).toEqual(expect.arrayContaining(logs));
 

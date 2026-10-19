@@ -275,8 +275,7 @@ describe("gear bonuses count only while equipped", () => {
     expect(summary.abilityScoreBonuses.dex).toBe(2);
   });
 
-  it("uses the highest gear acBonus and mpMaxBonus, then adds feature bonuses", () => {
-    // Damage reduction and damage-die step-ups are not effect types yet, so no current type stacks.
+  it("uses the highest gear acBonus and mpMaxBonus, then adds feature bonuses, because damage reduction and damage-die step-ups are not effect types yet", () => {
     const summary = aggregateCharacterEffects(
       collectEmbeddedItemEffects([
         embedded("weapon", true, [{ type: "acBonus", amount: 1 }]),
