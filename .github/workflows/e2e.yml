@@ -2,8 +2,8 @@ name: Foundry E2E
 
 on:
   schedule:
-    # 07:00 UTC is 03:00 EDT and 02:00 EST, inside 02:00-05:30 America/New_York all year.
-    - cron: "0 7 * * *"
+    # 07:23 UTC is 03:23 EDT and 02:23 EST, inside 02:00-05:30 America/New_York all year.
+    - cron: "23 7 * * *"
   workflow_dispatch:
     inputs:
       ref:

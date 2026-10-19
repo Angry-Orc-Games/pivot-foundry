@@ -229,21 +229,26 @@ export function redactDiagnostics(text) {
 
 export async function waitForHttp(baseUrl, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  let lastError = "no response";
   while (Date.now() < deadline) {
     try {
       const response = await fetch(baseUrl, { redirect: "manual" });
       if (response.status > 0) return response.status;
-      lastError = `status ${response.status}`;
-    } catch (error) {
-      lastError = error.message;
+    } catch {
+      // Keep polling. A refused connection is the gap before the server binds.
     }
     await new Promise((resolve) => {
-      const timer = globalThis.setTimeout(resolve, 1000);
-      timer.unref?.();
+      globalThis.setTimeout(resolve, 1000);
     });
   }
-  const error = new Error(`Timed out waiting for ${baseUrl} (${lastError}).`);
+  const error = new Error(
+    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s`,
+  );
   error.code = "TIMEOUT";
   throw error;
+}
+
+function httpTarget(baseUrl) {
+  const url = new URL(baseUrl);
+  const port = url.port || (url.protocol === "https:" ? "443" : "80");
+  return `${url.hostname}:${port}`;
 }
