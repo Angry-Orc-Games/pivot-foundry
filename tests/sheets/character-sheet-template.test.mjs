@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import Handlebars from "handlebars";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { prepareCharacterSheetContext } from "../../src/sheets/character-sheet.ts";
 
 Handlebars.registerHelper("localize", (key) => key);
 Handlebars.registerHelper("checked", (value) => (value ? "checked" : ""));
@@ -214,6 +215,212 @@ describe("character sheet template structure", () => {
       expect(control?.tagName).toBe("BUTTON");
       expect(control?.closest("label")).toBeNull();
     }
+  });
+
+  function renderTemplates() {
+    return {
+      sheet: Handlebars.compile(
+        readFileSync(resolve(process.cwd(), "templates/actors/character/sheet.hbs"), "utf-8"),
+      ),
+      vitals: Handlebars.compile(
+        readFileSync(resolve(process.cwd(), "templates/actors/character/vitals.hbs"), "utf-8"),
+      ),
+    };
+  }
+
+  function speedCard(html) {
+    const document = new JSDOM(html).window.document;
+    const card = [...document.querySelectorAll(".pf-stat")].find(
+      (element) => element.querySelector("b")?.textContent === "SPEED",
+    );
+    return card?.querySelector("span")?.textContent?.replace(/\s+/g, " ").trim();
+  }
+
+  it("prints 10 m for a default actor and 0 m when speed is zero", () => {
+    const { vitals } = renderTemplates();
+    const blank = {
+      name: "New Character",
+      type: "character",
+      system: {},
+      items: [],
+    };
+    expect(speedCard(vitals(prepareCharacterSheetContext(blank)))).toBe("10 m");
+    expect(
+      speedCard(
+        vitals(
+          prepareCharacterSheetContext({
+            ...blank,
+            system: { attributes: { speed: { value: 0, bonus: 0 } } },
+          }),
+        ),
+      ),
+    ).toBe("0 m");
+  });
+
+  it("keeps an integer speed input with the survival fields", () => {
+    const { sheet } = renderTemplates();
+    const blank = {
+      name: "New Character",
+      type: "character",
+      system: {},
+      items: [],
+    };
+    const editing = new JSDOM(sheet(prepareCharacterSheetContext(blank))).window.document;
+    const hpMax = editing.querySelector('input[name="system.attributes.hp.max"]');
+    const speed = editing.querySelector('input[name="system.attributes.speed.value"]');
+    expect(speed?.getAttribute("type")).toBe("number");
+    expect(speed?.getAttribute("min")).toBe("0");
+    expect(speed?.getAttribute("step")).toBe("1");
+    expect(speed?.disabled).toBe(false);
+    expect(speed?.closest("label")?.textContent).toContain("PIVOT.Fields.Speed");
+    expect(speed?.closest(".pf-meter-fields")).toBe(hpMax?.closest(".pf-meter-fields"));
+
+    const stopped = prepareCharacterSheetContext(
+      {
+        ...blank,
+        system: { attributes: { speed: { value: 0, bonus: 0 } } },
+      },
+      false,
+    );
+    const viewing = new JSDOM(sheet(stopped)).window.document;
+    const locked = viewing.querySelector('input[name="system.attributes.speed.value"]');
+    expect(locked?.disabled).toBe(true);
+    expect(locked?.value).toBe("0");
+  });
+
+  it("keeps the proficiency dot usable in view mode", () => {
+    const { sheet } = renderTemplates();
+    const document = new JSDOM(
+      sheet({
+        skillRows: [
+          {
+            id: "medicine",
+            label: "Medicine",
+            ability: "Wis",
+            proficient: false,
+            proficientPath: "system.skills.medicine.proficient",
+            total: "+2",
+            disabledAttr: "disabled",
+          },
+        ],
+        items: { traits: [{ id: "trait-1", name: "Keen", disabledAttr: "disabled" }] },
+        form: {},
+        proficiencyText: {},
+        system: { magic: {}, notes: {}, identity: {}, currency: {} },
+        derived: { armourClass: {}, magic: { mp: {} } },
+        disabledAttr: "disabled",
+      }),
+    ).window.document;
+    const checkbox = document.querySelector('input[name="system.skills.medicine.proficient"]');
+    expect(checkbox?.disabled).toBe(false);
+    expect(checkbox?.closest("label")?.getAttribute("title")).toBe(
+      "PIVOT.Actions.ToggleProficiency",
+    );
+    const name = document.querySelector("button.pf-skill-name");
+    const modifier = document.querySelector("td.pf-r button");
+    name?.click();
+    modifier?.click();
+    expect(checkbox?.checked).toBe(false);
+    const english = JSON.parse(readFileSync(resolve(process.cwd(), "lang/en.json"), "utf-8"));
+    expect(english["PIVOT.Actions.ToggleProficiency"]).toBe("Toggle proficiency");
+  });
+
+  it("shows a muted line when the character has no traits", () => {
+    const { sheet } = renderTemplates();
+    const empty = new JSDOM(
+      sheet({
+        skillRows: [],
+        items: { traits: [] },
+        form: {},
+        proficiencyText: {},
+        system: { magic: {}, notes: {}, identity: {}, currency: {} },
+        derived: { armourClass: {}, magic: { mp: {} } },
+      }),
+    ).window.document;
+    const note = [...empty.querySelectorAll("p.pf-small")].find((element) =>
+      element.textContent?.includes("PIVOT.Messages.NoTraits"),
+    );
+    expect(note).toBeTruthy();
+    const header = [...empty.querySelectorAll(".pf-section-header")].find((element) =>
+      element.textContent?.includes("Traits"),
+    );
+    expect(header?.querySelector("button")?.textContent?.trim()).toBe("+");
+    expect(header?.querySelector("button")?.dataset.action).toBe("createItem");
+
+    const filled = new JSDOM(
+      sheet({
+        skillRows: [],
+        items: { traits: [{ id: "trait-1", name: "Keen", disabledAttr: "" }] },
+        form: {},
+        proficiencyText: {},
+        system: { magic: {}, notes: {}, identity: {}, currency: {} },
+        derived: { armourClass: {}, magic: { mp: {} } },
+      }),
+    ).window.document;
+    expect(
+      [...filled.querySelectorAll("p.pf-small")].some((element) =>
+        element.textContent?.includes("PIVOT.Messages.NoTraits"),
+      ),
+    ).toBe(false);
+    const row = [...filled.querySelectorAll("li")].find((element) =>
+      element.textContent?.includes("Keen"),
+    );
+    expect(row?.querySelector('[data-action="openItem"]')?.textContent?.trim()).toBe("...");
+    expect(row?.querySelector('[data-action="deleteItem"]')?.textContent?.trim()).toBe("x");
+    const english = JSON.parse(readFileSync(resolve(process.cwd(), "lang/en.json"), "utf-8"));
+    expect(english["PIVOT.Messages.NoTraits"]).toBe("No traits yet");
+  });
+
+  it("gives the proficiency dot a 20px target", () => {
+    const css = [
+      readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pivot-fantasy.css"), "utf-8"),
+    ].join("\n");
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head><style>${css}</style></head>
+      <body class="theme-light"><form class="application pivot-fantasy pf-sheet sheet actor character">
+        <section class="window-content"><article class="pf-print">
+          <table class="pf-skills"><tr><td>
+            <label class="pf-check"><input class="pf-sr" type="checkbox" /><span class="pf-prof-mark">○</span></label>
+            <button type="button" class="pf-roll pf-skill-name">Medicine</button>
+          </td><td class="pf-r"><button type="button" class="pf-roll">+2</button></td></tr></table>
+        </article></section></form></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const dot = dom.window.document.querySelector("label.pf-check");
+    const dotStyle = dom.window.getComputedStyle(dot);
+    expect(Number.parseFloat(dotStyle.minWidth)).toBeGreaterThanOrEqual(20);
+    expect(Number.parseFloat(dotStyle.minHeight)).toBeGreaterThanOrEqual(20);
+  });
+
+  it("underlines the skill name on hover", () => {
+    const css = [
+      readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pivot-fantasy.css"), "utf-8"),
+    ].join("\n");
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head><style>${css}</style></head><body></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const rules = [...dom.window.document.styleSheets].flatMap((styleSheet) => {
+      try {
+        return [...styleSheet.cssRules];
+      } catch {
+        return [];
+      }
+    });
+    const hover = rules.find(
+      (rule) =>
+        typeof rule.selectorText === "string" &&
+        rule.selectorText.includes("pf-skill-name") &&
+        rule.selectorText.includes(":hover"),
+    );
+    const decoration = `${hover?.style?.textDecorationLine || ""} ${hover?.style?.textDecoration || ""}`;
+    expect(decoration).toContain("underline");
+    expect(hover?.style?.cursor).toBe("pointer");
+    expect(hover?.style?.color).toBe("#8a3b12");
   });
 
   it("vitals partial includes stat cards and abilities", () => {
