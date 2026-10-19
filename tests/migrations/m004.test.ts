@@ -299,6 +299,33 @@ describe("M004 world migration", () => {
     expect(ring.stored.equipped).toBe(false);
     expect(logs).toEqual([]);
   });
+
+  it("keeps equipment unequipped after the user turns it off on a later run", async () => {
+    const cloak = persistingEquipment("Cloak of Protection", {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      effects: [strengthEffect],
+      equipped: true,
+      carried: true,
+    });
+    const actor: MigratableDocument = {
+      name: "Arwen",
+      type: "character",
+      toObject: () => ({
+        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+      }),
+      update: async () => undefined,
+      items: [cloak],
+    };
+    const dependencies = {
+      game: { user: { isGM: true }, actors: [actor], items: [] },
+    };
+
+    await runWorldMigrations(dependencies);
+    cloak.setEquipped(false);
+    await runWorldMigrations(dependencies);
+
+    expect(cloak.stored.equipped).toBe(false);
+  });
 });
 
 function persistingEquipment(name: string, initial: Record<string, unknown>) {
