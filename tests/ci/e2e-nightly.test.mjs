@@ -503,6 +503,7 @@ describe("nightly failure results", () => {
       run_id: "4242",
       conclusion: "failure",
       summary: "License gate closed. Foundry was not started.",
+      started: false,
     });
   });
 
@@ -580,6 +581,7 @@ describe("nightly failure results", () => {
         run_id: "4242",
         conclusion: "failure",
         summary: "License gate closed. Foundry was not started.",
+        started: false,
       },
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -597,7 +599,7 @@ describe("nightly failure results", () => {
   it("posts the listening signal from a recorded result", async () => {
     const summary = `Server started and listening. Foundry started for E2E commit ${SAME}. The run failed after Foundry started.`;
     const ctx = await publishFixture({
-      doc: { sha: SAME, run_id: "4242", conclusion: "failure", summary },
+      doc: { sha: SAME, run_id: "4242", conclusion: "failure", summary, started: true },
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
     await rm(ctx.dir, { recursive: true, force: true });
@@ -632,7 +634,6 @@ describe("nightly failure results", () => {
   it.each([
     ["sha", { sha: MAIN, run_id: "4242", conclusion: "success", summary: "forged" }],
     ["run_id", { sha: SAME, run_id: "9999", conclusion: "success", summary: "forged" }],
-    ["extra", { sha: SAME, run_id: "4242", conclusion: "success", summary: "forged", extra: true }],
   ])("fails closed when the result %s does not match this run", async (_label, doc) => {
     const ctx = await publishFixture({ doc });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -643,5 +644,95 @@ describe("nightly failure results", () => {
     expect(body.head_sha).toBe(SAME);
     expect(body.output.summary).toContain("failed validation");
     expect(body.output.summary).not.toContain("forged");
+  });
+
+  it("appends a validation error to a readable summary instead of replacing it", async () => {
+    const ctx = await publishFixture({
+      doc: {
+        sha: SAME,
+        run_id: "4242",
+        conclusion: "success",
+        summary: "forged",
+        extra: true,
+      },
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(body.conclusion).toBe("failure");
+    expect(body.output.summary.startsWith("forged")).toBe(true);
+    expect(body.output.summary).toContain("Foundry E2E result failed validation for this run.");
+    expect(body.output.summary).not.toContain("not reported as started");
+  });
+});
+
+const SETUP_FAILURE =
+  "Foundry setup failed. The End User License Agreement is on screen. Set FOUNDRY_E2E_ACCEPT_EULA=1 to sign it for this run. Tests were not run.";
+
+async function recordPublishedResult(logText) {
+  const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+  const dest = join(dir, "pr-114.json");
+  const log = join(dir, "foundry-e2e.log");
+  await writeFile(log, logText);
+  const recorded = await runScript(recordScript, [dest], {
+    ...process.env,
+    E2E_SHA: SAME,
+    E2E_RUN_ID: "4242",
+    E2E_OK: "true",
+    E2E_AVAILABLE: "true",
+    E2E_JOB_STATUS: "failure",
+    E2E_LOG: log,
+  });
+  const doc = JSON.parse(await readFile(dest, "utf8"));
+  const ctx = await publishFixture({ doc });
+  const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+  await rm(dir, { recursive: true, force: true });
+  await rm(ctx.dir, { recursive: true, force: true });
+  return { recorded, doc, body };
+}
+
+describe("published result from the real writer", () => {
+  it("publishes a setup failure after listening as started with the EULA summary intact", async () => {
+    const { recorded, doc, body } = await recordPublishedResult(
+      [
+        "Server started and listening",
+        `Foundry started for E2E commit ${SAME}.`,
+        SETUP_FAILURE,
+        "FOUNDRY_LICENSE_KEY=ABCD-EFGH-IJKL-MNOP-QRST-UVWX",
+      ].join("\n"),
+    );
+
+    expect(recorded.status).toBe(0);
+    expect(doc.started).toBe(true);
+    expect(doc.summary).toBe(SETUP_FAILURE);
+    expect(JSON.stringify(doc)).not.toContain("ABCD-EFGH");
+    expect(body.output.summary).toBe(SETUP_FAILURE);
+    expect(body.output.summary).not.toContain("failed validation");
+    expect(body.output.text).toBe("started=true");
+    expect(body.output.summary + body.output.text).not.toContain("ABCD-EFGH");
+  });
+
+  it("publishes a test failure after listening as started", async () => {
+    const { doc, body } = await recordPublishedResult(
+      ["Server started and listening", "Error: expect(locator).toBeVisible() failed"].join("\n"),
+    );
+
+    expect(doc.started).toBe(true);
+    expect(doc.summary).toContain("The run failed after Foundry started.");
+    expect(doc.summary).not.toContain("End User License Agreement");
+    expect(body.output.summary).toBe(doc.summary);
+    expect(body.output.text).toBe("started=true");
+  });
+
+  it("publishes a readiness timeout before listening as not started", async () => {
+    const timeout = "Foundry did not log Server started and listening within 120s";
+    const { doc, body } = await recordPublishedResult(`${timeout}\n`);
+
+    expect(doc.started).toBe(false);
+    expect(doc.summary).toBe(timeout);
+    expect(body.output.summary).toBe(timeout);
+    expect(body.output.summary).not.toContain("failed validation");
+    expect(body.output.text).toBe("started=false");
   });
 });
