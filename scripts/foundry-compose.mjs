@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
 
@@ -160,6 +160,38 @@ export function pullImage(versions) {
   execFileSync("docker", ["pull", pinnedImageRef(versions)], { stdio: "inherit" });
 }
 
+export function prepareDataDir(dataDir, io = {}) {
+  const run = io.execFileSync ?? execFileSync;
+  const stat = io.statSync ?? statSync;
+  run("mkdir", ["-p", dataDir]);
+  const info = stat(dataDir);
+  if (info.uid === 1000 && info.gid === 1000) return { usedSudo: false };
+
+  const own = ["-R", "1000:1000", dataDir];
+  try {
+    run("chown", own);
+    return { usedSudo: false };
+  } catch (error) {
+    if (!chownNeedsSudo(error)) throw error;
+    try {
+      run("sudo", ["-n", "chown", ...own]);
+    } catch (sudoError) {
+      const wrapped = new Error(
+        `Could not give uid 1000 write access to ${dataDir}. The Foundry container runs as 1000:1000.`,
+      );
+      wrapped.code = "DATA_DIR";
+      wrapped.cause = sudoError;
+      throw wrapped;
+    }
+    return { usedSudo: true };
+  }
+}
+
+function chownNeedsSudo(error) {
+  const text = `${error?.stderr || ""}\n${error?.message || ""}`;
+  return /Operation not permitted|Permission denied|EPERM/.test(text);
+}
+
 export function prepareDevSystemDir(paths) {
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
   mkdirSync(systemDir, { recursive: true });
@@ -217,10 +249,41 @@ export function redactDiagnostics(text) {
     .replaceAll(/[A-Z0-9]{4}(?:-[A-Z0-9]{4}){5}/g, "<redacted-license>");
 }
 
-export async function waitForHttp(baseUrl, timeoutMs) {
+export function describeStartupFailure(logs, status = "") {
+  const text = String(logs || "");
+  if (
+    /Volume write test failed|Volume read test failed|insufficient permissions on \/data/.test(text)
+  ) {
+    return "Foundry container aborted: insufficient permissions on /data";
+  }
+  const state = String(status || "").trim();
+  if (/^(exited|dead)\b/.test(state)) {
+    return `Foundry container stopped (${state})`;
+  }
+  return null;
+}
+
+export function containerStartupProblem(paths) {
+  const container = composeNames(paths).container;
+  const logs = spawnSync("docker", ["logs", "--tail", "200", container], { encoding: "utf8" });
+  const state = spawnSync(
+    "docker",
+    ["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", container],
+    { encoding: "utf8" },
+  );
+  return describeStartupFailure(`${logs.stdout || ""}${logs.stderr || ""}`, state.stdout || "");
+}
+
+export async function waitForHttp(baseUrl, timeoutMs, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let lastError = "no response";
   while (Date.now() < deadline) {
+    const aborted = options.inspect?.();
+    if (aborted) {
+      const error = new Error(aborted);
+      error.code = "STARTUP_FAILED";
+      throw error;
+    }
     try {
       const response = await fetch(baseUrl, { redirect: "manual" });
       if (response.status > 0) return response.status;

@@ -18,8 +18,10 @@ import {
   assertOwned,
   collectDiagnostics,
   compose,
+  containerStartupProblem,
   inspectOwnership,
   installPackagedSystem,
+  prepareDataDir,
   pullImage,
   requireDocker,
   waitForHttp,
@@ -132,6 +134,7 @@ export async function runE2E(args = {}) {
       preserveConfig: false,
       world: "",
     });
+    prepareDataDir(paths.foundryData);
     compose(paths, ["up", "-d", "--remove-orphans"]);
     started = true;
     const runtime = writeRuntime(paths, names, port);
@@ -144,7 +147,9 @@ export async function runE2E(args = {}) {
     process.env.PIVOT_PLAYER_PASSWORD = process.env.PIVOT_PLAYER_PASSWORD || "e2e-player-local";
 
     console.log(`Waiting for Foundry HTTP on ${runtime.baseUrl} (not used as readiness).`);
-    await waitForHttp(runtime.baseUrl, HTTP_TIMEOUT_MS);
+    await waitForHttp(runtime.baseUrl, HTTP_TIMEOUT_MS, {
+      inspect: () => containerStartupProblem(paths),
+    });
 
     const ownership = inspectOwnership(paths);
     if (!ownership.owned) {
@@ -174,7 +179,12 @@ export async function runE2E(args = {}) {
     console.log("Foundry E2E passed.");
     return EXIT.ok;
   } catch (error) {
-    const exitCode = error.code === "TIMEOUT" ? EXIT.timeout : EXIT.tests;
+    const exitCode =
+      error.code === "TIMEOUT"
+        ? EXIT.timeout
+        : error.code === "STARTUP_FAILED" || error.code === "DATA_DIR"
+          ? EXIT.runtime
+          : EXIT.tests;
     console.error(error.message || error);
     try {
       collectDiagnostics(paths);
