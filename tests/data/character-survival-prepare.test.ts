@@ -6,7 +6,9 @@ class MockField {
   _mock = true;
 }
 
-class MockTypeDataModel {}
+class MockTypeDataModel {
+  prepareDerivedData?(): void {}
+}
 
 const mockFoundryRuntime: FoundryRuntime = {
   abstract: {

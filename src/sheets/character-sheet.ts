@@ -1,4 +1,5 @@
 import { readSurvival } from "../runtime/health";
+import { reconcileSurvival } from "../rules/survival";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
@@ -420,7 +421,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = readSurvival(actor);
+  const survival = reconcileSurvival(readSurvival(actor));
 
   // Helper to format signed numbers
   const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));

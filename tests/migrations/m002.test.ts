@@ -80,7 +80,7 @@ it("persists alive for a version-1 actor with positive HP stored as dying, and i
   });
   expect(JSON.stringify(first)).not.toMatch(/magic|mp/);
 
-  let stored: Record<string, unknown> = structuredClone(versionOneDying);
+  const stored: Record<string, unknown> = structuredClone(versionOneDying);
   const updates: Record<string, unknown>[] = [];
   const actor: MigratableDocument = {
     name: "Rest",
@@ -89,7 +89,7 @@ it("persists alive for a version-1 actor with positive HP stored as dying, and i
     update: async (data) => {
       updates.push(data);
       for (const [path, value] of Object.entries(data)) {
-        const parts = path.split(".");
+        const parts = path.replace(/^system\./, "").split(".");
         let cursor: Record<string, unknown> = stored;
         for (const part of parts.slice(0, -1)) {
           const next = cursor[part];

@@ -238,12 +238,12 @@ describe("prepareCharacterSheetContext", () => {
       },
     });
 
-    expect(context.survivalStatus).toBe("dying");
-    expect(context.survivalLabel).toBe("PIVOT.Survival.dying");
+    expect(context.survivalStatus).toBe("alive");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
     expect(context.hpPercent).toBe(50);
     expect(context.poolPercent).toBe(20);
-    expect(context.deathSaveSuccessPips).toEqual([true, true, false]);
-    expect(context.deathSaveFailurePips).toEqual([true, false, false]);
+    expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
+    expect(context.deathSaveFailurePips).toEqual([false, false, false]);
   });
 
   it("shows alive after prepare when stored HP is positive and status is dying", () => {
