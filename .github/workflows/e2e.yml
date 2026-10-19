@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || 'foundry-e2e' }}
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('e2e-secrets-{0}', github.ref) || format('e2e-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:

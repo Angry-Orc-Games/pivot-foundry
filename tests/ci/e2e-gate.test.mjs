@@ -327,7 +327,8 @@ describe("workflows that start Foundry", () => {
       releaseE2e.indexOf("foundry:e2e"),
     );
     expect(release).toContain("needs.e2e.result == 'success'");
-    expect(release).toContain("group: foundry-e2e");
+    expect(release).toContain("group: release-e2e-${{ github.ref }}");
+    expect(release).not.toContain("group: foundry-e2e");
 
     expect(staging).not.toContain("ref: ${{ github.event.workflow_run.head_sha }}");
     expect(staging).toContain(

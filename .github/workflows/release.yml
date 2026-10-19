@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -79,7 +79,7 @@ jobs:
     needs: [gate, package]
     environment: foundry-e2e
     concurrency:
-      group: foundry-e2e
+      group: release-e2e-${{ github.ref }}
       cancel-in-progress: false
     steps:
       - name: Checkout workflow commit
