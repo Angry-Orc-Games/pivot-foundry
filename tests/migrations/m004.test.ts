@@ -121,7 +121,7 @@ describe("planWeaponEquippedMigration", () => {
     });
   });
 
-  it("leaves equipment without effects alone", () => {
+  it("marks equipment without effects and leaves it unequipped", () => {
     expect(
       planWeaponEquippedMigration(
         {
@@ -132,7 +132,11 @@ describe("planWeaponEquippedMigration", () => {
         },
         "equipment",
       ),
-    ).toEqual({ ok: true, changed: false });
+    ).toEqual({
+      ok: true,
+      changed: true,
+      update: { [M004_FLAG]: true },
+    });
   });
 
   it("does not re-equip equipment after the M004 marker is set", () => {
@@ -278,11 +282,12 @@ describe("M004 world migration", () => {
 
     const first = await runWorldMigrations(dependencies);
 
-    expect(first).toEqual({ skipped: false, updated: 1, failed: 0 });
+    expect(first).toEqual({ skipped: false, updated: 2, failed: 0 });
     expect(ring.stored.equipped).toBe(true);
     expect(ring.marked).toBe(true);
     expect(rope.stored.equipped).toBe(false);
-    expect(rope.updates).toEqual([]);
+    expect(rope.marked).toBe(true);
+    expect(rope.updates).toEqual([{ [M004_FLAG]: true }]);
     expect(logs).toEqual([
       "M004: equipped equipment 'Ring of Protection' on 'Arwen' so its bonuses keep applying",
       "PIVOT.Migration.Complete",

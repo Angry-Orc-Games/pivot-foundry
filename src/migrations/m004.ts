@@ -14,7 +14,7 @@ export function planWeaponEquippedMigration(
   if (hasM004Marker(storedFlags)) return { ok: true, changed: false };
 
   if (itemType === "equipment") {
-    return planEquipmentEquippedMigration(storedSystem, storedFlags);
+    return planEquipmentEquippedMigration(storedSystem);
   }
 
   if (itemType !== "weapon") return { ok: true, changed: false };
@@ -42,21 +42,11 @@ function planUnmarkedWeaponMigration(storedSystem: Record<string, unknown>): Mig
   return { ok: true, changed: true, update };
 }
 
-function planEquipmentEquippedMigration(
-  storedSystem: Record<string, unknown>,
-  storedFlags: unknown,
-): MigrationPlan {
-  if (hasM004Marker(storedFlags)) return { ok: true, changed: false };
+function planEquipmentEquippedMigration(storedSystem: Record<string, unknown>): MigrationPlan {
   const hasEffects = Array.isArray(storedSystem.effects) && storedSystem.effects.length > 0;
-  if (!hasEffects || storedSystem.equipped !== false) return { ok: true, changed: false };
-  return {
-    ok: true,
-    changed: true,
-    update: {
-      "system.equipped": true,
-      [M004_EQUIPPED_FLAG]: true,
-    },
-  };
+  const update: Record<string, unknown> = { [M004_EQUIPPED_FLAG]: true };
+  if (hasEffects && storedSystem.equipped === false) update["system.equipped"] = true;
+  return { ok: true, changed: true, update };
 }
 
 function hasM004Marker(storedFlags: unknown): boolean {
