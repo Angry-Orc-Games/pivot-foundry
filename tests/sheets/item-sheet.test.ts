@@ -81,6 +81,34 @@ describe("weapon item sheet", () => {
   });
 });
 
+describe("equipment item sheet", () => {
+  it("renders an Equipped checkbox next to Carried", () => {
+    const template = Handlebars.compile(
+      readFileSync(join(__dirname, "../../templates/items/item-sheet.hbs"), "utf8"),
+    );
+    const html = template({
+      ...prepareItemSheetContext({
+        name: "Ring of Protection",
+        type: "equipment",
+        system: { equipped: true, carried: true },
+      }),
+      rootId: "equipment-sheet",
+    });
+    const document = new JSDOM(html).window.document;
+    const equipmentSection = [...document.querySelectorAll("section")].find((section) =>
+      section.querySelector("h2")?.textContent?.includes("PIVOT.Sections.Inventory"),
+    );
+    const checkbox = equipmentSection?.querySelector(
+      'label.pf-check input[name="system.equipped"]',
+    );
+    const carried = equipmentSection?.querySelector('label.pf-check input[name="system.carried"]');
+
+    expect(checkbox?.getAttribute("type")).toBe("checkbox");
+    expect(checkbox?.hasAttribute("checked")).toBe(true);
+    expect(carried?.getAttribute("type")).toBe("checkbox");
+  });
+});
+
 describe("PivotItemSheet window", () => {
   it("fits content height and stays resizable so the form is not clipped", () => {
     expect(ITEM_SHEET_POSITION).toEqual({ width: 560, height: "auto" });

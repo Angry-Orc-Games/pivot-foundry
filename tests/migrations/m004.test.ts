@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { SYSTEM_ID } from "../../src/config";
 import { planWeaponEquippedMigration } from "../../src/migrations/m004";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
+
+const M004_FLAG = `flags.${SYSTEM_ID}.m004`;
 
 const strengthEffect = { type: "abilityScoreBonus", ability: "str", amount: 2 };
 
@@ -79,6 +82,53 @@ describe("planWeaponEquippedMigration", () => {
     expect(second).toEqual({ ok: true, changed: false });
   });
 
+  it("equips carried equipment that has effects and no M004 marker", () => {
+    expect(
+      planWeaponEquippedMigration(
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          effects: [strengthEffect],
+          equipped: false,
+          carried: true,
+        },
+        "equipment",
+      ),
+    ).toEqual({
+      ok: true,
+      changed: true,
+      update: { "system.equipped": true, [M004_FLAG]: true },
+    });
+  });
+
+  it("leaves equipment without effects alone", () => {
+    expect(
+      planWeaponEquippedMigration(
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          effects: [],
+          equipped: false,
+          carried: true,
+        },
+        "equipment",
+      ),
+    ).toEqual({ ok: true, changed: false });
+  });
+
+  it("does not re-equip equipment after the M004 marker is set", () => {
+    expect(
+      planWeaponEquippedMigration(
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          effects: [strengthEffect],
+          equipped: false,
+          carried: true,
+        },
+        "equipment",
+        { [SYSTEM_ID]: { m004: true } },
+      ),
+    ).toEqual({ ok: true, changed: false });
+  });
+
   it("ignores items that are not weapons", () => {
     expect(
       planWeaponEquippedMigration(
@@ -150,7 +200,90 @@ describe("M004 world migration", () => {
     expect(flameTongue.stored.equipped).toBe(true);
     expect(dagger.stored.equipped).toBe(false);
   });
+
+  it("equips carried equipment with effects once, then leaves a later unequip alone", async () => {
+    const ring = persistingEquipment("Ring of Protection", {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      effects: [strengthEffect],
+      equipped: false,
+      carried: true,
+    });
+    const rope = persistingEquipment("Rope", {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      effects: [],
+      equipped: false,
+      carried: true,
+    });
+    const actor: MigratableDocument = {
+      name: "Arwen",
+      type: "character",
+      toObject: () => ({
+        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+      }),
+      update: async () => undefined,
+      items: [ring, rope],
+    };
+    const logs: string[] = [];
+    const dependencies = {
+      game: { user: { isGM: true }, actors: [actor], items: [] },
+      log: (message: string) => logs.push(message),
+      notify: () => undefined,
+    };
+
+    const first = await runWorldMigrations(dependencies);
+
+    expect(first).toEqual({ skipped: false, updated: 1, failed: 0 });
+    expect(ring.stored.equipped).toBe(true);
+    expect(ring.marked).toBe(true);
+    expect(rope.stored.equipped).toBe(false);
+    expect(rope.updates).toEqual([]);
+    expect(logs).toEqual([
+      "M004: equipped equipment 'Ring of Protection' on 'Arwen' so its bonuses keep applying",
+      "PIVOT.Migration.Complete",
+    ]);
+
+    logs.length = 0;
+    const second = await runWorldMigrations(dependencies);
+    expect(second).toEqual({ skipped: false, updated: 0, failed: 0 });
+    expect(logs).toEqual([]);
+
+    ring.setEquipped(false);
+    const third = await runWorldMigrations(dependencies);
+    expect(third).toEqual({ skipped: false, updated: 0, failed: 0 });
+    expect(ring.stored.equipped).toBe(false);
+    expect(logs).toEqual([]);
+  });
 });
+
+function persistingEquipment(name: string, initial: Record<string, unknown>) {
+  let stored = { ...initial };
+  let marked = false;
+  const updates: Record<string, unknown>[] = [];
+  const document = {
+    name,
+    type: "equipment" as const,
+    updates,
+    toObject: () => ({
+      system: stored,
+      flags: marked ? { [SYSTEM_ID]: { m004: true } } : {},
+    }),
+    update: async (data: Record<string, unknown>) => {
+      updates.push(data);
+      if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
+      if (data[M004_FLAG] === true) marked = true;
+    },
+    setEquipped(value: boolean) {
+      stored = { ...stored, equipped: value };
+    },
+    get stored() {
+      return stored;
+    },
+    get marked() {
+      return marked;
+    },
+  };
+  return document;
+}
 
 function persistingItem(name: string, initial: Record<string, unknown>) {
   let stored = { ...initial };
