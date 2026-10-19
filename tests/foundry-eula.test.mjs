@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 import { EXIT } from "../scripts/foundry-env.mjs";
+import { handleFoundryEula } from "../scripts/foundry-setup.mjs";
 
 const LICENSE = "ABCD-EFGH-IJKL-MNOP-QRST-UVWX";
 const SETUP_FAILURE =
@@ -190,7 +191,100 @@ describe("Foundry EULA opt-in", () => {
     );
     expect(example).not.toContain("FOUNDRY_E2E_ACCEPT_EULA");
   });
+});
 
+function delayedScreen({ eulaAfterMs = null, setupAfterMs = null } = {}) {
+  const started = Date.now();
+  const clicks = [];
+  let sawSetup = false;
+  const due = (delay) => delay !== null && Date.now() - started >= delay;
+  const waitUntil = async (delay) => {
+    if (delay === null) throw new Error("screen did not appear");
+    while (!due(delay)) await new Promise((resolve) => globalThis.setTimeout(resolve, 5));
+  };
+  return {
+    clicks,
+    sawSetup: () => sawSetup,
+    getByRole(role, options = {}) {
+      const name = options.name;
+      const label = name instanceof RegExp ? name.source : String(name ?? "");
+      if (role === "checkbox" && label.includes("I agree to these terms")) {
+        return {
+          isVisible: async () => due(eulaAfterMs),
+          waitFor: () => waitUntil(eulaAfterMs),
+          check: async () => {
+            clicks.push("check");
+          },
+        };
+      }
+      if (role === "button" && name === "Agree") {
+        return {
+          click: async () => {
+            clicks.push("Agree");
+          },
+        };
+      }
+      if (role === "heading" && label.includes("End User License Agreement")) {
+        return {
+          waitFor: async () => {
+            clicks.push("cleared");
+          },
+        };
+      }
+      if (role === "button" && name instanceof RegExp && name.test("Create World")) {
+        return {
+          waitFor: async () => {
+            await waitUntil(setupAfterMs);
+            sawSetup = true;
+          },
+        };
+      }
+      throw new Error(`unexpected role ${role} ${label}`);
+    },
+  };
+}
+
+describe("late Foundry EULA screen", () => {
+  it("throws SETUP when the checkbox appears after a delay and the flag is off", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pivot-eula-late-"));
+    const marker = join(dir, "setup-failure.txt");
+    const page = delayedScreen({ eulaAfterMs: 40 });
+    let error;
+    try {
+      await handleFoundryEula(page, {
+        FOUNDRY_E2E_ACCEPT_EULA: undefined,
+        PIVOT_E2E_SETUP_FAILURE: marker,
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    const written = await readFile(marker, "utf8").catch(() => "");
+    await rm(dir, { recursive: true, force: true });
+
+    expect(error?.code).toBe("SETUP");
+    expect(error?.message).toBe(SETUP_FAILURE);
+    expect(written).toBe(`${SETUP_FAILURE}\n`);
+    expect(page.clicks).toEqual([]);
+  });
+
+  it("checks the box and clicks Agree when the checkbox appears after a delay and the flag is 1", async () => {
+    const page = delayedScreen({ eulaAfterMs: 40 });
+    await handleFoundryEula(page, { FOUNDRY_E2E_ACCEPT_EULA: "1" });
+
+    expect(page.clicks).toEqual(["check", "Agree", "cleared"]);
+  });
+
+  it("returns when the setup screen appears and the agreement does not", async () => {
+    const page = delayedScreen({ setupAfterMs: 40 });
+    const result = await handleFoundryEula(page, { FOUNDRY_E2E_ACCEPT_EULA: undefined });
+
+    expect(result).toBeUndefined();
+    expect(page.sawSetup()).toBe(true);
+    expect(page.clicks).toEqual([]);
+  });
+});
+
+describe("setup failure classification", () => {
   it("classifies the setup marker as a setup failure, not a test failure", async () => {
     const loaded = await import("../scripts/foundry-e2e.mjs");
     expect(typeof EXIT.setup).toBe("number");
