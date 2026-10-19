@@ -1,6 +1,12 @@
 import { planSurvivalMigration } from "./m002";
 import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
 import {
+  coreReviewLine,
+  formatM006CoreReview,
+  MAGIC_ECHELON_MIGRATION_ID,
+  planMagicEchelonMigration,
+} from "./m006";
+import {
   planActorMigration,
   planItemMigration,
   SCHEMA_MIGRATION_ID,
@@ -66,10 +72,13 @@ export async function runWorldMigrations(
     ),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
+  const coreReview: string[] = [];
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
     game.items,
   ).map((document) => {
     const stored = readStoredSystem(document);
+    const line = coreReviewLine(document, stored);
+    if (line) coreReview.push(line);
     return {
       document,
       plan: combineItemMigrations(stored),
@@ -80,12 +89,21 @@ export async function runWorldMigrations(
       document: actor,
       plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
     });
+    const actorName = actor.name ?? actor.id ?? "unknown";
     for (const item of listDocuments(actor.items)) {
+      const stored = readStoredSystem(item);
+      const line = coreReviewLine(item, stored, actorName);
+      if (line) coreReview.push(line);
       planned.push({
         document: item,
-        plan: combineItemMigrations(readStoredSystem(item)),
+        plan: combineItemMigrations(stored),
       });
     }
+  }
+  if (coreReview.length > 0) {
+    const message = coreReviewMessage(coreReview, dependencies);
+    dependencies.notify?.("warn", message);
+    dependencies.log?.(message);
   }
   for (const entry of planned) {
     const result = await persistMigration(entry.document, entry.plan, dependencies);
@@ -97,7 +115,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
+        id: `${SCHEMA_MIGRATION_ID} / M002 / M003 / ${MAGIC_ECHELON_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -213,13 +231,25 @@ function combineItemMigrations(source: unknown): MigrationPlan {
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  const echelon = planMagicEchelonMigration(source);
+  if (!echelon.ok) return echelon;
+  if (!first.changed && !second.changed && !echelon.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
+      ...(echelon.changed ? echelon.update : {}),
     },
   };
+}
+
+function coreReviewMessage(
+  lines: readonly string[],
+  dependencies: WorldMigrationDependencies,
+): string {
+  const localized = formatMessage("PIVOT.Migration.M006CoreReview", {}, dependencies);
+  const instruction = localized === "PIVOT.Migration.M006CoreReview" ? undefined : localized;
+  return instruction ? [instruction, ...lines].join("\n") : formatM006CoreReview(lines);
 }

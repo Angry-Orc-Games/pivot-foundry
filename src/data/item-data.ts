@@ -8,6 +8,7 @@ import {
   stringField,
   type TypeDataModelConstructor,
 } from "../foundry-runtime";
+import { ECHELON_VALUES, migrateStoredEchelon, normalizeEchelon } from "../rules/echelon";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 
 type TypeDataModelWithSchema = TypeDataModelConstructor & {
@@ -97,9 +98,13 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     static defineSchema(): Record<string, DataField> {
       return withItemInfrastructure(fields, {
         ability: stringField(fields, { required: true, initial: "int" }),
-        echelon: numberField(fields, { required: true, integer: true, min: 1, max: 5, initial: 1 }),
+        echelon: echelonField(fields),
         notes: stringField(fields, { required: true, initial: "" }),
       });
+    }
+
+    static migrateData(source: Record<string, unknown>): Record<string, unknown> {
+      return migrateEchelonSource(source);
     }
   }
 
@@ -107,12 +112,16 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     static defineSchema(): Record<string, DataField> {
       return withItemInfrastructure(fields, {
         stream: stringField(fields, { required: true, initial: "" }),
-        echelon: numberField(fields, { required: true, integer: true, min: 1, max: 5, initial: 1 }),
+        echelon: echelonField(fields),
         mpCost: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         roll: stringField(fields, { required: true, initial: "" }),
         damage: stringField(fields, { required: true, initial: "" }),
         notes: stringField(fields, { required: true, initial: "" }),
       });
+    }
+
+    static migrateData(source: Record<string, unknown>): Record<string, unknown> {
+      return migrateEchelonSource(source);
     }
   }
 
@@ -124,6 +133,23 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     magicStream: PivotMagicStreamData,
     magicAbility: PivotMagicAbilityData,
   };
+}
+
+function echelonField(fields: FoundryRuntime["data"]["fields"]): DataField {
+  return stringField(fields, {
+    required: true,
+    blank: false,
+    initial: "core",
+    choices: [...ECHELON_VALUES],
+    validate: (value: unknown) => normalizeEchelon(value) !== undefined,
+  });
+}
+
+function migrateEchelonSource(source: Record<string, unknown>): Record<string, unknown> {
+  if (!("echelon" in source)) return source;
+  const next = migrateStoredEchelon(source.echelon);
+  if (next === source.echelon) return source;
+  return { ...source, echelon: next };
 }
 
 function withItemInfrastructure(
