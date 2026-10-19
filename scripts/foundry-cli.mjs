@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -25,6 +25,7 @@ import {
   prepareContainerCache,
   prepareDataDir,
   prepareDevSystemDir,
+  removeFoundryTree,
   pullImage,
   readRuntime,
   requireDocker,
@@ -297,7 +298,7 @@ function reset() {
     assertOwned(paths);
     compose(paths, ["down", "--remove-orphans", "--volumes"]);
   }
-  rmSync(paths.foundryData, { force: true, recursive: true });
+  removeFoundryTree(paths.foundryData);
   console.log(
     `Reset disposable E2E data for ${paths.instanceId}. Distribution cache was preserved.`,
   );

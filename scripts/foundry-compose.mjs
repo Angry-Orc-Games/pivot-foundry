@@ -9,7 +9,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import net from "node:net";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 
 import { EXIT, SYSTEM_LINK_ENTRIES, composeNames, pinnedImageRef } from "./foundry-env.mjs";
 
@@ -189,9 +190,38 @@ export function prepareContainerCache(paths, io = {}) {
   const run = io.execFileSync ?? execFileSync;
   const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
   run("mkdir", ["-p", cacheDir], quiet);
-  copy(source, join(cacheDir, paths.versions.cacheFileName));
+  replaceFile(copy, source, join(cacheDir, paths.versions.cacheFileName), run);
   chownFoundryTree(cacheDir, io, { force: true });
   return cacheDir;
+}
+
+function privilegeDenied(error) {
+  if (error?.code === "EACCES" || error?.code === "EPERM") return true;
+  const text = `${error?.stderr || ""}\n${error?.message || ""}`;
+  return /Operation not permitted|Permission denied|EPERM|EACCES/i.test(text);
+}
+
+function replaceFile(copy, from, to, run) {
+  try {
+    copy(from, to);
+    return;
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+  }
+
+  const temp = join(tmpdir(), `.pivot-cache-${process.pid}-${basename(to)}`);
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  try {
+    copy(from, temp);
+    try {
+      run("mv", ["-f", temp, to], quiet);
+    } catch (error) {
+      if (!privilegeDenied(error)) throw error;
+      run("sudo", ["-n", "mv", "-f", temp, to], quiet);
+    }
+  } finally {
+    rmSync(temp, { force: true });
+  }
 }
 
 function chownFoundryTree(dir, io = {}, { force = false } = {}) {
@@ -206,7 +236,7 @@ function chownFoundryTree(dir, io = {}, { force = false } = {}) {
     run("chown", own, quiet);
     return { usedSudo: false };
   } catch (error) {
-    if (!chownNeedsSudo(error)) throw error;
+    if (!privilegeDenied(error)) throw error;
     try {
       run("sudo", ["-n", "chown", ...own], quiet);
     } catch (sudoError) {
@@ -219,11 +249,6 @@ function chownFoundryTree(dir, io = {}, { force = false } = {}) {
     }
     return { usedSudo: true };
   }
-}
-
-function chownNeedsSudo(error) {
-  const text = `${error?.stderr || ""}\n${error?.message || ""}`;
-  return /Operation not permitted|Permission denied|EPERM/.test(text);
 }
 
 export function prepareDevSystemDir(paths) {
@@ -248,12 +273,36 @@ export function assertSafeZipEntries(zipPath) {
   }
 }
 
-export function installPackagedSystem(paths, zipPath) {
-  assertSafeZipEntries(zipPath);
+export function removeFoundryTree(target, io = {}) {
+  const remove = io.rmSync ?? rmSync;
+  const run = io.execFileSync ?? execFileSync;
+  try {
+    remove(target, { force: true, recursive: true });
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    run("sudo", ["-n", "rm", "-rf", target], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  }
+}
+
+export function installPackagedSystem(paths, zipPath, io = {}) {
+  const assertSafe = io.assertSafeZipEntries ?? assertSafeZipEntries;
+  assertSafe(zipPath);
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
-  rmSync(systemDir, { force: true, recursive: true });
-  mkdirSync(systemDir, { recursive: true });
-  execFileSync("unzip", ["-q", "-o", zipPath, "-d", systemDir], { stdio: "inherit" });
+  const mkdir = io.mkdirSync ?? mkdirSync;
+  const run = io.execFileSync ?? execFileSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  removeFoundryTree(systemDir, io);
+  try {
+    mkdir(systemDir, { recursive: true });
+    run("unzip", ["-q", "-o", zipPath, "-d", systemDir], { stdio: "inherit" });
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    run("sudo", ["-n", "mkdir", "-p", systemDir], quiet);
+    run("sudo", ["-n", "unzip", "-q", "-o", zipPath, "-d", systemDir], quiet);
+  }
 }
 
 export function followLogs(paths) {
