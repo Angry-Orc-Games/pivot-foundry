@@ -308,15 +308,49 @@ export function describeStartupFailure(logs, status = "") {
   return null;
 }
 
-export function containerStartupProblem(paths) {
+export function readContainerLogs(paths) {
   const container = composeNames(paths).container;
   const logs = spawnSync("docker", ["logs", "--tail", "200", container], { encoding: "utf8" });
+  return `${logs.stdout || ""}${logs.stderr || ""}`;
+}
+
+export function startedAnnouncement(logs, sha) {
+  if (!String(logs || "").includes("Server started and listening")) return [];
+  return ["Server started and listening", `Foundry started for E2E commit ${sha}.`];
+}
+
+export async function waitForListening(readLog, timeoutMs, options = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const aborted = options.inspect?.();
+    if (aborted) {
+      const error = new Error(aborted);
+      error.code = "STARTUP_FAILED";
+      throw error;
+    }
+    const logs = String(readLog() ?? "");
+    if (logs.includes("Server started and listening")) return logs;
+    const pause = Math.min(200, deadline - Date.now());
+    if (pause <= 0) break;
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, pause);
+    });
+  }
+  const error = new Error(
+    `Foundry did not log Server started and listening within ${timeoutMs / 1000}s`,
+  );
+  error.code = "TIMEOUT";
+  throw error;
+}
+
+export function containerStartupProblem(paths) {
+  const container = composeNames(paths).container;
   const state = spawnSync(
     "docker",
     ["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", container],
     { encoding: "utf8" },
   );
-  return describeStartupFailure(`${logs.stdout || ""}${logs.stderr || ""}`, state.stdout || "");
+  return describeStartupFailure(readContainerLogs(paths), state.stdout || "");
 }
 
 export async function waitForHttp(baseUrl, timeoutMs, options = {}) {

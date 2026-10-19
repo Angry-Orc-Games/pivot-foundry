@@ -1,5 +1,7 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
+import { handleFoundryEula } from "../../scripts/foundry-setup.mjs";
+
 export interface FoundryIdentity {
   ready: boolean;
   systemId: string;
@@ -48,6 +50,7 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
 export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void> {
   await waitForFoundryShell(page);
   await authenticateSetup(page, adminKey);
+  await handleFoundryEula(page);
 
   const ready = await page.evaluate(() =>
     Boolean((window as unknown as { game?: { ready?: boolean } }).game?.ready),

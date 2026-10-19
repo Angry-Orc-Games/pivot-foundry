@@ -21,6 +21,7 @@ export const EXIT = {
   identity: 6,
   tests: 7,
   unsafe: 8,
+  setup: 9,
   timeout: 10,
 };
 
