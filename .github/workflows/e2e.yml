@@ -14,6 +14,11 @@ on:
         type: boolean
         default: false
         required: false
+      accept_eula:
+        description: Sign the Foundry EULA for this dispatch only.
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
@@ -290,6 +295,7 @@ jobs:
           PIVOT_REQUIRE_RELEASE_SHA256: "1"
           PIVOT_FOUNDRY_TARGET: e2e
           PIVOT_E2E_SUBJECT: ${{ matrix.target.sha }}
+          FOUNDRY_E2E_ACCEPT_EULA: ${{ github.event_name == 'workflow_dispatch' && inputs.accept_eula == true && '1' || '' }}
         run: |
           set -o pipefail
           node scripts/foundry-cli.mjs e2e --skip-package 2>&1 | tee "$RUNNER_TEMP/foundry-e2e.log"
