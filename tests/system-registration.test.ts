@@ -154,6 +154,17 @@ describe("Pivot item data models", () => {
     expect(featureSchema).toHaveProperty("effects");
     expect(featureSchema.effects?.kind).toBe("array");
   });
+
+  it("defaults a new weapon to unequipped", () => {
+    const { foundry } = createMockFoundry();
+    const models = createPivotItemDataModels(foundry);
+    const weaponSchema = models.weapon.defineSchema() as Record<string, FieldRecord>;
+
+    expect(weaponSchema.equipped).toMatchObject({
+      kind: "boolean",
+      options: { required: true, initial: false },
+    });
+  });
 });
 
 describe("registerPivotFantasySystem", () => {

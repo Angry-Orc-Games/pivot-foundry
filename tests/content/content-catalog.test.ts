@@ -51,6 +51,26 @@ describe("validateContentRecord", () => {
   });
 });
 
+describe("weapon content records", () => {
+  it("allows an equipped flag on a weapon", () => {
+    expect(
+      validateContentRecord({
+        contentId: "flame-tongue",
+        name: "Flame Tongue",
+        type: "weapon",
+        system: {
+          schemaVersion: 2,
+          effects: [{ type: "abilityScoreBonus", ability: "str", amount: 2 }],
+          equipped: true,
+        },
+      }),
+    ).toMatchObject({
+      type: "weapon",
+      system: { equipped: true },
+    });
+  });
+});
+
 describe("validateContentCatalog", () => {
   it("rejects duplicate contentId values", () => {
     expect(() => validateContentCatalog([exampleKeenSenses, exampleKeenSenses])).toThrow(
