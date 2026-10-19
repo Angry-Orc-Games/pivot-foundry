@@ -87,6 +87,13 @@ license_gate() {
     reason="somebody is signed in on ${busy[0]} (shared Foundry license)"
   fi
   if [[ -n ${reason:-} ]]; then
+    if [[ ${E2E_GATE_MODE:-} == dispatch && ${E2E_GATE_SOFT_SKIP:-} == true ]]; then
+      write_output ok false
+      write_output skipped true
+      write_output skip_reason "$reason"
+      printf 'Foundry was not started. %s\n' "$reason"
+      exit 0
+    fi
     if [[ ${E2E_GATE_MODE:-} == dispatch ]]; then
       write_output skipped true
     fi

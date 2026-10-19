@@ -241,6 +241,7 @@ describe("quiet-hours bypass", () => {
       stderr: child.stderr ?? "",
       ok: outputValue(githubOutput, "ok"),
       skipped: outputValue(githubOutput, "skipped"),
+      skipReason: outputValue(githubOutput, "skip_reason"),
       curls: curls.split("\n").filter(Boolean),
     };
   }
@@ -283,6 +284,36 @@ describe("quiet-hours bypass", () => {
     expect(result.stdout).toContain("somebody is signed in");
     expect(result.stdout).not.toContain("success");
     expect(`${result.ok} ${result.skipped}`).not.toContain("ok=true");
+  });
+
+  it("lets a dispatch signed-in skip finish without an error annotation", async () => {
+    const result = await runGate("license", {
+      hour: "2300",
+      env: { E2E_GATE_MODE: "dispatch", E2E_GATE_SOFT_SKIP: "true" },
+      buildBody: '{"users":1}\n',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.ok).toBe("false");
+    expect(result.skipped).toBe("true");
+    expect(result.skipReason).toContain("build.angryorcgames.com");
+    expect(result.skipReason).not.toContain("foundry.angryorcgames.com");
+    expect(result.stdout).toContain("build.angryorcgames.com");
+    expect(result.stdout).not.toContain("::error::");
+    expect(result.stderr).not.toContain("::error::");
+  });
+
+  it("names both hosts when a dispatch skip finds both busy", async () => {
+    const result = await runGate("license", {
+      hour: "1200",
+      env: { E2E_GATE_MODE: "dispatch", E2E_GATE_SOFT_SKIP: "true" },
+      foundryBody: '{"users":2}\n',
+      buildBody: '{"users":1}\n',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.skipReason).toContain("foundry.angryorcgames.com and build.angryorcgames.com");
+    expect(result.stdout).not.toContain("::error::");
   });
 
   it("still tells a required release gate to re-run inside the window", async () => {
@@ -347,6 +378,31 @@ describe("on-demand check name", () => {
     expect(body.output.summary).toContain("signed in");
   });
 
+  it("names the signed-in host on the neutral on-demand check", async () => {
+    const ctx = await withJsonStub();
+    const reason = "somebody is signed in on build.angryorcgames.com (shared Foundry license)";
+    const result = await runScript(publishScript, [], {
+      ...ctx.env,
+      E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-78" }]),
+      E2E_RUN_ID: "4242",
+      E2E_MATRIX_RESULT: "skipped",
+      E2E_SKIPPED: "true",
+      E2E_GATE_OK: "false",
+      E2E_SKIP_REASON: reason,
+      E2E_CHECK_NAME: ON_DEMAND,
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(body.name).toBe(ON_DEMAND);
+    expect(body.head_sha).toBe(SAME);
+    expect(body.conclusion).toBe("neutral");
+    expect(body.conclusion).not.toBe("success");
+    expect(body.output.summary).toContain("build.angryorcgames.com");
+    expect(body.output.summary).not.toContain("foundry.angryorcgames.com or build");
+  });
+
   it("records a dispatch skip as neutral", async () => {
     const dir = await mkdtemp(join(tmpdir(), "e2e-record-skip-"));
     const dest = join(dir, "pr-78.json");
@@ -409,6 +465,24 @@ describe("launch window for dispatch", () => {
     expect(error?.status).toBe(1);
   });
 
+  it("still aborts a dispatch launch when somebody is signed in", async () => {
+    const ctx = await launchEnv("2300", {
+      env: { E2E_GATE_MODE: "dispatch" },
+      foundryBody: '{"users":0}\n',
+    });
+    await writeFile(join(ctx.dir, "stub", "build.body"), '{"users":1}\n');
+    let error;
+    try {
+      assertLaunchWindow(repoRoot, { env: ctx.env, stdio: "pipe" });
+    } catch (caught) {
+      error = caught;
+    }
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(error?.status).toBe(1);
+    expect(`${error?.stdout ?? ""}`).toContain("build.angryorcgames.com");
+  });
+
   it("allows a dispatch launch at 23:00 when nobody is signed in", async () => {
     const ctx = await launchEnv("2300", { env: { E2E_GATE_MODE: "dispatch" } });
     assertLaunchWindow(repoRoot, { env: ctx.env, stdio: "pipe" });
@@ -440,6 +514,19 @@ describe("on-demand workflow wiring", () => {
     expect(concurrency).not.toContain("on-demand");
     expect(yaml).toContain("needs.gate.outputs.skipped");
     expect(yaml).toContain("needs.gate.outputs.on_demand");
+    expect(yaml).toContain("needs.gate.outputs.skip_reason");
     expect(yaml).toContain("E2E_SKIPPED:");
+    expect(yaml).toContain("E2E_SKIP_REASON:");
+    expect(yaml).toContain("E2E_GATE_SOFT_SKIP:");
+    const gateJob = yaml.slice(yaml.indexOf("  gate:\n"), yaml.indexOf("  secrets:\n"));
+    const foundryStep = yaml.slice(
+      yaml.indexOf("- name: Run packaged Foundry E2E"),
+      yaml.indexOf("- name: Verify tests executed"),
+    );
+    expect(gateJob).toContain("E2E_GATE_SOFT_SKIP:");
+    expect(foundryStep).not.toContain("E2E_GATE_SOFT_SKIP");
+    expect(yaml).toContain(
+      "if: (always() || cancelled()) && needs.gate.result != 'success' && needs.gate.result != 'skipped'",
+    );
   });
 });

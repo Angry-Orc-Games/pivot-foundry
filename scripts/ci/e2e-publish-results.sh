@@ -100,7 +100,11 @@ while IFS= read -r row; do
     failed=1
   elif [[ $skipped == true ]]; then
     conclusion=neutral
-    summary="Skipped because somebody is signed in on foundry.angryorcgames.com or build.angryorcgames.com. Foundry was not started."
+    if [[ -n ${E2E_SKIP_REASON:-} ]]; then
+      summary="Skipped. ${E2E_SKIP_REASON} Foundry was not started."
+    else
+      summary="Skipped because somebody is signed in on foundry.angryorcgames.com or build.angryorcgames.com. Foundry was not started."
+    fi
   elif [[ -n $gate_ok && $gate_ok != true ]]; then
     summary="License gate closed. Foundry was not started."
     failed=1

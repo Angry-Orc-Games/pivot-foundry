@@ -42,6 +42,7 @@ jobs:
       ok: ${{ steps.decide.outputs.ok }}
       skipped: ${{ steps.decide.outputs.skipped }}
       on_demand: ${{ steps.decide.outputs.on_demand }}
+      skip_reason: ${{ steps.decide.outputs.skip_reason }}
     steps:
       - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -53,6 +54,8 @@ jobs:
 
       - name: Decide whether Foundry may start
         id: decide
+        env:
+          E2E_GATE_SOFT_SKIP: ${{ env.E2E_GATE_MODE == 'dispatch' && 'true' || 'false' }}
         run: bash trusted-gate/scripts/ci/e2e-gate.sh license
 
   secrets:
@@ -399,6 +402,7 @@ jobs:
           E2E_MATRIX_RESULT: ${{ needs.e2e.result }}
           E2E_SKIPPED: ${{ needs.gate.outputs.skipped }}
           E2E_GATE_OK: ${{ needs.gate.outputs.ok }}
+          E2E_SKIP_REASON: ${{ needs.gate.outputs.skip_reason }}
           E2E_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash trusted-gate/scripts/ci/e2e-publish-results.sh
