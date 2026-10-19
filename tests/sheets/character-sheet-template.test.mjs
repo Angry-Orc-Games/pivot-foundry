@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import Handlebars from "handlebars";
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 Handlebars.registerHelper("localize", (key) => key);
+Handlebars.registerHelper("checked", (value) => (value ? "checked" : ""));
+Handlebars.registerHelper("selectOptions", () => "");
 
 describe("character sheet template structure", () => {
   it("vitals partial includes ability rows", () => {
@@ -131,6 +134,86 @@ describe("character sheet template structure", () => {
     expect(template).toContain("{{proficiencyText.weapons}}");
     expect(template).toContain("{{proficiencyText.armour}}");
     expect(template).toContain("{{proficiencyText.shields}}");
+  });
+
+  it("keeps a skill name click from toggling proficiency and gives traits add and delete", () => {
+    const sheet = Handlebars.compile(
+      readFileSync(resolve(process.cwd(), "templates/actors/character/sheet.hbs"), "utf-8"),
+    );
+    const vitals = Handlebars.compile(
+      readFileSync(resolve(process.cwd(), "templates/actors/character/vitals.hbs"), "utf-8"),
+    );
+    const sheetDom = new JSDOM(
+      sheet({
+        skillRows: [
+          {
+            id: "medicine",
+            label: "Medicine",
+            ability: "Wis",
+            proficient: false,
+            proficientPath: "system.skills.medicine.proficient",
+            total: "+2",
+          },
+        ],
+        items: { traits: [{ id: "trait-1", name: "Keen", disabledAttr: "" }] },
+        form: {},
+        proficiencyText: {},
+        system: { magic: {}, notes: {}, identity: {}, currency: {} },
+        derived: { armourClass: {}, magic: { mp: {} } },
+      }),
+    ).window.document;
+    const name = [...sheetDom.querySelectorAll("table.pf-skills *")].find((element) =>
+      [...element.childNodes].some(
+        (node) => node.nodeType === 3 && node.textContent?.includes("Medicine"),
+      ),
+    );
+    const checkbox = sheetDom.querySelector('input[name="system.skills.medicine.proficient"]');
+    name?.click();
+    expect(checkbox?.checked).toBe(false);
+    expect(sheetDom.querySelector("label.pf-check")?.textContent ?? "").not.toContain("Medicine");
+    expect(name?.tagName).toBe("BUTTON");
+    expect(name?.dataset.action).toBe("roll");
+    expect(name?.dataset.rollKind).toBe("skill");
+    expect(name?.dataset.key).toBe("medicine");
+    expect(name?.dataset.label).toBe("Medicine");
+
+    const traits = [...sheetDom.querySelectorAll(".pf-section-header")].find((element) =>
+      element.textContent?.includes("Traits"),
+    );
+    const add = traits?.querySelector("button");
+    expect(add?.dataset.action).toBe("createItem");
+    expect(add?.dataset.type).toBe("feature");
+    expect(add?.dataset.category).toBe("other");
+    const row = [...sheetDom.querySelectorAll("li")].find((element) =>
+      element.textContent?.includes("Keen"),
+    );
+    expect(row?.querySelector('[data-action="openItem"]')).toBeTruthy();
+    expect(row?.querySelector('[data-action="deleteItem"]')).toBeTruthy();
+
+    const vitalsDom = new JSDOM(
+      vitals({
+        abilityRows: [
+          {
+            key: "str",
+            label: "Strength",
+            short: "Str",
+            save: "+1",
+            mod: "+1",
+            score: 12,
+            primary: false,
+            scorePath: "system.abilities.str.score",
+            primaryPath: "system.abilities.str.primary",
+            abilityClass: "pf-ab",
+          },
+        ],
+        derived: { initiative: 2, passivePerception: 12 },
+      }),
+    ).window.document;
+    for (const kind of ["save", "initiative"]) {
+      const control = vitalsDom.querySelector(`[data-roll-kind="${kind}"]`);
+      expect(control?.tagName).toBe("BUTTON");
+      expect(control?.closest("label")).toBeNull();
+    }
   });
 
   it("vitals partial includes stat cards and abilities", () => {

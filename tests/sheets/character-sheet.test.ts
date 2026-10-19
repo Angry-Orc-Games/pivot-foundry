@@ -515,6 +515,56 @@ describe("sheet interaction helpers", () => {
       name: "New Magic Ability",
       type: "magicAbility",
     });
+    expect(createEmbeddedItemData("feature", "other")).toEqual({
+      name: "New Trait",
+      type: "feature",
+      system: { category: "other" },
+    });
+  });
+
+  it("passes a trait category through createItem and opens the new sheet", async () => {
+    const created: unknown[] = [];
+    let rendered = false;
+    const SheetClass = createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+          },
+        },
+      },
+    } as never);
+    const sheet = new SheetClass();
+    Object.defineProperty(sheet, "document", {
+      value: {
+        async createEmbeddedDocuments(_type: string, data: unknown[]) {
+          created.push(...data);
+          return [{ sheet: { render: (force?: boolean) => (rendered = force === true) } }];
+        },
+      },
+    });
+    const createItem = (
+      SheetClass as {
+        DEFAULT_OPTIONS?: {
+          actions?: {
+            createItem?: (
+              this: unknown,
+              event: Event,
+              target: { dataset: Record<string, string> },
+            ) => Promise<void>;
+          };
+        };
+      }
+    ).DEFAULT_OPTIONS?.actions?.createItem;
+    await createItem?.call(sheet, new Event("click"), {
+      dataset: { type: "feature", category: "other" },
+    });
+    expect(created).toEqual([
+      { name: "New Trait", type: "feature", system: { category: "other" } },
+    ]);
+    expect(rendered).toBe(true);
   });
 
   it("normalizes comma-separated sheet fields into source arrays", () => {
