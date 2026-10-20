@@ -180,7 +180,7 @@ function breakdownTotal(lines: string[]): number {
 }
 
 describe("calculateArmourClass", () => {
-  it("takes the higher of natural AC and one worn armour", () => {
+  it("counts one worn suit and keeps shields separate from exclusion bonuses", () => {
     const wornWins = calculateArmourClass({
       dexterityModifier: 4,
       manualBonus: 1,
@@ -234,9 +234,9 @@ describe("calculateArmourClass", () => {
       ],
     });
     expect(naturalWins).toEqual({
-      value: 19,
-      armourWorn: "Carapace, Small Shield",
-      breakdown: ["Carapace 18", "Small Shield +1"],
+      value: 17,
+      armourWorn: "Plate, Small Shield",
+      breakdown: ["Base 10", "Plate +6", "Small Shield +1"],
     });
     expect(breakdownTotal(naturalWins.breakdown)).toBe(naturalWins.value);
 
@@ -294,8 +294,11 @@ describe("calculateArmourClass", () => {
         { name: "Carapace", category: "natural", acBonus: 18, equipped: true },
       ],
     });
-    expect(naturalWins.value).toBe(18);
-    expect(naturalWins.breakdown[0]).toBe("Carapace 18");
+    expect(naturalWins).toEqual({
+      value: 17,
+      armourWorn: "Leather",
+      breakdown: ["Base 10", "Dex +4", "Leather +3"],
+    });
   });
 
   it("adds Dexterity to a natural armour base", () => {

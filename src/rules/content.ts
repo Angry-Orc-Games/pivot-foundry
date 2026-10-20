@@ -70,6 +70,8 @@ const allowedSystemKeys: Record<PivotItemType, Set<string>> = {
     "category",
     "acBonus",
     "acStackKey",
+    "naturalMode",
+    "bodyLimit",
     "equipped",
     "weight",
     "quantity",

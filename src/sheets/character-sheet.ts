@@ -414,6 +414,12 @@ export function prepareCharacterSheetContext(
         ...(stringAt(item.system, ["acStackKey"], "")
           ? { stackKey: stringAt(item.system, ["acStackKey"], "") }
           : {}),
+        ...(stringAt(item.system, ["naturalMode"], "") === "higher"
+          ? { naturalMode: "higher" as const }
+          : {}),
+        ...(stringAt(item.system, ["bodyLimit"], "") === "light"
+          ? { bodyLimit: "light" as const }
+          : {}),
       })),
       manualArmourBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
       initiativeBonus: numberAt(system, ["attributes", "initiative", "bonus"], 0),
