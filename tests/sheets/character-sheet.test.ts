@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import Handlebars from "handlebars";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -880,5 +884,110 @@ describe("character sheet edit toggle", () => {
     const stillLocked = await locked._prepareContext({});
     expect(stillLocked.editable).toBe(false);
     expect(stillLocked.disabledAttr).toBe("disabled");
+  });
+});
+
+function actorWithPrimaries(
+  primaries: Array<"str" | "dex" | "con" | "int" | "wis" | "cha">,
+  options: {
+    level?: number;
+    magic?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+    feat?: string;
+  } = {},
+): ActorLike {
+  const scores = { str: 16, dex: 14, con: 14, int: 12, wis: 12, cha: 10 };
+  return {
+    name: "Grawl",
+    type: "character",
+    system: {
+      progression: { level: options.level ?? 5 },
+      abilities: Object.fromEntries(
+        (Object.keys(scores) as Array<keyof typeof scores>).map((key) => [
+          key,
+          { score: scores[key], primary: primaries.includes(key) },
+        ]),
+      ),
+      skills: {
+        athletics: { ability: "str", proficient: true, deepening: 0, expertise: false, bonus: 0 },
+      },
+      magic: { awakened: options.magic !== undefined, ability: options.magic ?? null },
+    },
+    items: options.feat
+      ? [{ id: "feat-1", name: options.feat, type: "feature", system: { category: "feat" } }]
+      : [],
+  };
+}
+
+describe("primary abilities", () => {
+  it("caps primary abilities at two and requires the magic ability to be primary", () => {
+    const three = prepareCharacterSheetContext(actorWithPrimaries(["str", "dex", "con"]));
+    expect(three.primaryWarnings).toEqual([
+      "More than 2 Primary abilities. The cap is 2, or 3 with Adapt or Die at level 3 or higher.",
+    ]);
+    Handlebars.registerHelper("checked", (value: unknown) => (value ? "checked" : ""));
+    const html = Handlebars.compile(
+      readFileSync(join(__dirname, "../../templates/actors/character/vitals.hbs"), "utf8"),
+    )(three);
+    expect(html).toContain("More than 2 Primary abilities");
+    expect(html).toContain("pf-primary-warning");
+    expect(three.abilityRows.filter((row) => row.primary)).toHaveLength(3);
+    expect(three.derived.saves.str).toBe(
+      three.derived.abilities.str.mod + three.derived.proficiencyBonus,
+    );
+    expect(three.derived.saves.int).toBe(three.derived.abilities.int.mod);
+    expect(three.derived.skills.athletics?.total).toBe(
+      three.derived.abilities.str.mod + three.derived.proficiencyBonus,
+    );
+
+    const adaptedActor = actorWithPrimaries(["str", "dex", "int"], {
+      level: 3,
+      feat: "Adapt or Die",
+      magic: "int",
+    });
+    const allowed = prepareCharacterSheetContext(adaptedActor);
+    expect(allowed.primaryWarnings).toEqual([]);
+    expect(allowed.abilityRows.filter((row) => row.primary)).toHaveLength(3);
+
+    const early = prepareCharacterSheetContext(
+      actorWithPrimaries(["str", "dex", "int"], { level: 2, feat: "Adapt or Die", magic: "int" }),
+    );
+    expect(early.primaryWarnings).toEqual([
+      "More than 2 Primary abilities. The cap is 2, or 3 with Adapt or Die at level 3 or higher.",
+    ]);
+
+    const fourth = prepareCharacterSheetContext(
+      actorWithPrimaries(["str", "dex", "con", "int"], {
+        level: 6,
+        feat: "Adapt or Die",
+        magic: "int",
+      }),
+    );
+    expect(fourth.primaryWarnings).toEqual([
+      "More than 3 Primary abilities. Adapt or Die allows only one extra Primary.",
+    ]);
+
+    const magicNotPrimary = prepareCharacterSheetContext(
+      actorWithPrimaries(["str", "dex"], { magic: "wis" }),
+    );
+    expect(magicNotPrimary.primaryWarnings).toEqual(["Magic ability must be a Primary ability."]);
+
+    const physicalMagic = prepareCharacterSheetContext(
+      actorWithPrimaries(["dex", "con"], { magic: "str" }),
+    );
+    expect(physicalMagic.primaryWarnings).toEqual([
+      "Magic ability must be Intelligence, Wisdom, or Charisma.",
+      "Magic ability must be a Primary ability.",
+    ]);
+
+    const kept = normalizeSheetSubmitData({
+      "system.abilities.str.primary": true,
+      "system.abilities.dex.primary": true,
+      "system.abilities.con.primary": true,
+    });
+    expect(kept).toMatchObject({
+      "system.abilities.str.primary": true,
+      "system.abilities.dex.primary": true,
+      "system.abilities.con.primary": true,
+    });
   });
 });
