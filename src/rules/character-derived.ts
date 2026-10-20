@@ -1,4 +1,5 @@
 import { abilityModifier, proficiencyBonusForLevel } from "./modifiers";
+import { baseSpeedForSpecies, unknownSpeciesSpeedMessage } from "./species-speed";
 
 export const abilityKeys = ["str", "dex", "con", "int", "wis", "cha"] as const;
 
@@ -66,6 +67,7 @@ export interface CharacterDerivedInput {
   passivePerceptionMode?: PassivePerceptionMode;
   poolBonus?: number;
   mpBonus?: number;
+  species?: string;
   speed?: {
     value: number;
     bonus: number;
@@ -236,10 +238,7 @@ export function calculateCharacterDerived(
       effectBonus: effects.acBonus ?? 0,
     }),
     initiative: abilities.dex.mod + (input.initiativeBonus ?? 0) + (effects.initiativeBonus ?? 0),
-    speed: Math.max(
-      0,
-      (input.speed?.value ?? 0) + (input.speed?.bonus ?? 0) + (effects.speedBonus ?? 0),
-    ),
+    speed: Math.max(0, resolveSpeed(input) + (effects.speedBonus ?? 0)),
     totalWeight: calculateTotalWeight(input.equipment),
     proficiencies,
   };
@@ -372,6 +371,23 @@ function mergeWeaponProficiencies(
     if (value) merged[category] = true;
   }
   return merged;
+}
+
+function resolveSpeed(input: CharacterDerivedInput): number {
+  const bonus = input.speed?.bonus ?? 0;
+  const stored = input.speed?.value;
+  const species = input.species?.trim() ?? "";
+  const speciesBase = species ? baseSpeedForSpecies(species) : null;
+  if (species && speciesBase === null) {
+    console.info(unknownSpeciesSpeedMessage(species));
+  }
+  const base =
+    speciesBase === null
+      ? (stored ?? 0)
+      : stored === undefined || stored === 10
+        ? speciesBase
+        : stored;
+  return base + bonus;
 }
 
 function clampAbilityScore(score: number): number {

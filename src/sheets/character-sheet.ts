@@ -401,6 +401,7 @@ export function prepareCharacterSheetContext(
       passivePerceptionMode: passiveModeAt(system, ["attributes", "passivePerception", "mode"]),
       poolBonus: numberAt(system, ["resources", "pool", "maxBonus"], 0),
       mpBonus: numberAt(system, ["magic", "mp", "maxBonus"], 0),
+      species: stringAt(system, ["identity", "speciesText"], ""),
       speed: {
         value: numberAt(system, ["attributes", "speed", "value"], 10),
         bonus: numberAt(system, ["attributes", "speed", "bonus"], 0),
