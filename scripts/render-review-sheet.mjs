@@ -61,10 +61,27 @@ function buildContext(editable) {
     conMod: "+2",
     scoreSourceText: "Score sources. Wis: base 13, species +1, Fearless +1.",
     proficiencyText: {
-      weapons: "Melee Medium",
+      weapons: "Bows, Crossbows, Slings, Thrown Weapons",
       armour: "Medium",
       shields: "Yes",
     },
+    weaponTrainingRows: [
+      ["meleeLight", "Light Melee", false],
+      ["meleeMedium", "Medium Melee", true],
+      ["meleeHeavy", "Heavy Melee", false],
+      ["meleeTwoHandedHeavy", "Two-Handed Heavy Melee", false],
+      ["improvised", "Improvised", false],
+      ["bows", "Bows", true],
+      ["crossbows", "Crossbows", true],
+      ["slings", "Slings", true],
+      ["thrown", "Thrown Weapons", false],
+    ].map(([id, label, proficient]) => ({
+      id,
+      label,
+      path: `system.proficiencies.weapons.${id}`,
+      proficient,
+      disabledAttr,
+    })),
     magicStreamsText: "Aggregate",
     form: {
       languagesText: "Common, Dwarvish",
