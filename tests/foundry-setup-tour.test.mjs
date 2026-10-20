@@ -210,6 +210,36 @@ describe("setup phase deadlines", () => {
     expect(outcome).toBeInstanceOf(Error);
     expect(outcome.message).toMatch(/stalled during create world/);
   });
+
+  it("names launch when world.launch never returns", async () => {
+    vi.useFakeTimers();
+    const page = tourPage();
+    let evaluations = 0;
+    page.evaluate = async () => {
+      evaluations += 1;
+      if (evaluations === 1) return false;
+      if (evaluations === 2) return "created";
+      return new Promise(() => {});
+    };
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(30_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during launch/);
+  });
 });
 
 function lateTourPage({ hangComplete = false } = {}) {
