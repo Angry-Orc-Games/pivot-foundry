@@ -151,7 +151,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void
 
 async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
-  await expect(create).toBeVisible({ timeout: 30_000 });
+  await create.waitFor({ state: "visible", timeout: 30_000 });
   await create.click();
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");
