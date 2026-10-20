@@ -271,6 +271,32 @@ describe("calculateArmourClass", () => {
     expect(result.breakdown).toEqual(["Base 10", "Cloak +1", "Amulet +2"]);
     expect(breakdownTotal(result.breakdown)).toBe(result.value);
   });
+
+  it("picks the worn suit by its bonus plus the category Dex cap", () => {
+    const lightWins = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Hide", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Leather", category: "light", acBonus: 3, equipped: true },
+      ],
+    });
+    expect(lightWins).toEqual({
+      value: 17,
+      armourWorn: "Leather",
+      breakdown: ["Base 10", "Dex +4", "Leather +3"],
+    });
+
+    const naturalWins = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Hide", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Leather", category: "light", acBonus: 3, equipped: true },
+        { name: "Carapace", category: "natural", acBonus: 18, equipped: true },
+      ],
+    });
+    expect(naturalWins.value).toBe(18);
+    expect(naturalWins.breakdown[0]).toBe("Carapace 18");
+  });
 });
 
 describe("calculateTotalWeight", () => {
