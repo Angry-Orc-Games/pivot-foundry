@@ -1,4 +1,5 @@
 import { readSurvival } from "../runtime/health";
+import { reconcileSurvival } from "../rules/survival";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
@@ -24,7 +25,11 @@ import {
   type SkillSourceMap,
   type WeaponProficiencyMap,
 } from "../rules/character-derived";
-import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
+import {
+  aggregateCharacterEffects,
+  collectEmbeddedItemEffects,
+  parseStoredEffect,
+} from "../rules/effects";
 import {
   applyAttackCrit,
   d20PoolFormula,
@@ -129,6 +134,7 @@ export interface CharacterSheetContext {
     shields: string;
   };
   magicStreamsText: string;
+  scoreSourceText: string;
   form: {
     languagesText: string;
     instrumentsText: string;
@@ -148,6 +154,7 @@ export interface CharacterSheetContext {
     featureCategories: typeof featureCategories;
   };
   derived: ReturnType<typeof calculateCharacterDerived>;
+  initiativeText: string;
   abilityRows: Array<{
     key: AbilityKey;
     label: string;
@@ -190,6 +197,7 @@ export interface CharacterSheetContext {
     feats: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     flaws: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     traits: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    bodyModifications: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicStreams: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicAbilities: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
   };
@@ -201,6 +209,8 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
   );
 
   class PivotCharacterSheet extends BaseSheet {
+    editorOpen: boolean | undefined;
+
     static DEFAULT_OPTIONS = {
       classes: ["pivot-fantasy", "pf-sheet", SYSTEM_ID, "sheet", "actor", "character"],
       position: { width: 820, height: 760 },
@@ -215,15 +225,11 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
-        toggleEditMode: function (
-          this: PivotCharacterSheet & {
-            options: { editable?: boolean };
-            render: (force?: boolean) => void;
-          },
-        ) {
-          // Toggle edit mode by inverting options.editable
-          const currentEditable = this.options.editable !== false;
-          this.options.editable = !currentEditable;
+        toggleEditMode: function (this: {
+          editorOpen?: boolean;
+          render: (force?: boolean) => void;
+        }) {
+          this.editorOpen = this.editorOpen === false;
           this.render();
         },
         survivalRoll: async function (this: { document: ActorLike }) {
@@ -262,80 +268,65 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       vitals: {
         template: `${SYSTEM_TEMPLATES_BASE}/vitals.hbs`,
       },
-      tabs: {
-        template: `${SYSTEM_TEMPLATES_BASE}/tabs.hbs`,
-      },
       sheet: {
         template: `${SYSTEM_TEMPLATES_BASE}/sheet.hbs`,
-        scrollable: [""],
-      },
-      survival: {
-        template: `${SYSTEM_TEMPLATES_BASE}/survival.hbs`,
-        scrollable: [""],
-      },
-      inventory: {
-        template: `${SYSTEM_TEMPLATES_BASE}/inventory.hbs`,
-        scrollable: [""],
-      },
-      magic: {
-        template: `${SYSTEM_TEMPLATES_BASE}/magic.hbs`,
-        scrollable: [""],
-      },
-      notes: {
-        template: `${SYSTEM_TEMPLATES_BASE}/notes.hbs`,
-        scrollable: [""],
-      },
-    };
-
-    static TABS = {
-      primary: {
-        tabs: [
-          { id: "sheet", label: "PIVOT.Tabs.Sheet" },
-          { id: "survival", label: "PIVOT.Tabs.Survival" },
-          { id: "inventory", label: "PIVOT.Tabs.Inventory" },
-          { id: "magic", label: "PIVOT.Tabs.Magic" },
-          { id: "notes", label: "PIVOT.Tabs.Notes" },
-        ],
-        initial: "sheet",
       },
     };
 
     async _prepareContext(options: Record<string, unknown>): Promise<Record<string, unknown>> {
       const parentContext = await callOptionalSuper(this, "_prepareContext", options);
       const actor = getSheetDocument(this);
+      const showEditor = sheetShowsEditor(parentContext.editable !== false, this.editorOpen);
       return {
         ...parentContext,
-        ...prepareCharacterSheetContext(actor, parentContext.editable !== false),
+        ...prepareCharacterSheetContext(actor, showEditor),
       };
-    }
-
-    async _preparePartContext(
-      partId: string,
-      context: Record<string, unknown>,
-    ): Promise<Record<string, unknown>> {
-      const parent = Object.getPrototypeOf(Object.getPrototypeOf(this)) as {
-        _preparePartContext?: (
-          partId: string,
-          context: Record<string, unknown>,
-        ) => Promise<Record<string, unknown>>;
-      } | null;
-      const superMethod = parent?._preparePartContext;
-      const partContext =
-        typeof superMethod === "function"
-          ? await Reflect.apply(superMethod, this, [partId, context])
-          : context;
-      // Wrap header, vitals, and sheet parts in print layout wrapper
-      if (partId === "header" || partId === "vitals" || partId === "sheet") {
-        return {
-          ...(isRecord(partContext) ? partContext : {}),
-          classes: ["pf-print-wrap"],
-        };
-      }
-      return isRecord(partContext) ? partContext : {};
     }
   }
 
   return PivotCharacterSheet;
+}
+
+const ABILITY_PRINT_CODE: Record<AbilityKey, string> = {
+  str: "Str",
+  dex: "Dex",
+  con: "Con",
+  int: "Int",
+  wis: "Wis",
+  cha: "Cha",
+};
+
+function abilityPrintCode(key: string): string {
+  return ABILITY_PRINT_CODE[key as AbilityKey] ?? key;
+}
+
+function formatScoreSources(
+  itemList: ItemLike[],
+  abilitySources: Record<AbilityKey, { score: number }>,
+): string {
+  const grouped = new Map<AbilityKey, string[]>();
+  for (const item of itemList) {
+    const effects = item.system?.effects;
+    if (!Array.isArray(effects)) continue;
+    for (const entry of effects) {
+      const parsed = parseStoredEffect(entry);
+      if (!parsed || parsed.type !== "abilityScoreBonus") continue;
+      const notes = grouped.get(parsed.ability) ?? [];
+      const sign = parsed.amount >= 0 ? `+${parsed.amount}` : String(parsed.amount);
+      notes.push(`${item.name} ${sign}`);
+      grouped.set(parsed.ability, notes);
+    }
+  }
+  const parts = abilities.flatMap(({ key }) => {
+    const sources = grouped.get(key);
+    if (!sources?.length) return [];
+    return [`${abilityPrintCode(key)}: base ${abilitySources[key].score}, ${sources.join(", ")}`];
+  });
+  return parts.length > 0 ? `Score sources. ${parts.join("; ")}.` : "";
+}
+
+export function sheetShowsEditor(ownerCanEdit: boolean, editorOpen: boolean | undefined): boolean {
+  return ownerCanEdit && editorOpen !== false;
 }
 
 export function prepareCharacterSheetContext(
@@ -430,7 +421,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = readSurvival(actor);
+  const survival = reconcileSurvival(readSurvival(actor));
 
   // Helper to format signed numbers
   const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));
@@ -476,10 +467,11 @@ export function prepareCharacterSheetContext(
   // Split features by category
   const feats = features.filter((item) => stringAt(item.system, ["category"], "") === "feat");
   const flaws = features.filter((item) => stringAt(item.system, ["category"], "") === "flaw");
+  const bodyModifications = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "bodyModification",
+  );
   const traits = features.filter((item) =>
-    ["species", "background", "bodyModification", "other"].includes(
-      stringAt(item.system, ["category"], ""),
-    ),
+    ["species", "background", "other"].includes(stringAt(item.system, ["category"], "")),
   );
 
   // Magic streams text
@@ -507,6 +499,7 @@ export function prepareCharacterSheetContext(
       shields: shieldProf,
     },
     magicStreamsText,
+    scoreSourceText: formatScoreSources(itemList, abilitySources),
     form: {
       languagesText: stringArrayAt(system, ["identity", "languages"]).join(", "),
       instrumentsText: stringArrayAt(system, ["proficiencies", "instruments"]).join(", "),
@@ -526,6 +519,7 @@ export function prepareCharacterSheetContext(
       featureCategories,
     },
     derived,
+    initiativeText: formatSigned(derived.initiative),
     abilityRows: abilities.map(({ key, label, short }) => ({
       key,
       label,
@@ -552,7 +546,7 @@ export function prepareCharacterSheetContext(
         return {
           id: skill.id,
           label: skill.label,
-          ability: source.ability.toUpperCase(),
+          ability: abilityPrintCode(source.ability),
           abilityPath: `system.skills.${skill.id}.ability`,
           proficientPath: `system.skills.${skill.id}.proficient`,
           deepeningPath: `system.skills.${skill.id}.deepening`,
@@ -603,6 +597,7 @@ export function prepareCharacterSheetContext(
       feats: withDisabledAttr(feats, disabledAttr),
       flaws: withDisabledAttr(flaws, disabledAttr),
       traits: withDisabledAttr(traits, disabledAttr),
+      bodyModifications: withDisabledAttr(bodyModifications, disabledAttr),
       magicStreams: withDisabledAttr(magicStreams, disabledAttr),
       magicAbilities: withDisabledAttr(magicAbilities, disabledAttr),
     },
@@ -872,7 +867,7 @@ export async function applyInitiativeRollToCombat(options: {
   return "updated";
 }
 
-export function createEmbeddedItemData(type: string): Record<string, unknown> {
+export function createEmbeddedItemData(type: string, category?: string): Record<string, unknown> {
   const nameByType: Record<string, string> = {
     weapon: "New Weapon",
     armour: "New Armour",
@@ -881,11 +876,13 @@ export function createEmbeddedItemData(type: string): Record<string, unknown> {
     magicStream: "New Magic Stream",
     magicAbility: "New Magic Ability",
   };
-
-  return {
-    name: nameByType[type] ?? "New Item",
+  const data: Record<string, unknown> = {
+    name:
+      type === "feature" && category === "other" ? "New Trait" : (nameByType[type] ?? "New Item"),
     type,
   };
+  if (category) data.system = { category };
+  return data;
 }
 
 function getSheetDocument(sheet: object): ActorLike {
@@ -1135,7 +1132,7 @@ async function createItemAction(
   if (!type) return;
   const [item] =
     ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
-      createEmbeddedItemData(type),
+      createEmbeddedItemData(type, target.dataset.category),
     ])) as ItemLike[] | undefined) ?? [];
   item?.sheet?.render?.(true);
 }

@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { createWriteStream, existsSync, mkdirSync, renameSync, copyFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -53,13 +54,103 @@ export async function ensureDistribution(paths, result, { requireChecksum = fals
   return { path: dest, sha256: digest };
 }
 
-async function downloadTo(url, dest) {
-  const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok || !response.body) {
-    throw new Error(`Foundry download failed with status ${response.status}.`);
+const MAX_RELEASE_REDIRECTS = 5;
+
+function releaseRequest(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("Foundry download URL is invalid.");
   }
 
-  const temp = `${dest}.partial`;
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(temp));
-  renameSync(temp, dest);
+  let username;
+  let password;
+  try {
+    username = decodeURIComponent(parsed.username);
+    password = decodeURIComponent(parsed.password);
+  } catch {
+    throw new Error(`Foundry download URL is invalid for ${describeUrl(rawUrl)}.`);
+  }
+
+  parsed.username = "";
+  parsed.password = "";
+  const headers = {};
+  if (username !== "" || password !== "") {
+    headers.authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  }
+  return { url: parsed.href, headers };
+}
+
+function nextReleaseRequest(currentUrl, headers, location) {
+  let next;
+  try {
+    next = new URL(location, currentUrl);
+  } catch {
+    throw new Error(`Foundry download redirect is invalid for ${describeUrl(currentUrl)}.`);
+  }
+
+  const current = new URL(currentUrl);
+  if (current.protocol === "https:" && next.protocol === "http:") {
+    throw new Error(
+      `Foundry download refused an https to http redirect for ${describeUrl(currentUrl)}.`,
+    );
+  }
+
+  next.username = "";
+  next.password = "";
+  const nextHeaders = {};
+  if (next.origin === current.origin && headers.authorization) {
+    nextHeaders.authorization = headers.authorization;
+  }
+  return { url: next.href, headers: nextHeaders };
+}
+
+export async function downloadTo(url, dest, fetchImpl = fetch) {
+  let request = releaseRequest(url);
+
+  for (let followed = 0; ; followed += 1) {
+    let response;
+    try {
+      response = await fetchImpl(request.url, {
+        redirect: "manual",
+        headers: request.headers,
+      });
+    } catch {
+      throw new Error(`Foundry download failed for ${describeUrl(request.url)}.`);
+    }
+
+    if (
+      response.status === 301 ||
+      response.status === 302 ||
+      response.status === 303 ||
+      response.status === 307 ||
+      response.status === 308
+    ) {
+      if (followed >= MAX_RELEASE_REDIRECTS) {
+        throw new Error(
+          `Foundry download exceeded ${MAX_RELEASE_REDIRECTS} redirects for ${describeUrl(request.url)}.`,
+        );
+      }
+      const location = response.headers.get("location");
+      if (!location) {
+        throw new Error(
+          `Foundry download redirect is missing a location for ${describeUrl(request.url)}.`,
+        );
+      }
+      request = nextReleaseRequest(request.url, request.headers, location);
+      continue;
+    }
+
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Foundry download failed with status ${response.status} for ${describeUrl(request.url)}.`,
+      );
+    }
+
+    const temp = `${dest}.partial`;
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(temp));
+    renameSync(temp, dest);
+    return;
+  }
 }

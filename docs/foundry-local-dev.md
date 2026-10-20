@@ -10,12 +10,12 @@ Pins live in [`foundry/versions.json`](../foundry/versions.json):
 
 | Item              | Pin                                                                                                        |
 | ----------------- | ---------------------------------------------------------------------------------------------------------- |
-| Foundry           | **14.368**                                                                                                 |
+| Foundry           | **14.361**                                                                                                 |
 | Foundry host Node | **24** (inside the container)                                                                              |
 | Container image   | `ghcr.io/felddy/foundryvtt:14.367@sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac` |
 | Playwright        | `@playwright/test` **1.63.0** / Chromium                                                                   |
 
-Felddy had no `14.368` image tag when this pin was recorded. `:14` and `:14.367` both resolved to the digest above. The wrapper installs Foundry **14.368** from `CONTAINER_CACHE` as `foundryvtt-14.368.zip`. Confirm the digest again before moving the pin.
+The container image stays `14.367` at the digest above. Felddy `v14.367.0` `src/entrypoint.sh` warns when `FOUNDRY_VERSION` is not `14.367` and continues. It installs `CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip` and does not reject a **14.361** Node zip. Confirm the digest again before moving the image pin.
 
 Do not upgrade an existing v13 campaign world as part of this workflow. Keep v13 user data out of `foundry-data-v14/`.
 
@@ -40,7 +40,7 @@ cp .env.foundry.local.example .env.foundry.local
 - `FOUNDRY_ADMIN_KEY` — local admin password, not `change-me-local-only`
 - `FOUNDRY_LICENSE_KEY` — required for unattended setup and E2E
 - One install source (in order of preference):
-  1. Place the official `FoundryVTT-Node-14.368.zip` in `foundry-dist/` as `foundryvtt-14.368.zip`
+  1. Place the official `FoundryVTT-Node-14.361.zip` in `foundry-dist/` as `foundryvtt-14.361.zip`
   2. `FOUNDRY_RELEASE_ARCHIVE` — absolute path to that zip
   3. `FOUNDRY_RELEASE_CACHE_URL` plus `FOUNDRY_RELEASE_SHA256` — private durable URL, not a Foundry timed URL
   4. `FOUNDRY_RELEASE_URL` — first bootstrap only; expires in about five minutes
@@ -84,7 +84,7 @@ npm run foundry:up
 | Path                       | Role                                                                                                       |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `foundry-data-v14/`        | Persistent local development data for this Compose workflow                                                |
-| `foundry-dist/`            | Private licensed archive cache (`foundryvtt-14.368.zip`)                                                   |
+| `foundry-dist/`            | Private licensed archive cache (`foundryvtt-14.361.zip`)                                                   |
 | `.foundry/instances/<id>/` | Per-worktree runtime files and disposable E2E data                                                         |
 | `foundry-app/`             | **Retired.** Left over from the host-Node launcher. Not used. Do not delete if you still need the install. |
 | `foundry-data/`            | **Retired.** Previous host-Node user data. Not mounted. Do not delete campaign backups stored there.       |
@@ -105,7 +105,7 @@ Each worktree, Cloud Agent, and CI run gets its own Compose project, container n
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Missing .env.foundry.local`  | Copy the example file or export the `FOUNDRY_*` secrets.                                                                                    |
 | `FOUNDRY_ADMIN_KEY` rejected  | Replace `change-me-local-only`.                                                                                                             |
-| Archive checksum mismatch     | Re-download the Node 14.368 zip and update `FOUNDRY_RELEASE_SHA256`.                                                                        |
+| Archive checksum mismatch     | Re-download the Node 14.361 zip and update `FOUNDRY_RELEASE_SHA256`.                                                                        |
 | Timed URL expired             | Generate a new Node.js timed URL, or use `foundry-dist/` from a previous successful download.                                               |
 | Docker not available          | Install Docker Compose v2 and start the daemon. Cloud Agents use `scripts/cloud-agent-start.sh`.                                            |
 | Port already in use           | The CLI picks the next free loopback port. Check `npm run foundry:status`.                                                                  |

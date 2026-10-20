@@ -54,7 +54,7 @@
   --pf-bad-soft: #3b2220;
   --pf-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
-/* Print sheet: fixed, never themed */
+/* Print sheet: fixed paper, same in light and dark. */
 .pivot-fantasy :is(.pf-print-wrap, .pf-print) {
   --pf-sheet-paper: #fff;
   --pf-sheet-ink: #1c1a16;
@@ -62,4 +62,20 @@
   --pf-sheet-muted: #555;
   --pf-sheet-accent: #8a3b12;
   --pf-sheet-accent-soft: #f1dccb;
+  --pf-ink: var(--pf-sheet-ink);
+  --pf-ink-muted: var(--pf-sheet-muted);
+  --pf-muted: var(--pf-sheet-muted);
+  --pf-panel: var(--pf-sheet-paper);
+  --pf-bg: var(--pf-sheet-paper);
+  --pf-accent: var(--pf-sheet-accent);
+  --pf-accent-hover: #74310f;
+  --pf-accent-soft: var(--pf-sheet-accent-soft);
+  --pf-accent-ink: #fff;
+  --pf-chip: #ece3cf;
+  --pf-good: #2f6b3a;
+  --pf-good-soft: #dcebdc;
+  --pf-warn: #8a5e00;
+  --pf-warn-soft: #f6ead0;
+  --pf-bad: #a1281e;
+  --pf-bad-soft: #f5d9d5;
 }

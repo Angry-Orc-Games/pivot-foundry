@@ -1,5 +1,6 @@
 import { dicePoolForRollMode, d20PoolFormula, selectKeptD20 } from "../rules/d20-roll";
 import {
+  reconcileSurvival,
   resolveDeathSave,
   SURVIVAL_STATUSES,
   validateSurvival,
@@ -99,12 +100,13 @@ export async function correctSurvivalDialog(actor: HealthActor): Promise<void> {
       JSON.stringify(readSurvival(actor)) !== JSON.stringify(s)
     )
       throw Error("changed");
-    validateSurvival(next);
-    if (next.status === "stable" || next.hp > 0) {
-      next.successes = 0;
-      next.failures = 0;
+    const legal = reconcileSurvival(next);
+    validateSurvival(legal);
+    if (legal.status === "stable" || legal.hp > 0) {
+      legal.successes = 0;
+      legal.failures = 0;
     }
-    await actor.update(survivalUpdate(next));
+    await actor.update(survivalUpdate(legal));
   } catch {
     warn("ApplyFailed");
   } finally {
