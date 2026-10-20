@@ -1,0 +1,79 @@
+/* Approximation of Foundry v14 sheet chrome for the local harness. The system does not load this file. */
+.application .window-content {
+  background: #1b1814;
+  color: #ede6d6;
+  display: flex;
+  flex-direction: column;
+}
+
+.application .window-content input[type="text"],
+.application .window-content input[type="number"],
+.application .window-content input[type="search"],
+.application .window-content select,
+.application .window-content textarea {
+  background: #2a2622;
+  border: 1px solid #5c5346;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.65),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ede6d6;
+  min-height: 26px;
+  padding: 2px 6px;
+}
+
+.application .window-content input[type="checkbox"] {
+  accent-color: #c4552a;
+  appearance: auto;
+  height: 16px;
+  margin: 0 4px 0 0;
+  width: 16px;
+}
+
+.application .window-content table thead {
+  background: #1a120e;
+  color: #f3efe6;
+}
+
+.application .window-content table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.application .window-content table tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* Stand-in for Foundry v14 interface chrome that beats the sheet's short selectors. */
+body
+  .application.pivot-fantasy.sheet.actor.character
+  .window-content
+  table
+  tbody
+  tr:nth-child(odd)
+  td,
+body
+  .application.pivot-fantasy.sheet.actor.character
+  .window-content
+  table
+  tbody
+  tr:nth-child(even)
+  td {
+  background: #6b6b6b;
+  color: #c5c5c5;
+  text-align: center;
+}
+
+body .application.pivot-fantasy.sheet.actor.character .window-content table thead th {
+  background: #3a3a3a;
+  border: 1px solid #000;
+  color: #f2f2f2;
+  text-transform: none;
+}
+
+body .application.pivot-fantasy.sheet.actor .window-content button {
+  background: #5a5a5a;
+  color: #d0d0d0;
+  display: flex;
+  text-decoration: underline;
+  width: 100%;
+}

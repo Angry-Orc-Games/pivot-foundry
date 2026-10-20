@@ -171,7 +171,19 @@ export function prepareDevSystemDir(paths) {
   }
 }
 
+export function assertSafeZipEntries(zipPath) {
+  const listing = execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8" });
+  for (const entry of listing.split(/\r?\n/)) {
+    if (!entry) continue;
+    const parts = entry.split(/[/\\]/);
+    if (entry.startsWith("/") || entry.startsWith("\\") || parts.includes("..")) {
+      throw new Error(`system.zip contains an unsafe path: ${entry}`);
+    }
+  }
+}
+
 export function installPackagedSystem(paths, zipPath) {
+  assertSafeZipEntries(zipPath);
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
   rmSync(systemDir, { force: true, recursive: true });
   mkdirSync(systemDir, { recursive: true });
@@ -217,21 +229,26 @@ export function redactDiagnostics(text) {
 
 export async function waitForHttp(baseUrl, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  let lastError = "no response";
   while (Date.now() < deadline) {
     try {
       const response = await fetch(baseUrl, { redirect: "manual" });
       if (response.status > 0) return response.status;
-      lastError = `status ${response.status}`;
-    } catch (error) {
-      lastError = error.message;
+    } catch {
+      // Keep polling. A refused connection is the gap before the server binds.
     }
     await new Promise((resolve) => {
-      const timer = globalThis.setTimeout(resolve, 1000);
-      timer.unref?.();
+      globalThis.setTimeout(resolve, 1000);
     });
   }
-  const error = new Error(`Timed out waiting for ${baseUrl} (${lastError}).`);
+  const error = new Error(
+    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s`,
+  );
   error.code = "TIMEOUT";
   throw error;
+}
+
+function httpTarget(baseUrl) {
+  const url = new URL(baseUrl);
+  const port = url.port || (url.protocol === "https:" ? "443" : "80");
+  return `${url.hostname}:${port}`;
 }
