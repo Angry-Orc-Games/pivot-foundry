@@ -313,8 +313,21 @@ export function calculateArmourClass({
   const dexBonus = dexterityModifierForArmour(dexterityModifier, bestBody?.category);
   const wornTotal = 10 + dexBonus + (bestBody?.acBonus ?? 0);
   const lines: Array<{ text: string; amount: number; worn?: string }> = [];
+  const naturalInsteadOfArmour = !bestBody && bestNatural;
 
-  if (bestNatural && bestNatural.acBonus > wornTotal) {
+  if (naturalInsteadOfArmour) {
+    lines.push({
+      text: `${bestNatural.name} ${bestNatural.acBonus}`,
+      amount: bestNatural.acBonus,
+      worn: bestNatural.name,
+    });
+    if (dexterityModifier !== 0) {
+      lines.push({
+        text: formatSigned("Dex", dexterityModifier),
+        amount: dexterityModifier,
+      });
+    }
+  } else if (bestNatural && bestNatural.acBonus > wornTotal) {
     lines.push({
       text: `${bestNatural.name} ${bestNatural.acBonus}`,
       amount: bestNatural.acBonus,
