@@ -31,6 +31,8 @@ export interface ArmourSource {
   acBonus: number;
   equipped: boolean;
   stackKey?: string;
+  naturalMode?: "unarmoured" | "higher";
+  bodyLimit?: "light";
 }
 
 export interface WeightSource {

@@ -322,6 +322,72 @@ describe("calculateArmourClass", () => {
     expect(thickHide.value).toBe(15);
     expect(thickHide.breakdown).toEqual(["Thick Hide 12", "Dex +3"]);
   });
+
+  it("uses worn armour instead of natural AC while a suit is equipped", () => {
+    const carapaceInLight = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 15,
+          equipped: true,
+          naturalMode: "unarmoured",
+        },
+        { name: "Leather", category: "light", acBonus: 1, equipped: true },
+      ],
+    });
+    expect(carapaceInLight.value).toBe(14);
+    expect(carapaceInLight.breakdown).toEqual(["Base 10", "Dex +3", "Leather +1"]);
+
+    const carapaceBare = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "unarmoured",
+          bodyLimit: "light",
+        },
+      ],
+    });
+    expect(carapaceBare.value).toBe(15);
+
+    const carapaceInHeavy = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "unarmoured",
+          bodyLimit: "light",
+        },
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+      ],
+    });
+    expect(carapaceInHeavy.value).toBe(13);
+    expect(carapaceInHeavy.breakdown).toEqual(["Base 10", "Dex +3"]);
+
+    const thickHideInMail = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        {
+          name: "Thick Hide",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "higher",
+        },
+        { name: "Chain", category: "medium", acBonus: 3, equipped: true },
+      ],
+    });
+    expect(thickHideInMail.value).toBe(16);
+    expect(thickHideInMail.breakdown).toEqual(["Thick Hide 12", "Dex +4"]);
+  });
 });
 
 describe("calculateTotalWeight", () => {
