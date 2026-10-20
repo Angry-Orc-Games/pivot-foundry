@@ -236,6 +236,51 @@ describe("character sheet template structure", () => {
     return card?.querySelector("span")?.textContent?.replace(/\s+/g, " ").trim();
   }
 
+  it("prints the proficiency bonus on the initiative line and speed alone on the speed card", () => {
+    const { vitals } = renderTemplates();
+    const html = vitals(
+      prepareCharacterSheetContext({
+        name: "New Character",
+        type: "character",
+        system: {},
+        items: [],
+      }),
+    );
+    const css = [
+      readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pivot-fantasy.css"), "utf-8"),
+    ].join("\n");
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head><style>${css}</style></head>
+      <body class="theme-light"><form class="application pivot-fantasy pf-sheet sheet actor character">
+        <section class="window-content">${html}</section></form></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const document = dom.window.document;
+    const speed = [...document.querySelectorAll(".pf-stat")].find(
+      (element) => element.querySelector("b")?.textContent === "SPEED",
+    );
+    const line = document.querySelector(".pf-init-line");
+    const passive = [...(line?.querySelectorAll("span") ?? [])].find((element) =>
+      element.textContent?.includes("Passive Perception"),
+    );
+    const bonus = [...(line?.querySelectorAll("span") ?? [])].find((element) =>
+      element.textContent?.includes("Prof. bonus"),
+    );
+    expect(speed?.textContent?.replace(/\s+/g, " ").trim()).toBe("SPEED 10 m");
+    expect(line?.textContent?.replace(/\s+/g, " ").trim()).toContain("Prof. bonus +2");
+    expect(line?.textContent).toContain("Initiative");
+    expect(line?.textContent).toContain("Passive Perception");
+    expect(bonus?.tagName).toBe("SPAN");
+    const passiveStyle = dom.window.getComputedStyle(passive);
+    const bonusStyle = dom.window.getComputedStyle(bonus);
+    expect(bonusStyle.fontSize).toBe(passiveStyle.fontSize);
+    expect(bonusStyle.color).toBe(passiveStyle.color);
+    expect(bonusStyle.fontFamily).toBe(passiveStyle.fontFamily);
+    expect(dom.window.getComputedStyle(line).gap).toBe("0.35em");
+  });
+
   it("prints 10 m for a default actor and 0 m when speed is zero", () => {
     const { vitals } = renderTemplates();
     const blank = {
@@ -430,6 +475,44 @@ describe("character sheet template structure", () => {
     const dotStyle = dom.window.getComputedStyle(dot);
     expect(Number.parseFloat(dotStyle.minWidth)).toBeGreaterThanOrEqual(20);
     expect(Number.parseFloat(dotStyle.minHeight)).toBeGreaterThanOrEqual(20);
+  });
+
+  it("gives the empty proficiency mark a darker ink outline and leaves the filled mark", () => {
+    const css = [
+      readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pivot-fantasy.css"), "utf-8"),
+    ].join("\n");
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head><style>${css}</style></head>
+      <body class="theme-light"><form class="application pivot-fantasy pf-sheet sheet actor character">
+        <section class="window-content"><article class="pf-print">
+          <table class="pf-skills"><tbody>
+            <tr><td><label class="pf-check"><input class="pf-sr" type="checkbox" /><span class="pf-prof-mark">○</span></label></td></tr>
+            <tr><td><label class="pf-check"><input class="pf-sr" type="checkbox" checked /><span class="pf-prof-mark">●</span></label></td></tr>
+          </tbody></table>
+        </article></section></form></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const empty = dom.window.document.querySelector(
+      "label.pf-check:not(:has(input:checked)) .pf-prof-mark",
+    );
+    const filled = dom.window.document.querySelector(
+      "label.pf-check:has(input:checked) .pf-prof-mark",
+    );
+    const emptyStyle = dom.window.getComputedStyle(empty);
+    const filledStyle = dom.window.getComputedStyle(filled);
+    const labelStyle = dom.window.getComputedStyle(empty.closest("label"));
+    expect(empty.textContent).toBe("○");
+    expect(emptyStyle.borderTopStyle).toBe("solid");
+    expect(emptyStyle.borderTopColor).toBe("rgb(28, 26, 22)");
+    expect(Number.parseFloat(emptyStyle.borderTopWidth)).toBeGreaterThanOrEqual(1.5);
+    expect(emptyStyle.borderRadius).toBe("50%");
+    expect(filled.textContent).toBe("●");
+    expect(filledStyle.color).toBe("rgb(28, 26, 22)");
+    expect(Number.parseFloat(filledStyle.borderTopWidth) || 0).toBe(0);
+    expect(Number.parseFloat(labelStyle.minWidth)).toBeGreaterThanOrEqual(20);
+    expect(Number.parseFloat(labelStyle.minHeight)).toBeGreaterThanOrEqual(20);
   });
 
   it("underlines the skill name on hover", () => {
