@@ -158,6 +158,25 @@ describe("Foundry traces stay off", () => {
     }
   });
 
+  it("ships the external smoke config with tracing off", async () => {
+    const previousBase = process.env.PIVOT_FOUNDRY_BASE_URL;
+    const previousTarget = process.env.PIVOT_FOUNDRY_TARGET;
+    process.env.PIVOT_FOUNDRY_BASE_URL = "https://staging.example.test";
+    process.env.PIVOT_FOUNDRY_TARGET = "staging";
+    try {
+      const external = await import("../e2e/external/playwright.config.ts");
+      expect(external.default.use?.trace).toBe("off");
+      for (const project of external.default.projects ?? []) {
+        expect(project.use?.trace ?? "off").toBe("off");
+      }
+    } finally {
+      if (previousBase === undefined) delete process.env.PIVOT_FOUNDRY_BASE_URL;
+      else process.env.PIVOT_FOUNDRY_BASE_URL = previousBase;
+      if (previousTarget === undefined) delete process.env.PIVOT_FOUNDRY_TARGET;
+      else process.env.PIVOT_FOUNDRY_TARGET = previousTarget;
+    }
+  });
+
   it("does not touch context.tracing while signing in", async () => {
     const trace = tracingTouch();
     const page = tracedAdminPage(trace);
