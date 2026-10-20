@@ -37,7 +37,7 @@ Run these from the repository root:
 
 Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, run `npm run foundry:e2e` when Docker and Foundry credentials exist; otherwise say that browser E2E was not run.
 
-The Foundry runtime is Docker Compose + Felddy, pinned in `foundry/versions.json` to Foundry **14.368**. Persistent data is `foundry-data-v14/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Do not delete retired `foundry-app/` or `foundry-data/` directories. Repository `npm run verify` stays on Node 20/22.
+The Foundry runtime is Docker Compose + Felddy, pinned in `foundry/versions.json` to Foundry **14.361**. Persistent data is `foundry-data-v14/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Do not delete retired `foundry-app/` or `foundry-data/` directories. Repository `npm run verify` stays on Node 20/22.
 
 Do not claim Cloud execution, GitHub CI, staging, production, or release publication unless that surface was actually observed.
 

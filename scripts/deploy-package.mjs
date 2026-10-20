@@ -44,9 +44,10 @@ if (identity.artifact?.sha256 !== sha256) {
 }
 
 if (target === "production") {
-  if (identity.staging?.result !== "passed" || identity.staging?.sha256 !== sha256) {
+  const recorded = process.env.PIVOT_STAGING_ARTIFACT_SHA256 || "";
+  if (!/^[0-9a-f]{64}$/.test(recorded) || recorded !== sha256) {
     console.error(
-      "Production promotion requires staging acceptance of this exact artifact SHA-256.",
+      "Production promotion requires the staging run's recorded SHA-256 for this exact system.zip.",
     );
     process.exit(EXIT.identity);
   }

@@ -13,7 +13,7 @@ import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
-import { waitForDice3D } from "./dice3d";
+import { waitForDiceSoNiceAnimation } from "./dice-so-nice";
 
 interface RestContext {
   actor: ActorLike;
@@ -226,7 +226,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
       content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
       rolls: diceRolls,
     });
-    await waitForDice3D(message);
+    await waitForDiceSoNiceAnimation(message);
   } catch {
     warnRest("ChatFailed");
   }

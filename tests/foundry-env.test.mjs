@@ -74,7 +74,7 @@ describe("foundry env check", () => {
     const result = await runCheck(
       [
         "FOUNDRY_ADMIN_KEY=change-me-local-only",
-        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.368/FoundryVTT-Node-14.368.zip",
+        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.361/FoundryVTT-Node-14.361.zip",
         "",
       ].join("\n"),
     );
@@ -87,13 +87,13 @@ describe("foundry env check", () => {
     const result = await runCheck(
       [
         "FOUNDRY_ADMIN_KEY=local-admin",
-        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.368/FoundryVTT-Node-14.368.zip",
+        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.361/FoundryVTT-Node-14.361.zip",
         "",
       ].join("\n"),
     );
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toMatch(/14\.368/);
+    expect(result.stdout).toMatch(/14\.361/);
   });
 
   it("rejects a non-v14 or non-Node timed URL", async () => {
@@ -107,7 +107,7 @@ describe("foundry env check", () => {
     const wrongOs = await runCheck(
       [
         "FOUNDRY_ADMIN_KEY=local-admin",
-        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.368/FoundryVTT-Linux-14.368.zip",
+        "FOUNDRY_RELEASE_URL=https://example.com/releases/14.361/FoundryVTT-Linux-14.361.zip",
         "",
       ].join("\n"),
     );
@@ -120,7 +120,7 @@ describe("foundry env check", () => {
 
   it("accepts an operator-supplied v14 Node.js zip", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pivot-foundry-zip-"));
-    const archive = join(dir, "FoundryVTT-Node-14.368.zip");
+    const archive = join(dir, "FoundryVTT-Node-14.361.zip");
     await writeFile(archive, "");
 
     const result = await runCheck(
@@ -128,7 +128,7 @@ describe("foundry env check", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toMatch(/14\.368/);
+    expect(result.stdout).toMatch(/14\.361/);
   });
 
   it("does not treat Foundry account login as an install method", async () => {
@@ -161,12 +161,12 @@ describe("foundry env check", () => {
 });
 
 describe("foundry version pins", () => {
-  it("pins Foundry 14.368 and an immutable Felddy digest", () => {
-    expect(versions.foundryVersion).toBe("14.368");
+  it("pins Foundry 14.361 and an immutable Felddy digest", () => {
+    expect(versions.foundryVersion).toBe("14.361");
     expect(versions.foundryNodeMajor).toBe(24);
     expect(versions.container.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(pinnedImageRef(versions)).toContain("@sha256:");
-    expect(versions.container.supportsFoundryVersion).toBe("14.368");
+    expect(versions.container.supportsFoundryVersion).toBe("14.361");
   });
 
   it("uses isolated instance ids for worktrees and CI runs", () => {
@@ -225,7 +225,7 @@ describe("env parsing helpers", () => {
   it("accepts the official Node zip URL shape", () => {
     expect(
       validateReleaseUrl(
-        "https://example.com/releases/14.368/FoundryVTT-Node-14.368.zip",
+        "https://example.com/releases/14.361/FoundryVTT-Node-14.361.zip",
         versions,
       ),
     ).toBeNull();
