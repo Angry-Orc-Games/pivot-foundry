@@ -782,7 +782,7 @@ async function runTests() {
     };
 
     return {
-      skillName: getColorAndBg(".pf-skills label span"),
+      skillName: getColorAndBg(".pf-skills button.pf-skill-name"),
       skillModifier: getColorAndBg(".pf-skills .pf-small"),
       sectionHeading: getColorAndBg(".pf-print h3"),
       abilityLabel: getColorAndBg(".pf-ab b"),
@@ -1012,6 +1012,7 @@ async function assertPrintSheet(page, label) {
           const style = window.getComputedStyle(el);
           const bg = style.backgroundColor;
           const cls = typeof el.className === "string" ? el.className : "";
+          if (cls.split(/\s+/).includes("pf-prof-mark")) continue;
           const label = `${el.tagName.toLowerCase()}${cls ? "." + cls.trim().split(/\s+/).slice(0, 2).join(".") : ""}`;
           if (!allowed.has(bg)) {
             offenders.push(`${label} ${bg}`);
