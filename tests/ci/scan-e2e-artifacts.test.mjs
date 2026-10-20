@@ -12,6 +12,106 @@ import {
   scanTree,
 } from "../../scripts/ci/scan-e2e-artifacts.mjs";
 
+const PRODUCED_BY_COMMAND = [
+  ["npm run package:system", ["system.json", "system.zip"]],
+  ["record-acceptance.mjs", ["artifact-identity.json"]],
+  [
+    "foundry-cli.mjs e2e",
+    ["playwright-report", "test-results", ".foundry/instances/*/diagnostics"],
+  ],
+];
+
+function workflowJobs(workflow) {
+  return workflow.split(/\n {2}(?=\S)/).flatMap((chunk) => {
+    const steps = [];
+    let current = null;
+    for (const line of chunk.split("\n")) {
+      const named = line.match(/^ {6}- name: (.*)$/);
+      if (named) {
+        if (current) steps.push(current);
+        current = { name: named[1], body: `${line}\n` };
+      } else if (current) {
+        current.body += `${line}\n`;
+      }
+    }
+    if (current) steps.push(current);
+    if (steps.length === 0) return [];
+    return [{ name: chunk.match(/^(\S+):/)?.[1] ?? "workflow", steps }];
+  });
+}
+
+function isUpload(step) {
+  return step.body.includes("actions/upload-artifact");
+}
+
+function isScan(step) {
+  return /^\s+id:\s+scan\s*$/m.test(step.body);
+}
+
+function scanArguments(step) {
+  const line = step.body.split("\n").find((item) => item.includes("scan-e2e-artifacts.mjs"));
+  if (!line) return [];
+  const rest = line.slice(line.indexOf("scan-e2e-artifacts.mjs") + "scan-e2e-artifacts.mjs".length);
+  return (rest.match(/"[^"]+"|'[^']+'|\S+/g) ?? []).map((token) =>
+    token.replace(/^["']|["']$/g, ""),
+  );
+}
+
+function uploadPaths(step) {
+  const paths = [];
+  const lines = step.body.split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const inline = lines[index].match(/^ {10}path:\s*(.*)$/);
+    if (!inline) continue;
+    const value = inline[1].trim();
+    if (value === "|") {
+      for (let next = index + 1; next < lines.length; next += 1) {
+        const entry = lines[next].match(/^ {12}(\S.*?)\s*$/);
+        if (!entry) break;
+        paths.push(entry[1]);
+      }
+    } else if (value) {
+      paths.push(value);
+    }
+  }
+  return paths;
+}
+
+function normalizeArtifact(path) {
+  return path.replace(/^trusted-gate\//, "");
+}
+
+function scanCovers(args, output) {
+  const file = normalizeArtifact(output);
+  return args.some((arg) => {
+    const root = normalizeArtifact(arg);
+    return root === file || file.startsWith(`${root}/`) || root.startsWith(`${file}/`);
+  });
+}
+
+function producedPaths(step) {
+  const paths = [];
+  for (const [command, outputs] of PRODUCED_BY_COMMAND) {
+    if (step.body.includes(command)) paths.push(...outputs);
+  }
+  const recorded = step.body.match(/e2e-record-result\.sh\s+"([^"]+)"/);
+  if (recorded) paths.push(recorded[1]);
+  const accepted = step.body.match(/accept-artifact\.sh\s+\S+\s+\S+\s+(\S+)\s+(\S+)/);
+  if (accepted) paths.push(accepted[1], accepted[2]);
+  return paths;
+}
+
+function pathsNamedInStep(step, artifactPaths) {
+  const named = [];
+  for (const artifactPath of artifactPaths) {
+    const normalized = normalizeArtifact(artifactPath);
+    if (normalized && (step.body.includes(artifactPath) || step.body.includes(normalized))) {
+      named.push(normalized);
+    }
+  }
+  return named;
+}
+
 const FAKE_SECRET = "zip-trace-secret";
 
 async function zipTrace(dir, name, contents) {
@@ -197,5 +297,74 @@ describe("E2E artifact credential scan", () => {
     expect(uploadStep).toContain("steps.scan.outcome == 'success'");
     expect(uploadStep).toContain("playwright-report");
     expect(uploadStep).toContain("test-results");
+  });
+
+  it("scans every artifact input before upload and gates each upload", async () => {
+    const workflow = await readFile(
+      new URL("../../.github/workflows/e2e.yml", import.meta.url),
+      "utf8",
+    );
+    const problems = [];
+    const records = workflow.match(/- name: Record E2E result\n/g) ?? [];
+    if (records.length !== 1) {
+      problems.push(`workflow has ${records.length} Record E2E result steps`);
+    }
+
+    for (const job of workflowJobs(workflow)) {
+      const scans = job.steps.filter(isScan);
+      const uploads = job.steps.filter(isUpload);
+      const artifactPaths = [...scans.flatMap(scanArguments), ...uploads.flatMap(uploadPaths)];
+      const writers = job.steps.flatMap((step, index) => {
+        if (isScan(step) || isUpload(step)) return [];
+        const outputs = [
+          ...new Set([...producedPaths(step), ...pathsNamedInStep(step, artifactPaths)]),
+        ];
+        return outputs.length === 0 ? [] : [{ step, index, outputs }];
+      });
+      if (uploads.length === 0 && writers.length === 0) continue;
+
+      if (scans.length !== 1) {
+        problems.push(`${job.name}: expected one credential scan, found ${scans.length}`);
+        for (const upload of uploads) {
+          if (!upload.body.includes("steps.scan.outcome == 'success'")) {
+            problems.push(
+              `${job.name}: upload "${upload.name}" is not gated on the credential scan`,
+            );
+          }
+        }
+        continue;
+      }
+
+      const scan = scans[0];
+      const scanIndex = job.steps.indexOf(scan);
+      if (!/if: always\(\)/.test(scan.body)) {
+        problems.push(`${job.name}: credential scan does not run with if: always()`);
+      }
+      const args = scanArguments(scan);
+      for (const writer of writers) {
+        if (writer.index > scanIndex) {
+          problems.push(
+            `${job.name}: "${writer.step.name}" writes an artifact input after the credential scan`,
+          );
+        }
+        for (const output of writer.outputs) {
+          if (!scanCovers(args, output)) {
+            problems.push(
+              `${job.name}: "${writer.step.name}" writes ${output}, which the scan arguments do not cover`,
+            );
+          }
+        }
+      }
+      for (const upload of uploads) {
+        if (job.steps.indexOf(upload) < scanIndex) {
+          problems.push(`${job.name}: upload "${upload.name}" runs before the credential scan`);
+        }
+        if (!upload.body.includes("steps.scan.outcome == 'success'")) {
+          problems.push(`${job.name}: upload "${upload.name}" is not gated on the credential scan`);
+        }
+      }
+    }
+
+    expect(problems).toEqual([]);
   });
 });
