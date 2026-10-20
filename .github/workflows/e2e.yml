@@ -109,6 +109,7 @@ jobs:
     if: needs.gate.outputs.ok == 'true' && needs.plan.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: foundry-e2e
     permissions:
       contents: read
     strategy:
@@ -190,8 +191,18 @@ jobs:
             pivot-e2e-package \
             npm run package:system
 
+      - name: Scan packaged system for credentials
+        id: scan
+        if: always()
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+        run: node scripts/ci/scan-e2e-artifacts.mjs system.json system.zip
+
       - name: Upload packaged system
-        if: steps.recheck.outputs.ok == 'true'
+        if: steps.recheck.outputs.ok == 'true' && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-package-${{ matrix.target.name }}
@@ -321,8 +332,33 @@ jobs:
           GH_TOKEN: ""
         run: node scripts/record-acceptance.mjs e2e
 
+      - name: Record E2E result
+        if: always()
+        working-directory: trusted-gate
+        env:
+          E2E_SHA: ${{ matrix.target.sha }}
+          E2E_RUN_ID: ${{ github.run_id }}
+          E2E_OK: ${{ steps.recheck.outputs.ok }}
+          E2E_AVAILABLE: ${{ steps.creds.outputs.available }}
+          E2E_JOB_STATUS: ${{ job.status }}
+          E2E_LOG: ${{ runner.temp }}/foundry-e2e.log
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+        run: bash scripts/ci/e2e-record-result.sh "e2e-result/${{ matrix.target.name }}.json"
+
+      - name: Scan diagnostics for credentials
+        id: scan
+        if: always()
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances/*/diagnostics system.json system.zip artifact-identity.json e2e-result
+
       - name: Upload tested artifact
-        if: success() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        if: success() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}
@@ -332,17 +368,6 @@ jobs:
             trusted-gate/artifact-identity.json
           if-no-files-found: error
           retention-days: 14
-
-      - name: Scan diagnostics for credentials
-        id: scan
-        if: failure() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        working-directory: trusted-gate
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-          FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
-          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances/*/diagnostics
 
       - name: Upload sanitized diagnostics
         if: failure() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
@@ -356,22 +381,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Record E2E result
-        if: always() || cancelled()
-        working-directory: trusted-gate
-        env:
-          E2E_SHA: ${{ matrix.target.sha }}
-          E2E_RUN_ID: ${{ github.run_id }}
-          E2E_OK: ${{ steps.recheck.outputs.ok }}
-          E2E_AVAILABLE: ${{ steps.creds.outputs.available }}
-          E2E_JOB_STATUS: ${{ job.status }}
-          E2E_LOG: ${{ runner.temp }}/foundry-e2e.log
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: bash scripts/ci/e2e-record-result.sh "e2e-result/${{ matrix.target.name }}.json"
-
       - name: Upload E2E result
-        if: always() || cancelled()
+        if: always() && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-result-${{ matrix.target.name }}

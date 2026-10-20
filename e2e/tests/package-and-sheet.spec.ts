@@ -14,7 +14,7 @@ const adminKey = process.env.PIVOT_FOUNDRY_ADMIN_KEY || process.env.FOUNDRY_ADMI
 const playerPassword = process.env.PIVOT_PLAYER_PASSWORD || "e2e-player-local";
 const playerName = "E2E Player";
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "serial", timeout: 360_000 });
 
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext();

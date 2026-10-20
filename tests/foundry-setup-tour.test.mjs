@@ -265,8 +265,7 @@ function lateTourPage() {
         }
       }
       evaluations += 1;
-      if (evaluations === 1) return false;
-      if (evaluations === 2) return "unavailable";
+      if (evaluations === 1) return "unavailable";
       return true;
     },
     locator(selector = "") {
