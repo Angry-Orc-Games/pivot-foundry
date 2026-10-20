@@ -302,6 +302,7 @@ export function installPackagedSystem(paths, zipPath, io = {}) {
     if (!privilegeDenied(error)) throw error;
     run("sudo", ["-n", "mkdir", "-p", systemDir], quiet);
     run("sudo", ["-n", "unzip", "-q", "-o", zipPath, "-d", systemDir], quiet);
+    chownFoundryTree(systemDir, io, { force: true });
   }
 }
 
