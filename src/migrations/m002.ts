@@ -1,3 +1,4 @@
+import { startingHitPoints } from "../rules/hit-points";
 import {
   reconcileSurvival,
   SURVIVAL_STATUSES,
@@ -53,8 +54,44 @@ export function planSurvivalMigration(source: unknown): MigrationPlan {
     update["system.attributes.deathSaves.successes"] = reconciled.successes;
     update["system.attributes.deathSaves.failures"] = reconciled.failures;
   }
+  if (hp?.max === 0) fillUnsetHitPoints(system, hp, update);
   if (Object.keys(update).length === 0) return { ok: true, changed: false };
   return { ok: true, changed: true, update };
+}
+
+function fillUnsetHitPoints(
+  system: Record<string, unknown>,
+  hp: { value?: unknown; max?: unknown },
+  update: Record<string, unknown>,
+): void {
+  const value = typeof hp.value === "number" ? hp.value : 0;
+  const total = Math.max(startingHitPoints(readHitDie(system), readConstitution(system)), value);
+  update["system.attributes.hp.max"] = total;
+  const saves = (
+    system.attributes as
+      { deathSaves?: { status?: unknown; successes?: unknown; failures?: unknown } } | undefined
+  )?.deathSaves;
+  const successes = typeof saves?.successes === "number" ? saves.successes : 0;
+  const failures = typeof saves?.failures === "number" ? saves.failures : 0;
+  const status = update["system.attributes.deathSaves.status"] ?? saves?.status;
+  const blank =
+    value === 0 &&
+    successes === 0 &&
+    failures === 0 &&
+    (status === undefined || status === "unconfirmed" || status === "dying" || status === "alive");
+  if (!blank) return;
+  update["system.attributes.hp.value"] = total;
+  update["system.attributes.deathSaves.status"] = "alive";
+}
+
+function readHitDie(system: Record<string, unknown>): string {
+  const hitDie = (system.attributes as { hitDie?: unknown } | undefined)?.hitDie;
+  return typeof hitDie === "string" ? hitDie : "d8";
+}
+
+function readConstitution(system: Record<string, unknown>): number {
+  const score = (system.abilities as { con?: { score?: unknown } } | undefined)?.con?.score;
+  return typeof score === "number" ? score : 10;
 }
 
 function readStoredSurvival(system: Record<string, unknown>): SurvivalState {
@@ -79,7 +116,6 @@ function readStoredSurvival(system: Record<string, unknown>): SurvivalState {
   };
 }
 
-/** Defaults stay legacy-safe; initialize only genuinely new Character documents. */
 export function initializeSurvival(actor: {
   type?: string;
   system?: unknown;
@@ -89,13 +125,29 @@ export function initializeSurvival(actor: {
   const system = actor.system as
     | {
         survivalVersion?: number;
-        attributes?: { hp?: { value?: number }; deathSaves?: { status?: string } };
+        abilities?: { con?: { score?: number } };
+        attributes?: {
+          hitDie?: string;
+          hp?: { value?: number; max?: number };
+          deathSaves?: { status?: string };
+        };
       }
     | undefined;
   if (system?.survivalVersion === SURVIVAL_VERSION) return;
-  actor.updateSource({
-    "system.survivalVersion": SURVIVAL_VERSION,
-    "system.attributes.deathSaves.status":
-      (system?.attributes?.hp?.value ?? 0) > 0 ? "alive" : "dying",
-  });
+  const hp = system?.attributes?.hp;
+  const value = hp?.value ?? 0;
+  const max = hp?.max ?? 0;
+  const update: Record<string, unknown> = { "system.survivalVersion": SURVIVAL_VERSION };
+  if (value === 0 && max === 0) {
+    const total = startingHitPoints(
+      system?.attributes?.hitDie ?? "d8",
+      system?.abilities?.con?.score ?? 10,
+    );
+    update["system.attributes.hp.value"] = total;
+    update["system.attributes.hp.max"] = total;
+    update["system.attributes.deathSaves.status"] = "alive";
+  } else {
+    update["system.attributes.deathSaves.status"] = value > 0 ? "alive" : "dying";
+  }
+  actor.updateSource(update);
 }
