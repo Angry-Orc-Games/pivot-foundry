@@ -28,6 +28,8 @@ export default defineConfig({
     baseURL,
     browserName: "chromium",
     headless: true,
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
     trace: "off",
     screenshot: "only-on-failure",
     video: "off",

@@ -6,6 +6,7 @@ import {
   ensureE2EWorld,
   expectPackageIdentity,
   joinAs,
+  setupHookTimeoutMs,
   unexpectedErrors,
   waitForCanvasReady,
 } from "../helpers/foundry";
@@ -17,6 +18,7 @@ const playerName = "E2E Player";
 test.describe.configure({ mode: "serial", timeout: 360_000 });
 
 test.beforeAll(async ({ browser }) => {
+  test.setTimeout(setupHookTimeoutMs());
   const context = await browser.newContext();
   attachErrorSink(context);
   let page = await context.newPage();

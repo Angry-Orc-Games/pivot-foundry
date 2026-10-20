@@ -2,8 +2,6 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readFile } from "node:fs/promises";
-
 import { describe, expect, it } from "vitest";
 
 import config from "../e2e/playwright.config.ts";
@@ -275,7 +273,7 @@ describe("Foundry administrator login", () => {
     const log = await readFile(join(dir, "auth-steps.log"), "utf8").catch(() => "");
     await rm(dir, { recursive: true, force: true });
 
-    expect(log).toBe("license\nadmin\neula\nadmin\n");
+    expect(log).toBe("license\nadmin\neula\nadmin\ntour close\n");
     expect(log).not.toContain(ADMIN_KEY);
     expect(page.events.join(" ")).not.toContain(ADMIN_KEY);
   });
@@ -368,29 +366,25 @@ describe("Foundry administrator login", () => {
     expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
   });
 
-  it(
-    "finishes the admin phase when clearing the password field never settles",
-    async () => {
-      const page = lateAdminPage({ adminAfterMs: 0, setupAfterSubmit: true });
-      const password = page.locator();
-      password.fill = () => new Promise(() => {});
-      let outcome = "hung";
-      const pending = authenticateSetup(page, ADMIN_KEY).then(
-        () => {
-          outcome = "done";
-        },
-        (error) => {
-          outcome = error;
-        },
-      );
-      await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 15_000))]);
+  it("finishes the admin phase when clearing the password field never settles", async () => {
+    const page = lateAdminPage({ adminAfterMs: 0, setupAfterSubmit: true });
+    const password = page.locator();
+    password.fill = () => new Promise(() => {});
+    let outcome = "hung";
+    const pending = authenticateSetup(page, ADMIN_KEY).then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 15_000))]);
 
-      expect(outcome).not.toBe("hung");
-      expect(page.events).toContain("setup-visible");
-      expect(page.events.join(" ")).not.toContain(ADMIN_KEY);
-    },
-    20_000,
-  );
+    expect(outcome).not.toBe("hung");
+    expect(page.events).toContain("setup-visible");
+    expect(page.events.join(" ")).not.toContain(ADMIN_KEY);
+  }, 20_000);
 
   it("logs tour close, create world, and launch when each phase starts", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pivot-auth-steps-"));
