@@ -1,5 +1,6 @@
 import {
   expect,
+  test,
   type Browser,
   type BrowserContext,
   type Locator,
@@ -73,6 +74,20 @@ function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number):
   });
 }
 
+function savedTraceChunkPath(): string {
+  try {
+    const info = test.info() as {
+      outputPath: (name: string) => string;
+      _tracing?: { maybeGenerateNextTraceRecordingPath?: () => string | undefined };
+    };
+    const generated = info._tracing?.maybeGenerateNextTraceRecordingPath?.();
+    if (generated) return generated;
+    return info.outputPath("trace-chunk.zip");
+  } catch {
+    return "trace-chunk.zip";
+  }
+}
+
 async function withoutTrace(page: Page, action: () => Promise<void>): Promise<void> {
   const tracing = typeof page.context === "function" ? page.context().tracing : undefined;
   const canPause =
@@ -80,7 +95,7 @@ async function withoutTrace(page: Page, action: () => Promise<void>): Promise<vo
   let paused = false;
   if (canPause && tracing) {
     try {
-      await tracing.stopChunk();
+      await tracing.stopChunk({ path: savedTraceChunkPath() });
       paused = true;
     } catch {
       paused = false;
