@@ -44,7 +44,7 @@ export function setupPhaseBudgetMs(): number {
   const adminSignIn = ADMIN_SCREEN_TIMEOUT_MS * 3 + FIELD_CLEAR_MS;
   const eulaSign = SCREEN_TIMEOUT_MS * 3 + EULA_HIDDEN_MS;
   const worldForm = CREATE_WORLD_UI_MS + TOUR_WAIT_MS * 4 + ADMIN_SCREEN_TIMEOUT_MS * 5;
-  const launch = LAUNCH_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS;
+  const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS;
   const join = NAVIGATION_MS + JOIN_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS + FIELD_CLEAR_MS;
   return (
     LICENSE_PHASE_MS +
@@ -473,24 +473,28 @@ async function createWorldThroughUi(page: Page): Promise<void> {
 
 async function launchWorld(page: Page): Promise<void> {
   noteAuthPhase("launch");
-  const launched = await page.evaluate(async (worldId) => {
-    const runtime = window as unknown as {
-      game?: {
-        worlds?: {
-          get?: (id: string) => { launch?: () => Promise<unknown> } | undefined;
-          contents?: Array<{ id?: string; launch?: () => Promise<unknown> }>;
+  const launched = await withPhaseTimeout(
+    "launch",
+    LAUNCH_PHASE_MS,
+    page.evaluate(async (worldId) => {
+      const runtime = window as unknown as {
+        game?: {
+          worlds?: {
+            get?: (id: string) => { launch?: () => Promise<unknown> } | undefined;
+            contents?: Array<{ id?: string; launch?: () => Promise<unknown> }>;
+          };
         };
       };
-    };
-    const world =
-      runtime.game?.worlds?.get?.(worldId) ||
-      runtime.game?.worlds?.contents?.find((item) => item.id === worldId);
-    if (world?.launch) {
-      await world.launch();
-      return true;
-    }
-    return false;
-  }, process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e");
+      const world =
+        runtime.game?.worlds?.get?.(worldId) ||
+        runtime.game?.worlds?.contents?.find((item) => item.id === worldId);
+      if (world?.launch) {
+        await world.launch();
+        return true;
+      }
+      return false;
+    }, process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e"),
+  );
 
   if (!launched) {
     const launch = page.getByRole("button", { name: /launch/i }).first();
