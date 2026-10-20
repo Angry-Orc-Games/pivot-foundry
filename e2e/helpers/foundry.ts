@@ -95,6 +95,7 @@ type ScreenLocator = {
   waitFor(options: { state: "visible"; timeout: number }): Promise<void>;
   or?(other: ScreenLocator): ScreenLocator;
   first?(): ScreenLocator;
+  visible?(): ScreenLocator;
   isVisible?(): Promise<boolean>;
 };
 
@@ -130,7 +131,8 @@ function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number):
   const [first] = entries;
   const union = visibleUnion(entries);
   if (first && union) {
-    const target = typeof union.first === "function" ? union.first() : union;
+    const visible = typeof union.visible === "function" ? union.visible() : union;
+    const target = typeof visible.first === "function" ? visible.first() : visible;
     return target.waitFor({ state: "visible", timeout }).then(async () => {
       for (const [name, locator] of entries) {
         if (await locator.isVisible?.().catch(() => false)) return name;
@@ -195,13 +197,20 @@ async function clearPasswordFields(page: Page): Promise<boolean> {
     for (let index = 0; index < count; index += 1) {
       const field = typeof fields.nth === "function" ? fields.nth(index) : fields;
       if (typeof field.fill !== "function") continue;
-      await Promise.race([
+      let wiped = false;
+      const done = await Promise.race([
         Promise.resolve(field.fill("")).then(
-          () => undefined,
-          () => undefined,
+          () => {
+            wiped = true;
+            return true;
+          },
+          () => false,
         ),
-        new Promise((resolve) => setTimeout(resolve, FIELD_CLEAR_MS)),
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(false), FIELD_CLEAR_MS);
+        }),
       ]);
+      if (!done || !wiped) return false;
     }
     return true;
   } catch {
