@@ -50,14 +50,29 @@ export interface PromptOptions {
 const DIALOG_FOCUSABLE =
   "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
 
+interface DialogNode {
+  focus?: () => void;
+  querySelector(selector: string): DialogNode | null;
+}
+
 interface RenderedDialog {
   bringToFront?: () => void;
-  element?: { querySelector(selector: string): { focus(): void } | null } | null;
+  element?: DialogNode | null;
+}
+
+function focusIn(root: DialogNode | null | undefined): boolean {
+  const target = root?.querySelector(DIALOG_FOCUSABLE);
+  if (!target?.focus) return false;
+  target.focus();
+  return true;
 }
 
 export function presentRenderedDialog(_event: unknown, dialog: RenderedDialog): void {
   dialog.bringToFront?.();
-  dialog.element?.querySelector(DIALOG_FOCUSABLE)?.focus();
+  const element = dialog.element;
+  if (!element) return;
+  if (focusIn(element.querySelector(".window-content"))) return;
+  focusIn(element);
 }
 
 export async function prompt<T>(
