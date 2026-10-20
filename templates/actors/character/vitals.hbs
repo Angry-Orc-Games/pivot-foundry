@@ -1,5 +1,5 @@
 {{! Vitals section: 4 stat cards, 6 ability boxes, Initiative/Passive Perception line }}
-<section class="pf-vitals">
+<section class="pf-vitals pf-print pf-print-wrap">
   <div class="pf-stats">
     {{! AC stat card }}
     <div class="pf-stat" title="{{derived.armourClass.breakdown}}">
@@ -15,14 +15,12 @@
       <small>{{system.attributes.hitDie}} + Con {{conMod}}</small>
     </div>
 
-    {{! Speed stat card }}
     <div class="pf-stat">
       <b>SPEED</b>
-      <span>{{#if derived.speed.value}}{{derived.speed.value}} m{{else}}—{{/if}}</span>
+      <span>{{derived.speed}} m</span>
       <small>Prof. bonus +{{derived.proficiencyBonus}}</small>
     </div>
 
-    {{! Pool stat card }}
     <div class="pf-stat">
       <b>POOL</b>
       <span>{{system.resources.pool.value}}
@@ -39,14 +37,26 @@
   <div class="pf-abil">
     {{#each abilityRows}}
       <div class="{{abilityClass}}">
-        <button
-          type="button"
-          class="pf-roll pf-ab-name"
-          data-action="roll"
-          data-roll-kind="ability"
-          data-key="{{key}}"
-          data-label="{{label}}"
-        ><b>{{short}}{{#if primary}} ★{{/if}}</b></button>
+        <div class="pf-ab-head">
+          <button
+            type="button"
+            class="pf-roll pf-ab-name"
+            data-action="roll"
+            data-roll-kind="ability"
+            data-key="{{key}}"
+            data-label="{{label}}"
+          ><b>{{short}}</b></button>
+          <label class="pf-prime-toggle"><input
+              class="pf-sr"
+              type="checkbox"
+              name="{{primaryPath}}"
+              aria-label="Primary {{label}}"
+              {{checked primary}}
+              {{disabledAttr}}
+            /><span class="pf-prime-mark" aria-hidden="true">{{#if
+                primary
+              }}★{{else}}☆{{/if}}</span></label>
+        </div>
         <span><input
             class="pf-inline pf-num pf-ab-score"
             name="{{scorePath}}"
@@ -67,30 +77,26 @@
           data-key="{{key}}"
           data-label="{{label}} save"
         ><small>Save {{save}}</small></button>
-        <label class="pf-prime-toggle"><input
-            type="checkbox"
-            name="{{primaryPath}}"
-            {{checked primary}}
-            {{disabledAttr}}
-          /><span class="pf-sr">Primary</span></label>
       </div>
     {{/each}}
   </div>
 
-  {{! Initiative and Passive Perception compact line }}
-  <div class="pf-small pf-init-pp">
-    Initiative
+  {{#if scoreSourceText}}
+    <div class="pf-small">{{scoreSourceText}}</div>
+  {{/if}}
+
+  <div class="pf-small pf-init-line">
     <button
       type="button"
       class="pf-roll"
       data-action="roll"
       data-roll-kind="initiative"
       data-label="{{localize 'PIVOT.Rolls.Initiative'}}"
-    >{{derived.initiative}}</button>
-    · Passive Perception
-    {{derived.passivePerception}}
+    >Initiative
+      {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}</button>
+    <span aria-hidden="true">·</span>
+    <span>Passive Perception {{derived.passivePerception}}</span>
   </div>
 
-  {{! Footnote about primary abilities }}
   <div class="pf-small">★ Primary abilities add Proficiency Bonus to saves.</div>
 </section>

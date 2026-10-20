@@ -8,16 +8,7 @@ import { prepareNpcSheetContext } from "../../src/sheets/npc-sheet";
 
 // Load all character part templates
 const CHARACTER_TEMPLATE_DIR = join(__dirname, "../../templates/actors/character");
-const CHARACTER_PARTS = [
-  "header",
-  "vitals",
-  "tabs",
-  "sheet",
-  "survival",
-  "inventory",
-  "magic",
-  "notes",
-];
+const CHARACTER_PARTS = ["header", "vitals", "sheet"];
 
 // NPC sheet has only one PARTS entry: form -> npc-sheet.hbs
 const NPC_TEMPLATE_PATH = join(__dirname, "../../templates/actors/npc-sheet.hbs");
