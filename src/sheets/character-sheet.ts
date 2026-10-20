@@ -16,6 +16,7 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { craftingAbility } from "../rules/part7-skills";
 import { primaryAbilityWarnings } from "../rules/primary-abilities";
 import { applyChatMessageMode } from "../runtime/ui";
 import {
@@ -376,6 +377,19 @@ export function prepareCharacterSheetContext(
       ];
     }),
   ) as SkillSourceMap;
+  if (skillSources.controlMagic) {
+    skillSources.controlMagic.ability = magicAbility(system);
+  }
+  const specializationSkills = readSpecializationSkills(system);
+  for (const entry of specializationSkills) {
+    skillSources[entry.id] = {
+      ability: entry.ability,
+      proficient: entry.proficient,
+      deepening: entry.deepening,
+      expertise: entry.expertise,
+      bonus: entry.bonus,
+    };
+  }
 
   const effectSummary = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
   const derived = calculateCharacterDerived(
@@ -551,10 +565,31 @@ export function prepareCharacterSheetContext(
       abilityClass: abilitySources[key].primary ? "pf-ab pf-prime" : "pf-ab",
       disabledAttr,
     })),
-    skillRows: canonicalSkills
+    skillRows: [
+      ...canonicalSkills.map((skill) => ({
+        id: skill.id,
+        label: skill.label,
+        source: skillSources[skill.id],
+        abilityPath: `system.skills.${skill.id}.ability`,
+        proficientPath: `system.skills.${skill.id}.proficient`,
+        deepeningPath: `system.skills.${skill.id}.deepening`,
+        expertisePath: `system.skills.${skill.id}.expertise`,
+        bonusPath: `system.skills.${skill.id}.bonus`,
+      })),
+      ...specializationSkills.map((skill) => ({
+        id: skill.id,
+        label: skill.label,
+        source: skillSources[skill.id],
+        abilityPath: skill.abilityPath,
+        proficientPath: skill.proficientPath,
+        deepeningPath: skill.deepeningPath,
+        expertisePath: skill.expertisePath,
+        bonusPath: skill.bonusPath,
+      })),
+    ]
       .map((skill) => {
-        const source = skillSources[skill.id] ?? {
-          ability: "int",
+        const source = skill.source ?? {
+          ability: "int" as AbilityKey,
           proficient: false,
           deepening: 0,
           expertise: false,
@@ -565,11 +600,11 @@ export function prepareCharacterSheetContext(
           id: skill.id,
           label: skill.label,
           ability: abilityPrintCode(source.ability),
-          abilityPath: `system.skills.${skill.id}.ability`,
-          proficientPath: `system.skills.${skill.id}.proficient`,
-          deepeningPath: `system.skills.${skill.id}.deepening`,
-          expertisePath: `system.skills.${skill.id}.expertise`,
-          bonusPath: `system.skills.${skill.id}.bonus`,
+          abilityPath: skill.abilityPath,
+          proficientPath: skill.proficientPath,
+          deepeningPath: skill.deepeningPath,
+          expertisePath: skill.expertisePath,
+          bonusPath: skill.bonusPath,
           proficient: source.proficient,
           deepening: source.deepening ?? 0,
           expertise: source.expertise ?? false,
@@ -956,7 +991,7 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       academiaPath,
       ["system", "skillSpecializations", "academia"],
-      specializationEntries(splitList(academia), "int"),
+      specializationEntries(splitList(academia), "academia"),
     );
     deleteSubmitPath(normalized, academiaPath);
   }
@@ -966,7 +1001,7 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       craftingPath,
       ["system", "skillSpecializations", "crafting"],
-      specializationEntries(splitList(crafting), "int"),
+      specializationEntries(splitList(crafting), "crafting"),
     );
     deleteSubmitPath(normalized, craftingPath);
   }
@@ -1250,16 +1285,68 @@ function specializationNamesAt(source: RecordValue, path: string[]): string[] {
 
 function specializationEntries(
   names: string[],
-  ability: AbilityKey,
+  group: "academia" | "crafting",
 ): Array<Record<string, unknown>> {
   return names.map((name) => ({
     name,
-    ability,
+    ability: group === "crafting" ? (craftingAbility(name) ?? "int") : "int",
     proficient: true,
     deepening: 0,
     expertise: false,
     bonus: 0,
   }));
+}
+
+function readSpecializationSkills(system: RecordValue): Array<{
+  id: string;
+  label: string;
+  ability: AbilityKey;
+  proficient: boolean;
+  deepening: number;
+  expertise: boolean;
+  bonus: number;
+  abilityPath: string;
+  proficientPath: string;
+  deepeningPath: string;
+  expertisePath: string;
+  bonusPath: string;
+}> {
+  return (["academia", "crafting"] as const).flatMap((group) => {
+    const entries = specializationRecords(system, ["skillSpecializations", group]);
+    return entries.flatMap((entry, index) => {
+      const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      if (!name) return [];
+      const storedAbility = isAbilityKey(entry.ability) ? entry.ability : "int";
+      const ability = group === "academia" ? "int" : (craftingAbility(name) ?? storedAbility);
+      const base = `system.skillSpecializations.${group}.${index}`;
+      return [
+        {
+          id: `${group}:${name}`,
+          label: name,
+          ability,
+          proficient: entry.proficient !== false,
+          deepening: typeof entry.deepening === "number" ? entry.deepening : 0,
+          expertise: entry.expertise === true,
+          bonus: typeof entry.bonus === "number" ? entry.bonus : 0,
+          abilityPath: `${base}.ability`,
+          proficientPath: `${base}.proficient`,
+          deepeningPath: `${base}.deepening`,
+          expertisePath: `${base}.expertise`,
+          bonusPath: `${base}.bonus`,
+        },
+      ];
+    });
+  });
+}
+
+function specializationRecords(source: RecordValue, path: string[]): RecordValue[] {
+  let current: unknown = source;
+  for (const part of path) {
+    if (!isRecord(current)) return [];
+    current = current[part];
+  }
+  if (!Array.isArray(current)) return [];
+  return current.filter(isRecord);
 }
 
 function withDisabledAttr<T extends ItemLike>(
