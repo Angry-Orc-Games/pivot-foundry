@@ -110,6 +110,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void
   await waitForFoundryShell(page);
   await authenticateSetup(page, adminKey);
   await handleFoundryEula(page);
+  await authenticateSetup(page, adminKey);
 
   const ready = await page.evaluate(() =>
     Boolean((window as unknown as { game?: { ready?: boolean } }).game?.ready),
