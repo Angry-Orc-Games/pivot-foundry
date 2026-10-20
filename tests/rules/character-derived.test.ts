@@ -163,6 +163,13 @@ describe("calculateManaMaximum", () => {
     expect(calculateManaMaximum({ awakened: false, level: 7, abilityScore: 17 })).toBe(0);
     expect(calculateManaMaximum({ awakened: true, level: 7, abilityScore: 17 })).toBe(29);
   });
+
+  it("pins mana to floor of the score over 2 plus the modifier times level", () => {
+    expect(calculateManaMaximum({ awakened: true, level: 7, abilityScore: 17 })).toBe(29);
+    expect(calculateManaMaximum({ awakened: true, level: 1, abilityScore: 10 })).toBe(5);
+    expect(calculateManaMaximum({ awakened: true, level: 4, abilityScore: 8 })).toBe(0);
+    expect(calculateManaMaximum({ awakened: false, level: 7, abilityScore: 17 })).toBe(0);
+  });
 });
 
 function breakdownTotal(lines: string[]): number {
