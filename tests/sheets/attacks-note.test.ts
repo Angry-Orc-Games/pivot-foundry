@@ -9,9 +9,10 @@ describe("character sheet attacks note", () => {
       join(__dirname, "../../templates/actors/character/sheet.hbs"),
       "utf8",
     );
-    const lang = JSON.parse(
-      readFileSync(join(__dirname, "../../lang/en.json"), "utf8"),
-    ) as Record<string, string>;
+    const lang = JSON.parse(readFileSync(join(__dirname, "../../lang/en.json"), "utf8")) as Record<
+      string,
+      string
+    >;
     const note = lang["PIVOT.Rolls.ExplodingDice"];
 
     expect(sheet).not.toMatch(/re-rolls once/i);
