@@ -47,6 +47,19 @@ export interface PromptOptions {
   cancelLabel?: string;
 }
 
+const DIALOG_FOCUSABLE =
+  "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
+
+interface RenderedDialog {
+  bringToFront?: () => void;
+  element?: { querySelector(selector: string): { focus(): void } | null } | null;
+}
+
+export function presentRenderedDialog(_event: unknown, dialog: RenderedDialog): void {
+  dialog.bringToFront?.();
+  dialog.element?.querySelector(DIALOG_FOCUSABLE)?.focus();
+}
+
 export async function prompt<T>(
   title: string,
   content: string,
@@ -74,6 +87,7 @@ export async function prompt<T>(
       },
       buttons: [{ action: "cancel", label: cancelLabel, callback: () => null }],
       rejectClose: false,
+      render: presentRenderedDialog,
     })) as T | null;
   } catch {
     return null;
