@@ -257,6 +257,20 @@ describe("calculateArmourClass", () => {
     expect(stackIdenticalBonuses(bonusStackMode.dr, [1, 2])).toBe(3);
     expect(stackIdenticalBonuses(bonusStackMode.dieStep, [1, 1])).toBe(2);
   });
+
+  it("adds an other armour bonus that has no exclusion key", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Cloak", category: "other", acBonus: 1, equipped: true },
+        { name: "Amulet", category: "other", acBonus: 2, equipped: true },
+      ],
+    });
+
+    expect(result.value).toBe(13);
+    expect(result.breakdown).toEqual(["Base 10", "Cloak +1", "Amulet +2"]);
+    expect(breakdownTotal(result.breakdown)).toBe(result.value);
+  });
 });
 
 describe("calculateTotalWeight", () => {
