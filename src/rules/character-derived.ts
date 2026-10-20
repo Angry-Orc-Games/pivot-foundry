@@ -1,4 +1,4 @@
-import { bonusStackMode, exclusionGroupId, stackIdenticalBonuses } from "./ac-stacking";
+import { bonusStackMode, selectKeyedAcBonuses, stackIdenticalBonuses } from "./ac-stacking";
 import { abilityModifier, proficiencyBonusForLevel } from "./modifiers";
 import { baseSpeedForSpecies, unknownSpeciesSpeedMessage } from "./species-speed";
 
@@ -356,7 +356,7 @@ export function calculateArmourClass({
   pushBonus(lines, bestShield);
   pushBonus(lines, bestHelmet);
   for (const item of open.filter((entry) => entry.category === "other")) pushBonus(lines, item);
-  for (const winner of exclusionWinners(keyed)) pushBonus(lines, winner);
+  for (const winner of selectKeyedAcBonuses(keyed)) pushBonus(lines, winner);
 
   if (manualBonus !== 0)
     lines.push({ text: formatSigned("Manual", manualBonus), amount: manualBonus });
@@ -460,24 +460,6 @@ function highestBonus(items: ArmourSource[]): ArmourSource | undefined {
     items.map((item) => item.acBonus),
   );
   return items.find((item) => item.acBonus === best);
-}
-
-function exclusionWinners(items: ArmourSource[]): ArmourSource[] {
-  const groups = new Map<string, ArmourSource[]>();
-  for (const item of items) {
-    const id = exclusionGroupId(item.stackKey ?? item.name);
-    const group = groups.get(id) ?? [];
-    group.push(item);
-    groups.set(id, group);
-  }
-  return [...groups.values()].flatMap((group) => {
-    const best = stackIdenticalBonuses(
-      bonusStackMode.ac,
-      group.map((item) => item.acBonus),
-    );
-    const winner = group.find((item) => item.acBonus === best);
-    return winner ? [winner] : [];
-  });
 }
 
 function pushBonus(
