@@ -78,7 +78,10 @@ describe("clampMpOnActorUpdate", () => {
 
     clampMpOnActorUpdate(actor, changes);
 
-    expect(changes.system).toMatchObject({ magic: { mp: { value: 5 } } });
+    expect(changes).toEqual({
+      "system.magic.mp.maxBonus": 0,
+      "system.magic.mp.value": 5,
+    });
   });
 
   it("keeps the dotted max change after Foundry expands the clamped update", () => {

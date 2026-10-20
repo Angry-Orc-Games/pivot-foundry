@@ -170,9 +170,12 @@ function projectSystem(stored: unknown, changes: Record<string, unknown>): Recor
 
 function writeMpValue(changes: Record<string, unknown>, value: number): void {
   const dotted = "system.magic.mp.value";
+  if (!isRecord(changes.system)) {
+    changes[dotted] = value;
+    return;
+  }
   if (dotted in changes) changes[dotted] = value;
-  if (!isRecord(changes.system) && dotted in changes) return;
-  const system = isRecord(changes.system) ? changes.system : {};
+  const system = changes.system;
   const magic = isRecord(system.magic) ? system.magic : {};
   const mp = isRecord(magic.mp) ? magic.mp : {};
   mp.value = value;
