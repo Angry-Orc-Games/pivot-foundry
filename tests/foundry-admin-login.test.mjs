@@ -366,6 +366,84 @@ describe("Foundry administrator login", () => {
     expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
   });
 
+  it("sees Setup when a hidden password is earlier in the DOM", async () => {
+    const events = [];
+    const password = {
+      first() {
+        return password;
+      },
+      async isVisible() {
+        return false;
+      },
+      async waitFor() {
+        throw new Error("password hidden");
+      },
+      or(other) {
+        return union.add(other);
+      },
+    };
+    const setup = {
+      first() {
+        return setup;
+      },
+      async isVisible() {
+        return true;
+      },
+      async waitFor() {
+        events.push("setup-visible");
+      },
+    };
+    const visibleSet = {
+      first() {
+        return setup;
+      },
+      async waitFor() {
+        events.push("setup-visible");
+      },
+    };
+    const union = {
+      parts: [],
+      add(other) {
+        union.parts.push(other);
+        return union;
+      },
+      or(other) {
+        return union.add(other);
+      },
+      first() {
+        return password;
+      },
+      visible() {
+        return visibleSet;
+      },
+      async waitFor() {
+        events.push("union-visible");
+      },
+    };
+    const page = {
+      locator() {
+        return password;
+      },
+      getByRole(role, options = {}) {
+        const name = options.name;
+        if (role === "button" && name instanceof RegExp && name.test("Create World")) return setup;
+        return {
+          async isVisible() {
+            return false;
+          },
+          async waitFor() {
+            throw new Error("screen did not appear");
+          },
+        };
+      },
+    };
+
+    await authenticateSetup(page, ADMIN_KEY);
+
+    expect(events).toContain("setup-visible");
+    expect(events.join(" ")).not.toContain(ADMIN_KEY);
+  });
+
   it("finishes the admin phase when clearing the password field never settles", async () => {
     const page = lateAdminPage({ adminAfterMs: 0, setupAfterSubmit: true });
     const password = page.locator();
