@@ -338,6 +338,7 @@ export function calculateArmourClass({
   const bestHelmet = highestBonus(open.filter((item) => item.category === "helmet"));
   pushBonus(lines, bestShield);
   pushBonus(lines, bestHelmet);
+  for (const item of open.filter((entry) => entry.category === "other")) pushBonus(lines, item);
   for (const winner of exclusionWinners(keyed)) pushBonus(lines, winner);
 
   if (manualBonus !== 0)
