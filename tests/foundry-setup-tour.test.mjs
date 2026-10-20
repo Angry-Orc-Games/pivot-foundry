@@ -242,6 +242,56 @@ describe("setup phase deadlines", () => {
   });
 });
 
+describe("setup context tours", () => {
+  it("does not fail the phase when a setup tour complete throws", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pivot-tour-notes-"));
+    const marker = join(dir, "setup-failure.txt");
+    const previous = process.env.PIVOT_E2E_SETUP_FAILURE;
+    process.env.PIVOT_E2E_SETUP_FAILURE = marker;
+    const page = classToursPage({ setupThrows: true });
+    let error;
+    try {
+      await ensureE2EWorld(page, "admin-key-secret");
+    } catch (caught) {
+      error = caught;
+    } finally {
+      if (previous === undefined) delete process.env.PIVOT_E2E_SETUP_FAILURE;
+      else process.env.PIVOT_E2E_SETUP_FAILURE = previous;
+    }
+    const notes = await readFile(join(dir, "tour-notes.log"), "utf8").catch(() => "");
+    await rm(dir, { recursive: true, force: true });
+
+    expect(error).toBeUndefined();
+    expect(notes).toContain("core.ui-overview");
+    expect(notes).toContain("reading 'isGM'");
+    expect(notes).not.toContain("admin-key-secret");
+  });
+
+  it("completes setup tours and leaves user tours alone", async () => {
+    const page = classToursPage({ includeSidebar: true });
+    let error;
+    try {
+      await ensureE2EWorld(page, "admin-key-secret");
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeUndefined();
+    expect(page.completed).toEqual(["ui-overview"]);
+  });
+
+  it("dismisses a suggested next tour dialog during tour close", async () => {
+    const page = classToursPage({ dialog: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("suggested-open");
+    expect(page.events).toContain("dismiss-next-tour");
+    expect(page.events.indexOf("dismiss-next-tour")).toBeLessThan(
+      page.events.indexOf("create-world"),
+    );
+  });
+});
+
 function lateTourPage({ hangComplete = false } = {}) {
   const events = [];
   let ended = false;
@@ -326,6 +376,153 @@ function lateTourPage({ hangComplete = false } = {}) {
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("tour-overlay")) return hidden;
+      if (text.includes("title") || text.includes('name="name"')) return title;
+      return hidden;
+    },
+    getByRole(role, options = {}) {
+      const name = options.name;
+      if (role === "button" && name instanceof RegExp && name.test("Create World"))
+        return createWorld;
+      if (role === "checkbox" || role === "heading") return hidden;
+      if (role === "button") return hidden;
+      throw new Error(`unexpected role ${role}`);
+    },
+    keyboard: { async press() {} },
+  };
+}
+
+function classToursPage({ setupThrows = false, includeSidebar = false, dialog = false } = {}) {
+  const completed = [];
+  const events = [];
+  class SetupTour {}
+  class SidebarTour {}
+  let dialogVisible = false;
+  const setup = Object.assign(new SetupTour(), {
+    namespace: "core",
+    id: "ui-overview",
+    status: "unstarted",
+    complete() {
+      completed.push(this.id);
+      if (setupThrows) {
+        throw new TypeError("Cannot read properties of null (reading 'isGM')");
+      }
+      if (dialog) {
+        dialogVisible = true;
+        events.push("suggested-open");
+      }
+    },
+  });
+  const tours = [setup];
+  if (includeSidebar) {
+    const sidebar = Object.assign(new SidebarTour(), {
+      namespace: "core",
+      id: "sidebar",
+      status: "unstarted",
+      complete() {
+        completed.push(this.id);
+        throw new TypeError("Cannot read properties of null (reading 'isGM')");
+      },
+    });
+    Object.defineProperty(sidebar, "steps", {
+      get() {
+        throw new TypeError("Cannot read properties of null (reading 'isGM')");
+      },
+    });
+    tours.push(sidebar);
+  }
+  const hidden = {
+    first() {
+      return hidden;
+    },
+    async count() {
+      return 0;
+    },
+    async isVisible() {
+      return false;
+    },
+    async waitFor() {
+      throw new Error("hidden");
+    },
+    async fill() {},
+  };
+  const title = {
+    first() {
+      return title;
+    },
+    async fill() {
+      events.push("title");
+    },
+  };
+  const createWorld = {
+    first() {
+      return createWorld;
+    },
+    last() {
+      return createWorld;
+    },
+    async waitFor() {},
+    async isVisible() {
+      return true;
+    },
+    async click() {
+      events.push("create-world");
+    },
+  };
+  const dialogRoot = {
+    filter() {
+      return dialogRoot;
+    },
+    first() {
+      return dialogRoot;
+    },
+    async waitFor() {
+      if (!dialogVisible) throw new Error("suggested next tour hidden");
+    },
+    getByRole(role, options = {}) {
+      const name = options.name;
+      if (role === "button" && name instanceof RegExp && name.test("No Thanks")) {
+        return {
+          first() {
+            return this;
+          },
+          async click() {
+            events.push("dismiss-next-tour");
+            dialogVisible = false;
+          },
+        };
+      }
+      throw new Error(`unexpected dialog role ${role}`);
+    },
+  };
+  let evaluations = 0;
+  return {
+    completed,
+    events,
+    async goto() {},
+    async waitForFunction() {},
+    async evaluate(fn) {
+      if (typeof fn === "function" && fn.toString().includes("activeTour")) {
+        globalThis.foundry = {
+          nue: {
+            tours: { SetupTour, SidebarTour },
+            Tour: { activeTour: null },
+          },
+        };
+        globalThis.game = { ready: false, user: null, tours };
+        try {
+          return await fn();
+        } finally {
+          delete globalThis.foundry;
+          delete globalThis.game;
+        }
+      }
+      evaluations += 1;
+      if (evaluations === 1) return "unavailable";
+      return true;
+    },
+    locator(selector = "") {
+      const text = String(selector);
+      if (text.includes("dialog") || text.includes("window-app")) return dialogRoot;
       if (text.includes("title") || text.includes('name="name"')) return title;
       return hidden;
     },
