@@ -294,7 +294,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
     current = recovered;
   }
 
-  const ready = await current.evaluate(silenceCoreTours);
+  const ready = await withPhaseTimeout("tour close", 15_000, current.evaluate(silenceCoreTours));
   if (ready) return current;
 
   const created = await withPhaseTimeout(
