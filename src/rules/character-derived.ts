@@ -355,7 +355,9 @@ export function calculateArmourClass({
   const bestHelmet = highestBonus(open.filter((item) => item.category === "helmet"));
   pushBonus(lines, bestShield);
   pushBonus(lines, bestHelmet);
-  for (const item of open.filter((entry) => entry.category === "other")) pushBonus(lines, item);
+  for (const item of highestByName(open.filter((entry) => entry.category === "other"))) {
+    pushBonus(lines, item);
+  }
   for (const winner of selectKeyedAcBonuses(keyed)) pushBonus(lines, winner);
 
   if (manualBonus !== 0)
@@ -451,6 +453,20 @@ function bestWornSuit(items: ArmourSource[], dexterityModifier: number): ArmourS
     }
   }
   return best;
+}
+
+function highestByName(items: ArmourSource[]): ArmourSource[] {
+  const groups = new Map<string, ArmourSource[]>();
+  for (const item of items) {
+    const key = item.name.trim().toLowerCase();
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  }
+  return [...groups.values()].flatMap((group) => {
+    const best = highestBonus(group);
+    return best ? [best] : [];
+  });
 }
 
 function highestBonus(items: ArmourSource[]): ArmourSource | undefined {
