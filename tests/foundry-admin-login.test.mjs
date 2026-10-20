@@ -2,8 +2,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { readFile } from "node:fs/promises";
+
 import { describe, expect, it } from "vitest";
 
+import config from "../e2e/playwright.config.ts";
 import { authenticateSetup, ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 
 const ADMIN_KEY = "admin-key-secret";
@@ -363,5 +366,74 @@ describe("Foundry administrator login", () => {
       "browserContext.pages: Target page, context or browser has been closed",
     );
     expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
+  });
+
+  it(
+    "finishes the admin phase when clearing the password field never settles",
+    async () => {
+      const page = lateAdminPage({ adminAfterMs: 0, setupAfterSubmit: true });
+      const password = page.locator();
+      password.fill = () => new Promise(() => {});
+      let outcome = "hung";
+      const pending = authenticateSetup(page, ADMIN_KEY).then(
+        () => {
+          outcome = "done";
+        },
+        (error) => {
+          outcome = error;
+        },
+      );
+      await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 15_000))]);
+
+      expect(outcome).not.toBe("hung");
+      expect(page.events).toContain("setup-visible");
+      expect(page.events.join(" ")).not.toContain(ADMIN_KEY);
+    },
+    20_000,
+  );
+
+  it("logs tour close, create world, and launch when each phase starts", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pivot-auth-steps-"));
+    const marker = join(dir, "setup-failure.txt");
+    const previous = process.env.PIVOT_E2E_SETUP_FAILURE;
+    const previousEula = process.env.FOUNDRY_E2E_ACCEPT_EULA;
+    process.env.PIVOT_E2E_SETUP_FAILURE = marker;
+    process.env.FOUNDRY_E2E_ACCEPT_EULA = "1";
+    const page = eulaThenAdminPage();
+    const seen = [];
+    let calls = 0;
+    page.evaluate = async () => {
+      calls += 1;
+      seen.push(await readFile(join(dir, "auth-steps.log"), "utf8").catch(() => ""));
+      if (calls === 1) return false;
+      if (calls === 2) return "created";
+      return true;
+    };
+    try {
+      await ensureE2EWorld(page, ADMIN_KEY);
+    } finally {
+      if (previous === undefined) delete process.env.PIVOT_E2E_SETUP_FAILURE;
+      else process.env.PIVOT_E2E_SETUP_FAILURE = previous;
+      if (previousEula === undefined) delete process.env.FOUNDRY_E2E_ACCEPT_EULA;
+      else process.env.FOUNDRY_E2E_ACCEPT_EULA = previousEula;
+      await rm(dir, { recursive: true, force: true });
+    }
+
+    expect(seen[0]).toContain("tour close\n");
+    expect(seen[1]).toContain("create world\n");
+    expect(seen[2]).toContain("launch\n");
+    expect(seen.join("")).not.toContain(ADMIN_KEY);
+  });
+
+  it("bounds actions and keeps the setup hook longer than its phase budgets", async () => {
+    expect(config.use?.actionTimeout).toBe(15_000);
+    expect(config.use?.navigationTimeout).toBe(30_000);
+    const spec = await readFile(
+      new URL("../e2e/tests/package-and-sheet.spec.ts", import.meta.url),
+      "utf8",
+    );
+    expect(spec).toContain("setupHookTimeoutMs()");
+    const { setupHookTimeoutMs, setupPhaseBudgetMs } = await import("../e2e/helpers/foundry.ts");
+    expect(setupHookTimeoutMs()).toBeGreaterThan(setupPhaseBudgetMs());
   });
 });
