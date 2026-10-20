@@ -30,6 +30,14 @@ import {
 const HTTP_TIMEOUT_MS = 120_000;
 const PLAYWRIGHT_TIMEOUT_MS = 15 * 60 * 1000;
 
+export function assertLaunchWindow(root, options = {}) {
+  execFileSync("bash", [join(root, "scripts/ci/e2e-gate.sh"), "require"], {
+    cwd: root,
+    stdio: options.stdio ?? "inherit",
+    env: options.env ?? process.env,
+  });
+}
+
 export async function runE2E(args = {}) {
   assertSafeTarget({
     target: process.env.PIVOT_FOUNDRY_TARGET || "e2e",
@@ -104,9 +112,16 @@ export async function runE2E(args = {}) {
       return EXIT.identity;
     }
 
-    const identity = writeArtifactIdentity(paths.root, { source: "e2e" });
+    const subject = /^[0-9a-f]{40}$/.test(process.env.PIVOT_E2E_SUBJECT || "")
+      ? process.env.PIVOT_E2E_SUBJECT
+      : "";
+    const identity = writeArtifactIdentity(paths.root, {
+      source: "e2e",
+      ...(subject ? { commit: subject } : {}),
+    });
     mkdirSync(paths.foundryData, { recursive: true });
     installPackagedSystem(paths, zipPath);
+    assertLaunchWindow(paths.root);
 
     const port =
       Number(process.env.PIVOT_FOUNDRY_PORT) ||
@@ -136,6 +151,8 @@ export async function runE2E(args = {}) {
       console.error("Refusing to run E2E against a container this checkout does not own.");
       return EXIT.identity;
     }
+
+    console.log(`Foundry started for E2E commit ${subject || identity.commit}.`);
 
     console.log("Running Playwright against the packaged system.");
     execFileSync("npx", ["playwright", "test", "--config", "e2e/playwright.config.ts"], {

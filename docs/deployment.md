@@ -25,19 +25,25 @@ If release preparation changes `system.json`, the new zip must pass E2E (and sta
 
 ## Implemented GitHub workflows
 
-| Workflow                                                                | Trigger                               | Secrets                              | Purpose                                                                                                                                                           |
-| ----------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                   | None                                 | Lint, format, types, Vitest, build, audit, package                                                                                                                |
-| [`e2e.yml`](../.github/workflows/e2e.yml)                               | Same-repo PRs and `workflow_dispatch` | `foundry-e2e`                        | Isolated Foundry E2E. If those secrets are missing, the job is visibly not run and does not fail the PR. Release publication still requires a successful E2E job. |
-| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Successful CI on `main`               | `staging`                            | Deploy tested zip, smoke https://build.angryorcgames.com                                                                                                          |
-| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval          | `production`                         | Promote the exact staging-accepted zip                                                                                                                            |
-| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                             | `foundry-e2e` then `contents: write` | Test the prepared zip, then publish                                                                                                                               |
+| Workflow                                                                | Trigger                                           | Secrets                              | Purpose                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](../.github/workflows/ci.yml)                                 | Every PR and `main`                               | None                                 | Lint, format, types, Vitest, build, audit, package                                                                                                                                                                                                       |
+| [`e2e.yml`](../.github/workflows/e2e.yml)                               | 07:23 UTC schedule and `workflow_dispatch`        | `foundry-e2e`                        | Real Foundry only from 02:00 to 05:30 America/New_York when prod and build show zero users. The nightly run tests main and open same-repo pull requests labeled `e2e-nightly`, one at a time. A closed gate fails the run. Missing secrets fail the job. |
+| [`deploy-staging.yml`](../.github/workflows/deploy-staging.yml)         | Push to `main` in this repo, or a `main` dispatch | `staging`                            | Isolated Foundry E2E, then deploy. A pull request or a fork does not start the job. The license gate runs first and fails the job outside the quiet window.                                                                                              |
+| [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval                      | `production`                         | Promote the exact staging-accepted zip. Does not start a Foundry process.                                                                                                                                                                                |
+| [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                                         | `foundry-e2e` then `contents: write` | License gate, then Foundry E2E, then publish. A closed gate fails the release and does not publish.                                                                                                                                                      |
 
-Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Staging uses `concurrency: foundry-staging` with `cancel-in-progress: false` so one run cannot deploy while another is testing.
+Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Nightly E2E, the release E2E job, and staging deploy share `concurrency: foundry-e2e` with `cancel-in-progress: false`, so a second run waits instead of starting another Foundry.
 
-Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. To test a fork commit: review the exact SHA, then run **Foundry E2E** with `workflow_dispatch` and that ref.
+Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. The nightly queue skips fork heads. `workflow_dispatch` `ref` accepts a 40-character SHA only when that commit is reachable from a branch in this repository. A commit that exists only as a fork pull-request head is refused. The runner scripts still come from `main`. `secrets_check_only` verifies the `foundry-e2e` secrets at any hour and does not start Foundry.
 
-Skipped E2E is visible as a skipped check and cannot satisfy release publication (`needs.e2e.result == success`).
+When the first license gate does not pass, the nightly workflow fails. The gate job prints the reason, and a summary job repeats that Foundry was not started. Before each SHA the gate runs again. If it closes, the package job does not check out the system and the secret job does not start Foundry. A report job then posts `Foundry E2E (nightly)` with conclusion `failure` on that SHA. The same failure check is posted when the SHA's job fails, is cancelled, or times out with no valid result. The workflow does not post a neutral check for a closed gate. The next SHA rechecks before it can start Foundry. `scripts/foundry-e2e.mjs` runs the gate again after the zip is installed and before the container starts, and it aborts at 05:30 ET. Schedule and dispatch share the `foundry-e2e` concurrency group and do not cancel an in-progress run, so a second dispatch waits instead of starting another Foundry. `secrets_check_only` uses a separate group. Missing secrets after a passing gate fail that SHA. A failed system test does not cancel the other SHAs.
+
+The license gate checks out `github.sha`, the commit that contains the workflow file. It does not check out the pull-request head, the dispatch `ref`, or the tag. The package job checks out the system under test only after the gate is ok, builds `system.zip`, and uploads that zip. Its build runs in a container that already has `zip` and `unzip`, with no network, a writable `HOME`, and only the workspace mounted, so the code under test cannot upload an artifact or replace the upload action. The job that holds the Foundry secrets has `actions: read`, downloads that zip for this run, and copies only `system.zip` and `system.json` into the harness. The trusted launcher writes `artifact-identity.json` after that. It runs `foundry-cli.mjs` from a sparse checkout of `github.sha` at `trusted-gate`. It does not check out the system under test and it does not run that tree's install or build. The zip install rejects path entries that leave the system directory. `release.yml` builds that tag from `refs/tags/${{ github.ref_name }}`. The release test job copies only the candidate files into a sparse checkout of `github.sha` and runs Foundry from there. A closed gate exits 1. `require` mode tells the caller to re-run inside the 02:00-05:30 ET window. The release publish job runs only when the E2E job succeeds, so a refused release is not published. `promote-production.yml` smokes the existing production server and does not start Foundry.
+
+The nightly workflow grants `contents: read` at the workflow level. The job that lists labeled pull requests is the only one with `issues: write`. The job that posts `Foundry E2E (nightly)` is the only one with `checks: write`, and it checks out only the workflow commit. It downloads the result artifact for this run by name and rejects a file whose `sha` or `run_id` does not match. The secret job has `contents: read`. It passes `FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`, `FOUNDRY_RELEASE_CACHE_URL`, and `FOUNDRY_RELEASE_SHA256` only to the step that runs `node scripts/foundry-cli.mjs e2e --skip-package` inside `trusted-gate`. The package job has no secrets. Every `actions/checkout` in that workflow sets `persist-credentials: false`.
+
+Staging deploy runs only when CI completed because of a push to `main` in this repository, or when someone dispatches the workflow on `refs/heads/main`. The job does not start for a pull request or a fork. It downloads the CI package into its own directory, checks that the files are exactly `system.json`, `system.zip`, and `artifact-identity.json` and that each is a regular file, then copies only those files into a sparse checkout of `github.sha`. Deploy and Foundry run from that checkout. They do not run code from the artifact directory. Production promotion uses the same check on the staging-accepted artifact before it uses the deploy key.
 
 ## GitHub settings that cannot be set from files
 
@@ -55,7 +61,7 @@ These are required for isolated E2E tests that run in Docker containers:
 
 - `FOUNDRY_ADMIN_KEY` — Admin password for the temporary Foundry instance
 - `FOUNDRY_LICENSE_KEY` — Foundry VTT license key for activation
-- `FOUNDRY_RELEASE_CACHE_URL` — Timed download URL for the Foundry v14 Node.js zip (expires ~5 minutes)
+- `FOUNDRY_RELEASE_CACHE_URL` — Durable private basic-auth URL for the Foundry v14 Node.js zip
 - `FOUNDRY_RELEASE_SHA256` — SHA-256 checksum of the Foundry release archive for verification
 
 ### Secrets for `staging` Environment
@@ -66,7 +72,7 @@ The staging environment requires **all** of the following secrets. The workflow 
 
 - `FOUNDRY_ADMIN_KEY` — Admin password for the temporary E2E Foundry instance
 - `FOUNDRY_LICENSE_KEY` — Foundry VTT license key
-- `FOUNDRY_RELEASE_CACHE_URL` — Timed download URL for Foundry v14 Node.js zip
+- `FOUNDRY_RELEASE_CACHE_URL` — Durable private basic-auth URL for the Foundry v14 Node.js zip
 - `FOUNDRY_RELEASE_SHA256` — SHA-256 checksum of the Foundry release archive
 
 **Deploy SSH credentials and paths:**
@@ -84,7 +90,8 @@ The staging environment requires **all** of the following secrets. The workflow 
 - `PIVOT_STAGING_GM_PASSWORD` — Game Master password
 - `PIVOT_STAGING_PLAYER_USER` — Player username for smoke tests
 - `PIVOT_STAGING_PLAYER_PASSWORD` — Player password
-- `PIVOT_PACKAGE_VERSION` — (Optional) Expected package version for verification
+
+Smoke tests read the expected package version from the `version` field of the accepted `system.json`.
 
 ### Secrets for `production` Environment
 
@@ -97,22 +104,23 @@ Suggested branch-protection checks on `main`:
 - `Verify / Node 20`
 - `Verify / Node 22`
 - `Package Foundry System`
-- `Foundry E2E` (same-repo PRs only; forks stay CI-only)
+
+`Foundry E2E (nightly)` is posted on each tested SHA. It is not a required pull-request check unless you add it. The workflow runs at 07:23 UTC and on `workflow_dispatch`.
 
 ## Staging
 
-After CI succeeds on `main`, `deploy-staging.yml` downloads that `system.zip`, runs isolated E2E against those bytes, deploys them, then runs `npm run test:e2e:staging` against https://build.angryorcgames.com.
+After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` runs the license gate, downloads that `system.zip`, runs isolated E2E against those bytes, deploys them, then runs `npm run test:e2e:staging` against https://build.angryorcgames.com. A pull-request CI run does not start this job. A closed gate fails the job before Foundry starts and before the deploy. Re-run it inside the 02:00-05:30 ET window.
 
-Reset only a designated local/E2E world. The staging job does not wipe other server data. Production promotion reads `artifact-identity.json.staging.sha256`, not “the latest successful staging run” by itself.
+Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` only when `artifact-identity.json` `commit` equals the CI commit (`github.event.workflow_run.head_sha`, or `github.sha` on a manual dispatch). The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 
-Keep the staging Foundry **runtime** on 14.368 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
+Keep the staging Foundry **runtime** on 14.361 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
 
 ## Production
 
 Run **Promote production** and pass the staging workflow run id. The `production` environment must require a human approval. The job:
 
-1. Downloads `pivot-foundry-staging-accepted`
-2. Verifies commit, version, SHA-256, and staging acceptance
+1. Refuses the typed run id unless the Actions API says it is a successful Deploy staging run on `main` in this repository
+2. Downloads `pivot-foundry-staging-accepted` and checks `system.zip` against the `pivot-staging-artifact` status on the packaged commit. A `workflow_run` checkout SHA can differ from that commit. The status must be from `github-actions[bot]`, its description must be the zip digest, and its target URL must be that staging run. `deploy-staging.yml` is the only workflow with `statuses: write`. The job then waits until production is active and serving that package version.
 3. Refuses packages that require a newer Foundry major than 14
 4. Backs up the configured target directory
 5. Replaces the package and restarts only the configured service

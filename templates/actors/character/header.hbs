@@ -1,5 +1,5 @@
 {{! Character sheet header: name + tagline left, species/background/tier right }}
-<header class="pf-hdr">
+<header class="pf-hdr pf-print pf-print-wrap pf-print-top">
   <div class="pf-hdr-id">
     {{#if editable}}
       <h1><input
@@ -26,9 +26,18 @@
     {{/if}}
   </div>
   <div class="pf-hdr-meta">
-    <div><b>{{speciesLabel}}</b>,
-      <b>{{backgroundLabel}}</b>{{#if tierLabel}}
-        ({{tierLabel}}){{/if}}</div>
+    {{#if speciesLabel}}
+      <div><b>{{speciesLabel}}</b>{{#if backgroundLabel}},
+          <b>{{backgroundLabel}}</b>{{/if}}{{#if tierLabel}}
+          ({{tierLabel}}){{/if}}</div>
+    {{else}}
+      {{#if backgroundLabel}}
+        <div><b>{{backgroundLabel}}</b>{{#if tierLabel}}
+            ({{tierLabel}}){{/if}}</div>
+      {{else}}
+        {{#if tierLabel}}<div>({{tierLabel}})</div>{{/if}}
+      {{/if}}
+    {{/if}}
     <div class="pf-small">Pivot: Fantasy, level
       {{#if editable}}
         <input
