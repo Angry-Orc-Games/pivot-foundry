@@ -141,6 +141,31 @@ function tracedPlayerPage(trace) {
   };
 }
 
+function keepingTrace() {
+  let recording = true;
+  let chunk = ["before-login"];
+  const kept = [];
+  return {
+    recording: () => recording,
+    kept,
+    chunk: () => chunk,
+    note(action) {
+      if (recording) chunk.push(action);
+    },
+    controls: {
+      async stopChunk(options = {}) {
+        if (typeof options.path === "string" && options.path) kept.push([...chunk]);
+        chunk = [];
+        recording = false;
+      },
+      async startChunk() {
+        recording = true;
+        chunk = [];
+      },
+    },
+  };
+}
+
 describe("Foundry secret traces", () => {
   it("does not record the administrator key", async () => {
     const trace = tracing();
@@ -154,6 +179,18 @@ describe("Foundry secret traces", () => {
     const page = tracedJoinPage(trace);
     await joinAs(page, { name: "Player", password: ADMIN_KEY });
     expect(page.leaked()).toBe(false);
+  });
+
+  it("keeps the steps before and after the administrator fill", async () => {
+    const trace = keepingTrace();
+    const page = tracedAdminPage(trace);
+    await authenticateSetup(page, ADMIN_KEY);
+    trace.note("after-login");
+
+    expect(page.leaked()).toBe(false);
+    expect(trace.kept.some((chunk) => chunk.includes("before-login"))).toBe(true);
+    expect(trace.chunk()).toContain("after-login");
+    expect([...trace.kept.flat(), ...trace.chunk()]).not.toContain(ADMIN_KEY);
   });
 
   it("does not record the player password passed into the page", async () => {
