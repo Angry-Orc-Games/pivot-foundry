@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { bonusStackMode, stackIdenticalBonuses } from "../../src/rules/ac-stacking";
 import {
   calculateArmourClass,
   calculateAttackSummary,
@@ -245,6 +246,9 @@ describe("calculateArmourClass", () => {
       breakdown: ["Base 10", "Dex +2", "Chain +5"],
     });
     expect(breakdownTotal(medium.breakdown)).toBe(medium.value);
+    expect(stackIdenticalBonuses(bonusStackMode.ac, [1, 3])).toBe(3);
+    expect(stackIdenticalBonuses(bonusStackMode.dr, [1, 2])).toBe(3);
+    expect(stackIdenticalBonuses(bonusStackMode.dieStep, [1, 1])).toBe(2);
   });
 });
 

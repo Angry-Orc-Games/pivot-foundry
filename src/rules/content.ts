@@ -69,6 +69,7 @@ const allowedSystemKeys: Record<PivotItemType, Set<string>> = {
     ...sharedSystemKeys,
     "category",
     "acBonus",
+    "acStackKey",
     "equipped",
     "weight",
     "quantity",

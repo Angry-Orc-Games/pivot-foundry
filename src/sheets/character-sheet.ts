@@ -395,6 +395,9 @@ export function prepareCharacterSheetContext(
         category: armourCategoryAt(item.system, ["category"]),
         acBonus: numberAt(item.system, ["acBonus"], 0),
         equipped: booleanAt(item.system, ["equipped"], false),
+        ...(stringAt(item.system, ["acStackKey"], "")
+          ? { stackKey: stringAt(item.system, ["acStackKey"], "") }
+          : {}),
       })),
       manualArmourBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
       initiativeBonus: numberAt(system, ["attributes", "initiative", "bonus"], 0),
@@ -1273,10 +1276,10 @@ function magicAbility(system: RecordValue): AbilityKey {
 function armourCategoryAt(
   source: RecordValue,
   path: string[],
-): "light" | "medium" | "heavy" | "shield" | "helmet" | "other" {
+): "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural" {
   const value = stringAt(source, path, "other");
-  return ["light", "medium", "heavy", "shield", "helmet", "other"].includes(value)
-    ? (value as "light" | "medium" | "heavy" | "shield" | "helmet" | "other")
+  return ["light", "medium", "heavy", "shield", "helmet", "other", "natural"].includes(value)
+    ? (value as "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural")
     : "other";
 }
 

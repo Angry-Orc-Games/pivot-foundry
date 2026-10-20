@@ -1,3 +1,4 @@
+import { bonusStackMode, exclusionGroupId, stackIdenticalBonuses } from "./ac-stacking";
 import { abilityModifier, proficiencyBonusForLevel } from "./modifiers";
 import { baseSpeedForSpecies, unknownSpeciesSpeedMessage } from "./species-speed";
 
@@ -26,9 +27,10 @@ export type SkillSourceMap = Record<string, SkillSource>;
 
 export interface ArmourSource {
   name: string;
-  category: "light" | "medium" | "heavy" | "shield" | "helmet" | "other";
+  category: "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural";
   acBonus: number;
   equipped: boolean;
+  stackKey?: string;
 }
 
 export interface WeightSource {
@@ -304,30 +306,49 @@ export function calculateArmourClass({
   effectBonus?: number;
 }): ArmourClassDerived {
   const equipped = armour.filter((item) => item.equipped);
-  const wornArmour = equipped.find((item) => ["light", "medium", "heavy"].includes(item.category));
-  const dexBonus = dexterityModifierForArmour(dexterityModifier, wornArmour?.category);
-  const breakdown = [`Base 10`, formatSigned("Dex", dexBonus)];
-  let value = 10 + dexBonus;
+  const keyed = equipped.filter((item) => item.stackKey);
+  const open = equipped.filter((item) => !item.stackKey);
+  const bestBody = highestBonus(
+    open.filter((item) => ["light", "medium", "heavy"].includes(item.category)),
+  );
+  const bestNatural = highestBonus(open.filter((item) => item.category === "natural"));
+  const dexBonus = dexterityModifierForArmour(dexterityModifier, bestBody?.category);
+  const wornTotal = 10 + dexBonus + (bestBody?.acBonus ?? 0);
+  const lines: Array<{ text: string; amount: number; worn?: string }> = [];
 
-  for (const item of equipped) {
-    value += item.acBonus;
-    breakdown.push(formatSigned(item.name, item.acBonus));
+  if (bestNatural && bestNatural.acBonus > wornTotal) {
+    lines.push({
+      text: `${bestNatural.name} ${bestNatural.acBonus}`,
+      amount: bestNatural.acBonus,
+      worn: bestNatural.name,
+    });
+  } else {
+    lines.push({ text: "Base 10", amount: 10 });
+    if (dexBonus !== 0) lines.push({ text: formatSigned("Dex", dexBonus), amount: dexBonus });
+    if (bestBody && bestBody.acBonus !== 0) {
+      lines.push({
+        text: formatSigned(bestBody.name, bestBody.acBonus),
+        amount: bestBody.acBonus,
+        worn: bestBody.name,
+      });
+    }
   }
 
-  if (manualBonus !== 0) {
-    value += manualBonus;
-    breakdown.push(formatSigned("Manual", manualBonus));
-  }
+  const bestShield = highestBonus(open.filter((item) => item.category === "shield"));
+  const bestHelmet = highestBonus(open.filter((item) => item.category === "helmet"));
+  pushBonus(lines, bestShield);
+  pushBonus(lines, bestHelmet);
+  for (const winner of exclusionWinners(keyed)) pushBonus(lines, winner);
 
-  if (effectBonus !== 0) {
-    value += effectBonus;
-    breakdown.push(formatSigned("Effects", effectBonus));
-  }
+  if (manualBonus !== 0)
+    lines.push({ text: formatSigned("Manual", manualBonus), amount: manualBonus });
+  if (effectBonus !== 0)
+    lines.push({ text: formatSigned("Effects", effectBonus), amount: effectBonus });
 
   return {
-    value,
-    armourWorn: equipped.map((item) => item.name).join(", "),
-    breakdown,
+    value: lines.reduce((total, line) => total + line.amount, 0),
+    armourWorn: lines.flatMap((line) => (line.worn ? [line.worn] : [])).join(", "),
+    breakdown: lines.map((line) => line.text),
   };
 }
 
@@ -392,6 +413,45 @@ function resolveSpeed(input: CharacterDerivedInput): number {
 
 function clampAbilityScore(score: number): number {
   return Math.min(30, Math.max(1, score));
+}
+
+function highestBonus(items: ArmourSource[]): ArmourSource | undefined {
+  if (items.length === 0) return undefined;
+  const best = stackIdenticalBonuses(
+    bonusStackMode.ac,
+    items.map((item) => item.acBonus),
+  );
+  return items.find((item) => item.acBonus === best);
+}
+
+function exclusionWinners(items: ArmourSource[]): ArmourSource[] {
+  const groups = new Map<string, ArmourSource[]>();
+  for (const item of items) {
+    const id = exclusionGroupId(item.stackKey ?? item.name);
+    const group = groups.get(id) ?? [];
+    group.push(item);
+    groups.set(id, group);
+  }
+  return [...groups.values()].flatMap((group) => {
+    const best = stackIdenticalBonuses(
+      bonusStackMode.ac,
+      group.map((item) => item.acBonus),
+    );
+    const winner = group.find((item) => item.acBonus === best);
+    return winner ? [winner] : [];
+  });
+}
+
+function pushBonus(
+  lines: Array<{ text: string; amount: number; worn?: string }>,
+  item: ArmourSource | undefined,
+): void {
+  if (!item || item.acBonus === 0) return;
+  lines.push({
+    text: formatSigned(item.name, item.acBonus),
+    amount: item.acBonus,
+    worn: item.name,
+  });
 }
 
 function dexterityModifierForArmour(

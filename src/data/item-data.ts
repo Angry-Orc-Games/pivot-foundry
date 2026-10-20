@@ -53,6 +53,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
       return withItemInfrastructure(fields, {
         category: stringField(fields, { required: true, initial: "light" }),
         acBonus: numberField(fields, { required: true, integer: true, initial: 1 }),
+        acStackKey: stringField(fields, { required: true, initial: "" }),
         equipped: booleanField(fields, { required: true, initial: false }),
         weight: numberField(fields, { required: true, min: 0, initial: 0 }),
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
