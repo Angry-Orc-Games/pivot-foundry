@@ -72,7 +72,7 @@ Use fast unit tests for rules behavior first. Add Playwright Foundry E2E when th
 
 For the character sheet, Vitest covers manifest declarations, registration wiring, schema factories, derived math, sheet context, and helper behavior. `npm run foundry:e2e` covers packaged-asset loading, sheet rendering, persistence, permissions, rolls, and sync when credentials are available.
 
-The local Foundry sandbox is Docker Compose + Felddy (`npm run foundry:up`). Foundry 14.368 runs on Node 24 inside the pinned container. Repository verify stays on Node 20 or 22. Browser acceptance is `npm run foundry:e2e` against `system.zip`. See [foundry-local-dev.md](foundry-local-dev.md) and [foundry-testing.md](foundry-testing.md).
+The local Foundry sandbox is Docker Compose + Felddy (`npm run foundry:up`). Foundry 14.361 runs on Node 24 inside the pinned container. Repository verify stays on Node 20 or 22. Browser acceptance is `npm run foundry:e2e` against `system.zip`. See [foundry-local-dev.md](foundry-local-dev.md) and [foundry-testing.md](foundry-testing.md).
 
 ## Implementation Sequence
 

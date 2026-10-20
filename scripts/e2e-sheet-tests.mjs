@@ -10,14 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "../templates/actors/character");
 const header = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "header.hbs"), "utf-8"));
 const vitals = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "vitals.hbs"), "utf-8"));
-const tabs = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "tabs.hbs"), "utf-8"));
 const sheet = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "sheet.hbs"), "utf-8"));
-const survival = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "survival.hbs"), "utf-8"));
-const inventory = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "inventory.hbs"), "utf-8"));
-const magic = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "magic.hbs"), "utf-8"));
-const notesTemplate = Handlebars.compile(readFileSync(join(TEMPLATE_DIR, "notes.hbs"), "utf-8"));
 
 // Load CSS
+const foundryForm = readFileSync(join(__dirname, "foundry-v14-form-fixture.css"), "utf-8");
 const tokens = readFileSync(join(__dirname, "../styles/pf-tokens.css"), "utf-8");
 const css = readFileSync(join(__dirname, "../styles/pivot-fantasy.css"), "utf-8");
 
@@ -229,7 +225,7 @@ function getContextData() {
         breakdown: "10 + DEX 3 + Medium 2",
         armourWorn: "Medium armour (Large Shield)",
       },
-      speed: { value: 10 },
+      speed: 10,
       proficiencyBonus: 4,
       initiative: "+7",
       passivePerception: 17,
@@ -350,7 +346,7 @@ function getContextData() {
       {
         id: "athletics",
         label: "Athletics",
-        ability: "STR",
+        ability: "Str",
         abilityPath: "system.skills.athletics.ability",
         proficientPath: "system.skills.athletics.proficient",
         deepeningPath: "system.skills.athletics.deepening",
@@ -366,7 +362,7 @@ function getContextData() {
       {
         id: "investigation",
         label: "Investigation",
-        ability: "INT",
+        ability: "Int",
         abilityPath: "system.skills.investigation.ability",
         proficientPath: "system.skills.investigation.proficient",
         deepeningPath: "system.skills.investigation.deepening",
@@ -382,7 +378,7 @@ function getContextData() {
       {
         id: "perception",
         label: "Perception",
-        ability: "WIS",
+        ability: "Wis",
         abilityPath: "system.skills.perception.ability",
         proficientPath: "system.skills.perception.proficient",
         deepeningPath: "system.skills.perception.deepening",
@@ -398,7 +394,7 @@ function getContextData() {
       {
         id: "acrobatics",
         label: "Acrobatics",
-        ability: "DEX",
+        ability: "Dex",
         abilityPath: "system.skills.acrobatics.ability",
         proficientPath: "system.skills.acrobatics.proficient",
         deepeningPath: "system.skills.acrobatics.deepening",
@@ -414,7 +410,7 @@ function getContextData() {
       {
         id: "deception",
         label: "Deception",
-        ability: "CHA",
+        ability: "Cha",
         abilityPath: "system.skills.deception.ability",
         proficientPath: "system.skills.deception.proficient",
         deepeningPath: "system.skills.deception.deepening",
@@ -430,7 +426,7 @@ function getContextData() {
       {
         id: "insight",
         label: "Insight",
-        ability: "WIS",
+        ability: "Wis",
         abilityPath: "system.skills.insight.ability",
         proficientPath: "system.skills.insight.proficient",
         deepeningPath: "system.skills.insight.deepening",
@@ -507,6 +503,7 @@ function generateHTML(theme, content, width) {
       font-family: system-ui, -apple-system, sans-serif;
       background: ${theme === "theme-dark" ? "#0d0b09" : "#f0f0f0"};
     }
+    ${foundryForm}
     ${tokens}
     ${css}
     /* Test-specific styles */
@@ -552,12 +549,12 @@ function generateHTML(theme, content, width) {
     });
   </script>
 </head>
-<body class="${theme} pivot-fantasy">
-  <div class="pf-sheet" style="container-type: inline-size; width: ${width}px; margin: 0 auto;">
-    <div class="pf-character-sheet">
+<body class="${theme}">
+  <form class="application pivot-fantasy pf-sheet sheet actor character ${theme === "theme-dark" ? "theme-dark" : ""}" style="width: ${width}px;">
+    <section class="window-content" style="height: 600px; width: ${width}px;">
       ${content}
-    </div>
-  </div>
+    </section>
+  </form>
 </body>
 </html>
 `;
@@ -593,23 +590,13 @@ async function runTests() {
   const data = getContextData();
   const headerHTML = header(data);
   const vitalsHTML = vitals(data);
-  const tabsHTML = tabs(data);
   const sheetHTML = sheet(data);
-  const survivalHTML = survival(data);
-  const inventoryHTML = inventory(data);
-  const magicHTML = magic(data);
-  const notesHTML = notesTemplate(data);
 
   const content = `
     ${headerHTML}
     ${vitalsHTML}
-    ${tabsHTML}
     <div class="pf-tab-body">
       ${sheetHTML}
-      ${survivalHTML}
-      ${inventoryHTML}
-      ${magicHTML}
-      ${notesHTML}
     </div>
   `;
 
@@ -701,57 +688,70 @@ async function runTests() {
     }
   }
 
-  // Test 2: Tab switching
-  console.log("\nTest 2: Tab switching functionality");
+  // Test 2: Former tab sections are visible together, with no tab bar.
+  console.log("\nTest 2: One-page sections (survival, inventory, magic, notes)");
 
-  const tabIds = ["sheet", "survival", "inventory", "magic", "notes"];
-  const panelClassMap = {
-    sheet: "pf-sheet-content",
-    survival: "pf-survival-tab",
-    inventory: "pf-inventory-tab",
-    magic: "pf-magic-tab",
-    notes: "pf-notes-tab",
-  };
-  let allTabsWork = true;
-
-  for (const tabId of tabIds) {
-    const result = await page.evaluate(
-      /* eslint-disable no-undef */
-      ({ id, panelClass }) => {
-        const tabButton = document.querySelector(`[data-tab="${id}"]`);
-        if (!tabButton) return { error: `Tab button ${id} not found` };
-
-        tabButton.click();
-
-        // Wait a bit for JS to execute
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            const activeTab = document.querySelector(".pf-tabs a.active");
-            const activePanel = document.querySelector(`.${panelClass}.active`);
-
-            resolve({
-              tabId: id,
-              tabIsActive: activeTab?.dataset.tab === id,
-              panelIsActive: !!activePanel,
-              panelVisible: activePanel
-                ? window.getComputedStyle(activePanel).display !== "none"
-                : false,
-            });
-          }, 50);
-        });
-      },
-      /* eslint-enable no-undef */
-      { id: tabId, panelClass: panelClassMap[tabId] },
-    );
-
-    const pass = result.tabIsActive && result.panelIsActive && result.panelVisible;
-    allTabsWork = allTabsWork && pass;
-    console.log(`  ${pass ? "✓" : "✗"} ${tabId}: ${pass ? "PASS" : "FAIL"}`);
-    if (!pass) {
-      console.log(
-        `    Tab active: ${result.tabIsActive}, Panel active: ${result.panelIsActive}, Panel visible: ${result.panelVisible}`,
-      );
+  const sectionResult = await page.evaluate(() => {
+    /* eslint-disable no-undef */
+    const visible = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return false;
+      return window.getComputedStyle(el).display !== "none";
+    };
+    const headings = [...document.querySelectorAll("h3")].map((el) => el.textContent.trim());
+    const order = [
+      "Skills",
+      "Attacks",
+      "Feats",
+      "Magic",
+      "Flaws",
+      "Traits",
+      "Gear and funds",
+      "Survival",
+      "Loyalty and details",
+    ];
+    let last = -1;
+    let orderOk = true;
+    for (const heading of order) {
+      const index = headings.indexOf(heading);
+      if (index < 0 || index < last) orderOk = false;
+      last = index;
     }
+    return {
+      noTabBar: document.querySelector(".pf-tabs") === null,
+      sheet: visible(".pf-sheet-content"),
+      survival: visible(".pf-survival"),
+      inventory: visible(".pf-inventory"),
+      magic: visible(".pf-magic"),
+      notes: visible('textarea[name="system.notes.special"]'),
+      shortRest: visible('[data-action="shortRest"]'),
+      createWeapon: visible('[data-type="weapon"]'),
+      awakened: visible('[name="system.magic.awakened"]'),
+      orderOk,
+      headings,
+    };
+    /* eslint-enable no-undef */
+  });
+
+  const sectionChecks = [
+    ["no tab bar", sectionResult.noTabBar],
+    ["sheet", sectionResult.sheet],
+    ["survival", sectionResult.survival],
+    ["inventory", sectionResult.inventory],
+    ["magic", sectionResult.magic],
+    ["notes", sectionResult.notes],
+    ["short rest", sectionResult.shortRest],
+    ["create weapon", sectionResult.createWeapon],
+    ["awakened", sectionResult.awakened],
+    ["section order", sectionResult.orderOk],
+  ];
+  let allTabsWork = true;
+  for (const [label, pass] of sectionChecks) {
+    allTabsWork = allTabsWork && pass;
+    console.log(`  ${pass ? "✓" : "✗"} ${label}: ${pass ? "PASS" : "FAIL"}`);
+  }
+  if (!sectionResult.orderOk) {
+    console.log(`    Headings: ${sectionResult.headings.join(" | ")}`);
   }
 
   // Test 3: Contrast ratios
@@ -784,7 +784,7 @@ async function runTests() {
     return {
       skillName: getColorAndBg(".pf-skills label span"),
       skillModifier: getColorAndBg(".pf-skills .pf-small"),
-      activeTab: getColorAndBg(".pf-tabs a.active"),
+      sectionHeading: getColorAndBg(".pf-print h3"),
       abilityLabel: getColorAndBg(".pf-ab b"),
     };
     /* eslint-enable no-undef */
@@ -817,14 +817,324 @@ async function runTests() {
     }
   }
 
+  console.log("\nTest 4: Print sheet measurements");
+  const printFailed = !(await assertPrintSheet(page, "light"));
+  const darkHtml = generateHTML("theme-dark", content, 900);
+  await page.setContent(darkHtml);
+  await page.setViewportSize({ width: 980, height: 800 });
+  const darkFailed = !(await assertPrintSheet(page, "dark"));
+
   await browser.close();
 
   console.log("\n=== Tests Complete ===\n");
 
-  if (!allTabsWork || contrastFailed) {
+  if (!allTabsWork || contrastFailed || printFailed || darkFailed) {
     console.error("✗ Some tests FAILED");
     process.exit(1);
   }
+}
+
+async function assertPrintSheet(page, label) {
+  const measured = await page.evaluate(() => {
+    /* eslint-disable no-undef */
+    const styleOf = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return null;
+      const style = window.getComputedStyle(el);
+      return {
+        fontSize: style.fontSize,
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        textTransform: style.textTransform,
+        letterSpacing: style.letterSpacing,
+        borderBottomWidth: style.borderBottomWidth,
+        borderBottomStyle: style.borderBottomStyle,
+        listStyleType: style.listStyleType,
+        fontWeight: style.fontWeight,
+      };
+    };
+    const row = document.querySelector("table.pf-skills tr");
+    const evenRow = document.querySelector("table.pf-skills tr:nth-child(even)");
+    const speed = [...document.querySelectorAll(".pf-stat span")].find((el) =>
+      /m/i.test(el.textContent || ""),
+    );
+    const mark = document.querySelector(".pf-prof-mark");
+    const ability = document.querySelector("table.pf-skills td.pf-small");
+    const score = document.querySelector(".pf-ab-score");
+    const scoreStyle = score ? window.getComputedStyle(score) : null;
+    const hpInput = document.querySelector('input[name="system.attributes.hp.value"]');
+    const hpReadout = document.querySelector(".pf-hp-readout");
+    const hpStyle = hpReadout ? window.getComputedStyle(hpReadout) : null;
+    const hpLine = document.querySelector(".pf-hp-line");
+    const awakened = document.querySelector('input[name="system.magic.awakened"]');
+    const awakenedStyle = awakened ? window.getComputedStyle(awakened) : null;
+    const prime = document.querySelector(".pf-ab.pf-prime .pf-prime-toggle");
+    const primeInput = document.querySelector(".pf-prime-toggle input");
+    const emptyStar = document.querySelector(".pf-ab:not(.pf-prime) .pf-prime-mark");
+    const primeBox = document.querySelector(".pf-ab.pf-prime");
+    const skillCell = document.querySelector("table.pf-skills td");
+    const skillName = document.querySelector("table.pf-skills .pf-skill-name");
+    const skillCellStyle = skillCell ? window.getComputedStyle(skillCell) : null;
+    const skillNameStyle = skillName ? window.getComputedStyle(skillName) : null;
+    const modifier = document.querySelector("table.pf-skills td.pf-r .pf-roll");
+    const modifierStyle = modifier ? window.getComputedStyle(modifier) : null;
+    const initLine = document.querySelector(".pf-init-line");
+    const initButton = initLine?.querySelector("button") ?? null;
+    const initNote = initLine?.querySelector("span:last-child") ?? null;
+    const initButtonStyle = initButton ? window.getComputedStyle(initButton) : null;
+    const scoreSpin = score ? window.getComputedStyle(score, "::-webkit-inner-spin-button") : null;
+    const mp = document.querySelector('input[name="system.magic.mp.value"]');
+    const mpStyle = mp ? window.getComputedStyle(mp) : null;
+    const plus = document.querySelector('[data-type="magicStream"]');
+    const plusStyle = plus ? window.getComputedStyle(plus) : null;
+    const contentWidth = document.querySelector(".window-content")?.clientWidth ?? 0;
+    const headerWidth = document.querySelector(".pf-hdr")?.getBoundingClientRect().width ?? 0;
+    const vitalsWidth = document.querySelector(".pf-vitals")?.getBoundingClientRect().width ?? 0;
+    return {
+      paper: styleOf(".pf-print-wrap"),
+      window: styleOf(".window-content"),
+      body: styleOf(".pf-print"),
+      small: styleOf(".pf-print .pf-small"),
+      heading: styleOf(".pf-print h3"),
+      attacks: styleOf("table.pf-attacks thead"),
+      attacksHead: styleOf("table.pf-attacks thead th"),
+      skillStripe: evenRow ? window.getComputedStyle(evenRow).backgroundColor : "",
+      list: styleOf(".pf-print .pf-list"),
+      scoreShadow: scoreStyle ? scoreStyle.boxShadow : "",
+      scoreBorder: scoreStyle ? scoreStyle.borderTopWidth : "",
+      scoreFont: scoreStyle ? scoreStyle.fontFamily : "",
+      hpInput: Boolean(hpInput),
+      hpText: hpReadout ? hpReadout.textContent.replace(/\s+/g, " ").trim() : "",
+      hpFont: hpStyle ? hpStyle.fontFamily : "",
+      hpBorder: hpStyle ? hpStyle.borderTopWidth : "",
+      hpDamageHeal: Boolean(hpLine?.querySelector('[data-action="survivalRoll"]')),
+      awakenedAppearance: awakenedStyle ? awakenedStyle.appearance : "",
+      awakenedBorder: awakenedStyle ? awakenedStyle.borderTopWidth : "",
+      awakenedWidth: awakenedStyle ? awakenedStyle.width : "",
+      primeText: prime ? prime.textContent.replace(/\s+/g, " ").trim() : "",
+      primeWidth: primeInput ? window.getComputedStyle(primeInput).width : "",
+      emptyStar: emptyStar ? emptyStar.textContent : "",
+      primeFill: primeBox ? window.getComputedStyle(primeBox).backgroundColor : "",
+      skillCellBg: skillCellStyle ? skillCellStyle.backgroundColor : "",
+      skillCellAlign: skillCellStyle ? skillCellStyle.textAlign : "",
+      skillNameAlign: skillNameStyle ? skillNameStyle.textAlign : "",
+      skillNameColor: skillNameStyle ? skillNameStyle.color : "",
+      skillNameOffset:
+        skillName && skillCell
+          ? skillName.getBoundingClientRect().left - skillCell.getBoundingClientRect().left
+          : 999,
+      abilityColor: ability ? window.getComputedStyle(ability).color : "",
+      modifierWeight: modifierStyle ? modifierStyle.fontWeight : "",
+      modifierDeco: modifierStyle ? modifierStyle.textDecorationLine : "",
+      modifierAlign: modifier ? window.getComputedStyle(modifier.parentElement).textAlign : "",
+      initText: initButton ? initButton.textContent.replace(/\s+/g, " ").trim() : "",
+      initDeco: initButtonStyle ? initButtonStyle.textDecorationLine : "",
+      initSameLine:
+        initButton && initNote
+          ? Math.abs(
+              initButton.getBoundingClientRect().top - initNote.getBoundingClientRect().top,
+            ) < 8
+          : false,
+      initNarrow:
+        initButton && initLine
+          ? initButton.getBoundingClientRect().width < initLine.getBoundingClientRect().width * 0.5
+          : false,
+      scoreAppearance: scoreStyle ? scoreStyle.appearance : "",
+      mpAppearance: mpStyle ? mpStyle.appearance : "",
+      scoreSpinDisplay: scoreSpin ? scoreSpin.display : "",
+      mpReadouts: document.querySelectorAll(".pf-magic .pf-resource-actions span").length,
+      plusBg: plusStyle ? plusStyle.backgroundColor : "",
+      plusColor: plusStyle ? plusStyle.color : "",
+      plusWidth: plus ? plus.getBoundingClientRect().width : 0,
+      contentWidth,
+      headerWidth,
+      vitalsWidth,
+      speedText: speed ? speed.textContent.replace(/\s+/g, " ").trim() : "",
+      speedTransform: speed ? window.getComputedStyle(speed).textTransform : "",
+      rowHeight: row ? row.getBoundingClientRect().height : 0,
+      mark: mark ? mark.textContent : "",
+      ability: ability ? ability.textContent.trim() : "",
+      skillNameLefts: [...document.querySelectorAll(".pf-skills .pf-skill-name")]
+        .slice(0, 2)
+        .map((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return Math.round(range.getBoundingClientRect().left);
+        }),
+      attackBorder: (() => {
+        const head = document.querySelector(".pf-attacks th");
+        if (!head) return null;
+        const style = window.getComputedStyle(head);
+        return {
+          top: style.borderTopWidth,
+          right: style.borderRightWidth,
+          bottom: style.borderBottomStyle,
+          left: style.borderLeftWidth,
+        };
+      })(),
+      focusRing: (() => {
+        const readLabel = (input) => {
+          if (!input) return "";
+          const wasDisabled = input.disabled;
+          input.disabled = false;
+          input.focus({ focusVisible: true });
+          const outline = window.getComputedStyle(input.closest("label")).outline;
+          input.blur();
+          input.disabled = wasDisabled;
+          return outline;
+        };
+        const roll = document.querySelector("button.pf-roll");
+        if (roll) roll.focus({ focusVisible: true });
+        const rollOutline = roll ? window.getComputedStyle(roll).outlineStyle : "";
+        if (roll) roll.blur();
+        return {
+          prime: readLabel(document.querySelector(".pf-prime-toggle input")),
+          skill: readLabel(document.querySelector(".pf-skills .pf-check input")),
+          roll: rollOutline,
+        };
+      })(),
+      paperOffenders: (() => {
+        const allowed = new Set([
+          "rgba(0, 0, 0, 0)",
+          "rgb(255, 255, 255)",
+          "rgb(241, 220, 203)",
+          "rgb(138, 59, 18)",
+          "rgb(220, 235, 220)",
+          "rgb(47, 107, 58)",
+          "rgb(246, 234, 208)",
+          "rgb(154, 106, 0)",
+          "rgb(245, 217, 213)",
+          "rgb(161, 40, 30)",
+          "rgb(236, 227, 207)",
+        ]);
+        const offenders = [];
+        for (const el of document.querySelectorAll(".window-content, .window-content *")) {
+          const style = window.getComputedStyle(el);
+          const bg = style.backgroundColor;
+          const cls = typeof el.className === "string" ? el.className : "";
+          const label = `${el.tagName.toLowerCase()}${cls ? "." + cls.trim().split(/\s+/).slice(0, 2).join(".") : ""}`;
+          if (!allowed.has(bg)) {
+            offenders.push(`${label} ${bg}`);
+          }
+          if (
+            (el.tagName === "BUTTON" || el.tagName === "A") &&
+            style.textDecorationLine.includes("underline")
+          ) {
+            offenders.push(`${label} underline`);
+          }
+        }
+        return offenders.slice(0, 12);
+      })(),
+    };
+    /* eslint-enable no-undef */
+  });
+
+  const checks = [
+    ["paper background", measured.paper?.backgroundColor === "rgb(255, 255, 255)"],
+    ["window paper", measured.window?.backgroundColor === "rgb(255, 255, 255)"],
+    ["paper ink", measured.paper?.color === "rgb(28, 26, 22)"],
+    ["body 12px", measured.body?.fontSize === "12px"],
+    ["small 10.5px", measured.small?.fontSize === "10.5px"],
+    ["heading uppercase", measured.heading?.textTransform === "uppercase"],
+    ["heading 12px", measured.heading?.fontSize === "12px"],
+    ["heading rust", measured.heading?.color === "rgb(138, 59, 18)"],
+    ["heading rule", measured.heading?.borderBottomStyle === "solid"],
+    ["attacks white", measured.attacksHead?.backgroundColor === "rgb(255, 255, 255)"],
+    ["attacks ink", measured.attacksHead?.color === "rgb(28, 26, 22)"],
+    ["attacks plain", measured.attacksHead?.textTransform === "none"],
+    ["attacks size", measured.attacksHead?.fontSize === "11.5px"],
+    ["attacks rule", measured.attacksHead?.borderBottomStyle === "solid"],
+    ["attacks bold", Number(measured.attacksHead?.fontWeight) >= 700],
+    [
+      "skills unstriped",
+      measured.skillStripe === "rgba(0, 0, 0, 0)" || measured.skillStripe === "rgb(255, 255, 255)",
+    ],
+    ["skill cell white", measured.skillCellBg === "rgb(255, 255, 255)"],
+    ["skill name left", measured.skillCellAlign === "left" && measured.skillNameAlign === "left"],
+    ["skill name ink", measured.skillNameColor === "rgb(28, 26, 22)"],
+    ["skill ability muted", measured.abilityColor === "rgb(85, 85, 85)"],
+    [
+      "skill modifier",
+      Number(measured.modifierWeight) >= 700 &&
+        measured.modifierDeco === "none" &&
+        measured.modifierAlign === "right",
+    ],
+    [
+      "initiative line",
+      measured.initText === "Initiative +7" &&
+        measured.initDeco === "none" &&
+        measured.initSameLine === true &&
+        measured.initNarrow === true,
+    ],
+    ["empty star", measured.emptyStar === "☆"],
+    ["primary fill", measured.primeFill === "rgb(241, 220, 203)"],
+    [
+      "number fields",
+      measured.scoreAppearance === "textfield" && measured.mpAppearance === "textfield",
+    ],
+    ["mp once", measured.mpReadouts === 0],
+    [
+      "add button",
+      measured.plusBg === "rgb(138, 59, 18)" &&
+        measured.plusColor === "rgb(255, 255, 255)" &&
+        measured.plusWidth > 0 &&
+        measured.plusWidth < 48,
+    ],
+    ["score flat", measured.scoreShadow === "none" && measured.scoreBorder === "0px"],
+    ["score georgia", /Georgia/i.test(measured.scoreFont)],
+    [
+      "hp text",
+      measured.hpInput === false &&
+        measured.hpText === "47 / 71" &&
+        /Georgia/i.test(measured.hpFont) &&
+        measured.hpBorder === "0px" &&
+        measured.hpDamageHeal === true,
+    ],
+    [
+      "awakened box",
+      measured.awakenedAppearance === "none" &&
+        measured.awakenedBorder === "1px" &&
+        measured.awakenedWidth === "18px",
+    ],
+    ["primary star", measured.primeText === "★"],
+    ["primary control clipped", measured.primeWidth === "1px"],
+    [
+      "parts one width",
+      Math.abs(measured.headerWidth - measured.contentWidth) < 1 &&
+        Math.abs(measured.vitalsWidth - measured.contentWidth) < 1,
+    ],
+    ["bullets", measured.list?.listStyleType === "disc"],
+    ["speed lowercase", measured.speedText === "10 m"],
+    ["speed transform", measured.speedTransform === "none"],
+    ["skill marker", measured.mark === "●" || measured.mark === "○"],
+    ["ability case", measured.ability === "Str"],
+    ["skill row height", measured.rowHeight >= 16 && measured.rowHeight <= 24],
+    [
+      "skill names aligned",
+      measured.skillNameLefts?.length === 2 &&
+        measured.skillNameLefts[0] === measured.skillNameLefts[1],
+    ],
+    [
+      "attacks header rule",
+      measured.attackBorder?.top === "0px" &&
+        measured.attackBorder?.right === "0px" &&
+        measured.attackBorder?.left === "0px" &&
+        measured.attackBorder?.bottom === "solid",
+    ],
+    [
+      "focus rings",
+      measured.focusRing?.prime.includes("solid 2px") &&
+        measured.focusRing?.skill.includes("solid 2px"),
+    ],
+    ["paper surfaces", measured.paperOffenders?.length === 0],
+  ];
+  let ok = true;
+  for (const [name, pass] of checks) {
+    ok = ok && pass;
+    console.log(`  ${pass ? "✓" : "✗"} ${label} ${name}`);
+  }
+  if (!ok) console.log(`    ${label} measured ${JSON.stringify(measured)}`);
+  return ok;
 }
 
 runTests().catch((err) => {

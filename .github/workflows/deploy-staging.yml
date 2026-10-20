@@ -10,17 +10,22 @@ on:
 permissions:
   contents: read
   actions: read
+  statuses: write
 
 concurrency:
-  group: foundry-staging
+  group: foundry-e2e
   cancel-in-progress: false
 
 jobs:
   staging:
     name: Build server deploy and smoke
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: staging
@@ -29,10 +34,22 @@ jobs:
       PIVOT_FOUNDRY_BASE_URL: https://build.angryorcgames.com
       PIVOT_E2E_DESTRUCTIVE: "0"
     steps:
-      - name: Checkout
+      - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
+          path: trusted-gate
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/
+            /e2e/
+            /foundry/
+            /package.json
+            /package-lock.json
+
+      - name: License gate
+        run: bash trusted-gate/scripts/ci/e2e-gate.sh require
 
       - name: Check required staging secrets
         env:
@@ -66,29 +83,48 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: trusted-gate/package-lock.json
 
       - name: Install dependencies
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: npm ci
 
       - name: Download CI package artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: pivot-foundry-system
+          path: package-artifact
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id || github.run_id }}
 
+      - name: Accept the packaged files
+        run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip artifact-identity.json
+
+      - name: Read package version
+        id: package-version
+        run: |
+          version=$(bash trusted-gate/scripts/ci/package-version.sh trusted-gate/system.json)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Verify artifact identity
-        run: node scripts/artifact-identity.mjs && node -e '
-          const fs = require("fs");
-          const crypto = require("crypto");
-          const identity = JSON.parse(fs.readFileSync("artifact-identity.json","utf8"));
-          const sha = crypto.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex");
-          if (identity.artifact.sha256 !== sha) { console.error("Checksum mismatch"); process.exit(6); }
+        working-directory: trusted-gate
+        run: node --input-type=module -e '
+          import { readFileSync } from "node:fs";
+          import { fileSha256 } from "./scripts/artifact-identity.mjs";
+          const identity = JSON.parse(readFileSync("artifact-identity.json","utf8"));
+          const sha = fileSha256("system.zip");
+          if (identity.artifact?.sha256 !== sha) { console.error("Checksum mismatch"); process.exit(6); }
           console.log("Staging will deploy", identity.commit, sha);
           '
 
       - name: Install Playwright browser
-        # Needed by the isolated E2E below as well as the external staging smoke.
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
         run: npx playwright install chromium --with-deps
 
       - name: Run isolated Foundry E2E against the CI artifact
@@ -103,8 +139,19 @@ jobs:
           # assertSafeTarget refuses with "Refusing to reset the shared staging server" (exit 8).
           PIVOT_FOUNDRY_TARGET: e2e
           PIVOT_FOUNDRY_BASE_URL: ""
+        working-directory: trusted-gate
         run: |
-          # foundry:e2e rebuilds the zip; restore the exact CI bytes afterward if needed.
+          # Keep the packaged commit. The harness checkout is github.sha, which is not the CI head.
+          PIVOT_E2E_SUBJECT=$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const identity = JSON.parse(readFileSync("artifact-identity.json","utf8"));
+            if (!/^[0-9a-f]{40}$/.test(identity.commit || "")) {
+              console.error("Artifact identity has no commit");
+              process.exit(6);
+            }
+            process.stdout.write(identity.commit);
+          ')
+          export PIVOT_E2E_SUBJECT
           CI_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
           npm run foundry:e2e -- --skip-package
           NOW_SHA=$(node -e 'const fs=require("fs");const c=require("crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync("system.zip")).digest("hex"))')
@@ -119,14 +166,17 @@ jobs:
           FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR }}
           FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE }}
           PIVOT_DEPLOY_PUBLIC_URL: https://build.angryorcgames.com
+        working-directory: trusted-gate
         run: node scripts/deploy-package.mjs staging
 
       - name: Wait for the build server to come back after restart
         run: |
+          set -o pipefail
           for _ in $(seq 1 36); do
             if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
               let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
-                const s = JSON.parse(d || "{}");
+                if (!d.trim()) process.exit(1);
+                const s = JSON.parse(d);
                 process.exit(s.active === true ? 0 : 1);
               });'; then
               echo "Build server is active."
@@ -143,19 +193,28 @@ jobs:
           PIVOT_STAGING_GM_PASSWORD: ${{ secrets.PIVOT_STAGING_GM_PASSWORD }}
           PIVOT_STAGING_PLAYER_USER: ${{ secrets.PIVOT_STAGING_PLAYER_USER }}
           PIVOT_STAGING_PLAYER_PASSWORD: ${{ secrets.PIVOT_STAGING_PLAYER_PASSWORD }}
-          PIVOT_PACKAGE_VERSION: ${{ secrets.PIVOT_PACKAGE_VERSION }}
+          PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
+        working-directory: trusted-gate
         run: npm run test:e2e:staging
 
       - name: Record staging acceptance
+        working-directory: trusted-gate
         run: node scripts/record-acceptance.mjs staging
+
+      - name: Record the staging artifact sha
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PIVOT_CI_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: bash scripts/ci/record-staging-sha.sh "$PWD"
 
       - name: Upload staging-accepted artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-staging-accepted
           path: |
-            system.json
-            system.zip
-            artifact-identity.json
+            trusted-gate/system.json
+            trusted-gate/system.zip
+            trusted-gate/artifact-identity.json
           if-no-files-found: error
           retention-days: 30
