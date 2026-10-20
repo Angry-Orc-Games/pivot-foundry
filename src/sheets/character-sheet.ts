@@ -442,7 +442,6 @@ export function prepareCharacterSheetContext(
   // Calculate Con modifier for HP footnote
   const conMod = formatSigned(derived.abilities.con.mod);
 
-  // Build proficiency text
   const weaponProfs = derived.proficiencies.weapons;
   const weaponProfList = weaponCategories
     .filter((entry) => weaponProfs[entry.id])
