@@ -43,6 +43,21 @@
       <h3>Proficiencies</h3>
       <div class="pf-small">
         <div><b>Weapons:</b> {{proficiencyText.weapons}}</div>
+        {{#each weaponTrainingRows}}
+          <label class="pf-check" title="{{localize 'PIVOT.Actions.ToggleProficiency'}}">
+            <input
+              class="pf-sr"
+              type="checkbox"
+              name="{{path}}"
+              role="checkbox"
+              aria-label="Proficient in {{label}}"
+              {{checked proficient}}
+              {{disabledAttr}}
+            />
+            <span class="pf-prof-mark" aria-hidden="true">{{#if proficient}}●{{else}}○{{/if}}</span>
+            <span>{{label}}</span>
+          </label>
+        {{/each}}
         <div><b>Armour:</b> {{proficiencyText.armour}}</div>
         <div><b>Shields:</b> {{proficiencyText.shields}}</div>
       </div>

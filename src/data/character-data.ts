@@ -1,4 +1,5 @@
 import { abilities, canonicalSkills } from "../config";
+import { weaponCategories } from "../rules/item-choices";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 import { abilityModifier } from "../rules/modifiers";
 import {
@@ -211,16 +212,15 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
           }),
           shields: booleanField(fields, { required: true, initial: false }),
           instruments: arrayField(fields, stringField(fields, { required: true, initial: "" })),
-          weapons: schemaField(fields, {
-            meleeLight: booleanField(fields, { required: true, initial: false }),
-            meleeMedium: booleanField(fields, { required: true, initial: false }),
-            meleeHeavy: booleanField(fields, { required: true, initial: false }),
-            meleeTwoHandedHeavy: booleanField(fields, { required: true, initial: false }),
-            bows: booleanField(fields, { required: true, initial: false }),
-            crossbows: booleanField(fields, { required: true, initial: false }),
-            thrown: booleanField(fields, { required: true, initial: false }),
-            improvised: booleanField(fields, { required: true, initial: false }),
-          }),
+          weapons: schemaField(
+            fields,
+            Object.fromEntries(
+              weaponCategories.map((entry) => [
+                entry.id,
+                booleanField(fields, { required: true, initial: false }),
+              ]),
+            ),
+          ),
         }),
         currency: schemaField(fields, {
           gp: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),

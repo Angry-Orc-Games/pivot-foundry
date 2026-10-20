@@ -1,9 +1,15 @@
+import {
+  FIELD_MIGRATION_ID,
+  planSlingsProficiencyMigration,
+  planWeaponFieldItemMigration,
+} from "./m004";
 import { planSurvivalMigration } from "./m002";
 import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
 import {
   planActorMigration,
   planItemMigration,
   SCHEMA_MIGRATION_ID,
+  type MigrationNotice,
   type MigrationPlan,
 } from "./m001";
 
@@ -72,7 +78,7 @@ export async function runWorldMigrations(
     const stored = readStoredSystem(document);
     return {
       document,
-      plan: combineItemMigrations(stored),
+      plan: combineItemMigrations(stored, document.type),
     };
   });
   for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
@@ -83,7 +89,7 @@ export async function runWorldMigrations(
     for (const item of listDocuments(actor.items)) {
       planned.push({
         document: item,
-        plan: combineItemMigrations(readStoredSystem(item)),
+        plan: combineItemMigrations(readStoredSystem(item), item.type),
       });
     }
   }
@@ -97,7 +103,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
+        id: `${SCHEMA_MIGRATION_ID} / M002 / M003 / ${FIELD_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -138,6 +144,7 @@ async function persistMigration(
     reportFailure(document, plan.error, dependencies);
     return { updated: 0, failed: 1 };
   }
+  reportNotices(document, plan.notices, dependencies);
   if (!plan.changed) return { updated: 0, failed: 0 };
 
   try {
@@ -148,6 +155,22 @@ async function persistMigration(
     const message = error instanceof Error ? error.message : String(error);
     reportFailure(document, message, dependencies);
     return { updated: 0, failed: 1 };
+  }
+}
+
+function reportNotices(
+  document: MigratableDocument,
+  notices: readonly MigrationNotice[] | undefined,
+  dependencies: WorldMigrationDependencies,
+): void {
+  if (!notices?.length) return;
+  const name = document.name ?? document.id ?? "unknown";
+  for (const notice of notices) {
+    const data: Record<string, string> = { name, field: notice.field, from: notice.from };
+    if (notice.to !== undefined) data.to = notice.to;
+    const message = formatMessage(notice.key, data, dependencies);
+    dependencies.notify?.("warn", message);
+    dependencies.log?.(message);
   }
 }
 
@@ -192,34 +215,41 @@ function formatMessage(
 export function planAllActorMigrations(source: unknown, type?: string): MigrationPlan {
   const first = planActorMigration(source);
   if (!first.ok || (type && type !== "character")) return first;
-  const second = planSurvivalMigration(source);
-  if (!second.ok) return second;
-  const third = planSchemaV2ActorMigration(source);
-  if (!third.ok) return third;
-  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
-  return {
-    ok: true,
-    changed: true,
-    update: {
-      ...(first.changed ? first.update : {}),
-      ...(second.changed ? second.update : {}),
-      ...(third.changed ? third.update : {}),
-    },
-  };
+  return concatPlans([
+    first,
+    planSurvivalMigration(source),
+    planSchemaV2ActorMigration(source),
+    planSlingsProficiencyMigration(source),
+  ]);
 }
 
-function combineItemMigrations(source: unknown): MigrationPlan {
+function combineItemMigrations(source: unknown, type?: string): MigrationPlan {
   const first = planItemMigration(source);
   if (!first.ok) return first;
-  const second = planSchemaV2ItemMigration(source);
-  if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
-  return {
-    ok: true,
-    changed: true,
-    update: {
-      ...(first.changed ? first.update : {}),
-      ...(second.changed ? second.update : {}),
-    },
-  };
+  return concatPlans([
+    first,
+    planSchemaV2ItemMigration(source),
+    planWeaponFieldItemMigration(source, type),
+  ]);
+}
+
+function concatPlans(plans: readonly MigrationPlan[]): MigrationPlan {
+  const update: Record<string, unknown> = {};
+  const notices: MigrationNotice[] = [];
+  let changed = false;
+  for (const plan of plans) {
+    if (!plan.ok) return plan;
+    if (plan.notices?.length) notices.push(...plan.notices);
+    if (!plan.changed) continue;
+    changed = true;
+    Object.assign(update, plan.update);
+  }
+  if (!changed) {
+    return notices.length > 0
+      ? { ok: true, changed: false, notices }
+      : { ok: true, changed: false };
+  }
+  return notices.length > 0
+    ? { ok: true, changed: true, update, notices }
+    : { ok: true, changed: true, update };
 }
