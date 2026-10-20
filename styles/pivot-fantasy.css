@@ -503,10 +503,14 @@
   color: var(--pf-warn);
 }
 
-.pf-status.dead,
 .pf-status.unconfirmed {
   background: var(--pf-chip);
   color: var(--pf-muted);
+}
+
+.pf-status.dead {
+  background: var(--pf-ink);
+  color: var(--pf-accent-ink);
 }
 
 .pf-temp-hp {
@@ -1851,6 +1855,21 @@
   .pivot-fantasy.sheet.actor.character
   .window-content
   .pf-print
+  table.pf-skills
+  .pf-check:not(:has(input:checked))
+  .pf-prof-mark {
+  border: 2px solid #1c1a16;
+  border-radius: 50%;
+  box-sizing: border-box;
+  color: transparent;
+  height: 1.1em;
+  width: 1.1em;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
   button.pf-roll {
   background: transparent;
   color: #1c1a16;
@@ -2223,14 +2242,18 @@
   .pivot-fantasy.sheet.actor.character
   .window-content
   .pf-print
-  .pf-status.dead,
+  .pf-status.unconfirmed {
+  background: #ece3cf;
+  color: #555;
+}
+
 :is(body, body.theme-dark, body.theme-light)
   .pivot-fantasy.sheet.actor.character
   .window-content
   .pf-print
-  .pf-status.unconfirmed {
-  background: #ece3cf;
-  color: #555;
+  .pf-status.dead {
+  background: #1c1a16;
+  color: #fff;
 }
 
 :is(body, body.theme-dark, body.theme-light)
