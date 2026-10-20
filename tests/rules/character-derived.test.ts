@@ -297,6 +297,31 @@ describe("calculateArmourClass", () => {
     expect(naturalWins.value).toBe(18);
     expect(naturalWins.breakdown[0]).toBe("Carapace 18");
   });
+
+  it("adds Dexterity to a natural armour base", () => {
+    const carapace = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Chitinous Carapace", category: "natural", acBonus: 12, equipped: true }],
+    });
+    const furry = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Furry", category: "natural", acBonus: 11, equipped: true }],
+    });
+    const thickHide = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Thick Hide", category: "natural", acBonus: 12, equipped: true }],
+    });
+
+    expect(carapace).toEqual({
+      value: 15,
+      armourWorn: "Chitinous Carapace",
+      breakdown: ["Chitinous Carapace 12", "Dex +3"],
+    });
+    expect(furry.value).toBe(14);
+    expect(furry.breakdown).toEqual(["Furry 11", "Dex +3"]);
+    expect(thickHide.value).toBe(15);
+    expect(thickHide.breakdown).toEqual(["Thick Hide 12", "Dex +3"]);
+  });
 });
 
 describe("calculateTotalWeight", () => {
