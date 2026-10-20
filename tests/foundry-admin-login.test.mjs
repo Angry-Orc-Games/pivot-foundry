@@ -1,3 +1,7 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { authenticateSetup, ensureE2EWorld } from "../e2e/helpers/foundry.ts";
@@ -201,6 +205,47 @@ describe("Foundry administrator login", () => {
     expect(error?.message).toBe(MISSING_SCREEN);
     expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
     expect(page.events).toEqual([]);
+  });
+
+  it("reports an exception thrown while waiting for the administrator field", async () => {
+    const page = lateAdminPage({ adminAfterMs: 0, setupAfterSubmit: true });
+    const password = page.locator();
+    password.waitFor = async () => {
+      throw new Error("Must start tracing before stopping");
+    };
+    let error;
+    try {
+      await authenticateSetup(page, ADMIN_KEY);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error?.message).toBe("Must start tracing before stopping");
+    expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
+  });
+
+  it("records license, eula, and admin without the administrator key", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pivot-auth-steps-"));
+    const marker = join(dir, "setup-failure.txt");
+    const previous = process.env.PIVOT_E2E_SETUP_FAILURE;
+    process.env.PIVOT_E2E_SETUP_FAILURE = marker;
+    const previousEula = process.env.FOUNDRY_E2E_ACCEPT_EULA;
+    process.env.FOUNDRY_E2E_ACCEPT_EULA = "1";
+    const page = eulaThenAdminPage();
+    try {
+      await ensureE2EWorld(page, ADMIN_KEY);
+    } finally {
+      if (previous === undefined) delete process.env.PIVOT_E2E_SETUP_FAILURE;
+      else process.env.PIVOT_E2E_SETUP_FAILURE = previous;
+      if (previousEula === undefined) delete process.env.FOUNDRY_E2E_ACCEPT_EULA;
+      else process.env.FOUNDRY_E2E_ACCEPT_EULA = previousEula;
+    }
+    const log = await readFile(join(dir, "auth-steps.log"), "utf8").catch(() => "");
+    await rm(dir, { recursive: true, force: true });
+
+    expect(log).toBe("license\nadmin\neula\nadmin\n");
+    expect(log).not.toContain(ADMIN_KEY);
+    expect(page.events.join(" ")).not.toContain(ADMIN_KEY);
   });
 
   it("signs in when the admin field appears after the agreement", async () => {
