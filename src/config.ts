@@ -57,17 +57,4 @@ export const featureCategories = [
   "other",
 ];
 
-export const weaponCategories = [
-  "meleeLight",
-  "meleeMedium",
-  "meleeHeavy",
-  "meleeTwoHandedHeavy",
-  "bows",
-  "crossbows",
-  "thrown",
-  "improvised",
-] as const;
-
-export const armourCategories = ["light", "medium", "heavy", "shield", "helmet", "other"] as const;
-
 export const hitDice = ["d4", "d6", "d8", "d10", "d12"] as const;

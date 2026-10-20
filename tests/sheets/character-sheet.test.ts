@@ -110,6 +110,24 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.items.weapons).toEqual([]);
   });
 
+  it("lists Slings in weapon proficiency text only when the actor flag is true", () => {
+    const trained = prepareCharacterSheetContext({
+      name: "Slinger",
+      type: "character",
+      system: { proficiencies: { weapons: { slings: true } } },
+      items: [],
+    });
+    const untrained = prepareCharacterSheetContext({
+      name: "Slinger",
+      type: "character",
+      system: { proficiencies: { weapons: { slings: false } } },
+      items: [],
+    });
+
+    expect(trained.proficiencyText.weapons).toContain("Slings");
+    expect(untrained.proficiencyText.weapons).not.toContain("Slings");
+  });
+
   it("displays existing actor data and embedded item calculations", () => {
     const context = prepareCharacterSheetContext(sampleActor());
 

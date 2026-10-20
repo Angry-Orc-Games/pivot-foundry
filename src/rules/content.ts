@@ -1,5 +1,12 @@
 import { itemTypes, SYSTEM_ID } from "../config";
 import { validateEffectRule, type EffectRule } from "./effects";
+import {
+  isArmourCategoryId,
+  isAttackAbilityId,
+  isDamageAbilityId,
+  isDamageTypeId,
+  isWeaponCategoryId,
+} from "./item-choices";
 import { CURRENT_SCHEMA_VERSION } from "./schema-version";
 
 export const CONTENT_PACK_ITEM_IMG = "icons/svg/item-bag.svg";
@@ -175,8 +182,16 @@ function validateItemSystem(value: unknown, type: PivotItemType): ContentItemSys
   };
 
   if (value.notes !== undefined) system.notes = requirePlainString(value.notes, "notes");
-  if (value.category !== undefined)
-    system.category = requirePlainString(value.category, "category");
+  if (value.category !== undefined) {
+    const category = requirePlainString(value.category, "category");
+    if (type === "weapon" && !isWeaponCategoryId(category)) {
+      throw new Error(`Unknown weapon category: ${category}`);
+    }
+    if (type === "armour" && !isArmourCategoryId(category)) {
+      throw new Error(`Unknown armour category: ${category}`);
+    }
+    system.category = category;
+  }
   if (value.source !== undefined) system.source = requirePlainString(value.source, "source");
   if (value.ability !== undefined) system.ability = requirePlainString(value.ability, "ability");
   if (value.stream !== undefined) system.stream = requirePlainString(value.stream, "stream");
@@ -262,8 +277,11 @@ function requireAttack(value: unknown): { ability?: string; bonus?: number } {
   if (!isPlainObject(value)) throw new Error("attack must be a plain object.");
   assertAllowedKeys(value, new Set(["ability", "bonus"]), "attack");
   const attack: { ability?: string; bonus?: number } = {};
-  if (value.ability !== undefined)
-    attack.ability = requirePlainString(value.ability, "attack.ability");
+  if (value.ability !== undefined) {
+    const ability = requirePlainString(value.ability, "attack.ability");
+    if (!isAttackAbilityId(ability)) throw new Error(`Unknown attack ability: ${ability}`);
+    attack.ability = ability;
+  }
   if (value.bonus !== undefined) attack.bonus = requireFiniteInteger(value.bonus, "attack.bonus");
   return attack;
 }
@@ -285,10 +303,16 @@ function requireDamage(value: unknown): {
   if (value.formula !== undefined) {
     damage.formula = requirePlainString(value.formula, "damage.formula");
   }
-  if (value.type !== undefined) damage.type = requirePlainString(value.type, "damage.type");
+  if (value.type !== undefined) {
+    const damageType = requirePlainString(value.type, "damage.type");
+    if (!isDamageTypeId(damageType)) throw new Error(`Unknown damage type: ${damageType}`);
+    damage.type = damageType;
+  }
   if (value.ability === null) damage.ability = null;
   else if (value.ability !== undefined) {
-    damage.ability = requirePlainString(value.ability, "damage.ability");
+    const ability = requirePlainString(value.ability, "damage.ability");
+    if (!isDamageAbilityId(ability)) throw new Error(`Unknown damage ability: ${ability}`);
+    damage.ability = ability;
   }
   if (value.bonus !== undefined) damage.bonus = requireFiniteInteger(value.bonus, "damage.bonus");
   return damage;

@@ -476,4 +476,57 @@ describe("character sheet template structure", () => {
     expect(template).toContain('class="pf-abil"');
     expect(template).toContain('class="{{abilityClass}}"');
   });
+
+  it("renders a Slings training checkbox between Crossbows and Thrown Weapons", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character/sheet.hbs");
+    const source = readFileSync(templatePath, "utf-8");
+    const start = source.indexOf("{{#each weaponTrainingRows}}");
+    expect(start).toBeGreaterThan(-1);
+    const block = source.slice(start, source.indexOf("{{/each}}", start));
+    expect(block).toContain("pf-check");
+    expect(block).toContain("pf-sr");
+    expect(block).toContain("pf-prof-mark");
+    expect(block).toContain("{{checked proficient}}");
+    expect(block).toContain("{{disabledAttr}}");
+
+    const render = Handlebars.compile(source);
+    const context = prepareCharacterSheetContext({
+      name: "Slinger",
+      type: "character",
+      system: {
+        proficiencies: {
+          weapons: { bows: true, crossbows: true, slings: true, thrown: true },
+        },
+      },
+      items: [],
+    });
+    const dom = new JSDOM(render(context)).window.document;
+    const inputs = [...dom.querySelectorAll('input[name^="system.proficiencies.weapons."]')];
+    expect(inputs.map((input) => input.getAttribute("name"))).toEqual([
+      "system.proficiencies.weapons.meleeLight",
+      "system.proficiencies.weapons.meleeMedium",
+      "system.proficiencies.weapons.meleeHeavy",
+      "system.proficiencies.weapons.meleeTwoHandedHeavy",
+      "system.proficiencies.weapons.improvised",
+      "system.proficiencies.weapons.bows",
+      "system.proficiencies.weapons.crossbows",
+      "system.proficiencies.weapons.slings",
+      "system.proficiencies.weapons.thrown",
+    ]);
+    expect(inputs.map((input) => input.getAttribute("aria-label"))).toEqual([
+      "Proficient in Light Melee",
+      "Proficient in Medium Melee",
+      "Proficient in Heavy Melee",
+      "Proficient in Two-Handed Heavy Melee",
+      "Proficient in Improvised",
+      "Proficient in Bows",
+      "Proficient in Crossbows",
+      "Proficient in Slings",
+      "Proficient in Thrown Weapons",
+    ]);
+    const slings = dom.querySelector('input[name="system.proficiencies.weapons.slings"]');
+    expect(slings?.classList.contains("pf-sr")).toBe(true);
+    expect(slings?.closest("label")?.classList.contains("pf-check")).toBe(true);
+    expect(slings?.parentElement?.querySelector(".pf-prof-mark")).toBeTruthy();
+  });
 });
