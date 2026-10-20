@@ -515,6 +515,72 @@ describe("character sheet template structure", () => {
     expect(Number.parseFloat(labelStyle.minHeight)).toBeGreaterThanOrEqual(20);
   });
 
+  it("draws the filled proficiency mark at the same outer size as the empty ring", () => {
+    const css = [
+      readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
+      readFileSync(resolve(process.cwd(), "styles/pivot-fantasy.css"), "utf-8"),
+    ].join("\n");
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head><style>${css}</style></head>
+      <body class="theme-light"><form class="application pivot-fantasy pf-sheet sheet actor character">
+        <section class="window-content"><article class="pf-print">
+          <table class="pf-skills"><tbody>
+            <tr><td><label class="pf-check"><input class="pf-sr" type="checkbox" /><span class="pf-prof-mark">○</span></label></td></tr>
+            <tr><td><label class="pf-check"><input class="pf-sr" type="checkbox" checked /><span class="pf-prof-mark">●</span></label></td></tr>
+          </tbody></table>
+        </article></section></form></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const empty = dom.window.document.querySelector(
+      "label.pf-check:not(:has(input:checked)) .pf-prof-mark",
+    );
+    const filled = dom.window.document.querySelector(
+      "label.pf-check:has(input:checked) .pf-prof-mark",
+    );
+    const box = (style) => ({
+      width: style.width,
+      height: style.height,
+      boxSizing: style.boxSizing,
+      borderTopWidth: style.borderTopWidth,
+      borderRightWidth: style.borderRightWidth,
+      borderBottomWidth: style.borderBottomWidth,
+      borderLeftWidth: style.borderLeftWidth,
+    });
+    expect(box(dom.window.getComputedStyle(filled))).toEqual(
+      box(dom.window.getComputedStyle(empty)),
+    );
+  });
+
+  it("keeps rendered skills alphabetical after a proficiency toggle", () => {
+    const sheet = Handlebars.compile(
+      readFileSync(resolve(process.cwd(), "templates/actors/character/sheet.hbs"), "utf-8"),
+    );
+    const actor = {
+      name: "Toggle",
+      type: "character",
+      system: {
+        skills: {
+          acrobatics: { ability: "dex", proficient: false },
+          alchemy: { ability: "int", proficient: false },
+        },
+      },
+      items: [],
+    };
+    const labels = () => {
+      const document = new JSDOM(sheet(prepareCharacterSheetContext(actor))).window.document;
+      return [...document.querySelectorAll("table.pf-skills button.pf-skill-name")].map((button) =>
+        button.textContent?.replace(/\s+/g, " ").trim(),
+      );
+    };
+    const before = labels();
+    actor.system.skills.alchemy.proficient = true;
+    const after = labels();
+    expect(after).toEqual([...after].sort((left, right) => left.localeCompare(right)));
+    expect(after.indexOf("Acrobatics")).toBeLessThan(after.indexOf("Alchemy"));
+    expect(after).toEqual(before);
+  });
+
   it("underlines the skill name on hover", () => {
     const css = [
       readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
