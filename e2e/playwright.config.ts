@@ -22,7 +22,7 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 20_000 },
   forbidOnly: !!process.env.CI,
-  reporter: [["list"], ["html", { open: "never", outputFolder: "../playwright-report" }]],
+  reporter: [["list"], ["json", { outputFile: "../playwright-report/results.json" }]],
   outputDir: "../test-results",
   use: {
     baseURL,

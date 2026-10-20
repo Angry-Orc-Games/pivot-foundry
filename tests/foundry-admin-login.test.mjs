@@ -36,6 +36,11 @@ function lateAdminPage({ adminAfterMs = null, setupAfterSubmit = false } = {}) {
       sawKey = value === ADMIN_KEY;
       events.push("filled");
     },
+    async evaluate(_fn, value) {
+      if (value === "") return;
+      sawKey = value === ADMIN_KEY;
+      events.push("filled");
+    },
     async press(key) {
       events.push(`press:${key}`);
     },
@@ -85,10 +90,10 @@ function lateAdminPage({ adminAfterMs = null, setupAfterSubmit = false } = {}) {
   };
 }
 
-function eulaThenAdminPage() {
+function eulaThenAdminPage({ phase: initialPhase = "eula" } = {}) {
   const events = [];
   let sawKey = false;
-  let phase = "eula";
+  let phase = initialPhase;
   let notedEula = false;
   const password = {
     first() {
@@ -101,6 +106,11 @@ function eulaThenAdminPage() {
       if (phase !== "admin") throw new Error("admin hidden");
     },
     async fill(value) {
+      if (value === "") return;
+      sawKey = value === ADMIN_KEY;
+      events.push("filled");
+    },
+    async evaluate(_fn, value) {
       if (value === "") return;
       sawKey = value === ADMIN_KEY;
       events.push("filled");
@@ -281,5 +291,77 @@ describe("Foundry administrator login", () => {
     expect(page.events).toEqual(["eula", "agree", "filled", "submit", "setup-visible"]);
     expect(page.sawKey()).toBe(true);
     expect(page.events.join(" ")).not.toContain(ADMIN_KEY);
+  });
+
+  it("signs in on a live page when the post-EULA admin wait loses its page", async () => {
+    const previous = process.env.FOUNDRY_E2E_ACCEPT_EULA;
+    process.env.FOUNDRY_E2E_ACCEPT_EULA = "1";
+    const replacement = eulaThenAdminPage({ phase: "admin" });
+    const page = eulaThenAdminPage();
+    let closed = false;
+    page.isClosed = () => closed;
+    const password = page.locator();
+    const originalWait = password.waitFor.bind(password);
+    password.waitFor = async () => {
+      if (page.events.includes("agree") && !closed) {
+        closed = true;
+        throw new Error("locator.waitFor: Target page, context or browser has been closed");
+      }
+      return originalWait();
+    };
+    const context = {
+      pages() {
+        return closed ? [page, replacement] : [page];
+      },
+    };
+    page.context = () => context;
+    replacement.context = () => context;
+    replacement.isClosed = () => false;
+    try {
+      await ensureE2EWorld(page, ADMIN_KEY);
+    } finally {
+      if (previous === undefined) delete process.env.FOUNDRY_E2E_ACCEPT_EULA;
+      else process.env.FOUNDRY_E2E_ACCEPT_EULA = previous;
+    }
+
+    expect(replacement.sawKey()).toBe(true);
+    expect(replacement.events).toEqual(["filled", "submit", "setup-visible"]);
+    expect(replacement.events.join(" ")).not.toContain(ADMIN_KEY);
+  });
+
+  it("reports the context error when the browser is gone after the EULA", async () => {
+    const previous = process.env.FOUNDRY_E2E_ACCEPT_EULA;
+    process.env.FOUNDRY_E2E_ACCEPT_EULA = "1";
+    const page = eulaThenAdminPage();
+    let closed = false;
+    page.isClosed = () => closed;
+    const password = page.locator();
+    const originalWait = password.waitFor.bind(password);
+    password.waitFor = async () => {
+      if (page.events.includes("agree") && !closed) {
+        closed = true;
+        throw new Error("locator.waitFor: Target page, context or browser has been closed");
+      }
+      return originalWait();
+    };
+    page.context = () => ({
+      pages() {
+        throw new Error("browserContext.pages: Target page, context or browser has been closed");
+      },
+    });
+    let error;
+    try {
+      await ensureE2EWorld(page, ADMIN_KEY);
+    } catch (caught) {
+      error = caught;
+    } finally {
+      if (previous === undefined) delete process.env.FOUNDRY_E2E_ACCEPT_EULA;
+      else process.env.FOUNDRY_E2E_ACCEPT_EULA = previous;
+    }
+
+    expect(error?.message).toBe(
+      "browserContext.pages: Target page, context or browser has been closed",
+    );
+    expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
   });
 });

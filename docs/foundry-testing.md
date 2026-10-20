@@ -68,8 +68,8 @@ Staging checks HTTPS, WebSocket, package version, and GM/player login against th
 
 ## Debugging
 
-- HTML report: `playwright-report/` (gitignored)
-- Screenshots: `test-results/` on failure. Playwright traces are off. An auth failure clears password fields before a shot.
+- JSON report: `playwright-report/results.json` (gitignored). The HTML reporter is off, so there is no `index.html` with an embedded zip.
+- Screenshots: `test-results/` on failure. Playwright traces are off. Password fields are set with `fillSecret`, which does not put the value in a step title. An auth failure clears password fields before a shot.
 - Server logs: `.foundry/instances/<id>/diagnostics/foundry.log` (license keys redacted, EULA signature kept) and `auth-steps.log` (phase names only)
 
 Do not commit traces that include session cookies. Do not upload Foundry binaries or `foundry-dist/` as CI artifacts.

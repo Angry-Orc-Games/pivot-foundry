@@ -19,8 +19,8 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext();
   attachErrorSink(context);
-  const page = await context.newPage();
-  await ensureE2EWorld(page, adminKey);
+  let page = await context.newPage();
+  page = await ensureE2EWorld(page, adminKey);
   await joinAs(page, { name: "Gamemaster" });
   await expectPackageIdentity(page);
   await createPlayerUser(page, playerName, playerPassword);

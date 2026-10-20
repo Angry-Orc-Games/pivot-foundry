@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -109,6 +110,75 @@ describe("E2E artifact credential scan", () => {
         "compose.env",
       );
       expect(credentialLeakMessage("compose.env")).not.toContain(FAKE_SECRET);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("finds a credential inside a base64 zip embedded in html", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-scan-"));
+    try {
+      const zip = await zipTrace(dir, "nested.zip", `Fill "${FAKE_SECRET}"`);
+      const encoded = (await readFile(zip)).toString("base64");
+      await rm(zip);
+      await writeFile(
+        join(dir, "index.html"),
+        `<template id="playwrightReportBase64">data:application/zip;base64,${encoded}</template>`,
+      );
+      expect(scanTree(dir, [FAKE_SECRET])).toBe("index.html");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("finds a base64 and url-encoded credential that is not stored in plaintext", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-scan-"));
+    const secret = "scan/key value";
+    try {
+      await writeFile(join(dir, "encoded.txt"), Buffer.from(secret).toString("base64"));
+      await writeFile(join(dir, "url.txt"), "scan%2Fkey%20value");
+      expect(scanTree(dir, [secret])).not.toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("finds a credential inside a zip that is stored inside another zip", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-scan-"));
+    try {
+      const inner = join(dir, "inner.zip");
+      const packedInner = spawnSync("python3", [
+        "-c",
+        "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9); z.writestr('secret.txt', sys.argv[2]); z.close()",
+        inner,
+        FAKE_SECRET,
+      ]);
+      if (packedInner.status !== 0) throw new Error("inner zip failed");
+      const innerBytes = await readFile(inner);
+      expect(innerBytes.includes(FAKE_SECRET)).toBe(false);
+      const outer = join(dir, "outer.zip");
+      const packed = spawnSync("python3", [
+        "-c",
+        "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9); z.write(sys.argv[2], 'inner.zip'); z.close()",
+        outer,
+        inner,
+      ]);
+      if (packed.status !== 0) throw new Error("outer zip failed");
+      await rm(inner);
+      expect(scanTree(dir, [FAKE_SECRET])).toBe("outer.zip");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when an html data blob cannot be decoded", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-scan-"));
+    try {
+      await writeFile(
+        join(dir, "index.html"),
+        `<template>data:application/zip;base64,!!!!</template>`,
+      );
+      expect(() => scanTree(dir, [FAKE_SECRET])).toThrow(/Could not scan index\.html/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -23,6 +23,9 @@ function tracedAdminPage(trace) {
     async fill(value) {
       if (trace.recording() && value === ADMIN_KEY) leaked = true;
     },
+    async evaluate(_fn, value) {
+      if (trace.recording() && value === ADMIN_KEY) leaked = true;
+    },
     async press() {},
   };
   return {
@@ -80,6 +83,9 @@ function tracedJoinPage(trace) {
     locator() {
       const field = {
         async fill(value) {
+          if (trace.recording() && value === ADMIN_KEY) leaked = true;
+        },
+        async evaluate(_fn, value) {
           if (trace.recording() && value === ADMIN_KEY) leaked = true;
         },
       };
@@ -216,6 +222,9 @@ describe("Foundry traces stay off", () => {
       },
       async waitFor() {},
       async fill(value) {
+        filled = value === ADMIN_KEY;
+      },
+      async evaluate(_fn, value) {
         filled = value === ADMIN_KEY;
       },
       async count() {

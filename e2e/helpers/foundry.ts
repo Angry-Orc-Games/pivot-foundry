@@ -2,7 +2,14 @@ import { Buffer } from "node:buffer";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 
 import { handleFoundryEula } from "../../scripts/foundry-setup.mjs";
 
@@ -137,6 +144,51 @@ function releaseFailureShots(page: Page): void {
   (page as ShotState).__pivotHoldShots = false;
 }
 
+export async function fillSecret(locator: Locator, value: string): Promise<void> {
+  const write = () =>
+    locator.evaluate((element, secret) => {
+      const input = element as HTMLInputElement;
+      input.value = secret;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+  try {
+    await test.step("fill secret field", write);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message !== "test.step() can only be called from a test") throw error;
+    await write();
+  }
+}
+
+const CLOSED_TARGET = /target page, context or browser has been closed/i;
+
+function closedTarget(error: unknown): boolean {
+  const message =
+    error && typeof error === "object" && "message" in error ? String(error.message) : "";
+  return CLOSED_TARGET.test(message);
+}
+
+async function openPage(page: Page, closedError?: unknown): Promise<Page> {
+  if (typeof page.isClosed !== "function" || !page.isClosed()) return page;
+  const pages = page.context().pages();
+  const next = pages.filter((candidate) => !candidate.isClosed()).at(-1);
+  if (!next) {
+    if (closedError instanceof Error) throw closedError;
+    throw new Error("Foundry closed the page during setup and left no open page.");
+  }
+  return next;
+}
+
+async function settle(page: Page): Promise<void> {
+  if (typeof page.waitForLoadState !== "function") return;
+  try {
+    await page.waitForLoadState("domcontentloaded");
+  } catch (error) {
+    if (!closedTarget(error)) throw error;
+  }
+}
+
 export async function authenticateSetup(page: Page, adminKey: string): Promise<void> {
   noteAuthPhase("admin");
   holdFailureShots(page);
@@ -155,7 +207,7 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
       return;
     }
 
-    await password.fill(adminKey);
+    await fillSecret(password, adminKey);
     const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
     if (await submit.isVisible().catch(() => false)) {
       await submit.click();
@@ -171,20 +223,32 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
   }
 }
 
-export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void> {
+export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page> {
   await waitForFoundryShell(page);
   noteAuthPhase("license");
   await authenticateSetup(page, adminKey);
   noteAuthPhase("eula");
   await handleFoundryEula(page);
-  await authenticateSetup(page, adminKey);
+  let current = await openPage(page);
+  await settle(current);
+  current = await openPage(current);
+  try {
+    await authenticateSetup(current, adminKey);
+  } catch (error) {
+    if (!closedTarget(error)) throw error;
+    const recovered = await openPage(current, error);
+    if (recovered === current) throw error;
+    await settle(recovered);
+    await authenticateSetup(recovered, adminKey);
+    current = recovered;
+  }
 
-  const ready = await page.evaluate(() =>
+  const ready = await current.evaluate(() =>
     Boolean((window as unknown as { game?: { ready?: boolean } }).game?.ready),
   );
-  if (ready) return;
+  if (ready) return current;
 
-  const created = await page.evaluate(
+  const created = await current.evaluate(
     async (world) => {
       const runtime = window as unknown as {
         World?: { create?: (data: Record<string, string>) => Promise<unknown> };
@@ -210,12 +274,13 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void
   );
 
   if (created === "unavailable") {
-    await createWorldThroughUi(page);
+    await createWorldThroughUi(current);
   } else if (created === "created") {
     noteAuthPhase("create world");
   }
 
-  await launchWorld(page);
+  await launchWorld(current);
+  return current;
 }
 
 const TOUR_WAIT_MS = 2_000;
@@ -312,7 +377,7 @@ export async function joinAs(
     };
     if (password) {
       const field = page.locator('input[type="password"]');
-      if ((await field.count()) > 0) await field.first().fill(password);
+      if ((await field.count()) > 0) await fillSecret(field.first(), password);
       await submitJoin();
       if ((await field.count()) > 0)
         await field
