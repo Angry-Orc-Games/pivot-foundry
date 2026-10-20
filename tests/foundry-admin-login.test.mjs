@@ -224,6 +224,25 @@ describe("Foundry administrator login", () => {
     expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
   });
 
+  it("reports a test timeout instead of a missing administrator field", async () => {
+    const page = lateAdminPage();
+    const password = page.locator();
+    const timeout = new Error("Test timeout of 120000ms exceeded.");
+    timeout.name = "TimeoutError";
+    password.waitFor = async () => {
+      throw timeout;
+    };
+    let error;
+    try {
+      await authenticateSetup(page, ADMIN_KEY);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error?.message).toBe("Test timeout of 120000ms exceeded.");
+    expect(`${error?.message ?? ""}`).not.toContain(ADMIN_KEY);
+  });
+
   it("records license, eula, and admin without the administrator key", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pivot-auth-steps-"));
     const marker = join(dir, "setup-failure.txt");

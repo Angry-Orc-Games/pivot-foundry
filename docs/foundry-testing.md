@@ -69,7 +69,7 @@ Staging checks HTTPS, WebSocket, package version, and GM/player login against th
 ## Debugging
 
 - HTML report: `playwright-report/` (gitignored)
-- Traces and screenshots: `test-results/` on failure
-- Server logs: `.foundry/instances/<id>/diagnostics/foundry.log` (license keys redacted)
+- Screenshots: `test-results/` on failure. Playwright traces are off. An auth failure clears password fields before a shot.
+- Server logs: `.foundry/instances/<id>/diagnostics/foundry.log` (license keys redacted, EULA signature kept) and `auth-steps.log` (phase names only)
 
 Do not commit traces that include session cookies. Do not upload Foundry binaries or `foundry-dist/` as CI artifacts.

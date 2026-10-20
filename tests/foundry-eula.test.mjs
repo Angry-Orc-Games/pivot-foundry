@@ -28,6 +28,9 @@ function eulaPage({ agreementVisible }) {
           return this;
         },
         isVisible: async () => false,
+        waitFor: async () => {
+          throw new Error("admin hidden");
+        },
       };
     },
     async evaluate() {

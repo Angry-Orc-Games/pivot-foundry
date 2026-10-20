@@ -15,6 +15,7 @@ const dockerStub = `#!/bin/sh
 printf '%s\\n' "$*" >> "$STARTUP_STUB_DIR/argv"
 if [ "$1" = "logs" ]; then
   printf '%s\\n' "foundry-booting FOUNDRY_LICENSE_KEY=super-secret-license"
+  printf '%s\\n' "EULA signature: 9b1c0d2e3f4a5678"
   printf '%s\\n' "cache https://cache-user:p%3Ass%40word@cache.example/foundry.zip"
   exit 0
 fi
@@ -90,6 +91,7 @@ describe("failed Foundry start", () => {
     expect(result.output).not.toContain("unsettled top-level await");
     expect(argv).toMatch(/^logs /m);
     expect(log).toContain("foundry-booting");
+    expect(log).toContain("EULA signature: 9b1c0d2e3f4a5678");
     expect(log).toContain("FOUNDRY_LICENSE_KEY=<redacted>");
     expect(log).toContain("https://<redacted>@cache.example/foundry.zip");
     expect(log).not.toContain("super-secret-license");
