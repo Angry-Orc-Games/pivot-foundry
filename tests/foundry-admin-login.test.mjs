@@ -36,6 +36,11 @@ function lateAdminPage({ adminAfterMs = null, setupAfterSubmit = false } = {}) {
       sawKey = value === ADMIN_KEY;
       events.push("filled");
     },
+    async evaluate(_fn, value) {
+      if (value === "") return;
+      sawKey = value === ADMIN_KEY;
+      events.push("filled");
+    },
     async press(key) {
       events.push(`press:${key}`);
     },
@@ -101,6 +106,11 @@ function eulaThenAdminPage({ phase: initialPhase = "eula" } = {}) {
       if (phase !== "admin") throw new Error("admin hidden");
     },
     async fill(value) {
+      if (value === "") return;
+      sawKey = value === ADMIN_KEY;
+      events.push("filled");
+    },
+    async evaluate(_fn, value) {
       if (value === "") return;
       sawKey = value === ADMIN_KEY;
       events.push("filled");
