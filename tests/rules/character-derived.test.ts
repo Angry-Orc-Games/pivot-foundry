@@ -164,30 +164,87 @@ describe("calculateManaMaximum", () => {
   });
 });
 
+function breakdownTotal(lines: string[]): number {
+  return lines.reduce((sum, line) => {
+    const match = line.match(/[+-]?\d+$/);
+    return sum + (match ? Number(match[0]) : 0);
+  }, 0);
+}
+
 describe("calculateArmourClass", () => {
-  it("uses equipped armour, shield, helmet, dex caps, and manual bonuses", () => {
-    expect(
-      calculateArmourClass({
-        dexterityModifier: 4,
-        manualBonus: 1,
-        armour: [
-          { name: "Chainmail", category: "medium", acBonus: 3, equipped: true },
-          { name: "Large Shield", category: "shield", acBonus: 2, equipped: true },
-          { name: "Full Helmet", category: "helmet", acBonus: 1, equipped: true },
-        ],
-      }),
-    ).toEqual({
-      value: 19,
-      armourWorn: "Chainmail, Large Shield, Full Helmet",
-      breakdown: [
-        "Base 10",
-        "Dex +2",
-        "Chainmail +3",
-        "Large Shield +2",
-        "Full Helmet +1",
-        "Manual +1",
+  it("takes the higher of natural AC and one worn armour", () => {
+    const wornWins = calculateArmourClass({
+      dexterityModifier: 4,
+      manualBonus: 1,
+      effectBonus: 1,
+      armour: [
+        { name: "Leather", category: "light", acBonus: 1, equipped: true },
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Fortress", category: "heavy", acBonus: 20, equipped: false },
+        { name: "Carapace", category: "natural", acBonus: 14, equipped: true },
+        { name: "Small Shield", category: "shield", acBonus: 1, equipped: true },
+        { name: "Large Shield", category: "shield", acBonus: 2, equipped: true },
+        { name: "Helm", category: "helmet", acBonus: 1, equipped: true },
+        {
+          name: "Magic Armour",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicArmour",
+        },
+        {
+          name: "Ring of Protection",
+          category: "other",
+          acBonus: 2,
+          equipped: true,
+          stackKey: "ringOfProtection",
+        },
       ],
     });
+
+    expect(wornWins).toEqual({
+      value: 23,
+      armourWorn: "Plate, Large Shield, Helm, Ring of Protection",
+      breakdown: [
+        "Base 10",
+        "Plate +6",
+        "Large Shield +2",
+        "Helm +1",
+        "Ring of Protection +2",
+        "Manual +1",
+        "Effects +1",
+      ],
+    });
+    expect(breakdownTotal(wornWins.breakdown)).toBe(wornWins.value);
+
+    const naturalWins = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Carapace", category: "natural", acBonus: 18, equipped: true },
+        { name: "Small Shield", category: "shield", acBonus: 1, equipped: true },
+      ],
+    });
+    expect(naturalWins).toEqual({
+      value: 19,
+      armourWorn: "Carapace, Small Shield",
+      breakdown: ["Carapace 18", "Small Shield +1"],
+    });
+    expect(breakdownTotal(naturalWins.breakdown)).toBe(naturalWins.value);
+
+    const medium = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Hide", category: "heavy", acBonus: 1, equipped: true },
+        { name: "Chain", category: "medium", acBonus: 5, equipped: true },
+      ],
+    });
+    expect(medium).toEqual({
+      value: 17,
+      armourWorn: "Chain",
+      breakdown: ["Base 10", "Dex +2", "Chain +5"],
+    });
+    expect(breakdownTotal(medium.breakdown)).toBe(medium.value);
   });
 });
 
