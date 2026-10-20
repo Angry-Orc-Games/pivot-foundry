@@ -65,8 +65,11 @@ describe("m003 edge cases", () => {
         "character",
       );
 
-      // Should not change anything
-      expect(result).toEqual({ ok: true, changed: false });
+      expect(result).toEqual({
+        ok: true,
+        changed: true,
+        update: { "system.proficiencies.weapons.slings": false },
+      });
     });
 
     it("m001 upgrades v0 to v2 when m003 adds fields", () => {

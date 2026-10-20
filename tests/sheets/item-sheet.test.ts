@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -46,6 +48,51 @@ describe("prepareItemSheetContext", () => {
 
     expect(context.effects).toEqual([]);
     expect(context.isEquipment).toBe(true);
+  });
+
+  it("keeps a stored rangedLight category selected on the weapon category select", () => {
+    const context = prepareItemSheetContext({
+      name: "Short Bow",
+      type: "weapon",
+      system: { category: "rangedLight" },
+    });
+
+    expect(context.weaponCategorySelect.selected).toBe("rangedLight");
+    expect(context.weaponCategorySelect.options.rangedLight).toBe("Invalid, pick one");
+    expect(context.weaponCategorySelect.options.bows).toBe("Bows");
+  });
+});
+
+describe("item sheet template", () => {
+  it("uses selects for weapon and armour closed fields", () => {
+    const template = readFileSync(
+      resolve(process.cwd(), "templates/items/item-sheet.hbs"),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    const weapon = template.slice(
+      template.indexOf("{{#if isWeapon}}"),
+      template.indexOf("{{#if isArmour}}"),
+    );
+    const armour = template.slice(
+      template.indexOf("{{#if isArmour}}"),
+      template.indexOf("{{#if isEquipment}}"),
+    );
+    const feature = template.slice(
+      template.indexOf("{{#if isFeature}}"),
+      template.indexOf("{{#if effects.length}}"),
+    );
+
+    expect(weapon).toContain('<select name="system.category"');
+    expect(weapon).toContain('<select name="system.attack.ability"');
+    expect(weapon).toContain('<select name="system.damage.ability"');
+    expect(weapon).toContain('<select name="system.damage.type"');
+    expect(weapon).not.toContain('<input name="system.category"');
+    expect(weapon).not.toContain('<input name="system.attack.ability"');
+    expect(weapon).not.toContain('<input name="system.damage.ability"');
+    expect(weapon).not.toContain('<input name="system.damage.type"');
+    expect(weapon).not.toContain("localize=true");
+    expect(armour).toContain('<select name="system.category"');
+    expect(feature).toContain('<input name="system.category"');
   });
 });
 
