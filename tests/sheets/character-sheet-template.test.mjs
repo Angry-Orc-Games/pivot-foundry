@@ -477,7 +477,7 @@ describe("character sheet template structure", () => {
     expect(Number.parseFloat(dotStyle.minHeight)).toBeGreaterThanOrEqual(20);
   });
 
-  it("gives the empty proficiency mark a darker ink outline and leaves the filled mark", () => {
+  it("gives both proficiency marks the same ink ring and fills the proficient mark", () => {
     const css = [
       readFileSync(resolve(process.cwd(), "scripts/foundry-v14-form-fixture.css"), "utf-8"),
       readFileSync(resolve(process.cwd(), "styles/pf-tokens.css"), "utf-8"),
@@ -509,8 +509,10 @@ describe("character sheet template structure", () => {
     expect(Number.parseFloat(emptyStyle.borderTopWidth)).toBeGreaterThanOrEqual(1.5);
     expect(emptyStyle.borderRadius).toBe("50%");
     expect(filled.textContent).toBe("●");
-    expect(filledStyle.color).toBe("rgb(28, 26, 22)");
-    expect(Number.parseFloat(filledStyle.borderTopWidth) || 0).toBe(0);
+    expect(filledStyle.backgroundColor).toBe("rgb(28, 26, 22)");
+    expect(filledStyle.borderTopStyle).toBe("solid");
+    expect(filledStyle.borderTopColor).toBe(emptyStyle.borderTopColor);
+    expect(filledStyle.borderTopWidth).toBe(emptyStyle.borderTopWidth);
     expect(Number.parseFloat(labelStyle.minWidth)).toBeGreaterThanOrEqual(20);
     expect(Number.parseFloat(labelStyle.minHeight)).toBeGreaterThanOrEqual(20);
   });

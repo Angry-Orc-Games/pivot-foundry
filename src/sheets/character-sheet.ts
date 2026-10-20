@@ -560,11 +560,7 @@ export function prepareCharacterSheetContext(
           disabledAttr: disabledAttr as "" | "disabled",
         };
       })
-      .sort((a, b) => {
-        // Proficient first, then alphabetical
-        if (a.proficient !== b.proficient) return a.proficient ? -1 : 1;
-        return a.label.localeCompare(b.label);
-      }),
+      .sort((a, b) => a.label.localeCompare(b.label)),
     items: {
       weapons: withDisabledAttr(weapons, disabledAttr).map((item) => ({
         ...item,

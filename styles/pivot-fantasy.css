@@ -1856,7 +1856,7 @@
   .window-content
   .pf-print
   table.pf-skills
-  .pf-check:not(:has(input:checked))
+  .pf-check
   .pf-prof-mark {
   border: 2px solid #1c1a16;
   border-radius: 50%;
@@ -1864,6 +1864,16 @@
   color: transparent;
   height: 1.1em;
   width: 1.1em;
+}
+
+:is(body, body.theme-dark, body.theme-light)
+  .pivot-fantasy.sheet.actor.character
+  .window-content
+  .pf-print
+  table.pf-skills
+  .pf-check:has(input:checked)
+  .pf-prof-mark {
+  background: #1c1a16;
 }
 
 :is(body, body.theme-dark, body.theme-light)
