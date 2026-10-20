@@ -2,7 +2,7 @@ export const ECHELON_VALUES = ["core", "1", "2", "3", "4", "5"] as const;
 
 export type Echelon = (typeof ECHELON_VALUES)[number];
 
-export const M006_NUMERIC_ECHELON_MAP = {
+const M006_NUMERIC_ECHELON_MAP = {
   1: "1",
   2: "2",
   3: "3",
