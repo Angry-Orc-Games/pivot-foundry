@@ -391,6 +391,67 @@ describe("calculateArmourClass", () => {
     expect(thickHideInMail.value).toBe(16);
     expect(thickHideInMail.breakdown).toEqual(["Thick Hide 12", "Dex +4"]);
   });
+
+  it("adds Magic Armour and Magic Shield instead of cancelling them", () => {
+    const both = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Chain", category: "medium", acBonus: 3, equipped: true },
+        { name: "Large Shield", category: "shield", acBonus: 2, equipped: true },
+        {
+          name: "Magic Armour",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicArmour",
+        },
+        {
+          name: "Magic Shield",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicShield",
+        },
+      ],
+    });
+    expect(both.value).toBe(17);
+    expect(both.breakdown).toEqual([
+      "Base 10",
+      "Chain +3",
+      "Large Shield +2",
+      "Magic Armour +1",
+      "Magic Shield +1",
+    ]);
+
+    const gradeLoses = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        {
+          name: "Ring of Protection",
+          category: "other",
+          acBonus: 2,
+          equipped: true,
+          stackKey: "ringOfProtection",
+        },
+        {
+          name: "Magic Armour",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicArmour",
+        },
+        {
+          name: "Magic Shield",
+          category: "other",
+          acBonus: 2,
+          equipped: true,
+          stackKey: "magicShield",
+        },
+      ],
+    });
+    expect(gradeLoses.value).toBe(13);
+    expect(gradeLoses.breakdown).toEqual(["Base 10", "Magic Armour +1", "Magic Shield +2"]);
+  });
 });
 
 describe("calculateTotalWeight", () => {
