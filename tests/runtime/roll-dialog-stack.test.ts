@@ -29,7 +29,8 @@ function openBehindSheet(config: PromptConfig): HTMLElement {
 
   const element = document.createElement("section");
   element.className = "application";
-  element.innerHTML = typeof config.content === "string" ? config.content : "";
+  const content = typeof config.content === "string" ? config.content : "";
+  element.innerHTML = `<header class="window-header"><button type="button">Close</button></header><div class="window-content">${content}</div>`;
   element.style.zIndex = "1";
   document.body.append(element);
 
@@ -48,7 +49,8 @@ function openBehindSheet(config: PromptConfig): HTMLElement {
 function expectInFrontAndFocused(element: HTMLElement): void {
   const sheet = element.ownerDocument.querySelector("[data-sheet='character']");
   expect(Number(element.style.zIndex)).toBeGreaterThan(Number((sheet as HTMLElement).style.zIndex));
-  expect(element.contains(element.ownerDocument.activeElement)).toBe(true);
+  const content = element.querySelector(".window-content");
+  expect(content?.contains(element.ownerDocument.activeElement)).toBe(true);
 }
 
 function installDialog(): HTMLElement[] {
