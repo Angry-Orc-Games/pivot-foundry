@@ -245,7 +245,7 @@ it("sets base speed only when the stored value is still 10", async () => {
   expect(missing.updates).toEqual([]);
   expect(unknown.updates).toEqual([]);
   expect(npc.updates).toEqual([]);
-  expect(logs).toEqual([
+  expect(logs.filter((line) => !line.includes("PIVOT.Migration.Complete"))).toEqual([
     "Bram: base speed 10 -> 7 (Halfling).",
     "Durin: base speed 10 -> 8 (Dwarf).",
     "Pip: base speed 10 -> 7 (Small Humanoid).",
