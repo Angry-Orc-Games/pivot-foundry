@@ -5,7 +5,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { credentialLeakMessage, scanTree } from "../../scripts/ci/scan-e2e-artifacts.mjs";
+import {
+  credentialLeakMessage,
+  scanRoots,
+  scanTree,
+} from "../../scripts/ci/scan-e2e-artifacts.mjs";
 
 const FAKE_SECRET = "zip-trace-secret";
 
@@ -62,6 +66,49 @@ describe("E2E artifact credential scan", () => {
       await writeFile(join(dir, "foundry.log"), `boot\n${FAKE_SECRET}\n`);
       expect(scanTree(dir, [FAKE_SECRET])).toBe("foundry.log");
       expect(credentialLeakMessage("foundry.log")).not.toContain(FAKE_SECRET);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  function scanCommand(workflow) {
+    const scan = workflow.indexOf("- name: Scan diagnostics for credentials");
+    const upload = workflow.indexOf("- name: Upload sanitized diagnostics");
+    const line = workflow
+      .slice(scan, upload)
+      .split("\n")
+      .find((entry) => entry.includes("scan-e2e-artifacts.mjs"));
+    return line?.trim() ?? "";
+  }
+
+  it("ignores compose.env when it is outside the uploaded diagnostics", async () => {
+    const workflow = await readFile(
+      new URL("../../.github/workflows/e2e.yml", import.meta.url),
+      "utf8",
+    );
+    const command = scanCommand(workflow);
+    expect(command).toContain(".foundry/instances/*/diagnostics");
+
+    const dir = await mkdtemp(join(tmpdir(), "e2e-scan-"));
+    try {
+      const diagnostics = join(dir, ".foundry", "instances", "e2e", "diagnostics");
+      await mkdir(diagnostics, { recursive: true });
+      await writeFile(join(diagnostics, "foundry.log"), "Server started and listening\n");
+      await writeFile(
+        join(dir, ".foundry", "instances", "e2e", "compose.env"),
+        `FOUNDRY_ADMIN_KEY=${FAKE_SECRET}\n`,
+      );
+      const roots = command
+        .split("scan-e2e-artifacts.mjs")[1]
+        .trim()
+        .split(/\s+/)
+        .map((root) => join(dir, root.replaceAll("*", "e2e")));
+      const result = scanRoots(roots, { FOUNDRY_ADMIN_KEY: FAKE_SECRET, FOUNDRY_LICENSE_KEY: "" });
+      expect(result.hit).toBeNull();
+      expect(scanTree(join(dir, ".foundry", "instances", "e2e"), [FAKE_SECRET])).toBe(
+        "compose.env",
+      );
+      expect(credentialLeakMessage("compose.env")).not.toContain(FAKE_SECRET);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
