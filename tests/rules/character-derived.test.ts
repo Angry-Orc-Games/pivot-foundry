@@ -372,8 +372,38 @@ describe("calculateArmourClass", () => {
         { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
       ],
     });
-    expect(carapaceInHeavy.value).toBe(13);
-    expect(carapaceInHeavy.breakdown).toEqual(["Base 10", "Dex +3"]);
+    expect(carapaceInHeavy).toEqual({
+      value: 15,
+      armourWorn: "Chitinous Carapace",
+      breakdown: ["Chitinous Carapace 12", "Dex +3"],
+    });
+
+    const lesserCarapace = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        {
+          name: "Thick Hide",
+          category: "natural",
+          acBonus: 13,
+          equipped: true,
+          naturalMode: "higher",
+        },
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "unarmoured",
+          bodyLimit: "light",
+        },
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+      ],
+    });
+    expect(lesserCarapace).toEqual({
+      value: 16,
+      armourWorn: "Plate",
+      breakdown: ["Base 10", "Plate +6"],
+    });
 
     const thickHideInMail = calculateArmourClass({
       dexterityModifier: 4,
