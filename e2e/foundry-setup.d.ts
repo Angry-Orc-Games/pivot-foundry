@@ -1,4 +1,6 @@
 declare module "../../scripts/foundry-setup.mjs" {
+  export function withPhaseTimeout<T>(phase: string, ms: number, work: Promise<T>): Promise<T>;
+
   export function handleFoundryEula(
     page: {
       getByRole(

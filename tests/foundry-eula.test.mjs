@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 import { EXIT } from "../scripts/foundry-env.mjs";
@@ -215,6 +215,41 @@ describe("Foundry EULA opt-in", () => {
   });
 });
 
+function stuckAgreement() {
+  const hidden = {
+    async waitFor() {
+      throw new Error("hidden");
+    },
+  };
+  return {
+    getByRole(role, options = {}) {
+      const name = options.name;
+      const label = name instanceof RegExp ? name.source : String(name ?? "");
+      if (role === "checkbox" && label.includes("I agree to these terms")) {
+        return {
+          async waitFor() {},
+          async check() {},
+        };
+      }
+      if (role === "button" && name === "Agree") {
+        return { async click() {} };
+      }
+      if (role === "heading" && label.includes("End User License Agreement")) {
+        return {
+          waitFor() {
+            return new Promise(() => {});
+          },
+        };
+      }
+      if (role === "button" && name instanceof RegExp && name.test("Create World")) {
+        return hidden;
+      }
+      if (role === "heading" && name === "Setup") return hidden;
+      throw new Error(`unexpected role ${role} ${label}`);
+    },
+  };
+}
+
 function delayedScreen({ eulaAfterMs = null, setupAfterMs = null } = {}) {
   const started = Date.now();
   const clicks = [];
@@ -310,6 +345,29 @@ describe("late Foundry EULA screen", () => {
     expect(result).toBeUndefined();
     expect(page.sawSetup()).toBe(true);
     expect(page.clicks).toEqual([]);
+  });
+
+  it("names the eula phase when the agreement heading never clears", async () => {
+    vi.useFakeTimers();
+    const page = stuckAgreement();
+    let outcome = "hung";
+    const pending = handleFoundryEula(page, { FOUNDRY_E2E_ACCEPT_EULA: "1" }).then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(45_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during eula/);
   });
 
   it("throws SETUP when neither the agreement nor the setup screen appears", async () => {

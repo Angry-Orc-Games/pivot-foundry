@@ -11,7 +11,7 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { handleFoundryEula } from "../../scripts/foundry-setup.mjs";
+import { handleFoundryEula, withPhaseTimeout } from "../../scripts/foundry-setup.mjs";
 
 export interface FoundryIdentity {
   ready: boolean;
@@ -22,18 +22,26 @@ export interface FoundryIdentity {
   version: string;
 }
 
+const LICENSE_PHASE_MS = 60_000;
+
 export async function waitForFoundryShell(page: Page): Promise<void> {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(
-    () => {
-      const title = document.title || "";
-      return (
-        title.includes("Foundry") ||
-        Boolean(document.querySelector("#join-game, #setup, .setup, .join-game")) ||
-        Boolean((window as unknown as { game?: { ready?: boolean } }).game)
+  await withPhaseTimeout(
+    "license",
+    LICENSE_PHASE_MS,
+    (async () => {
+      await page.goto("/", { waitUntil: "domcontentloaded", timeout: LICENSE_PHASE_MS });
+      await page.waitForFunction(
+        () => {
+          const title = document.title || "";
+          return (
+            title.includes("Foundry") ||
+            Boolean(document.querySelector("#join-game, #setup, .setup, .join-game")) ||
+            Boolean((window as unknown as { game?: { ready?: boolean } }).game)
+          );
+        },
+        { timeout: LICENSE_PHASE_MS },
       );
-    },
-    { timeout: 180_000 },
+    })(),
   );
 }
 
@@ -183,7 +191,7 @@ async function openPage(page: Page, closedError?: unknown): Promise<Page> {
 async function settle(page: Page): Promise<void> {
   if (typeof page.waitForLoadState !== "function") return;
   try {
-    await page.waitForLoadState("domcontentloaded");
+    await withPhaseTimeout("eula", 15_000, page.waitForLoadState("domcontentloaded"));
   } catch (error) {
     if (!closedTarget(error)) throw error;
   }
@@ -223,6 +231,49 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
   }
 }
 
+async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promise<boolean> {
+  const host = runtime as typeof globalThis & {
+    foundry?: {
+      nue?: {
+        Tour?: {
+          activeTour?: { namespace?: string; exit?: () => void } | null;
+        };
+      };
+    };
+    game?: {
+      ready?: boolean;
+      tours?: Iterable<{
+        namespace?: string;
+        status?: string;
+        complete?: () => Promise<unknown> | unknown;
+      }>;
+    };
+  };
+  const active = host.foundry?.nue?.Tour?.activeTour;
+  if (
+    active &&
+    (active.namespace === undefined || active.namespace === "core") &&
+    typeof active.exit === "function"
+  ) {
+    active.exit();
+  }
+  const tours = host.game?.tours;
+  if (tours) {
+    const pending: Array<Promise<unknown>> = [];
+    for (const tour of tours) {
+      if (
+        tour?.namespace === "core" &&
+        tour.status !== "completed" &&
+        typeof tour.complete === "function"
+      ) {
+        pending.push(Promise.resolve(tour.complete()));
+      }
+    }
+    await Promise.all(pending);
+  }
+  return Boolean(host.game?.ready);
+}
+
 export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page> {
   await waitForFoundryShell(page);
   noteAuthPhase("license");
@@ -243,34 +294,36 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
     current = recovered;
   }
 
-  const ready = await current.evaluate(() =>
-    Boolean((window as unknown as { game?: { ready?: boolean } }).game?.ready),
-  );
+  const ready = await withPhaseTimeout("tour close", 15_000, current.evaluate(silenceCoreTours));
   if (ready) return current;
 
-  const created = await current.evaluate(
-    async (world) => {
-      const runtime = window as unknown as {
-        World?: { create?: (data: Record<string, string>) => Promise<unknown> };
-        game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
-      };
-      if (runtime.game?.worlds?.get?.(world.id)) return "exists";
-      if (typeof runtime.World?.create === "function") {
-        await runtime.World.create({
-          id: world.id,
-          name: world.id,
-          title: world.title,
-          system: world.system,
-        });
-        return "created";
-      }
-      return "unavailable";
-    },
-    {
-      id: process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e",
-      title: "Pivot Fantasy E2E",
-      system: "pivot-fantasy",
-    },
+  const created = await withPhaseTimeout(
+    "create world",
+    20_000,
+    current.evaluate(
+      async (world) => {
+        const runtime = window as unknown as {
+          World?: { create?: (data: Record<string, string>) => Promise<unknown> };
+          game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
+        };
+        if (runtime.game?.worlds?.get?.(world.id)) return "exists";
+        if (typeof runtime.World?.create === "function") {
+          await runtime.World.create({
+            id: world.id,
+            name: world.id,
+            title: world.title,
+            system: world.system,
+          });
+          return "created";
+        }
+        return "unavailable";
+      },
+      {
+        id: process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e",
+        title: "Pivot Fantasy E2E",
+        system: "pivot-fantasy",
+      },
+    ),
   );
 
   if (created === "unavailable") {
