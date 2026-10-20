@@ -379,7 +379,7 @@ describe("Foundry administrator login", () => {
         outcome = error;
       },
     );
-    await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 15_000))]);
+    await Promise.race([pending, new Promise((resolve) => globalThis.setTimeout(resolve, 15_000))]);
 
     expect(outcome).not.toBe("hung");
     expect(page.events).toContain("setup-visible");
