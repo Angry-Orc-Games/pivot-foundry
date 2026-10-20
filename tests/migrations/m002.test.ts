@@ -129,6 +129,69 @@ it("does not persist a stale dying state when the user is not a GM", async () =>
   expect(report).toEqual({ skipped: true, updated: 0, failed: 0 });
 });
 
+it("replaces a stored zero maximum from hit die and Constitution, and the second run changes nothing", () => {
+  const source = {
+    survivalVersion: 1,
+    abilities: { con: { score: 14 } },
+    attributes: {
+      hitDie: "d10",
+      hp: { value: 0, max: 0, temp: 0 },
+      deathSaves: { status: "dying", successes: 0, failures: 0 },
+    },
+  };
+  const first = planSurvivalMigration(source);
+  expect(first).toEqual({
+    ok: true,
+    changed: true,
+    update: {
+      "system.attributes.hp.value": 12,
+      "system.attributes.hp.max": 12,
+      "system.attributes.deathSaves.status": "alive",
+    },
+  });
+  const stored = structuredClone(source) as typeof source;
+  const update = first.ok && first.changed ? first.update : {};
+  for (const [path, value] of Object.entries(update)) {
+    const parts = path.replace(/^system\./, "").split(".");
+    let cursor: Record<string, unknown> = stored;
+    for (const part of parts.slice(0, -1)) {
+      cursor = cursor[part] as Record<string, unknown>;
+    }
+    cursor[parts[parts.length - 1] ?? ""] = value;
+  }
+  expect(planSurvivalMigration(stored)).toEqual({ ok: true, changed: false });
+});
+
+it("raises a stored zero maximum without clearing an in-progress or finished death state", () => {
+  expect(
+    planSurvivalMigration({
+      survivalVersion: 1,
+      attributes: {
+        hitDie: "d8",
+        hp: { value: 0, max: 0, temp: 0 },
+        deathSaves: { status: "unconfirmed", successes: 1, failures: 1 },
+      },
+    }),
+  ).toEqual({
+    ok: true,
+    changed: true,
+    update: { "system.attributes.hp.max": 8 },
+  });
+  expect(
+    planSurvivalMigration({
+      survivalVersion: 1,
+      attributes: {
+        hp: { value: 0, max: 0, temp: 0 },
+        deathSaves: { status: "dead", successes: 0, failures: 3 },
+      },
+    }),
+  ).toEqual({
+    ok: true,
+    changed: true,
+    update: { "system.attributes.hp.max": 8 },
+  });
+});
+
 it("leaves zero HP dying, zero HP stable, and dead actors untouched", () => {
   for (const source of [
     {
