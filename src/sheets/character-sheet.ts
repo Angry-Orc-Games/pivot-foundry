@@ -946,16 +946,19 @@ function getSheetDocument(sheet: object): ActorLike {
 }
 
 async function submitDocumentForm(
-  this: { document?: { update?: (data: Record<string, unknown>) => Promise<unknown> } },
+  this: { document?: ActorLike },
   _event: Event,
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
-  const data = normalizeSheetSubmitData(formData.object ?? {});
+  const data = normalizeSheetSubmitData(formData.object ?? {}, this.document?.system ?? {});
   return this.document?.update?.(data);
 }
 
-export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
+export function normalizeSheetSubmitData(
+  data: Record<string, unknown>,
+  current: RecordValue = {},
+): Record<string, unknown> {
   const normalized = { ...data };
   const languagesPath = ["system", "identity", "languagesText"];
   const instrumentsPath = ["system", "proficiencies", "instrumentsText"];
@@ -991,7 +994,12 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       academiaPath,
       ["system", "skillSpecializations", "academia"],
-      specializationEntries(splitList(academia), "academia"),
+      specializationEntries(
+        splitList(academia),
+        "academia",
+        specializationRecords(current, ["skillSpecializations", "academia"]),
+        readSubmitPath(normalized, ["system", "skillSpecializations", "academia"]),
+      ),
     );
     deleteSubmitPath(normalized, academiaPath);
   }
@@ -1001,7 +1009,12 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       craftingPath,
       ["system", "skillSpecializations", "crafting"],
-      specializationEntries(splitList(crafting), "crafting"),
+      specializationEntries(
+        splitList(crafting),
+        "crafting",
+        specializationRecords(current, ["skillSpecializations", "crafting"]),
+        readSubmitPath(normalized, ["system", "skillSpecializations", "crafting"]),
+      ),
     );
     deleteSubmitPath(normalized, craftingPath);
   }
@@ -1286,15 +1299,45 @@ function specializationNamesAt(source: RecordValue, path: string[]): string[] {
 function specializationEntries(
   names: string[],
   group: "academia" | "crafting",
+  previous: RecordValue[] = [],
+  formEntries: unknown = [],
 ): Array<Record<string, unknown>> {
-  return names.map((name) => ({
-    name,
-    ability: group === "crafting" ? (craftingAbility(name) ?? "int") : "int",
-    proficient: true,
-    deepening: 0,
-    expertise: false,
-    bonus: 0,
-  }));
+  const submitted = Array.isArray(formEntries) ? formEntries : [];
+  const previousNames = previous.map((entry) =>
+    typeof entry.name === "string" ? entry.name.trim() : "",
+  );
+  const sameOrder =
+    names.length === previousNames.length &&
+    names.every((name, index) => name === previousNames[index]);
+
+  return names.map((name, index) => {
+    const prior = previous.find(
+      (entry) =>
+        typeof entry.name === "string" && entry.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    const formEntry = sameOrder && isRecord(submitted[index]) ? submitted[index] : undefined;
+    const storedAbility = prior && isAbilityKey(prior.ability) ? prior.ability : "int";
+    return {
+      name,
+      ability: group === "crafting" ? (craftingAbility(name) ?? storedAbility) : "int",
+      proficient:
+        formEntry && typeof formEntry.proficient === "boolean"
+          ? formEntry.proficient
+          : prior
+            ? prior.proficient !== false
+            : true,
+      deepening: numberFrom(formEntry?.deepening, numberFrom(prior?.deepening, 0)),
+      expertise:
+        formEntry && typeof formEntry.expertise === "boolean"
+          ? formEntry.expertise
+          : prior?.expertise === true,
+      bonus: numberFrom(formEntry?.bonus, numberFrom(prior?.bonus, 0)),
+    };
+  });
+}
+
+function numberFrom(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function readSpecializationSkills(system: RecordValue): Array<{
