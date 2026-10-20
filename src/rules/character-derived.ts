@@ -308,9 +308,7 @@ export function calculateArmourClass({
   const equipped = armour.filter((item) => item.equipped);
   const keyed = equipped.filter((item) => item.stackKey);
   const open = equipped.filter((item) => !item.stackKey);
-  const bestBody = highestBonus(
-    open.filter((item) => ["light", "medium", "heavy"].includes(item.category)),
-  );
+  const bestBody = bestWornSuit(open, dexterityModifier);
   const bestNatural = highestBonus(open.filter((item) => item.category === "natural"));
   const dexBonus = dexterityModifierForArmour(dexterityModifier, bestBody?.category);
   const wornTotal = 10 + dexBonus + (bestBody?.acBonus ?? 0);
@@ -414,6 +412,22 @@ function resolveSpeed(input: CharacterDerivedInput): number {
 
 function clampAbilityScore(score: number): number {
   return Math.min(30, Math.max(1, score));
+}
+
+function bestWornSuit(items: ArmourSource[], dexterityModifier: number): ArmourSource | undefined {
+  let best: ArmourSource | undefined;
+  let bestFinished = Number.NEGATIVE_INFINITY;
+  for (const item of items) {
+    if (item.category !== "light" && item.category !== "medium" && item.category !== "heavy") {
+      continue;
+    }
+    const finished = item.acBonus + dexterityModifierForArmour(dexterityModifier, item.category);
+    if (!best || finished > bestFinished) {
+      best = item;
+      bestFinished = finished;
+    }
+  }
+  return best;
 }
 
 function highestBonus(items: ArmourSource[]): ArmourSource | undefined {
