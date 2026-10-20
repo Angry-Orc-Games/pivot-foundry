@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -28,11 +29,45 @@ function walk(root, dir, needles) {
     return null;
   }
   if (!stat.isFile()) return null;
-  const bytes = readFileSync(dir);
-  for (const needle of needles) {
-    if (bytes.includes(Buffer.from(needle))) return relative(root, dir);
+  const label = relative(root, dir);
+  if (dir.endsWith(".zip")) {
+    if (zipContains(label, dir, needles)) return label;
+    return null;
   }
+  if (containsNeedle(readFileSync(dir), needles)) return label;
   return null;
+}
+
+function containsNeedle(bytes, needles) {
+  for (const needle of needles) {
+    if (bytes.includes(Buffer.from(needle))) return true;
+  }
+  return false;
+}
+
+function zipContains(label, zipPath, needles) {
+  let listing;
+  try {
+    listing = execFileSync("unzip", ["-Z1", zipPath], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    throw new Error(`Could not scan ${label}. Diagnostics were not uploaded.`);
+  }
+  for (const entry of listing.toString("utf8").split("\n")) {
+    if (!entry || entry.endsWith("/")) continue;
+    let bytes;
+    try {
+      bytes = execFileSync("unzip", ["-p", zipPath, entry], {
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: 32 * 1024 * 1024,
+      });
+    } catch {
+      throw new Error(`Could not scan ${label}. Diagnostics were not uploaded.`);
+    }
+    if (containsNeedle(bytes, needles)) return true;
+  }
+  return false;
 }
 
 function secretsFromEnv(env) {
@@ -56,7 +91,14 @@ export function scanRoots(roots, env = process.env) {
 const invoked = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (invoked) {
-  const result = scanRoots(process.argv.slice(2));
+  let result;
+  try {
+    result = scanRoots(process.argv.slice(2));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Credential scan failed.";
+    process.stderr.write(`::error::${message}\n`);
+    process.exit(1);
+  }
   if (result.missingKeys) {
     process.stderr.write(
       "::error::Credential scan had no admin or license key to search for. Diagnostics were not uploaded.\n",

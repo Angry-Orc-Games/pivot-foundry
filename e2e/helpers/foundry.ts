@@ -73,6 +73,26 @@ function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number):
   });
 }
 
+async function withoutTrace(page: Page, action: () => Promise<void>): Promise<void> {
+  const tracing = typeof page.context === "function" ? page.context().tracing : undefined;
+  const canPause =
+    typeof tracing?.stopChunk === "function" && typeof tracing.startChunk === "function";
+  let paused = false;
+  if (canPause && tracing) {
+    try {
+      await tracing.stopChunk();
+      paused = true;
+    } catch {
+      paused = false;
+    }
+  }
+  try {
+    await action();
+  } finally {
+    if (paused && tracing) await tracing.startChunk();
+  }
+}
+
 function maskPasswordShots(page: Page, field: Locator): void {
   if (typeof page.screenshot !== "function") return;
   const shoot = page.screenshot.bind(page);
@@ -96,13 +116,16 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
   const screen = await firstVisible([["admin", password], ...setup], ADMIN_SCREEN_TIMEOUT_MS);
   if (screen !== "admin") return;
 
-  await password.fill(adminKey);
-  const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
-  if (await submit.isVisible().catch(() => false)) {
-    await submit.click();
-  } else {
-    await password.press("Enter");
-  }
+  await withoutTrace(page, async () => {
+    await password.fill(adminKey);
+    const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
+    if (await submit.isVisible().catch(() => false)) {
+      await submit.click();
+    } else {
+      await password.press("Enter");
+    }
+    await password.fill("").catch(() => undefined);
+  });
   await firstVisible(setup, ADMIN_SCREEN_TIMEOUT_MS);
 }
 
@@ -232,13 +255,23 @@ export async function joinAs(
     await page.goto("/join", { waitUntil: "domcontentloaded" });
   }
   await page.getByText(name, { exact: true }).first().click({ timeout: 60_000 });
+  const submitJoin = async () => {
+    const join = page.getByRole("button", { name: /join game|join/i }).first();
+    if (await join.isVisible().catch(() => false)) await join.click();
+  };
   if (password) {
-    const field = page.locator('input[type="password"]');
-    if ((await field.count()) > 0) await field.first().fill(password);
-  }
-  const join = page.getByRole("button", { name: /join game|join/i }).first();
-  if (await join.isVisible().catch(() => false)) {
-    await join.click();
+    await withoutTrace(page, async () => {
+      const field = page.locator('input[type="password"]');
+      if ((await field.count()) > 0) await field.first().fill(password);
+      await submitJoin();
+      if ((await field.count()) > 0)
+        await field
+          .first()
+          .fill("")
+          .catch(() => undefined);
+    });
+  } else {
+    await submitJoin();
   }
   await waitForGameReady(page);
 }
@@ -286,30 +319,32 @@ export async function waitForCanvasReady(page: Page): Promise<void> {
 }
 
 export async function createPlayerUser(page: Page, name: string, password: string): Promise<void> {
-  await page.evaluate(
-    async ({ userName, userPassword }) => {
-      const game = (
-        window as unknown as {
-          game: {
-            users: {
-              getName?: (name: string) => { id?: string } | undefined;
+  await withoutTrace(page, () =>
+    page.evaluate(
+      async ({ userName, userPassword }) => {
+        const game = (
+          window as unknown as {
+            game: {
+              users: {
+                getName?: (name: string) => { id?: string } | undefined;
+              };
             };
-          };
-          User: { create: (data: Record<string, unknown>) => Promise<unknown> };
-        }
-      ).game;
-      if (game.users.getName?.(userName)) return;
-      await (
-        window as unknown as {
-          User: { create: (data: Record<string, unknown>) => Promise<unknown> };
-        }
-      ).User.create({
-        name: userName,
-        role: 1,
-        password: userPassword,
-      });
-    },
-    { userName: name, userPassword: password },
+            User: { create: (data: Record<string, unknown>) => Promise<unknown> };
+          }
+        ).game;
+        if (game.users.getName?.(userName)) return;
+        await (
+          window as unknown as {
+            User: { create: (data: Record<string, unknown>) => Promise<unknown> };
+          }
+        ).User.create({
+          name: userName,
+          role: 1,
+          password: userPassword,
+        });
+      },
+      { userName: name, userPassword: password },
+    ),
   );
 }
 

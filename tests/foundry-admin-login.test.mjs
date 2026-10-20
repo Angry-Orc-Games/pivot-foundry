@@ -28,6 +28,7 @@ function lateAdminPage({ adminAfterMs = null, setupAfterSubmit = false } = {}) {
     },
     waitFor: () => waitUntil(adminAfterMs),
     async fill(value) {
+      if (value === "") return;
       sawKey = value === ADMIN_KEY;
       events.push("filled");
     },
@@ -96,6 +97,7 @@ function eulaThenAdminPage() {
       if (phase !== "admin") throw new Error("admin hidden");
     },
     async fill(value) {
+      if (value === "") return;
       sawKey = value === ADMIN_KEY;
       events.push("filled");
     },
