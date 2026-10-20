@@ -311,18 +311,18 @@ export function calculateArmourClass({
   const keyed = equipped.filter((item) => item.stackKey);
   const open = equipped.filter((item) => !item.stackKey);
   const naturals = open.filter((item) => item.category === "natural");
-  const lightOnly = naturals.some((item) => item.bodyLimit === "light");
+  const bestNatural = highestBonus(naturals);
+  const lightOnly = bestNatural?.bodyLimit === "light";
   const wornSuits = open.filter((item) => isBodySuit(item.category));
   const benefitingSuits = lightOnly
     ? wornSuits.filter((item) => item.category === "light")
     : wornSuits;
   const bestBody = bestWornSuit(benefitingSuits, dexterityModifier);
-  const bestNatural = highestBonus(naturals);
   const dexBonus = dexterityModifierForArmour(dexterityModifier, bestBody?.category);
   const wornTotal = 10 + dexBonus + (bestBody?.acBonus ?? 0);
   const naturalTotal = bestNatural ? bestNatural.acBonus + dexterityModifier : 0;
   const lines: Array<{ text: string; amount: number; worn?: string }> = [];
-  const wearingSuit = wornSuits.length > 0;
+  const wearingSuit = benefitingSuits.length > 0;
   const useNatural =
     Boolean(bestNatural) &&
     (!wearingSuit || (bestNatural?.naturalMode === "higher" && naturalTotal > wornTotal));
