@@ -342,7 +342,7 @@ jobs:
           GH_TOKEN: ""
           FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
           FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances
+        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances/*/diagnostics
 
       - name: Upload sanitized diagnostics
         if: failure() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
