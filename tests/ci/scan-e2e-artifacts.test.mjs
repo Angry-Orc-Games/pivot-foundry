@@ -184,6 +184,40 @@ describe("E2E artifact credential scan", () => {
     }
   });
 
+  it("runs the credential scan on every outcome before each upload", async () => {
+    const workflow = await readFile(
+      new URL("../../.github/workflows/e2e.yml", import.meta.url),
+      "utf8",
+    );
+    const jobs = workflow.split(/\n {2}(?=\S)/);
+    const uploads = [];
+    for (const job of jobs) {
+      const steps = [];
+      let current = null;
+      for (const line of job.split("\n")) {
+        const named = line.match(/^ {6}- name: (.*)$/);
+        if (named) {
+          if (current) steps.push(current);
+          current = { name: named[1], body: `${line}\n` };
+        } else if (current) {
+          current.body += `${line}\n`;
+        }
+      }
+      if (current) steps.push(current);
+      steps.forEach((step, index) => {
+        if (step.body.includes("actions/upload-artifact")) uploads.push({ step, index, steps });
+      });
+    }
+
+    expect(uploads.length).toBeGreaterThan(0);
+    for (const { step, index, steps } of uploads) {
+      const scan = steps.slice(0, index).findLast((item) => item.body.includes("id: scan"));
+      expect(scan, step.name).toBeDefined();
+      expect(scan.body, step.name).toMatch(/if: always\(\)/);
+      expect(step.body, step.name).toContain("steps.scan.outcome == 'success'");
+    }
+  });
+
   it("does not upload diagnostics unless the credential scan passes", async () => {
     const workflow = await readFile(
       new URL("../../.github/workflows/e2e.yml", import.meta.url),

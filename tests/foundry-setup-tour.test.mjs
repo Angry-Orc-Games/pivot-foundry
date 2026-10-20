@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 
@@ -148,3 +148,141 @@ describe("Foundry setup tour", () => {
     expect(page.events).not.toContain("tour-exit");
   });
 });
+
+describe("setup phase deadlines", () => {
+  it("ends an active core tour before Create World when the overlay shows up late", async () => {
+    const page = lateTourPage();
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.ended).toBe(true);
+    expect(page.events).toContain("create-world");
+  });
+
+  it("names create world when World.create never returns", async () => {
+    vi.useFakeTimers();
+    const page = tourPage();
+    let evaluations = 0;
+    page.evaluate = async () => {
+      evaluations += 1;
+      if (evaluations === 1) return false;
+      if (evaluations === 2) return new Promise(() => {});
+      return true;
+    };
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(30_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during create world/);
+  });
+});
+
+function lateTourPage() {
+  const events = [];
+  let ended = false;
+  const tour = {
+    namespace: "core",
+    id: "backups-overview",
+    status: "in-progress",
+    exit() {
+      ended = true;
+      this.status = "completed";
+    },
+    complete() {
+      ended = true;
+      this.status = "completed";
+      return Promise.resolve();
+    },
+  };
+  let evaluations = 0;
+  const hidden = {
+    first() {
+      return hidden;
+    },
+    async count() {
+      return 0;
+    },
+    async isVisible() {
+      return false;
+    },
+    async waitFor() {
+      throw new Error("hidden");
+    },
+    async fill() {},
+  };
+  const title = {
+    first() {
+      return title;
+    },
+    async fill() {
+      events.push("title");
+    },
+  };
+  const createWorld = {
+    first() {
+      return createWorld;
+    },
+    last() {
+      return createWorld;
+    },
+    async waitFor() {},
+    async isVisible() {
+      return true;
+    },
+    async click() {
+      if (!ended) throw new Error(INTERCEPTS);
+      events.push("create-world");
+    },
+  };
+  return {
+    events,
+    get ended() {
+      return ended;
+    },
+    async goto() {},
+    async waitForFunction() {},
+    async evaluate(fn) {
+      if (typeof fn === "function" && fn.toString().includes("activeTour")) {
+        globalThis.foundry = { nue: { Tour: { activeTour: tour } } };
+        globalThis.game = { ready: false, tours: [tour] };
+        try {
+          return await fn();
+        } finally {
+          delete globalThis.foundry;
+          delete globalThis.game;
+        }
+      }
+      evaluations += 1;
+      if (evaluations === 1) return false;
+      if (evaluations === 2) return "unavailable";
+      return true;
+    },
+    locator(selector = "") {
+      const text = String(selector);
+      if (text.includes("tour-overlay")) return hidden;
+      if (text.includes("title") || text.includes('name="name"')) return title;
+      return hidden;
+    },
+    getByRole(role, options = {}) {
+      const name = options.name;
+      if (role === "button" && name instanceof RegExp && name.test("Create World"))
+        return createWorld;
+      if (role === "checkbox" || role === "heading") return hidden;
+      if (role === "button") return hidden;
+      throw new Error(`unexpected role ${role}`);
+    },
+    keyboard: { async press() {} },
+  };
+}
