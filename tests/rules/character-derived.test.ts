@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   calculateArmourClass,
@@ -9,6 +9,25 @@ import {
   calculateSkillTotal,
   calculateTotalWeight,
 } from "../../src/rules/character-derived";
+
+function speedActor(species: string, stored: number) {
+  return {
+    level: 1,
+    abilities: {
+      str: { score: 10, primary: false },
+      dex: { score: 14, primary: false },
+      con: { score: 10, primary: false },
+      int: { score: 10, primary: false },
+      wis: { score: 10, primary: false },
+      cha: { score: 10, primary: false },
+    },
+    skills: {},
+    magic: { awakened: false, ability: null },
+    equipment: [],
+    species,
+    speed: { value: stored, bonus: 2 },
+  };
+}
 
 describe("calculateCharacterDerived", () => {
   it("derives ability modifiers, proficiency, resources, and passive perception", () => {
@@ -64,6 +83,29 @@ describe("calculateCharacterDerived", () => {
     expect(derived.pool.max).toBe(10);
     expect(derived.speed).toBe(12);
     expect(derived.armourClass.value).toBe(11);
+  });
+
+  it("derives base speed from species size and adds bonuses", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const halfling = calculateCharacterDerived(speedActor("Halfling", 10), { speedBonus: 1 });
+    const dwarf = calculateCharacterDerived(speedActor("Dwarf", 10));
+    const human = calculateCharacterDerived(speedActor("Human", 10));
+    const smallHumanoid = calculateCharacterDerived(speedActor("Small Humanoid", 10));
+    const largeBeast = calculateCharacterDerived(speedActor("Large Beast", 10));
+    const unknown = calculateCharacterDerived(speedActor("Dragon", 10));
+    const custom = calculateCharacterDerived(speedActor("Halfling", 4));
+    const zero = calculateCharacterDerived(speedActor("Halfling", 0));
+
+    expect(halfling.speed).toBe(10);
+    expect(dwarf.speed).toBe(10);
+    expect(human.speed).toBe(12);
+    expect(smallHumanoid.speed).toBe(9);
+    expect(largeBeast.speed).toBe(14);
+    expect(unknown.speed).toBe(12);
+    expect(custom.speed).toBe(6);
+    expect(zero.speed).toBe(2);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("Dragon"));
+    info.mockRestore();
   });
 });
 
