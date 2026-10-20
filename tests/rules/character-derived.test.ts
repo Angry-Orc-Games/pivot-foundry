@@ -452,6 +452,28 @@ describe("calculateArmourClass", () => {
     expect(gradeLoses.value).toBe(13);
     expect(gradeLoses.breakdown).toEqual(["Base 10", "Magic Armour +1", "Magic Shield +2"]);
   });
+
+  it("keeps the highest bonus when untagged other items share a name", () => {
+    const identical = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Ring of Protection", category: "other", acBonus: 1, equipped: true },
+        { name: "ring of protection", category: "other", acBonus: 2, equipped: true },
+      ],
+    });
+    const different = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Ring of Protection", category: "other", acBonus: 1, equipped: true },
+        { name: "Cloak", category: "other", acBonus: 1, equipped: true },
+      ],
+    });
+
+    expect(identical.value).toBe(12);
+    expect(identical.breakdown).toEqual(["Base 10", "ring of protection +2"]);
+    expect(different.value).toBe(12);
+    expect(different.breakdown).toEqual(["Base 10", "Ring of Protection +1", "Cloak +1"]);
+  });
 });
 
 describe("calculateTotalWeight", () => {
