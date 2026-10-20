@@ -394,8 +394,12 @@ function lateTourPage({ hangComplete = false } = {}) {
 function classToursPage({ setupThrows = false, includeSidebar = false, dialog = false } = {}) {
   const completed = [];
   const events = [];
-  class SetupTour {}
-  class SidebarTour {}
+  function SetupTour() {
+    this.kind = "setup";
+  }
+  function SidebarTour() {
+    this.kind = "sidebar";
+  }
   let dialogVisible = false;
   const setup = Object.assign(new SetupTour(), {
     namespace: "core",

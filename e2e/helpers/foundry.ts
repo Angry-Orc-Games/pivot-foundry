@@ -182,6 +182,29 @@ function noteAuthPhase(phase: AuthPhase): void {
   appendFileSync(file, `${phase}\n`);
 }
 
+function noteTourProblem(line: string): void {
+  const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+  if (!marker) return;
+  let safe = line;
+  for (const secret of [process.env.FOUNDRY_ADMIN_KEY, process.env.FOUNDRY_LICENSE_KEY]) {
+    if (secret) safe = safe.split(secret).join("[redacted]");
+  }
+  const file = join(dirname(marker), "tour-notes.log");
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, `${safe}\n`);
+}
+
+function tourCloseOutcome(value: unknown): { ready: boolean; notes: string[] } {
+  if (value && typeof value === "object" && "ready" in value) {
+    const record = value as { ready?: unknown; notes?: unknown };
+    const notes = Array.isArray(record.notes)
+      ? record.notes.filter((line): line is string => typeof line === "string")
+      : [];
+    return { ready: record.ready === true, notes };
+  }
+  return { ready: value === true, notes: [] };
+}
+
 const BLANK_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
@@ -316,47 +339,111 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
   }
 }
 
-async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promise<boolean> {
+type SetupTourLike = {
+  namespace?: string;
+  id?: string;
+  status?: string;
+  steps?: unknown;
+  exit?: () => void;
+  complete?: () => Promise<unknown> | unknown;
+};
+
+async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promise<{
+  ready: boolean;
+  notes: string[];
+}> {
   const host = runtime as typeof globalThis & {
     foundry?: {
       nue?: {
-        Tour?: {
-          activeTour?: { namespace?: string; exit?: () => void } | null;
+        Tour?: { activeTour?: SetupTourLike | null };
+        tours?: {
+          SetupTour?: new (...args: never[]) => unknown;
+          SidebarTour?: new (...args: never[]) => unknown;
         };
+        SetupTour?: new (...args: never[]) => unknown;
+        SidebarTour?: new (...args: never[]) => unknown;
       };
     };
     game?: {
       ready?: boolean;
-      tours?: Iterable<{
-        namespace?: string;
-        status?: string;
-        complete?: () => Promise<unknown> | unknown;
-      }>;
+      tours?: Iterable<SetupTourLike>;
     };
   };
+
+  function stepsNeedUser(tour: SetupTourLike): boolean {
+    try {
+      const steps = tour.steps;
+      if (!Array.isArray(steps)) return false;
+      return steps.some(
+        (step) =>
+          Boolean(step) &&
+          typeof step === "object" &&
+          ("sidebarTab" in step || "layer" in step || "tool" in step),
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  function setupContext(tour: SetupTourLike): boolean {
+    const nue = host.foundry?.nue;
+    const SetupTour = nue?.tours?.SetupTour ?? nue?.SetupTour;
+    const SidebarTour = nue?.tours?.SidebarTour ?? nue?.SidebarTour;
+    if (typeof SidebarTour === "function" && tour instanceof SidebarTour) return false;
+    if (typeof SetupTour === "function" && tour instanceof SetupTour) return true;
+    if (stepsNeedUser(tour)) return false;
+    if (typeof SetupTour === "function" && tour.constructor !== Object) return false;
+    return tour.namespace === undefined || tour.namespace === "core";
+  }
+
+  function problem(tour: SetupTourLike, error: unknown): string {
+    const id = [tour.namespace, tour.id].filter(Boolean).join(".") || "tour";
+    const message = error instanceof Error ? error.message : String(error);
+    return `${id}: ${message}`.slice(0, 240);
+  }
+
+  const notes: string[] = [];
   const active = host.foundry?.nue?.Tour?.activeTour;
-  if (
-    active &&
-    (active.namespace === undefined || active.namespace === "core") &&
-    typeof active.exit === "function"
-  ) {
-    active.exit();
+  if (active && setupContext(active) && typeof active.exit === "function") {
+    try {
+      active.exit();
+    } catch (error) {
+      notes.push(problem(active, error));
+    }
   }
   const tours = host.game?.tours;
   if (tours) {
-    const pending: Array<Promise<unknown>> = [];
     for (const tour of tours) {
-      if (
-        tour?.namespace === "core" &&
-        tour.status !== "completed" &&
-        typeof tour.complete === "function"
-      ) {
-        pending.push(Promise.resolve(tour.complete()));
+      if (!tour || tour.status === "completed" || typeof tour.complete !== "function") continue;
+      if (!setupContext(tour)) continue;
+      try {
+        await tour.complete();
+      } catch (error) {
+        notes.push(problem(tour, error));
       }
     }
-    await Promise.all(pending);
   }
-  return Boolean(host.game?.ready);
+  return { ready: Boolean(host.game?.ready), notes };
+}
+
+async function dismissSuggestedNextTour(page: Page): Promise<void> {
+  try {
+    const root = page.locator(".dialog, .window-app, dialog, .application");
+    if (typeof root.filter !== "function") return;
+    const dialog = root.filter({ hasText: /suggested next tour/i }).first();
+    const visible = await dialog
+      .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
+      .then(() => true)
+      .catch(() => false);
+    if (!visible) return;
+    const decline = dialog
+      .getByRole("button", { name: /no thanks|decline|not now|cancel|close/i })
+      .first();
+    await decline.click({ timeout: TOUR_WAIT_MS });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    noteTourProblem(`suggested next tour: ${message}`.slice(0, 240));
+  }
 }
 
 export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page> {
@@ -383,7 +470,12 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
   const ready = await withPhaseTimeout(
     "tour close",
     TOUR_CLOSE_PHASE_MS,
-    current.evaluate(silenceCoreTours),
+    (async () => {
+      const outcome = tourCloseOutcome(await current.evaluate(silenceCoreTours));
+      for (const line of outcome.notes) noteTourProblem(line);
+      await dismissSuggestedNextTour(current);
+      return outcome.ready;
+    })(),
   );
   if (ready) return current;
 
