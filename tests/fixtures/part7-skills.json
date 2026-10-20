@@ -1,0 +1,59 @@
+{
+  "Academia": {
+    "ability": "Intelligence",
+    "disciplines": {
+      "Arcane": "Intelligence",
+      "Commerce": "Intelligence",
+      "Dungeoneering": "Intelligence",
+      "Engineering": "Intelligence",
+      "Geography": "Intelligence",
+      "Geology": "Intelligence",
+      "History": "Intelligence",
+      "Languages": "Intelligence",
+      "Local": "Intelligence",
+      "Nobility and Royalty": "Intelligence",
+      "Realms": "Intelligence",
+      "Religion": "Intelligence"
+    }
+  },
+  "Acrobatics": "Dexterity",
+  "Alchemy": "Intelligence",
+  "Animal Handling": "Wisdom",
+  "Athletics": "Strength",
+  "Control Magic": "Magic Ability Score (Intelligence, Wisdom, or Charisma)",
+  "Crafting": {
+    "ability": "Varies by specialisation",
+    "specialisations": {
+      "Armourer": "Strength",
+      "Bowyer": "Dexterity",
+      "Cooking": "Wisdom",
+      "Fine Arts": "Dexterity",
+      "Fletching": "Dexterity",
+      "Leatherworking": "Dexterity",
+      "Metalworking": "Strength",
+      "Prose": "Intelligence",
+      "Rune Etching": "Intelligence",
+      "Stoneworking": "Strength",
+      "Tattooing": "Dexterity",
+      "Textile Craft": "Dexterity",
+      "Tinkering": "Dexterity",
+      "Woodworking": "Strength"
+    }
+  },
+  "Deception": "Charisma",
+  "Insight": "Wisdom",
+  "Intimidation": "Charisma",
+  "Investigation": "Intelligence",
+  "Medicine": "Intelligence",
+  "Medicine: Holistic": "Wisdom",
+  "Nature": "Intelligence",
+  "Navigation": "Intelligence",
+  "Perception": "Wisdom",
+  "Performance": "Charisma",
+  "Persuasion": "Charisma",
+  "Religion": "Wisdom",
+  "Sleight of Hand": "Dexterity",
+  "Stealth": "Dexterity",
+  "Survival": "Wisdom",
+  "Thievery": "Dexterity"
+}
