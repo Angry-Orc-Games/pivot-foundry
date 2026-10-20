@@ -1,4 +1,5 @@
 import { itemTypes, SYSTEM_ID } from "../config";
+import { normalizeEchelon, type Echelon } from "./echelon";
 import { validateEffectRule, type EffectRule } from "./effects";
 import { CURRENT_SCHEMA_VERSION } from "./schema-version";
 
@@ -32,7 +33,7 @@ export interface ContentItemSystem {
   carried?: boolean;
   ability?: string;
   stream?: string;
-  echelon?: number;
+  echelon?: Echelon;
   mpCost?: number;
   roll?: string;
   damageFormula?: string;
@@ -190,7 +191,7 @@ function validateItemSystem(value: unknown, type: PivotItemType): ContentItemSys
   if (value.damage !== undefined && type === "weapon") system.damage = requireDamage(value.damage);
   if (value.range !== undefined) system.range = requireRange(value.range);
   if (value.acBonus !== undefined) system.acBonus = requireFiniteInteger(value.acBonus, "acBonus");
-  if (value.echelon !== undefined) system.echelon = requireFiniteInteger(value.echelon, "echelon");
+  if (value.echelon !== undefined) system.echelon = requireEchelon(value.echelon);
   if (value.mpCost !== undefined) system.mpCost = requireNonNegativeInteger(value.mpCost, "mpCost");
   if (value.quantity !== undefined) {
     system.quantity = requireNonNegativeInteger(value.quantity, "quantity");
@@ -303,6 +304,14 @@ function requireRange(value: unknown): { normal?: number; long?: number } {
   }
   if (value.long !== undefined) range.long = requireNonNegativeInteger(value.long, "range.long");
   return range;
+}
+
+function requireEchelon(value: unknown): Echelon {
+  const echelon = normalizeEchelon(value);
+  if (echelon === undefined) {
+    throw new Error("echelon must be Core or an integer from 1 to 5.");
+  }
+  return echelon;
 }
 
 function requireFiniteInteger(value: unknown, field: string): number {
