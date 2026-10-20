@@ -1,3 +1,7 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
@@ -115,6 +119,25 @@ describe("Foundry setup tour", () => {
     expect(page.events[0]).toBe("tour-exit");
     expect(page.events).toContain("create-world");
     expect(page.events.indexOf("create-world")).toBeGreaterThan(page.events.indexOf("tour-exit"));
+  });
+
+  it("records tour close and create world without the administrator key", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pivot-auth-steps-"));
+    const marker = join(dir, "setup-failure.txt");
+    const previous = process.env.PIVOT_E2E_SETUP_FAILURE;
+    process.env.PIVOT_E2E_SETUP_FAILURE = marker;
+    const page = tourPage();
+    try {
+      await ensureE2EWorld(page, "admin-key-secret");
+    } finally {
+      if (previous === undefined) delete process.env.PIVOT_E2E_SETUP_FAILURE;
+      else process.env.PIVOT_E2E_SETUP_FAILURE = previous;
+    }
+    const log = await readFile(join(dir, "auth-steps.log"), "utf8").catch(() => "");
+    await rm(dir, { recursive: true, force: true });
+
+    expect(log).toBe("license\nadmin\neula\nadmin\ntour close\ncreate world\n");
+    expect(log).not.toContain("admin-key-secret");
   });
 
   it("clicks Create World when no tour is showing", async () => {

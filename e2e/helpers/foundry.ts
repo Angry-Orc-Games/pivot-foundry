@@ -1,11 +1,8 @@
-import {
-  expect,
-  test,
-  type Browser,
-  type BrowserContext,
-  type Locator,
-  type Page,
-} from "@playwright/test";
+import { Buffer } from "node:buffer";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 import { handleFoundryEula } from "../../scripts/foundry-setup.mjs";
 
@@ -46,17 +43,31 @@ function asFirst<T>(locator: T): T {
   return typeof withFirst.first === "function" ? withFirst.first() : locator;
 }
 
+type AuthPhase = "license" | "eula" | "admin" | "tour close" | "create world" | "join";
+
+function absentScreen(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = "name" in error ? String(error.name) : "";
+  const message = "message" in error ? String(error.message) : "";
+  if (/hidden|did not appear/i.test(message)) return true;
+  if (/^timeout \d+ms exceeded\.?$/i.test(message)) return true;
+  return name === "TimeoutError" && !/test timeout/i.test(message);
+}
+
 function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number): Promise<string> {
   return new Promise((resolve, reject) => {
     let pending = entries.length;
     let settled = false;
-    const fail = () => {
+    let fault: unknown;
+    const finish = (error: unknown) => {
       if (settled) return;
       settled = true;
       globalThis.clearTimeout(timer);
-      reject(new Error(ADMIN_SCREEN_MISSING));
+      reject(error);
     };
-    const timer = globalThis.setTimeout(fail, timeout);
+    const timer = globalThis.setTimeout(() => {
+      finish(fault ?? new Error(ADMIN_SCREEN_MISSING));
+    }, timeout);
     for (const [name, locator] of entries) {
       Promise.resolve()
         .then(() => locator.waitFor({ state: "visible", timeout }))
@@ -66,72 +77,84 @@ function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number):
           globalThis.clearTimeout(timer);
           resolve(name);
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          if (!absentScreen(error)) fault = fault ?? error;
           pending -= 1;
-          if (!settled && pending === 0) fail();
+          if (settled) return;
+          if (fault) finish(fault);
+          else if (pending === 0) finish(new Error(ADMIN_SCREEN_MISSING));
         });
     }
   });
 }
 
-function savedTraceChunkPath(): string {
-  try {
-    const info = test.info() as {
-      outputPath: (name: string) => string;
-      _tracing?: { maybeGenerateNextTraceRecordingPath?: () => string | undefined };
-    };
-    const generated = info._tracing?.maybeGenerateNextTraceRecordingPath?.();
-    if (generated) return generated;
-    return info.outputPath("trace-chunk.zip");
-  } catch {
-    return "trace-chunk.zip";
-  }
+function noteAuthPhase(phase: AuthPhase): void {
+  const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+  if (!marker) return;
+  const file = join(dirname(marker), "auth-steps.log");
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, `${phase}\n`);
 }
 
-async function withoutTrace(page: Page, action: () => Promise<void>): Promise<void> {
-  const tracing = typeof page.context === "function" ? page.context().tracing : undefined;
-  const canPause =
-    typeof tracing?.stopChunk === "function" && typeof tracing.startChunk === "function";
-  let paused = false;
-  if (canPause && tracing) {
-    try {
-      await tracing.stopChunk({ path: savedTraceChunkPath() });
-      paused = true;
-    } catch {
-      paused = false;
+const BLANK_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+type ShotState = Page & { __pivotHoldShots?: boolean; __pivotShotWrapped?: boolean };
+
+async function clearPasswordFields(page: Page): Promise<boolean> {
+  try {
+    const fields = page.locator('input[type="password"]');
+    if (typeof fields.count !== "function") return true;
+    const count = await fields.count();
+    for (let index = 0; index < count; index += 1) {
+      const field = typeof fields.nth === "function" ? fields.nth(index) : fields;
+      if (typeof field.fill === "function") await field.fill("");
     }
-  }
-  try {
-    await action();
-  } finally {
-    if (paused && tracing) await tracing.startChunk();
+    return true;
+  } catch {
+    return false;
   }
 }
 
-function maskPasswordShots(page: Page, field: Locator): void {
-  if (typeof page.screenshot !== "function") return;
+function holdFailureShots(page: Page): void {
+  const state = page as ShotState;
+  state.__pivotHoldShots = true;
+  if (state.__pivotShotWrapped || typeof page.screenshot !== "function") return;
+  state.__pivotShotWrapped = true;
   const shoot = page.screenshot.bind(page);
-  page.screenshot = (options) =>
-    shoot({
-      ...options,
-      mask: [...(options?.mask ?? []), field],
-    });
+  page.screenshot = (async (options?: Parameters<Page["screenshot"]>[0]) => {
+    if (state.__pivotHoldShots) {
+      const cleared = await clearPasswordFields(page);
+      if (!cleared) return BLANK_PNG;
+    }
+    return shoot(options);
+  }) as Page["screenshot"];
+}
+
+function releaseFailureShots(page: Page): void {
+  (page as ShotState).__pivotHoldShots = false;
 }
 
 export async function authenticateSetup(page: Page, adminKey: string): Promise<void> {
+  noteAuthPhase("admin");
+  holdFailureShots(page);
   const password = asFirst(
     page.locator('input[type="password"], input[name="adminPassword"], input[name="password"]'),
   );
-  maskPasswordShots(page, password);
-  const setup: Array<[string, ScreenLocator]> = [
-    ["setup", asFirst(page.getByRole("button", { name: /create world|new world/i }))],
-    ["setup", asFirst(page.getByRole("checkbox", { name: "I agree to these terms" }))],
-    ["setup", asFirst(page.getByRole("heading", { name: "Setup", exact: true }))],
-  ];
-  const screen = await firstVisible([["admin", password], ...setup], ADMIN_SCREEN_TIMEOUT_MS);
-  if (screen !== "admin") return;
+  try {
+    const setup: Array<[string, ScreenLocator]> = [
+      ["setup", asFirst(page.getByRole("button", { name: /create world|new world/i }))],
+      ["setup", asFirst(page.getByRole("checkbox", { name: "I agree to these terms" }))],
+      ["setup", asFirst(page.getByRole("heading", { name: "Setup", exact: true }))],
+    ];
+    const screen = await firstVisible([["admin", password], ...setup], ADMIN_SCREEN_TIMEOUT_MS);
+    if (screen !== "admin") {
+      releaseFailureShots(page);
+      return;
+    }
 
-  await withoutTrace(page, async () => {
     await password.fill(adminKey);
     const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
     if (await submit.isVisible().catch(() => false)) {
@@ -140,13 +163,19 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
       await password.press("Enter");
     }
     await password.fill("").catch(() => undefined);
-  });
-  await firstVisible(setup, ADMIN_SCREEN_TIMEOUT_MS);
+    await firstVisible(setup, ADMIN_SCREEN_TIMEOUT_MS);
+    releaseFailureShots(page);
+  } catch (error) {
+    await clearPasswordFields(page);
+    throw error;
+  }
 }
 
 export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void> {
   await waitForFoundryShell(page);
+  noteAuthPhase("license");
   await authenticateSetup(page, adminKey);
+  noteAuthPhase("eula");
   await handleFoundryEula(page);
   await authenticateSetup(page, adminKey);
 
@@ -182,6 +211,8 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void
 
   if (created === "unavailable") {
     await createWorldThroughUi(page);
+  } else if (created === "created") {
+    noteAuthPhase("create world");
   }
 
   await launchWorld(page);
@@ -190,6 +221,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void
 const TOUR_WAIT_MS = 2_000;
 
 async function dismissSetupTour(page: Page): Promise<void> {
+  noteAuthPhase("tour close");
   const overlay = page.locator("div.tour-overlay").first();
   const visible = await overlay
     .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
@@ -217,6 +249,7 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
   await create.waitFor({ state: "visible", timeout: 30_000 });
   await dismissSetupTour(page);
+  noteAuthPhase("create world");
   await create.click();
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");
@@ -266,16 +299,18 @@ export async function joinAs(
   page: Page,
   { name, password = "" }: { name: string; password?: string },
 ): Promise<void> {
-  if (!page.url().includes("/join")) {
-    await page.goto("/join", { waitUntil: "domcontentloaded" });
-  }
-  await page.getByText(name, { exact: true }).first().click({ timeout: 60_000 });
-  const submitJoin = async () => {
-    const join = page.getByRole("button", { name: /join game|join/i }).first();
-    if (await join.isVisible().catch(() => false)) await join.click();
-  };
-  if (password) {
-    await withoutTrace(page, async () => {
+  noteAuthPhase("join");
+  holdFailureShots(page);
+  try {
+    if (!page.url().includes("/join")) {
+      await page.goto("/join", { waitUntil: "domcontentloaded" });
+    }
+    await page.getByText(name, { exact: true }).first().click({ timeout: 60_000 });
+    const submitJoin = async () => {
+      const join = page.getByRole("button", { name: /join game|join/i }).first();
+      if (await join.isVisible().catch(() => false)) await join.click();
+    };
+    if (password) {
       const field = page.locator('input[type="password"]');
       if ((await field.count()) > 0) await field.first().fill(password);
       await submitJoin();
@@ -284,11 +319,15 @@ export async function joinAs(
           .first()
           .fill("")
           .catch(() => undefined);
-    });
-  } else {
-    await submitJoin();
+    } else {
+      await submitJoin();
+    }
+    await waitForGameReady(page);
+    releaseFailureShots(page);
+  } catch (error) {
+    await clearPasswordFields(page);
+    throw error;
   }
-  await waitForGameReady(page);
 }
 
 export async function waitForGameReady(page: Page): Promise<FoundryIdentity> {
@@ -334,8 +373,9 @@ export async function waitForCanvasReady(page: Page): Promise<void> {
 }
 
 export async function createPlayerUser(page: Page, name: string, password: string): Promise<void> {
-  await withoutTrace(page, () =>
-    page.evaluate(
+  holdFailureShots(page);
+  try {
+    await page.evaluate(
       async ({ userName, userPassword }) => {
         const game = (
           window as unknown as {
@@ -359,8 +399,12 @@ export async function createPlayerUser(page: Page, name: string, password: strin
         });
       },
       { userName: name, userPassword: password },
-    ),
-  );
+    );
+    releaseFailureShots(page);
+  } catch (error) {
+    await clearPasswordFields(page);
+    throw error;
+  }
 }
 
 export async function openOwnedContext(
