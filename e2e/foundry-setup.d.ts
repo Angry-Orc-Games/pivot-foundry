@@ -1,4 +1,7 @@
 declare module "../../scripts/foundry-setup.mjs" {
+  export const SCREEN_TIMEOUT_MS: number;
+  export const EULA_HIDDEN_MS: number;
+
   export function withPhaseTimeout<T>(phase: string, ms: number, work: Promise<T>): Promise<T>;
 
   export function handleFoundryEula(

@@ -136,7 +136,7 @@ describe("Foundry setup tour", () => {
     const log = await readFile(join(dir, "auth-steps.log"), "utf8").catch(() => "");
     await rm(dir, { recursive: true, force: true });
 
-    expect(log).toBe("license\nadmin\neula\nadmin\ntour close\ncreate world\n");
+    expect(log).toBe("license\nadmin\neula\nadmin\ntour close\ncreate world\nlaunch\n");
     expect(log).not.toContain("admin-key-secret");
   });
 

@@ -11,7 +11,12 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { handleFoundryEula, withPhaseTimeout } from "../../scripts/foundry-setup.mjs";
+import {
+  EULA_HIDDEN_MS,
+  SCREEN_TIMEOUT_MS,
+  handleFoundryEula,
+  withPhaseTimeout,
+} from "../../scripts/foundry-setup.mjs";
 
 export interface FoundryIdentity {
   ready: boolean;
@@ -23,6 +28,44 @@ export interface FoundryIdentity {
 }
 
 const LICENSE_PHASE_MS = 60_000;
+const ADMIN_SCREEN_TIMEOUT_MS = 15_000;
+const SETTLE_PHASE_MS = 15_000;
+const TOUR_CLOSE_PHASE_MS = 15_000;
+const CREATE_WORLD_PHASE_MS = 20_000;
+const CREATE_WORLD_UI_MS = 30_000;
+const LAUNCH_PHASE_MS = 30_000;
+const JOIN_PHASE_MS = 60_000;
+const GAME_READY_MS = 180_000;
+const TOUR_WAIT_MS = 2_000;
+const FIELD_CLEAR_MS = 1_000;
+const NAVIGATION_MS = 30_000;
+
+export function setupPhaseBudgetMs(): number {
+  const adminSignIn = ADMIN_SCREEN_TIMEOUT_MS * 3 + FIELD_CLEAR_MS;
+  const eulaSign = SCREEN_TIMEOUT_MS * 3 + EULA_HIDDEN_MS;
+  const worldForm = CREATE_WORLD_UI_MS + TOUR_WAIT_MS * 4 + ADMIN_SCREEN_TIMEOUT_MS * 5;
+  const launch = LAUNCH_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS;
+  const join = NAVIGATION_MS + JOIN_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS + FIELD_CLEAR_MS;
+  return (
+    LICENSE_PHASE_MS +
+    adminSignIn +
+    eulaSign +
+    SETTLE_PHASE_MS +
+    adminSignIn +
+    SETTLE_PHASE_MS +
+    adminSignIn +
+    TOUR_CLOSE_PHASE_MS +
+    CREATE_WORLD_PHASE_MS +
+    worldForm +
+    launch +
+    join +
+    GAME_READY_MS
+  );
+}
+
+export function setupHookTimeoutMs(): number {
+  return setupPhaseBudgetMs() + 5_000;
+}
 
 export async function waitForFoundryShell(page: Page): Promise<void> {
   await withPhaseTimeout(
@@ -45,12 +88,14 @@ export async function waitForFoundryShell(page: Page): Promise<void> {
   );
 }
 
-const ADMIN_SCREEN_TIMEOUT_MS = 15_000;
 const ADMIN_SCREEN_MISSING =
   "Foundry setup did not show the administrator password field or the Setup screen.";
 
 type ScreenLocator = {
   waitFor(options: { state: "visible"; timeout: number }): Promise<void>;
+  or?(other: ScreenLocator): ScreenLocator;
+  first?(): ScreenLocator;
+  isVisible?(): Promise<boolean>;
 };
 
 function asFirst<T>(locator: T): T {
@@ -58,7 +103,7 @@ function asFirst<T>(locator: T): T {
   return typeof withFirst.first === "function" ? withFirst.first() : locator;
 }
 
-type AuthPhase = "license" | "eula" | "admin" | "tour close" | "create world" | "join";
+type AuthPhase = "license" | "eula" | "admin" | "tour close" | "create world" | "launch" | "join";
 
 function absentScreen(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -69,7 +114,30 @@ function absentScreen(error: unknown): boolean {
   return name === "TimeoutError" && !/test timeout/i.test(message);
 }
 
+function visibleUnion(entries: Array<[string, ScreenLocator]>): ScreenLocator | undefined {
+  const [first, ...rest] = entries;
+  if (!first || rest.length === 0 || typeof first[1].or !== "function") return undefined;
+  let combined = first[1];
+  for (const [, locator] of rest) {
+    const widen = combined.or;
+    if (typeof widen !== "function") return undefined;
+    combined = widen.call(combined, locator);
+  }
+  return combined;
+}
+
 function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number): Promise<string> {
+  const [first] = entries;
+  const union = visibleUnion(entries);
+  if (first && union) {
+    const target = typeof union.first === "function" ? union.first() : union;
+    return target.waitFor({ state: "visible", timeout }).then(async () => {
+      for (const [name, locator] of entries) {
+        if (await locator.isVisible?.().catch(() => false)) return name;
+      }
+      return first[0];
+    });
+  }
   return new Promise((resolve, reject) => {
     let pending = entries.length;
     let settled = false;
@@ -93,6 +161,7 @@ function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number):
           resolve(name);
         })
         .catch((error: unknown) => {
+          if (settled) return;
           if (!absentScreen(error)) fault = fault ?? error;
           pending -= 1;
           if (settled) return;
@@ -125,7 +194,14 @@ async function clearPasswordFields(page: Page): Promise<boolean> {
     const count = await fields.count();
     for (let index = 0; index < count; index += 1) {
       const field = typeof fields.nth === "function" ? fields.nth(index) : fields;
-      if (typeof field.fill === "function") await field.fill("");
+      if (typeof field.fill !== "function") continue;
+      await Promise.race([
+        Promise.resolve(field.fill("")).then(
+          () => undefined,
+          () => undefined,
+        ),
+        new Promise((resolve) => setTimeout(resolve, FIELD_CLEAR_MS)),
+      ]);
     }
     return true;
   } catch {
@@ -191,7 +267,7 @@ async function openPage(page: Page, closedError?: unknown): Promise<Page> {
 async function settle(page: Page): Promise<void> {
   if (typeof page.waitForLoadState !== "function") return;
   try {
-    await withPhaseTimeout("eula", 15_000, page.waitForLoadState("domcontentloaded"));
+    await withPhaseTimeout("eula", SETTLE_PHASE_MS, page.waitForLoadState("domcontentloaded"));
   } catch (error) {
     if (!closedTarget(error)) throw error;
   }
@@ -218,11 +294,11 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
     await fillSecret(password, adminKey);
     const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
     if (await submit.isVisible().catch(() => false)) {
-      await submit.click();
+      await submit.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
     } else {
-      await password.press("Enter");
+      await password.press("Enter", { timeout: ADMIN_SCREEN_TIMEOUT_MS });
     }
-    await password.fill("").catch(() => undefined);
+    await clearPasswordFields(page);
     await firstVisible(setup, ADMIN_SCREEN_TIMEOUT_MS);
     releaseFailureShots(page);
   } catch (error) {
@@ -294,12 +370,18 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
     current = recovered;
   }
 
-  const ready = await withPhaseTimeout("tour close", 15_000, current.evaluate(silenceCoreTours));
+  noteAuthPhase("tour close");
+  const ready = await withPhaseTimeout(
+    "tour close",
+    TOUR_CLOSE_PHASE_MS,
+    current.evaluate(silenceCoreTours),
+  );
   if (ready) return current;
 
+  noteAuthPhase("create world");
   const created = await withPhaseTimeout(
     "create world",
-    20_000,
+    CREATE_WORLD_PHASE_MS,
     current.evaluate(
       async (world) => {
         const runtime = window as unknown as {
@@ -326,20 +408,13 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
     ),
   );
 
-  if (created === "unavailable") {
-    await createWorldThroughUi(current);
-  } else if (created === "created") {
-    noteAuthPhase("create world");
-  }
+  if (created === "unavailable") await createWorldThroughUi(current);
 
   await launchWorld(current);
   return current;
 }
 
-const TOUR_WAIT_MS = 2_000;
-
 async function dismissSetupTour(page: Page): Promise<void> {
-  noteAuthPhase("tour close");
   const overlay = page.locator("div.tour-overlay").first();
   const visible = await overlay
     .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
@@ -365,28 +440,30 @@ async function dismissSetupTour(page: Page): Promise<void> {
 
 async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
-  await create.waitFor({ state: "visible", timeout: 30_000 });
+  await create.waitFor({ state: "visible", timeout: CREATE_WORLD_UI_MS });
   await dismissSetupTour(page);
-  noteAuthPhase("create world");
-  await create.click();
+  await create.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");
   const system = page.locator('select[name="system"], select#system');
   if ((await system.count()) > 0) {
     await system
       .first()
-      .selectOption({ value: "pivot-fantasy" })
+      .selectOption({ value: "pivot-fantasy" }, { timeout: ADMIN_SCREEN_TIMEOUT_MS })
       .catch(async () => {
-        await system.first().selectOption({ label: /pivot fantasy/i });
+        await system
+          .first()
+          .selectOption({ label: /pivot fantasy/i }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
       });
   }
   await page
     .getByRole("button", { name: /create world|create/i })
     .last()
-    .click();
+    .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
 }
 
 async function launchWorld(page: Page): Promise<void> {
+  noteAuthPhase("launch");
   const launched = await page.evaluate(async (worldId) => {
     const runtime = window as unknown as {
       game?: {
@@ -408,8 +485,8 @@ async function launchWorld(page: Page): Promise<void> {
 
   if (!launched) {
     const launch = page.getByRole("button", { name: /launch/i }).first();
-    await expect(launch).toBeVisible({ timeout: 30_000 });
-    await launch.click();
+    await expect(launch).toBeVisible({ timeout: LAUNCH_PHASE_MS });
+    await launch.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   }
 }
 
@@ -421,22 +498,20 @@ export async function joinAs(
   holdFailureShots(page);
   try {
     if (!page.url().includes("/join")) {
-      await page.goto("/join", { waitUntil: "domcontentloaded" });
+      await page.goto("/join", { waitUntil: "domcontentloaded", timeout: NAVIGATION_MS });
     }
-    await page.getByText(name, { exact: true }).first().click({ timeout: 60_000 });
+    await page.getByText(name, { exact: true }).first().click({ timeout: JOIN_PHASE_MS });
     const submitJoin = async () => {
       const join = page.getByRole("button", { name: /join game|join/i }).first();
-      if (await join.isVisible().catch(() => false)) await join.click();
+      if (await join.isVisible().catch(() => false)) {
+        await join.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+      }
     };
     if (password) {
       const field = page.locator('input[type="password"]');
       if ((await field.count()) > 0) await fillSecret(field.first(), password);
       await submitJoin();
-      if ((await field.count()) > 0)
-        await field
-          .first()
-          .fill("")
-          .catch(() => undefined);
+      await clearPasswordFields(page);
     } else {
       await submitJoin();
     }
@@ -452,7 +527,7 @@ export async function waitForGameReady(page: Page): Promise<FoundryIdentity> {
   await page.waitForFunction(
     () => (window as unknown as { game?: { ready?: boolean } }).game?.ready === true,
     {
-      timeout: 180_000,
+      timeout: GAME_READY_MS,
     },
   );
   return readIdentity(page);
