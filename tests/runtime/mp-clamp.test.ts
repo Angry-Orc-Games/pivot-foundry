@@ -6,6 +6,34 @@ import {
   registerMpClampHooks,
 } from "../../src/runtime/mp-clamp";
 
+// Foundry expandObject writes keys in order. A concrete `system` key replaces dotted keys written first.
+function expandFoundryUpdate(data: Record<string, unknown>): Record<string, unknown> {
+  const expanded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    const nested =
+      typeof value === "object" && value !== null && !Array.isArray(value)
+        ? expandFoundryUpdate(value as Record<string, unknown>)
+        : value;
+    assignFoundryProperty(expanded, key, nested);
+  }
+  return expanded;
+}
+
+function assignFoundryProperty(object: Record<string, unknown>, key: string, value: unknown): void {
+  const parts = key.split(".");
+  const leaf = parts.pop();
+  if (leaf === undefined) return;
+  let target = object;
+  for (const part of parts) {
+    const current = target[part];
+    if (typeof current !== "object" || current === null || Array.isArray(current)) {
+      target[part] = {};
+    }
+    target = target[part] as Record<string, unknown>;
+  }
+  target[leaf] = value;
+}
+
 function awakenedMagic(value: number, maxBonus = 0) {
   return {
     progression: { level: 1 },
@@ -51,6 +79,17 @@ describe("clampMpOnActorUpdate", () => {
     clampMpOnActorUpdate(actor, changes);
 
     expect(changes.system).toMatchObject({ magic: { mp: { value: 5 } } });
+  });
+
+  it("keeps the dotted max change after Foundry expands the clamped update", () => {
+    const actor = { type: "character", system: awakenedMagic(8, 3), items: [] };
+    const changes: Record<string, unknown> = { "system.magic.mp.maxBonus": 0 };
+
+    clampMpOnActorUpdate(actor, changes);
+
+    expect(expandFoundryUpdate(changes)).toEqual({
+      system: { magic: { mp: { maxBonus: 0, value: 5 } } },
+    });
   });
 
   it("clamps the stored current MP when an update lowers max", () => {
