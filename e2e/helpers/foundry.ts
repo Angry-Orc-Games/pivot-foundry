@@ -1,4 +1,10 @@
-import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 
 import { handleFoundryEula } from "../../scripts/foundry-setup.mjs";
 
@@ -26,31 +32,85 @@ export async function waitForFoundryShell(page: Page): Promise<void> {
   );
 }
 
-export async function authenticateSetup(page: Page, adminKey: string): Promise<void> {
-  const password = page.locator(
-    'input[type="password"], input[name="adminPassword"], input[name="password"]',
-  );
-  if (
-    (await password.count()) > 0 &&
-    (await password
-      .first()
-      .isVisible()
-      .catch(() => false))
-  ) {
-    await password.first().fill(adminKey);
-    const submit = page.getByRole("button", { name: /submit|log in|unlock|continue/i }).first();
-    if (await submit.isVisible().catch(() => false)) {
-      await submit.click();
-    } else {
-      await password.first().press("Enter");
+const ADMIN_SCREEN_TIMEOUT_MS = 15_000;
+const ADMIN_SCREEN_MISSING =
+  "Foundry setup did not show the administrator password field or the Setup screen.";
+
+type ScreenLocator = {
+  waitFor(options: { state: "visible"; timeout: number }): Promise<void>;
+};
+
+function asFirst<T>(locator: T): T {
+  const withFirst = locator as T & { first?: () => T };
+  return typeof withFirst.first === "function" ? withFirst.first() : locator;
+}
+
+function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let pending = entries.length;
+    let settled = false;
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timer);
+      reject(new Error(ADMIN_SCREEN_MISSING));
+    };
+    const timer = globalThis.setTimeout(fail, timeout);
+    for (const [name, locator] of entries) {
+      Promise.resolve()
+        .then(() => locator.waitFor({ state: "visible", timeout }))
+        .then(() => {
+          if (settled) return;
+          settled = true;
+          globalThis.clearTimeout(timer);
+          resolve(name);
+        })
+        .catch(() => {
+          pending -= 1;
+          if (!settled && pending === 0) fail();
+        });
     }
+  });
+}
+
+function maskPasswordShots(page: Page, field: Locator): void {
+  if (typeof page.screenshot !== "function") return;
+  const shoot = page.screenshot.bind(page);
+  page.screenshot = (options) =>
+    shoot({
+      ...options,
+      mask: [...(options?.mask ?? []), field],
+    });
+}
+
+export async function authenticateSetup(page: Page, adminKey: string): Promise<void> {
+  const password = asFirst(
+    page.locator('input[type="password"], input[name="adminPassword"], input[name="password"]'),
+  );
+  maskPasswordShots(page, password);
+  const setup: Array<[string, ScreenLocator]> = [
+    ["setup", asFirst(page.getByRole("button", { name: /create world|new world/i }))],
+    ["setup", asFirst(page.getByRole("checkbox", { name: "I agree to these terms" }))],
+    ["setup", asFirst(page.getByRole("heading", { name: "Setup", exact: true }))],
+  ];
+  const screen = await firstVisible([["admin", password], ...setup], ADMIN_SCREEN_TIMEOUT_MS);
+  if (screen !== "admin") return;
+
+  await password.fill(adminKey);
+  const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
+  if (await submit.isVisible().catch(() => false)) {
+    await submit.click();
+  } else {
+    await password.press("Enter");
   }
+  await firstVisible(setup, ADMIN_SCREEN_TIMEOUT_MS);
 }
 
 export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void> {
   await waitForFoundryShell(page);
   await authenticateSetup(page, adminKey);
   await handleFoundryEula(page);
+  await authenticateSetup(page, adminKey);
 
   const ready = await page.evaluate(() =>
     Boolean((window as unknown as { game?: { ready?: boolean } }).game?.ready),
