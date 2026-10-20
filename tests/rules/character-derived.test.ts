@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { bonusStackMode, stackIdenticalBonuses } from "../../src/rules/ac-stacking";
 import {
   calculateArmourClass,
   calculateAttackSummary,
@@ -9,6 +10,25 @@ import {
   calculateSkillTotal,
   calculateTotalWeight,
 } from "../../src/rules/character-derived";
+
+function speedActor(species: string, stored: number) {
+  return {
+    level: 1,
+    abilities: {
+      str: { score: 10, primary: false },
+      dex: { score: 14, primary: false },
+      con: { score: 10, primary: false },
+      int: { score: 10, primary: false },
+      wis: { score: 10, primary: false },
+      cha: { score: 10, primary: false },
+    },
+    skills: {},
+    magic: { awakened: false, ability: null },
+    equipment: [],
+    species,
+    speed: { value: stored, bonus: 2 },
+  };
+}
 
 describe("calculateCharacterDerived", () => {
   it("derives ability modifiers, proficiency, resources, and passive perception", () => {
@@ -65,6 +85,29 @@ describe("calculateCharacterDerived", () => {
     expect(derived.speed).toBe(12);
     expect(derived.armourClass.value).toBe(11);
   });
+
+  it("derives base speed from species size and adds bonuses", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const halfling = calculateCharacterDerived(speedActor("Halfling", 10), { speedBonus: 1 });
+    const dwarf = calculateCharacterDerived(speedActor("Dwarf", 10));
+    const human = calculateCharacterDerived(speedActor("Human", 10));
+    const smallHumanoid = calculateCharacterDerived(speedActor("Small Humanoid", 10));
+    const largeBeast = calculateCharacterDerived(speedActor("Large Beast", 10));
+    const unknown = calculateCharacterDerived(speedActor("Dragon", 10));
+    const custom = calculateCharacterDerived(speedActor("Halfling", 4));
+    const zero = calculateCharacterDerived(speedActor("Halfling", 0));
+
+    expect(halfling.speed).toBe(10);
+    expect(dwarf.speed).toBe(10);
+    expect(human.speed).toBe(12);
+    expect(smallHumanoid.speed).toBe(9);
+    expect(largeBeast.speed).toBe(14);
+    expect(unknown.speed).toBe(12);
+    expect(custom.speed).toBe(6);
+    expect(zero.speed).toBe(2);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("Dragon"));
+    info.mockRestore();
+  });
 });
 
 describe("calculateSkillTotal", () => {
@@ -120,32 +163,346 @@ describe("calculateManaMaximum", () => {
     expect(calculateManaMaximum({ awakened: false, level: 7, abilityScore: 17 })).toBe(0);
     expect(calculateManaMaximum({ awakened: true, level: 7, abilityScore: 17 })).toBe(29);
   });
+
+  it("pins mana to floor of the score over 2 plus the modifier times level", () => {
+    expect(calculateManaMaximum({ awakened: true, level: 7, abilityScore: 17 })).toBe(29);
+    expect(calculateManaMaximum({ awakened: true, level: 1, abilityScore: 10 })).toBe(5);
+    expect(calculateManaMaximum({ awakened: true, level: 4, abilityScore: 8 })).toBe(0);
+    expect(calculateManaMaximum({ awakened: false, level: 7, abilityScore: 17 })).toBe(0);
+  });
 });
 
+function breakdownTotal(lines: string[]): number {
+  return lines.reduce((sum, line) => {
+    const match = line.match(/[+-]?\d+$/);
+    return sum + (match ? Number(match[0]) : 0);
+  }, 0);
+}
+
 describe("calculateArmourClass", () => {
-  it("uses equipped armour, shield, helmet, dex caps, and manual bonuses", () => {
-    expect(
-      calculateArmourClass({
-        dexterityModifier: 4,
-        manualBonus: 1,
-        armour: [
-          { name: "Chainmail", category: "medium", acBonus: 3, equipped: true },
-          { name: "Large Shield", category: "shield", acBonus: 2, equipped: true },
-          { name: "Full Helmet", category: "helmet", acBonus: 1, equipped: true },
-        ],
-      }),
-    ).toEqual({
-      value: 19,
-      armourWorn: "Chainmail, Large Shield, Full Helmet",
-      breakdown: [
-        "Base 10",
-        "Dex +2",
-        "Chainmail +3",
-        "Large Shield +2",
-        "Full Helmet +1",
-        "Manual +1",
+  it("counts one worn suit and keeps shields separate from exclusion bonuses", () => {
+    const wornWins = calculateArmourClass({
+      dexterityModifier: 4,
+      manualBonus: 1,
+      effectBonus: 1,
+      armour: [
+        { name: "Leather", category: "light", acBonus: 1, equipped: true },
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Fortress", category: "heavy", acBonus: 20, equipped: false },
+        { name: "Carapace", category: "natural", acBonus: 14, equipped: true },
+        { name: "Small Shield", category: "shield", acBonus: 1, equipped: true },
+        { name: "Large Shield", category: "shield", acBonus: 2, equipped: true },
+        { name: "Helm", category: "helmet", acBonus: 1, equipped: true },
+        {
+          name: "Magic Armour",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicArmour",
+        },
+        {
+          name: "Ring of Protection",
+          category: "other",
+          acBonus: 2,
+          equipped: true,
+          stackKey: "ringOfProtection",
+        },
       ],
     });
+
+    expect(wornWins).toEqual({
+      value: 23,
+      armourWorn: "Plate, Large Shield, Helm, Ring of Protection",
+      breakdown: [
+        "Base 10",
+        "Plate +6",
+        "Large Shield +2",
+        "Helm +1",
+        "Ring of Protection +2",
+        "Manual +1",
+        "Effects +1",
+      ],
+    });
+    expect(breakdownTotal(wornWins.breakdown)).toBe(wornWins.value);
+
+    const naturalWins = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Carapace", category: "natural", acBonus: 18, equipped: true },
+        { name: "Small Shield", category: "shield", acBonus: 1, equipped: true },
+      ],
+    });
+    expect(naturalWins).toEqual({
+      value: 17,
+      armourWorn: "Plate, Small Shield",
+      breakdown: ["Base 10", "Plate +6", "Small Shield +1"],
+    });
+    expect(breakdownTotal(naturalWins.breakdown)).toBe(naturalWins.value);
+
+    const medium = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Hide", category: "heavy", acBonus: 1, equipped: true },
+        { name: "Chain", category: "medium", acBonus: 5, equipped: true },
+      ],
+    });
+    expect(medium).toEqual({
+      value: 17,
+      armourWorn: "Chain",
+      breakdown: ["Base 10", "Dex +2", "Chain +5"],
+    });
+    expect(breakdownTotal(medium.breakdown)).toBe(medium.value);
+    expect(stackIdenticalBonuses(bonusStackMode.ac, [1, 3])).toBe(3);
+    expect(stackIdenticalBonuses(bonusStackMode.dr, [1, 2])).toBe(3);
+    expect(stackIdenticalBonuses(bonusStackMode.dieStep, [1, 1])).toBe(2);
+  });
+
+  it("adds an other armour bonus that has no exclusion key", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Cloak", category: "other", acBonus: 1, equipped: true },
+        { name: "Amulet", category: "other", acBonus: 2, equipped: true },
+      ],
+    });
+
+    expect(result.value).toBe(13);
+    expect(result.breakdown).toEqual(["Base 10", "Cloak +1", "Amulet +2"]);
+    expect(breakdownTotal(result.breakdown)).toBe(result.value);
+  });
+
+  it("picks the worn suit by its bonus plus the category Dex cap", () => {
+    const lightWins = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Hide", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Leather", category: "light", acBonus: 3, equipped: true },
+      ],
+    });
+    expect(lightWins).toEqual({
+      value: 17,
+      armourWorn: "Leather",
+      breakdown: ["Base 10", "Dex +4", "Leather +3"],
+    });
+
+    const naturalWins = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        { name: "Hide", category: "heavy", acBonus: 6, equipped: true },
+        { name: "Leather", category: "light", acBonus: 3, equipped: true },
+        { name: "Carapace", category: "natural", acBonus: 18, equipped: true },
+      ],
+    });
+    expect(naturalWins).toEqual({
+      value: 17,
+      armourWorn: "Leather",
+      breakdown: ["Base 10", "Dex +4", "Leather +3"],
+    });
+  });
+
+  it("adds Dexterity to a natural armour base", () => {
+    const carapace = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Chitinous Carapace", category: "natural", acBonus: 12, equipped: true }],
+    });
+    const furry = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Furry", category: "natural", acBonus: 11, equipped: true }],
+    });
+    const thickHide = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Thick Hide", category: "natural", acBonus: 12, equipped: true }],
+    });
+
+    expect(carapace).toEqual({
+      value: 15,
+      armourWorn: "Chitinous Carapace",
+      breakdown: ["Chitinous Carapace 12", "Dex +3"],
+    });
+    expect(furry.value).toBe(14);
+    expect(furry.breakdown).toEqual(["Furry 11", "Dex +3"]);
+    expect(thickHide.value).toBe(15);
+    expect(thickHide.breakdown).toEqual(["Thick Hide 12", "Dex +3"]);
+  });
+
+  it("uses worn armour instead of natural AC while a suit is equipped", () => {
+    const carapaceInLight = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 15,
+          equipped: true,
+          naturalMode: "unarmoured",
+        },
+        { name: "Leather", category: "light", acBonus: 1, equipped: true },
+      ],
+    });
+    expect(carapaceInLight.value).toBe(14);
+    expect(carapaceInLight.breakdown).toEqual(["Base 10", "Dex +3", "Leather +1"]);
+
+    const carapaceBare = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "unarmoured",
+          bodyLimit: "light",
+        },
+      ],
+    });
+    expect(carapaceBare.value).toBe(15);
+
+    const carapaceInHeavy = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "unarmoured",
+          bodyLimit: "light",
+        },
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+      ],
+    });
+    expect(carapaceInHeavy).toEqual({
+      value: 15,
+      armourWorn: "Chitinous Carapace",
+      breakdown: ["Chitinous Carapace 12", "Dex +3"],
+    });
+
+    const lesserCarapace = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        {
+          name: "Thick Hide",
+          category: "natural",
+          acBonus: 13,
+          equipped: true,
+          naturalMode: "higher",
+        },
+        {
+          name: "Chitinous Carapace",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "unarmoured",
+          bodyLimit: "light",
+        },
+        { name: "Plate", category: "heavy", acBonus: 6, equipped: true },
+      ],
+    });
+    expect(lesserCarapace).toEqual({
+      value: 16,
+      armourWorn: "Plate",
+      breakdown: ["Base 10", "Plate +6"],
+    });
+
+    const thickHideInMail = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [
+        {
+          name: "Thick Hide",
+          category: "natural",
+          acBonus: 12,
+          equipped: true,
+          naturalMode: "higher",
+        },
+        { name: "Chain", category: "medium", acBonus: 3, equipped: true },
+      ],
+    });
+    expect(thickHideInMail.value).toBe(16);
+    expect(thickHideInMail.breakdown).toEqual(["Thick Hide 12", "Dex +4"]);
+  });
+
+  it("adds Magic Armour and Magic Shield instead of cancelling them", () => {
+    const both = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Chain", category: "medium", acBonus: 3, equipped: true },
+        { name: "Large Shield", category: "shield", acBonus: 2, equipped: true },
+        {
+          name: "Magic Armour",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicArmour",
+        },
+        {
+          name: "Magic Shield",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicShield",
+        },
+      ],
+    });
+    expect(both.value).toBe(17);
+    expect(both.breakdown).toEqual([
+      "Base 10",
+      "Chain +3",
+      "Large Shield +2",
+      "Magic Armour +1",
+      "Magic Shield +1",
+    ]);
+
+    const gradeLoses = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        {
+          name: "Ring of Protection",
+          category: "other",
+          acBonus: 2,
+          equipped: true,
+          stackKey: "ringOfProtection",
+        },
+        {
+          name: "Magic Armour",
+          category: "other",
+          acBonus: 1,
+          equipped: true,
+          stackKey: "magicArmour",
+        },
+        {
+          name: "Magic Shield",
+          category: "other",
+          acBonus: 2,
+          equipped: true,
+          stackKey: "magicShield",
+        },
+      ],
+    });
+    expect(gradeLoses.value).toBe(13);
+    expect(gradeLoses.breakdown).toEqual(["Base 10", "Magic Armour +1", "Magic Shield +2"]);
+  });
+
+  it("keeps the highest bonus when untagged other items share a name", () => {
+    const identical = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Ring of Protection", category: "other", acBonus: 1, equipped: true },
+        { name: "ring of protection", category: "other", acBonus: 2, equipped: true },
+      ],
+    });
+    const different = calculateArmourClass({
+      dexterityModifier: 0,
+      armour: [
+        { name: "Ring of Protection", category: "other", acBonus: 1, equipped: true },
+        { name: "Cloak", category: "other", acBonus: 1, equipped: true },
+      ],
+    });
+
+    expect(identical.value).toBe(12);
+    expect(identical.breakdown).toEqual(["Base 10", "ring of protection +2"]);
+    expect(different.value).toBe(12);
+    expect(different.breakdown).toEqual(["Base 10", "Ring of Protection +1", "Cloak +1"]);
   });
 });
 

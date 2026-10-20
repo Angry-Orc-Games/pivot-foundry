@@ -68,6 +68,14 @@ export const weaponCategories = [
   "improvised",
 ] as const;
 
-export const armourCategories = ["light", "medium", "heavy", "shield", "helmet", "other"] as const;
+export const armourCategories = [
+  "light",
+  "medium",
+  "heavy",
+  "shield",
+  "helmet",
+  "other",
+  "natural",
+] as const;
 
 export const hitDice = ["d4", "d6", "d8", "d10", "d12"] as const;
