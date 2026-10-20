@@ -196,7 +196,7 @@ async function clearPasswordFields(page: Page): Promise<boolean> {
       const field = typeof fields.nth === "function" ? fields.nth(index) : fields;
       if (typeof field.fill !== "function") continue;
       await Promise.race([
-        Promise.resolve(field.fill("", { timeout: FIELD_CLEAR_MS })).then(
+        Promise.resolve(field.fill("")).then(
           () => undefined,
           () => undefined,
         ),
@@ -444,7 +444,7 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   await dismissSetupTour(page);
   await create.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   const title = page.locator('input[name="title"], input[name="name"]').first();
-  await title.fill("Pivot Fantasy E2E", { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await title.fill("Pivot Fantasy E2E");
   const system = page.locator('select[name="system"], select#system');
   if ((await system.count()) > 0) {
     await system
