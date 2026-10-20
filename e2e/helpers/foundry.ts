@@ -149,9 +149,36 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<void
   await launchWorld(page);
 }
 
+const TOUR_WAIT_MS = 2_000;
+
+async function dismissSetupTour(page: Page): Promise<void> {
+  const overlay = page.locator("div.tour-overlay").first();
+  const visible = await overlay
+    .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return;
+
+  const exit = page.getByRole("button", { name: /exit tour|skip tour|end tour|skip/i }).first();
+  const exited = await exit
+    .click({ timeout: TOUR_WAIT_MS })
+    .then(() => true)
+    .catch(() => false);
+  if (!exited) {
+    const action = page.locator('button[data-action="exit"]').first();
+    const clicked = await action
+      .click({ timeout: TOUR_WAIT_MS })
+      .then(() => true)
+      .catch(() => false);
+    if (!clicked) await page.keyboard.press("Escape");
+  }
+  await overlay.waitFor({ state: "detached", timeout: TOUR_WAIT_MS });
+}
+
 async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
   await create.waitFor({ state: "visible", timeout: 30_000 });
+  await dismissSetupTour(page);
   await create.click();
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");

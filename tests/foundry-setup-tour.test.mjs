@@ -4,9 +4,9 @@ import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 
 const INTERCEPTS = '<div class="tour-overlay"></div> intercepts pointer events';
 
-function tourPage() {
+function tourPage({ attached = true } = {}) {
   const events = [];
-  let attached = true;
+  let covered = attached;
   let evaluations = 0;
   const overlay = {
     first() {
@@ -14,10 +14,10 @@ function tourPage() {
     },
     async waitFor(options = {}) {
       if (options.state === "detached") {
-        if (attached) throw new Error("tour overlay still attached");
+        if (covered) throw new Error("tour overlay still attached");
         return;
       }
-      if (!attached) throw new Error("tour overlay hidden");
+      if (!covered) throw new Error("tour overlay hidden");
     },
   };
   const hidden = {
@@ -48,7 +48,7 @@ function tourPage() {
       return exitTour;
     },
     async click() {
-      attached = false;
+      covered = false;
       events.push("tour-exit");
     },
   };
@@ -64,7 +64,7 @@ function tourPage() {
       return true;
     },
     async click() {
-      if (attached) throw new Error(INTERCEPTS);
+      if (covered) throw new Error(INTERCEPTS);
       events.push("create-world");
     },
   };
@@ -99,7 +99,7 @@ function tourPage() {
     keyboard: {
       async press(key) {
         if (key === "Escape") {
-          attached = false;
+          covered = false;
           events.push("tour-exit");
         }
       },
@@ -115,5 +115,13 @@ describe("Foundry setup tour", () => {
     expect(page.events[0]).toBe("tour-exit");
     expect(page.events).toContain("create-world");
     expect(page.events.indexOf("create-world")).toBeGreaterThan(page.events.indexOf("tour-exit"));
+  });
+
+  it("clicks Create World when no tour is showing", async () => {
+    const page = tourPage({ attached: false });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events[0]).toBe("create-world");
+    expect(page.events).not.toContain("tour-exit");
   });
 });
