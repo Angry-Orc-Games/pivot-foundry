@@ -346,8 +346,19 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload sanitized diagnostics
+      - name: Scan diagnostics for credentials
+        id: scan
         if: failure() && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
+        working-directory: trusted-gate
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances/*/diagnostics
+
+      - name: Upload sanitized diagnostics
+        if: failure() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}-diagnostics
