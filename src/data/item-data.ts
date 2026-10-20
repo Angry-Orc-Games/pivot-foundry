@@ -43,6 +43,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
         weight: numberField(fields, { required: true, min: 0, initial: 0 }),
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         carried: booleanField(fields, { required: true, initial: true }),
+        equipped: booleanField(fields, { required: true, initial: false }),
         notes: stringField(fields, { required: true, initial: "" }),
       });
     }

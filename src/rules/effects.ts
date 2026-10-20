@@ -182,60 +182,143 @@ export function parseStoredEffect(value: unknown): EffectRule | null {
   }
 }
 
-export function aggregateCharacterEffects(effects: readonly EffectRule[]): CharacterEffectSummary {
-  const summary = emptyCharacterEffectSummary();
+type CountedEffect = EffectRule | { source: "gear"; effect: EffectRule };
 
-  for (const effect of effects) {
-    switch (effect.type) {
-      case "abilityScoreBonus":
-        summary.abilityScoreBonuses[effect.ability] += effect.amount;
-        break;
-      case "skillBonus":
-        summary.skillBonuses[effect.skill] =
-          (summary.skillBonuses[effect.skill] ?? 0) + effect.amount;
-        break;
-      case "armourProficiency":
-        if (effect.category === "shield") summary.shieldProficiency = true;
-        else summary.armourProficiencies[effect.category] = true;
-        break;
-      case "weaponProficiency":
-        summary.weaponProficiencies[effect.category] = true;
-        break;
-      case "acBonus":
-        summary.acBonus += effect.amount;
-        break;
-      case "initiativeBonus":
-        summary.initiativeBonus += effect.amount;
-        break;
-      case "speedBonus":
-        summary.speedBonus += effect.amount;
-        break;
-      case "poolMaxBonus":
-        summary.poolMaxBonus += effect.amount;
-        break;
-      case "mpMaxBonus":
-        summary.mpMaxBonus += effect.amount;
-        break;
+const gearItemTypes = new Set(["weapon", "armour", "equipment"]);
+
+export function aggregateCharacterEffects(
+  effects: readonly CountedEffect[],
+): CharacterEffectSummary {
+  const summary = emptyCharacterEffectSummary();
+  const gearBest = new Map<string, EffectRule>();
+
+  for (const counted of effects) {
+    const fromGear = isGearCounted(counted);
+    const effect = fromGear ? counted.effect : counted;
+    const key = numericEffectKey(effect);
+    if (key === null) {
+      applyProficiency(summary, effect);
+      continue;
     }
+    if (fromGear) {
+      const current = gearBest.get(key);
+      if (!current || numericAmount(effect) > numericAmount(current)) gearBest.set(key, effect);
+      continue;
+    }
+    addNumericEffect(summary, effect);
   }
 
+  for (const effect of gearBest.values()) addNumericEffect(summary, effect);
   return summary;
 }
 
-export function collectEmbeddedItemEffects(items: readonly { system?: unknown }[]): EffectRule[] {
-  const effects: EffectRule[] = [];
+export function collectEmbeddedItemEffects(
+  items: readonly { type?: unknown; system?: unknown }[],
+): CountedEffect[] {
+  const effects: CountedEffect[] = [];
 
   for (const item of items) {
     if (!item || typeof item !== "object") continue;
     const system = item.system;
     if (!isPlainObject(system) || !Array.isArray(system.effects)) continue;
+    const gear = typeof item.type === "string" && gearItemTypes.has(item.type);
+    if (gear && system.equipped !== true) continue;
     for (const entry of system.effects) {
       const parsed = parseStoredEffect(entry);
-      if (parsed) effects.push(parsed);
+      if (!parsed) continue;
+      effects.push(gear ? { source: "gear", effect: parsed } : parsed);
     }
   }
 
   return effects;
+}
+
+function isGearCounted(value: CountedEffect): value is { source: "gear"; effect: EffectRule } {
+  return "source" in value && value.source === "gear";
+}
+
+function numericEffectKey(effect: EffectRule): string | null {
+  switch (effect.type) {
+    case "abilityScoreBonus":
+      return `abilityScoreBonus:${effect.ability}`;
+    case "skillBonus":
+      return `skillBonus:${effect.skill}`;
+    case "acBonus":
+    case "initiativeBonus":
+    case "speedBonus":
+    case "poolMaxBonus":
+    case "mpMaxBonus":
+      return effect.type;
+    case "armourProficiency":
+    case "weaponProficiency":
+      return null;
+  }
+}
+
+function numericAmount(effect: EffectRule): number {
+  switch (effect.type) {
+    case "abilityScoreBonus":
+    case "skillBonus":
+    case "acBonus":
+    case "initiativeBonus":
+    case "speedBonus":
+    case "poolMaxBonus":
+    case "mpMaxBonus":
+      return effect.amount;
+    case "armourProficiency":
+    case "weaponProficiency":
+      return 0;
+  }
+}
+
+function addNumericEffect(summary: CharacterEffectSummary, effect: EffectRule): void {
+  switch (effect.type) {
+    case "abilityScoreBonus":
+      summary.abilityScoreBonuses[effect.ability] += effect.amount;
+      break;
+    case "skillBonus":
+      summary.skillBonuses[effect.skill] =
+        (summary.skillBonuses[effect.skill] ?? 0) + effect.amount;
+      break;
+    case "acBonus":
+      summary.acBonus += effect.amount;
+      break;
+    case "initiativeBonus":
+      summary.initiativeBonus += effect.amount;
+      break;
+    case "speedBonus":
+      summary.speedBonus += effect.amount;
+      break;
+    case "poolMaxBonus":
+      summary.poolMaxBonus += effect.amount;
+      break;
+    case "mpMaxBonus":
+      summary.mpMaxBonus += effect.amount;
+      break;
+    case "armourProficiency":
+    case "weaponProficiency":
+      break;
+  }
+}
+
+function applyProficiency(summary: CharacterEffectSummary, effect: EffectRule): void {
+  switch (effect.type) {
+    case "armourProficiency":
+      if (effect.category === "shield") summary.shieldProficiency = true;
+      else summary.armourProficiencies[effect.category] = true;
+      break;
+    case "weaponProficiency":
+      summary.weaponProficiencies[effect.category] = true;
+      break;
+    case "abilityScoreBonus":
+    case "skillBonus":
+    case "acBonus":
+    case "initiativeBonus":
+    case "speedBonus":
+    case "poolMaxBonus":
+    case "mpMaxBonus":
+      break;
+  }
 }
 
 export function describeEffectRule(effect: EffectRule): { typeLabelKey: string; detail: string } {
