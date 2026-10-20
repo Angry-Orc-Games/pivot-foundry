@@ -3,12 +3,56 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import config from "../e2e/playwright.config.ts";
 import { scanTree } from "../scripts/ci/scan-e2e-artifacts.mjs";
 
 const FAKE_KEY = "fake-report-key-91c4e7";
+const REPO = new URL("..", import.meta.url).pathname;
+
+function launchProbe() {
+  const probe = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      "import { chromium } from '@playwright/test'; const browser = await chromium.launch(); await browser.close();",
+    ],
+    {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, NODE_PATH: join(REPO, "node_modules") },
+    },
+  );
+  return { status: probe.status, output: `${probe.stdout ?? ""}\n${probe.stderr ?? ""}` };
+}
+
+function installChromium(args) {
+  const install = spawnSync("npx", args, {
+    cwd: REPO,
+    encoding: "utf8",
+    timeout: 180_000,
+  });
+  if (install.status !== 0) {
+    throw new Error(`${install.stdout ?? ""}\n${install.stderr ?? ""}`);
+  }
+}
+
+beforeAll(() => {
+  let probe = launchProbe();
+  if (probe.status === 0) return;
+  if (/Executable doesn't exist|Please run the following command/i.test(probe.output)) {
+    installChromium(["playwright", "install", "chromium"]);
+    probe = launchProbe();
+  }
+  if (probe.status === 0) return;
+  if (/missing dependencies|shared librar/i.test(probe.output)) {
+    installChromium(["playwright", "install", "--with-deps", "chromium"]);
+    probe = launchProbe();
+  }
+  if (probe.status !== 0) throw new Error(probe.output);
+}, 180_000);
 
 function retargetReporter(reporter, dir) {
   return reporter.map((entry) => {
@@ -78,7 +122,7 @@ test("seed", async ({ page }) => {
 });
 `,
       });
-      expect(result.status).toBe(0);
+      expect(result.status, result.output).toBe(0);
       expect(result.output).not.toContain(FAKE_KEY);
       expect(scanTree(dir, [FAKE_KEY])).toBeNull();
       await expect(
@@ -101,7 +145,7 @@ test("leak", async ({ page }) => {
 });
 `,
       });
-      expect(result.status).toBe(0);
+      expect(result.status, result.output).toBe(0);
       expect(scanTree(dir, [FAKE_KEY])).toBe("playwright-report/index.html");
     } finally {
       await rm(dir, { recursive: true, force: true });
