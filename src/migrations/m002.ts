@@ -78,7 +78,7 @@ function fillUnsetHitPoints(
     value === 0 &&
     successes === 0 &&
     failures === 0 &&
-    (status === undefined || status === "unconfirmed" || status === "dying");
+    (status === undefined || status === "unconfirmed" || status === "dying" || status === "alive");
   if (!blank) return;
   update["system.attributes.hp.value"] = total;
   update["system.attributes.deathSaves.status"] = "alive";
