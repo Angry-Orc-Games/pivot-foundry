@@ -925,6 +925,7 @@ describe("primary abilities", () => {
       "More than 2 Primary abilities. The cap is 2, or 3 with Adapt or Die at level 3 or higher.",
     ]);
     Handlebars.registerHelper("checked", (value: unknown) => (value ? "checked" : ""));
+    Handlebars.registerHelper("localize", (key: unknown) => String(key));
     const html = Handlebars.compile(
       readFileSync(join(__dirname, "../../templates/actors/character/vitals.hbs"), "utf8"),
     )(three);

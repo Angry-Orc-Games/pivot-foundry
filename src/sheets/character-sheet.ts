@@ -16,6 +16,7 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { primaryAbilityWarnings } from "../rules/primary-abilities";
 import { applyChatMessageMode } from "../runtime/ui";
 import {
   type AbilityKey,
@@ -128,6 +129,7 @@ export interface CharacterSheetContext {
   backgroundLabel: string;
   tierLabel: string;
   conMod: string;
+  primaryWarnings: string[];
   proficiencyText: {
     weapons: string;
     armour: string;
@@ -480,6 +482,17 @@ export function prepareCharacterSheetContext(
 
   // Magic streams text
   const magicStreamsText = magicStreams.map((item) => item.name).join(", ");
+  const primaryWarnings = primaryAbilityWarnings({
+    primaries: abilities.flatMap(({ key }) => (abilitySources[key].primary ? [key] : [])),
+    magicAbility: nullableAbilityAt(system, ["magic", "ability"]),
+    level: numberAt(system, ["progression", "level"], 1),
+    hasAdaptOrDie: itemList.some(
+      (item) =>
+        item.type === "feature" &&
+        stringAt(item.system, ["category"], "") === "feat" &&
+        item.name.trim().toLowerCase() === "adapt or die",
+    ),
+  });
 
   return {
     actor,
@@ -497,6 +510,7 @@ export function prepareCharacterSheetContext(
     backgroundLabel,
     tierLabel,
     conMod,
+    primaryWarnings,
     proficiencyText: {
       weapons: weaponProfList.join(", ") || "None",
       armour: armourProfList.join(", ") || "None",
