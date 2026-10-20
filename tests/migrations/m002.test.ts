@@ -162,6 +162,33 @@ it("replaces a stored zero maximum from hit die and Constitution, and the second
   expect(planSurvivalMigration(stored)).toEqual({ ok: true, changed: false });
 });
 
+it("fills current hit points when a zero maximum is already marked alive", () => {
+  const source = {
+    survivalVersion: 1,
+    attributes: {
+      hitDie: "d8",
+      hp: { value: 0, max: 0, temp: 0 },
+      deathSaves: { status: "alive", successes: 0, failures: 0 },
+    },
+  };
+  const first = planSurvivalMigration(source);
+  expect(first).toEqual({
+    ok: true,
+    changed: true,
+    update: {
+      "system.attributes.hp.value": 8,
+      "system.attributes.hp.max": 8,
+      "system.attributes.deathSaves.status": "alive",
+    },
+  });
+  const stored = structuredClone(source);
+  if (first.ok && first.changed) {
+    stored.attributes.hp.value = 8;
+    stored.attributes.hp.max = 8;
+  }
+  expect(planSurvivalMigration(stored)).toEqual({ ok: true, changed: false });
+});
+
 it("raises a stored zero maximum without clearing an in-progress or finished death state", () => {
   expect(
     planSurvivalMigration({
