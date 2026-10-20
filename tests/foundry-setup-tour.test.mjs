@@ -158,6 +158,29 @@ describe("setup phase deadlines", () => {
     expect(page.events).toContain("create-world");
   });
 
+  it("names tour close when core tour completion never returns", async () => {
+    vi.useFakeTimers();
+    const page = lateTourPage({ hangComplete: true });
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(30_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during tour close/);
+  });
+
   it("names create world when World.create never returns", async () => {
     vi.useFakeTimers();
     const page = tourPage();
@@ -189,7 +212,7 @@ describe("setup phase deadlines", () => {
   });
 });
 
-function lateTourPage() {
+function lateTourPage({ hangComplete = false } = {}) {
   const events = [];
   let ended = false;
   const tour = {
@@ -197,10 +220,12 @@ function lateTourPage() {
     id: "backups-overview",
     status: "in-progress",
     exit() {
+      if (hangComplete) return;
       ended = true;
       this.status = "completed";
     },
     complete() {
+      if (hangComplete) return new Promise(() => {});
       ended = true;
       this.status = "completed";
       return Promise.resolve();
