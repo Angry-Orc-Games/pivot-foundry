@@ -28,15 +28,20 @@ function hidden() {
   return node;
 }
 
-function v14CreateWorldPage({ hangCard = false, decoySelect = false } = {}) {
+function v14CreateWorldPage({ hangCard = false, decoySelect = false, stepDelayMs = 0 } = {}) {
   const events = [];
   const selectCalls = [];
   let worldReady = false;
+  const pause = () =>
+    stepDelayMs === 0
+      ? Promise.resolve()
+      : new Promise((resolve) => globalThis.setTimeout(resolve, stepDelayMs));
   const title = {
     first() {
       return title;
     },
     async fill() {
+      await pause();
       events.push("title");
     },
   };
@@ -67,6 +72,7 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false } = {}) {
       return true;
     },
     async click() {
+      await pause();
       events.push("open-form");
     },
   };
@@ -76,6 +82,7 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false } = {}) {
       return card;
     },
     async click() {
+      await pause();
       events.push("pick-system");
       if (hangCard) return new Promise(() => {});
     },
@@ -106,6 +113,7 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false } = {}) {
             return field;
           },
           async fill(value) {
+            await pause();
             events.push(`filter:${value}`);
           },
         };
@@ -127,6 +135,7 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false } = {}) {
       if (role === "button" && name === "Continue" && options.exact === true) {
         return {
           async click() {
+            await pause();
             events.push("continue");
             worldReady = true;
           },
@@ -138,6 +147,7 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false } = {}) {
             return launch;
           },
           async waitFor() {
+            await pause();
             if (!worldReady) throw new Error("launch hidden");
             events.push("world-ready");
           },
@@ -174,6 +184,29 @@ describe("v14 create world", () => {
       "world-ready",
     ]);
     expect(page.selectCalls.some((call) => call?.label instanceof RegExp)).toBe(false);
+  });
+
+  it("finishes a create-world form that takes longer than 20s", async () => {
+    vi.useFakeTimers();
+    const page = v14CreateWorldPage({ stepDelayMs: 4_000 });
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(24_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBe("done");
+    expect(page.events).toContain("world-ready");
   });
 
   it("stalls create world when the system card click never returns", async () => {
