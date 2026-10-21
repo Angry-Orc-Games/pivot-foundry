@@ -39,6 +39,8 @@ function v14CreateWorldPage({
   filterText = "",
   missingCard = false,
   afterContinue = "launch",
+  record = "unavailable",
+  usersOpen = false,
 } = {}) {
   const events = [];
   const selectCalls = [];
@@ -47,6 +49,7 @@ function v14CreateWorldPage({
   let pageUrl = "http://foundry.local/setup";
   let joinVisible = false;
   let launchWaits = 0;
+  let launchCalls = 0;
   const pause = () =>
     stepDelayMs === 0
       ? Promise.resolve()
@@ -115,6 +118,9 @@ function v14CreateWorldPage({
     get launchWaits() {
       return launchWaits;
     },
+    get launchCalls() {
+      return launchCalls;
+    },
     url() {
       return pageUrl;
     },
@@ -122,8 +128,11 @@ function v14CreateWorldPage({
     async waitForFunction() {},
     async evaluate(fn) {
       if (fn?.name === "silenceCoreTours") return { ready: false, notes: [] };
-      if (fn?.name === "ensureWorldRecord") return "unavailable";
-      if (fn?.name === "launchInstalledWorld") return true;
+      if (fn?.name === "ensureWorldRecord") return record;
+      if (fn?.name === "launchInstalledWorld") {
+        launchCalls += 1;
+        return true;
+      }
       return false;
     },
     locator(selector = "") {
@@ -162,7 +171,7 @@ function v14CreateWorldPage({
             events.push("user-management");
           },
           async isVisible() {
-            return afterContinue === "users" && !joinVisible;
+            return !joinVisible && (usersOpen || afterContinue === "users");
           },
         };
       }
@@ -390,5 +399,36 @@ describe("v14 create world", () => {
     expect(outcome.message).toMatch(/stalled during create world/);
     expect(page.events).not.toContain("save-users");
     expect(page.events).not.toContain("join");
+  });
+
+  it("saves users when launch starts on User Management", async () => {
+    const page = v14CreateWorldPage({ record: "exists", usersOpen: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("save-users");
+    expect(page.events).toContain("join");
+    expect(page.events).not.toContain("gm-password");
+    expect(page.launchCalls).toBe(0);
+    expect(page.url()).toContain("/join");
+  });
+
+  it("saves users after World.create opens User Management", async () => {
+    const page = v14CreateWorldPage({ record: "created", usersOpen: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("save-users");
+    expect(page.events).toContain("join");
+    expect(page.events).not.toContain("gm-password");
+    expect(page.launchCalls).toBe(0);
+    expect(page.url()).toContain("/join");
+  });
+
+  it("saves User Management only once when setup reaches it twice", async () => {
+    const page = v14CreateWorldPage({ record: "created", usersOpen: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events.filter((event) => event === "save-users")).toHaveLength(1);
+    expect(page.events.filter((event) => event === "join")).toHaveLength(1);
+    expect(page.url()).toContain("/join");
   });
 });
