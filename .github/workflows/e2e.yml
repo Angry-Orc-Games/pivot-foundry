@@ -6,8 +6,11 @@ on:
     - cron: "23 7 * * *"
   workflow_dispatch:
     inputs:
+      pr:
+        description: Open pull request number in this repository. Refuses a fork or a closed pull request.
+        required: false
       ref:
-        description: Exact 40-character commit SHA reachable from a branch in this repository. Empty runs main and open e2e-nightly pull requests.
+        description: Exact 40-character commit SHA reachable from a branch in this repository. A pr or a ref is on-demand. Empty runs main and open e2e-nightly pull requests.
         required: false
       secrets_check_only:
         description: Verify foundry-e2e secrets are non-empty, then exit. Does not start Foundry, at any hour.
@@ -27,6 +30,11 @@ concurrency:
   group: ${{ (github.event_name == 'workflow_dispatch' && inputs.secrets_check_only) && format('foundry-e2e-secrets-{0}', github.ref) || 'foundry-e2e' }}
   cancel-in-progress: false
 
+env:
+  E2E_GATE_MODE: ${{ github.event_name == 'workflow_dispatch' && (inputs.pr || inputs.ref) && 'dispatch' || 'license' }}
+  E2E_CHECK_NAME: ${{ github.event_name == 'workflow_dispatch' && (inputs.pr || inputs.ref) && 'Foundry E2E (on-demand)' || 'Foundry E2E (nightly)' }}
+  E2E_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr || '' }}
+
 jobs:
   gate:
     name: License gate
@@ -37,6 +45,9 @@ jobs:
       contents: read
     outputs:
       ok: ${{ steps.decide.outputs.ok }}
+      skipped: ${{ steps.decide.outputs.skipped }}
+      on_demand: ${{ steps.decide.outputs.on_demand }}
+      skip_reason: ${{ steps.decide.outputs.skip_reason }}
     steps:
       - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -48,6 +59,8 @@ jobs:
 
       - name: Decide whether Foundry may start
         id: decide
+        env:
+          E2E_GATE_SOFT_SKIP: ${{ env.E2E_GATE_MODE == 'dispatch' && 'true' || 'false' }}
         run: bash trusted-gate/scripts/ci/e2e-gate.sh license
 
   secrets:
@@ -78,7 +91,7 @@ jobs:
   plan:
     name: Select E2E targets
     needs: gate
-    if: needs.gate.outputs.ok == 'true'
+    if: needs.gate.outputs.ok == 'true' || needs.gate.outputs.skipped == 'true' || needs.gate.outputs.on_demand == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -333,7 +346,7 @@ jobs:
         run: node scripts/record-acceptance.mjs e2e
 
       - name: Record E2E result
-        if: always()
+        if: always() || cancelled()
         working-directory: trusted-gate
         env:
           E2E_SHA: ${{ matrix.target.sha }}
@@ -341,6 +354,7 @@ jobs:
           E2E_OK: ${{ steps.recheck.outputs.ok }}
           E2E_AVAILABLE: ${{ steps.creds.outputs.available }}
           E2E_JOB_STATUS: ${{ job.status }}
+          E2E_SKIPPED: ${{ steps.recheck.outputs.skipped }}
           E2E_LOG: ${{ runner.temp }}/foundry-e2e.log
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
@@ -348,14 +362,14 @@ jobs:
 
       - name: Scan diagnostics for credentials
         id: scan
-        if: always()
+        if: always() || cancelled()
         working-directory: trusted-gate
         env:
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
           FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
           FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances/*/diagnostics system.json system.zip artifact-identity.json e2e-result
+        run: node scripts/ci/scan-e2e-artifacts.mjs playwright-report test-results .foundry/instances/*/diagnostics system.json system.zip artifact-identity.json "e2e-result/${{ matrix.target.name }}.json"
 
       - name: Upload tested artifact
         if: success() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
@@ -382,7 +396,7 @@ jobs:
           retention-days: 7
 
       - name: Upload E2E result
-        if: always() && steps.scan.outcome == 'success'
+        if: (always() || cancelled()) && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-result-${{ matrix.target.name }}
@@ -414,6 +428,9 @@ jobs:
           E2E_TARGETS: ${{ needs.plan.outputs.targets }}
           E2E_RUN_ID: ${{ github.run_id }}
           E2E_MATRIX_RESULT: ${{ needs.e2e.result }}
+          E2E_SKIPPED: ${{ needs.gate.outputs.skipped }}
+          E2E_GATE_OK: ${{ needs.gate.outputs.ok }}
+          E2E_SKIP_REASON: ${{ needs.gate.outputs.skip_reason }}
           E2E_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash trusted-gate/scripts/ci/e2e-publish-results.sh

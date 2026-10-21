@@ -18,6 +18,8 @@ if [[ $(jq -r 'type' <<<"$targets") != "array" ]]; then
   exit 1
 fi
 
+skipped=${E2E_SKIPPED:-}
+gate_ok=${E2E_GATE_OK:-}
 count=$(jq 'length' <<<"$targets")
 if ((count == 0)); then
   printf '::error::No E2E targets to report\n' >&2
@@ -44,7 +46,7 @@ valid_result() {
     and .run_id == $run
     and (.run_id | test("^[0-9]+$"))
     and (.conclusion | type == "string")
-    and (.conclusion == "success" or .conclusion == "failure")
+    and (.conclusion == "success" or .conclusion == "failure" or .conclusion == "neutral")
     and (.summary | type == "string" and length > 0 and length <= 2000)
   ' "$file" >/dev/null
 }
@@ -118,6 +120,16 @@ while IFS= read -r row; do
   if [[ ! $name =~ ^[A-Za-z0-9._-]+$ || ! $sha =~ ^[0-9a-f]{40}$ ]]; then
     summary="Foundry E2E target failed validation. Foundry was not reported as started."
     failed=1
+  elif [[ $skipped == true ]]; then
+    conclusion=neutral
+    if [[ -n ${E2E_SKIP_REASON:-} ]]; then
+      summary="Skipped. ${E2E_SKIP_REASON} Foundry was not started."
+    else
+      summary="Skipped because somebody is signed in on foundry.angryorcgames.com or build.angryorcgames.com. Foundry was not started."
+    fi
+  elif [[ -n $gate_ok && $gate_ok != true ]]; then
+    summary="License gate closed. Foundry was not started."
+    failed=1
   elif [[ -z $catalog ]]; then
     if [[ $matrix == cancelled ]]; then
       summary="Foundry E2E was cancelled or timed out. Foundry was not left running by this job."
@@ -177,7 +189,7 @@ while IFS= read -r row; do
         conclusion=$(jq -r '.conclusion' "${jsons[0]}")
         summary=$(jq -r '.summary' "${jsons[0]}")
         started_value=$(jq -r '.started' "${jsons[0]}")
-        if [[ $conclusion != success ]]; then
+        if [[ $conclusion != success && $conclusion != neutral ]]; then
           failed=1
         fi
       else

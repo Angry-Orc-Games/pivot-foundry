@@ -5,6 +5,7 @@ conclusion=${1:?usage: e2e-report.sh success|failure|neutral}
 sha=${E2E_SHA:?}
 summary=${E2E_SUMMARY:?}
 repo=${E2E_REPOSITORY:?}
+name=${E2E_CHECK_NAME:-Foundry E2E (nightly)}
 api=${GITHUB_API_URL:-https://api.github.com}
 token=${GITHUB_TOKEN:?}
 
@@ -12,6 +13,14 @@ case $conclusion in
   success | failure | neutral) ;;
   *)
     printf '::error::Unknown check conclusion\n' >&2
+    exit 1
+    ;;
+esac
+
+case $name in
+  "Foundry E2E (nightly)" | "Foundry E2E (on-demand)") ;;
+  *)
+    printf '::error::Unknown Foundry E2E check name\n' >&2
     exit 1
     ;;
 esac
@@ -33,13 +42,14 @@ if [[ -n $started ]]; then
       --arg sha "$sha" \
       --arg conclusion "$conclusion" \
       --arg summary "$summary" \
+      --arg name "$name" \
       --arg text "started=${started}" \
       '{
-        name: "Foundry E2E (nightly)",
+        name: $name,
         head_sha: $sha,
         status: "completed",
         conclusion: $conclusion,
-        output: { title: "Foundry E2E (nightly)", summary: $summary, text: $text }
+        output: { title: $name, summary: $summary, text: $text }
       }'
   )
 else
@@ -48,12 +58,13 @@ else
       --arg sha "$sha" \
       --arg conclusion "$conclusion" \
       --arg summary "$summary" \
+      --arg name "$name" \
       '{
-        name: "Foundry E2E (nightly)",
+        name: $name,
         head_sha: $sha,
         status: "completed",
         conclusion: $conclusion,
-        output: { title: "Foundry E2E (nightly)", summary: $summary }
+        output: { title: $name, summary: $summary }
       }'
   )
 fi
