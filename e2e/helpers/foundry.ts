@@ -32,7 +32,6 @@ const ADMIN_SCREEN_TIMEOUT_MS = 15_000;
 const SETTLE_PHASE_MS = 15_000;
 const TOUR_CLOSE_PHASE_MS = 15_000;
 const CREATE_WORLD_PHASE_MS = 20_000;
-const CREATE_WORLD_UI_MS = 30_000;
 const LAUNCH_PHASE_MS = 30_000;
 const JOIN_PHASE_MS = 60_000;
 const GAME_READY_MS = 180_000;
@@ -43,7 +42,6 @@ const NAVIGATION_MS = 30_000;
 export function setupPhaseBudgetMs(): number {
   const adminSignIn = ADMIN_SCREEN_TIMEOUT_MS * 3 + FIELD_CLEAR_MS;
   const eulaSign = SCREEN_TIMEOUT_MS * 3 + EULA_HIDDEN_MS;
-  const worldForm = CREATE_WORLD_UI_MS + TOUR_WAIT_MS * 4 + ADMIN_SCREEN_TIMEOUT_MS * 5;
   const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS;
   const join = NAVIGATION_MS + JOIN_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS + FIELD_CLEAR_MS;
   return (
@@ -56,7 +54,6 @@ export function setupPhaseBudgetMs(): number {
     adminSignIn +
     TOUR_CLOSE_PHASE_MS +
     CREATE_WORLD_PHASE_MS +
-    worldForm +
     launch +
     join +
     GAME_READY_MS
@@ -490,36 +487,37 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
   if (ready) return current;
 
   noteAuthPhase("create world");
-  const created = await withPhaseTimeout(
+  await withPhaseTimeout(
     "create world",
     CREATE_WORLD_PHASE_MS,
-    current.evaluate(
-      async function ensureWorldRecord(world) {
-        const runtime = window as unknown as {
-          World?: { create?: (data: Record<string, string>) => Promise<unknown> };
-          game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
-        };
-        if (runtime.game?.worlds?.get?.(world.id)) return "exists";
-        if (typeof runtime.World?.create === "function") {
-          await runtime.World.create({
-            id: world.id,
-            name: world.id,
-            title: world.title,
-            system: world.system,
-          });
-          return "created";
-        }
-        return "unavailable";
-      },
-      {
-        id: process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e",
-        title: "Pivot Fantasy E2E",
-        system: "pivot-fantasy",
-      },
-    ),
+    (async () => {
+      const created = await current.evaluate(
+        async function ensureWorldRecord(world) {
+          const runtime = window as unknown as {
+            World?: { create?: (data: Record<string, string>) => Promise<unknown> };
+            game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
+          };
+          if (runtime.game?.worlds?.get?.(world.id)) return "exists";
+          if (typeof runtime.World?.create === "function") {
+            await runtime.World.create({
+              id: world.id,
+              name: world.id,
+              title: world.title,
+              system: world.system,
+            });
+            return "created";
+          }
+          return "unavailable";
+        },
+        {
+          id: process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e",
+          title: "Pivot Fantasy E2E",
+          system: "pivot-fantasy",
+        },
+      );
+      if (created === "unavailable") await createWorldThroughUi(current);
+    })(),
   );
-
-  if (created === "unavailable") await createWorldThroughUi(current);
 
   await launchWorld(current);
   return current;
@@ -551,26 +549,25 @@ async function dismissSetupTour(page: Page): Promise<void> {
 
 async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
-  await create.waitFor({ state: "visible", timeout: CREATE_WORLD_UI_MS });
+  await create.waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
   await dismissSetupTour(page);
   await create.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");
-  const system = page.locator('select[name="system"], select#system');
-  if ((await system.count()) > 0) {
-    await system
-      .first()
-      .selectOption({ value: "pivot-fantasy" }, { timeout: ADMIN_SCREEN_TIMEOUT_MS })
-      .catch(async () => {
-        await system
-          .first()
-          .selectOption({ label: /pivot fantasy/i }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
-      });
-  }
+  const filter = page.getByRole("searchbox", { name: /filter systems/i }).first();
+  await filter.fill("Pivot Fantasy");
+  const card = page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { name: "Pivot Fantasy", exact: true }) })
+    .first();
+  await card.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   await page
-    .getByRole("button", { name: /create world|create/i })
-    .last()
+    .getByRole("button", { name: "Continue", exact: true })
     .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await page
+    .getByRole("button", { name: /launch/i })
+    .first()
+    .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
 }
 
 async function launchWorld(page: Page): Promise<void> {
