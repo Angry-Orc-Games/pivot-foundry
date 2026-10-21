@@ -638,15 +638,9 @@ async function createWorldThroughUi(page: Page): Promise<void> {
     .filter({ has: page.getByRole("heading", { name: "Pivot Fantasy", exact: true }) })
     .first();
   await card.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
-  const worldId = e2eWorldId();
-  const dataPath = page.locator('input[name="name"]:not([disabled])').first();
-  await dataPath.evaluate((element, id) => {
-    const input = element as HTMLInputElement;
-    input.value = id;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }, worldId);
-  expect(await dataPath.inputValue()).toBe(worldId);
+  const worldIdField = page.locator('form:has(input[name="title"]) input[name="world-id"]').first();
+  await worldIdField.fill(e2eWorldId());
+  expect(await worldIdField.inputValue()).toBe(e2eWorldId());
   await page
     .getByRole("button", { name: "Continue", exact: true })
     .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });

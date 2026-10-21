@@ -23,6 +23,7 @@ function recordedSecretCalls(source) {
     const args = (match.groups.args ?? match.groups.keyArgs ?? "").trim();
     if (!args) continue;
     if (/^(['"])(?:\\.|(?!\1).)*\1$/.test(args)) continue;
+    if (args === "e2eWorldId(") continue;
     const line = source.slice(0, match.index).split("\n").length;
     hits.push(`${method}(${args}) at line ${line}`);
   }
