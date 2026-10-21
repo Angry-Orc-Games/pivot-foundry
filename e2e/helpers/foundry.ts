@@ -668,21 +668,35 @@ export async function joinAs(
     if (!page.url().includes("/join")) {
       await page.goto("/join", { waitUntil: "domcontentloaded", timeout: NAVIGATION_MS });
     }
-    await page.getByText(name, { exact: true }).first().click({ timeout: JOIN_PHASE_MS });
-    const submitJoin = async () => {
-      const join = page.getByRole("button", { name: /join game|join/i }).first();
-      if (await join.isVisible().catch(() => false)) {
-        await join.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
-      }
-    };
-    if (password) {
-      const field = page.locator('input[type="password"]');
-      if ((await field.count()) > 0) await fillSecret(field.first(), password);
-      await submitJoin();
-      await clearPasswordFields(page);
-    } else {
-      await submitJoin();
-    }
+    await withPhaseTimeout(
+      "join",
+      JOIN_PHASE_MS,
+      (async () => {
+        const form = page
+          .locator("section")
+          .filter({
+            has: page.getByRole("heading", { name: "Join Game Session", exact: true }),
+          })
+          .first();
+        const user = form.getByRole("combobox").first();
+        const choose = () =>
+          user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        await choose();
+        if (password) {
+          const field = form.locator('input[type="password"]');
+          if ((await field.count()) > 0) await fillSecret(field.first(), password);
+          await choose();
+        }
+        const selected = await user.evaluate(
+          (element: HTMLSelectElement) => element.selectedOptions[0]?.label ?? "",
+        );
+        await expect(selected).toBe(name);
+        await form
+          .getByRole("button", { name: "Join Game Session", exact: true })
+          .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+      })(),
+    );
+    if (password) await clearPasswordFields(page);
     await waitForGameReady(page);
     releaseFailureShots(page);
   } catch (error) {
