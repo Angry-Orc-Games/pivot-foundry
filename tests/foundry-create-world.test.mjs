@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
+import { CREATE_WORLD_PHASE_MS, ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 
 const SNAPSHOT = fileURLToPath(
   new URL("./fixtures/foundry-v14-create-world.snapshot.txt", import.meta.url),
@@ -222,7 +222,7 @@ describe("v14 create world", () => {
       },
     );
     try {
-      await vi.advanceTimersByTimeAsync(20_000);
+      await vi.advanceTimersByTimeAsync(CREATE_WORLD_PHASE_MS);
       await Promise.race([pending, Promise.resolve()]);
     } finally {
       vi.useRealTimers();

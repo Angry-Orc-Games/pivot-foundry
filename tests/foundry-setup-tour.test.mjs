@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
+import { CREATE_WORLD_PHASE_MS, ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 
 const INTERCEPTS = '<div class="tour-overlay"></div> intercepts pointer events';
 
@@ -225,7 +225,7 @@ describe("setup phase deadlines", () => {
       },
     );
     try {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(CREATE_WORLD_PHASE_MS);
       await Promise.race([pending, Promise.resolve()]);
     } finally {
       vi.useRealTimers();
