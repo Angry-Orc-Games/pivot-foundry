@@ -22,13 +22,13 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 20_000 },
   forbidOnly: !!process.env.CI,
-  reporter: [["list"], ["html", { open: "never", outputFolder: "../playwright-report" }]],
+  reporter: [["list"], ["json", { outputFile: "../playwright-report/results.json" }]],
   outputDir: "../test-results",
   use: {
     baseURL,
     browserName: "chromium",
     headless: true,
-    trace: "retain-on-failure",
+    trace: "off",
     screenshot: "only-on-failure",
     video: "off",
     ignoreHTTPSErrors: false,
@@ -36,7 +36,10 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1366, height: 768 },
+      },
     },
   ],
 });
