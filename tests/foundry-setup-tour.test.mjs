@@ -8,6 +8,28 @@ import { ensureE2EWorld } from "../e2e/helpers/foundry.ts";
 
 const INTERCEPTS = '<div class="tour-overlay"></div> intercepts pointer events';
 
+function v14FormControl(role, name) {
+  const node = {
+    first() {
+      return node;
+    },
+    filter() {
+      return node;
+    },
+    async click() {},
+    async fill() {},
+    async waitFor() {},
+    async isVisible() {
+      return true;
+    },
+  };
+  if (role === "searchbox" && name instanceof RegExp && name.test("Filter systems")) return node;
+  if (role === "listitem") return node;
+  if (role === "button" && name === "Continue") return node;
+  if (role === "button" && name instanceof RegExp && name.test("Launch")) return node;
+  return undefined;
+}
+
 function tourPage({ attached = true } = {}) {
   const events = [];
   let covered = attached;
@@ -98,6 +120,8 @@ function tourPage({ attached = true } = {}) {
         return createWorld;
       }
       if (role === "checkbox" || role === "heading") return hidden;
+      const form = v14FormControl(role, name);
+      if (form) return form;
       throw new Error(`unexpected role ${role} ${label}`);
     },
     keyboard: {
@@ -476,6 +500,8 @@ function lateTourPage({ hangComplete = false } = {}) {
       const name = options.name;
       if (role === "button" && name instanceof RegExp && name.test("Create World"))
         return createWorld;
+      const form = v14FormControl(role, name);
+      if (form) return form;
       if (role === "checkbox" || role === "heading") return hidden;
       if (role === "button") return hidden;
       throw new Error(`unexpected role ${role}`);
@@ -705,6 +731,8 @@ function classToursPage({
       const name = options.name;
       if (role === "button" && name instanceof RegExp && name.test("Create World"))
         return createWorld;
+      const form = v14FormControl(role, name);
+      if (form) return form;
       if (role === "checkbox" || role === "heading") return hidden;
       if (role === "button") return hidden;
       throw new Error(`unexpected role ${role}`);
