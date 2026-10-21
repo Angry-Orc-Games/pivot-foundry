@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
@@ -35,6 +35,9 @@ const LAUNCH_PHASE_MS = 30_000;
 const JOIN_PHASE_MS = 60_000;
 const GAME_READY_MS = 180_000;
 const UNPAUSE_MS = 15_000;
+const CANVAS_READY_MS = 120_000;
+const EXPECT_MS = 20_000;
+const PLAYER_CONSOLE_TAIL = 50;
 const TOUR_WAIT_MS = 2_000;
 const CREATE_WORLD_EVALUATE_MS = 20_000;
 const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 10 + TOUR_WAIT_MS * 4;
@@ -68,6 +71,22 @@ export function setupHookTimeoutMs(): number {
   return setupPhaseBudgetMs() + 5_000;
 }
 
+export function joinAsCeilingMs(withPassword = false): number {
+  return NAVIGATION_MS + JOIN_PHASE_MS + (withPassword ? FIELD_CLEAR_MS : 0) + GAME_READY_MS;
+}
+
+export function playerSyncTimeoutMs(): number {
+  return joinAsCeilingMs(false) + joinAsCeilingMs(true) + EXPECT_MS;
+}
+
+export function sceneCanvasTimeoutMs(): number {
+  return joinAsCeilingMs(false) + EXPECT_MS + UNPAUSE_MS + CANVAS_READY_MS;
+}
+
+export function sheetSpecTimeoutMs(): number {
+  return joinAsCeilingMs(false) * 2 + EXPECT_MS * 2 + NAVIGATION_MS;
+}
+
 export function e2eWorldId(): string {
   return process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e";
 }
@@ -87,6 +106,7 @@ export async function waitForFoundryShell(page: Page): Promise<void> {
             Boolean((window as unknown as { game?: { ready?: boolean } }).game)
           );
         },
+        undefined,
         { timeout: LICENSE_PHASE_MS },
       );
     })(),
@@ -187,13 +207,22 @@ function noteAuthPhase(phase: AuthPhase): void {
   appendFileSync(file, `${phase}\n`);
 }
 
+function redactDiagnosticText(text: string, extras: readonly string[] = []): string {
+  let safe = text;
+  for (const secret of [
+    process.env.FOUNDRY_ADMIN_KEY,
+    process.env.FOUNDRY_LICENSE_KEY,
+    ...extras,
+  ]) {
+    if (secret) safe = safe.split(secret).join("[redacted]");
+  }
+  return safe;
+}
+
 function noteTourProblem(line: string): void {
   const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
   if (!marker) return;
-  let safe = line;
-  for (const secret of [process.env.FOUNDRY_ADMIN_KEY, process.env.FOUNDRY_LICENSE_KEY]) {
-    if (secret) safe = safe.split(secret).join("[redacted]");
-  }
+  const safe = redactDiagnosticText(line);
   const file = join(dirname(marker), "tour-notes.log");
   mkdirSync(dirname(file), { recursive: true });
   appendFileSync(file, `${safe}\n`);
@@ -263,6 +292,31 @@ function holdFailureShots(page: Page): void {
 
 function releaseFailureShots(page: Page): void {
   (page as ShotState).__pivotHoldShots = false;
+}
+
+export async function saveSecondaryPageFailure(
+  page: Page,
+  consoleLines: readonly string[],
+  secrets: readonly string[] = [],
+): Promise<void> {
+  const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+  if (!marker) return;
+  const dir = dirname(marker);
+  mkdirSync(dir, { recursive: true });
+  const cleared = await clearPasswordFields(page);
+  let shot: Buffer | undefined;
+  if (cleared && typeof page.screenshot === "function") {
+    try {
+      shot = await page.screenshot();
+    } catch {
+      shot = undefined;
+    }
+  }
+  if (shot) writeFileSync(join(dir, "player-page.png"), shot);
+  const tail = consoleLines
+    .slice(-PLAYER_CONSOLE_TAIL)
+    .map((line) => redactDiagnosticText(line, secrets));
+  writeFileSync(join(dir, "player-console.log"), `${tail.join("\n")}\n`);
 }
 
 export async function fillSecret(locator: Locator, value: string): Promise<void> {
@@ -747,9 +801,8 @@ export async function joinAs(
 export async function waitForGameReady(page: Page): Promise<FoundryIdentity> {
   await page.waitForFunction(
     () => (window as unknown as { game?: { ready?: boolean } }).game?.ready === true,
-    {
-      timeout: GAME_READY_MS,
-    },
+    undefined,
+    { timeout: GAME_READY_MS },
   );
   return readIdentity(page);
 }
@@ -795,6 +848,7 @@ export async function ensureUnpaused(page: Page): Promise<void> {
   if (!gm) return;
   await page.waitForFunction(
     () => (window as unknown as { game?: { paused?: boolean } }).game?.paused === false,
+    undefined,
     { timeout: UNPAUSE_MS },
   );
 }
@@ -802,9 +856,8 @@ export async function ensureUnpaused(page: Page): Promise<void> {
 export async function waitForCanvasReady(page: Page): Promise<void> {
   await page.waitForFunction(
     () => (window as unknown as { canvas?: { ready?: boolean } }).canvas?.ready === true,
-    {
-      timeout: 120_000,
-    },
+    undefined,
+    { timeout: CANVAS_READY_MS },
   );
 }
 

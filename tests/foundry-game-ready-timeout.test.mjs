@@ -2,8 +2,13 @@ import { createContext, runInContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
+import config from "../e2e/playwright.config.ts";
 import {
   ensureUnpaused,
+  joinAsCeilingMs,
+  playerSyncTimeoutMs,
+  sceneCanvasTimeoutMs,
+  sheetSpecTimeoutMs,
   waitForCanvasReady,
   waitForFoundryShell,
   waitForGameReady,
@@ -96,5 +101,31 @@ describe("waitForFunction timeouts", () => {
     expect(page.calls).toHaveLength(1);
     expect(page.calls[0].arg).toBeUndefined();
     expect(page.calls[0].options?.timeout).toBe(CANVAS_READY_MS);
+  });
+});
+
+describe("spec timeouts", () => {
+  it("leaves 180s for the player join after the GM join", () => {
+    const gm = joinAsCeilingMs(false);
+    const player = joinAsCeilingMs(true);
+    expect(gm).toBe(30_000 + 60_000 + 180_000);
+    expect(player).toBe(30_000 + 60_000 + 1_000 + 180_000);
+    expect(gm + 180_000).toBeGreaterThan(360_000);
+    expect(playerSyncTimeoutMs()).toBe(gm + player + config.expect.timeout);
+    expect(playerSyncTimeoutMs()).toBeGreaterThan(360_000);
+  });
+
+  it("leaves the scene test room for the canvas wait after the GM join", () => {
+    expect(sceneCanvasTimeoutMs()).toBe(
+      joinAsCeilingMs(false) + config.expect.timeout + 15_000 + 120_000,
+    );
+    expect(sceneCanvasTimeoutMs()).toBeGreaterThan(360_000);
+  });
+
+  it("leaves the sheet test room for two GM joins and a reload", () => {
+    expect(sheetSpecTimeoutMs()).toBe(
+      joinAsCeilingMs(false) * 2 + config.expect.timeout * 2 + config.use.navigationTimeout,
+    );
+    expect(sheetSpecTimeoutMs()).toBeGreaterThan(360_000);
   });
 });
