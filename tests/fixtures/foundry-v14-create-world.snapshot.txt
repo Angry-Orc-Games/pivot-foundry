@@ -1,0 +1,9 @@
+- banner: heading "Pivot Fantasy E2E" [level=1]
+- button "Cancel World Creation"
+- World Title: textbox [active]: Pivot Fantasy E2E
+- Data Path: textbox [disabled] "Data/worlds/" + textbox "pivot-fantasy-e2e"
+- Background Image textbox, Join Page Theme combobox (Default/Minimal), Next Session textbox, World Description editor
+- contentinfo: button "Continue"
+- search: searchbox "Filter systems"
+- list:
+  - listitem [cursor=pointer]: img "Pivot Fantasy", heading "Pivot Fantasy" [level=3], "0.1.0"
