@@ -54,7 +54,7 @@ function v14CreateWorldPage({
   let launchCalls = 0;
   let usersLive = false;
   let titleValue = "";
-  let dataPathValue = "pivot-fantasy-e2e";
+  let worldIdValue = "";
   let worldIdAtContinue = "";
   let createdWorldId = "";
   let launchedWorldId = "";
@@ -72,17 +72,50 @@ function v14CreateWorldPage({
       events.push("title");
     },
   };
-  const dataPath = {
+  const disabledPrefix = {
     first() {
-      return dataPath;
+      return disabledPrefix;
     },
     async inputValue() {
-      return dataPathValue;
+      return "Data/worlds/";
     },
-    async evaluate(_fn, id) {
-      if (typeof id === "string") dataPathValue = id;
+    async fill() {
+      throw new Error("locator.fill: Timeout 15000ms exceeded");
+    },
+    async evaluate() {
+      throw new Error("locator.evaluate: Timeout 15000ms exceeded");
     },
   };
+  const worldIdField = {
+    first() {
+      return worldIdField;
+    },
+    async fill(value) {
+      worldIdValue = String(value);
+    },
+    async inputValue() {
+      return worldIdValue;
+    },
+  };
+  function missingField(selector) {
+    const timeout = (action) =>
+      new Error(`locator.${action}: Timeout 15000ms exceeded waiting for ${selector}`);
+    const node = {
+      first() {
+        return node;
+      },
+      async fill() {
+        throw timeout("fill");
+      },
+      async evaluate() {
+        throw timeout("evaluate");
+      },
+      async inputValue() {
+        throw timeout("inputValue");
+      },
+    };
+    return node;
+  }
   const systemSelect = {
     first() {
       return systemSelect;
@@ -174,8 +207,21 @@ function v14CreateWorldPage({
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("select")) return systemSelect;
-      if (text.includes('name="title"')) return title;
-      if (text.includes('name="name"')) return dataPath;
+      if (text.includes('name="title"') && !text.includes('name="world-id"')) return title;
+      if (
+        text.includes("form") &&
+        text.includes('name="title"') &&
+        text.includes('name="world-id"')
+      ) {
+        return worldIdField;
+      }
+      const excludesDisabled = text.includes(":not([disabled])");
+      if (!excludesDisabled && (text.includes("[disabled]") || text.includes(":disabled"))) {
+        return disabledPrefix;
+      }
+      if (text.includes('name="name"') || text.includes('name="world-id"')) {
+        return missingField(text);
+      }
       if (text.includes("title")) return title;
       return hidden();
     },
@@ -232,7 +278,7 @@ function v14CreateWorldPage({
         return {
           async click() {
             await pause();
-            worldIdAtContinue = dataPathValue;
+            worldIdAtContinue = worldIdValue;
             events.push("continue");
             worldReady = true;
           },
