@@ -28,10 +28,18 @@ function hidden() {
   return node;
 }
 
-function v14CreateWorldPage({ hangCard = false, decoySelect = false, stepDelayMs = 0 } = {}) {
+function v14CreateWorldPage({
+  hangCard = false,
+  decoySelect = false,
+  stepDelayMs = 0,
+  hideOnFilter = false,
+  filterText = "",
+  missingCard = false,
+} = {}) {
   const events = [];
   const selectCalls = [];
   let worldReady = false;
+  let systemsFilter = filterText;
   const pause = () =>
     stepDelayMs === 0
       ? Promise.resolve()
@@ -83,6 +91,10 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false, stepDelayMs
     },
     async click() {
       await pause();
+      if (hideOnFilter && systemsFilter !== "") {
+        throw new Error("locator.click: Timeout 15000ms exceeded");
+      }
+      if (missingCard) return new Promise(() => {});
       events.push("pick-system");
       if (hangCard) return new Promise(() => {});
     },
@@ -90,6 +102,9 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false, stepDelayMs
   return {
     events,
     selectCalls,
+    get filterText() {
+      return systemsFilter;
+    },
     async goto() {},
     async waitForFunction() {},
     async evaluate(fn) {
@@ -112,8 +127,13 @@ function v14CreateWorldPage({ hangCard = false, decoySelect = false, stepDelayMs
           first() {
             return field;
           },
+          async inputValue() {
+            await pause();
+            return systemsFilter;
+          },
           async fill(value) {
             await pause();
+            systemsFilter = String(value);
             events.push(`filter:${value}`);
           },
         };
@@ -184,6 +204,53 @@ describe("v14 create world", () => {
       "world-ready",
     ]);
     expect(page.selectCalls.some((call) => call?.label instanceof RegExp)).toBe(false);
+  });
+
+  it("clicks the Pivot Fantasy card without typing a system filter", async () => {
+    const page = v14CreateWorldPage({ hideOnFilter: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.filterText).toBe("");
+    expect(page.events).toContain("pick-system");
+    expect(page.events).toContain("continue");
+    expect(page.events).toContain("world-ready");
+    expect(page.events.some((event) => /^filter:.+/.test(event))).toBe(false);
+  });
+
+  it("clears system filter text before clicking the Pivot Fantasy card", async () => {
+    const page = v14CreateWorldPage({ hideOnFilter: true, filterText: "core" });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.filterText).toBe("");
+    expect(page.events).toContain("filter:");
+    expect(page.events).toContain("pick-system");
+    expect(page.events).toContain("world-ready");
+    expect(page.events.some((event) => /^filter:.+/.test(event))).toBe(false);
+  });
+
+  it("stalls create world when the Pivot Fantasy card is missing", async () => {
+    vi.useFakeTimers();
+    const page = v14CreateWorldPage({ hideOnFilter: true, missingCard: true });
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(CREATE_WORLD_PHASE_MS);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during create world/);
+    expect(page.events).not.toContain("pick-system");
+    expect(page.events).not.toContain("continue");
   });
 
   it("finishes a create-world form that takes longer than 20s", async () => {
