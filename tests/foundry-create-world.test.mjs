@@ -53,6 +53,11 @@ function v14CreateWorldPage({
   let launchWaits = 0;
   let launchCalls = 0;
   let usersLive = false;
+  let titleValue = "";
+  let dataPathValue = "pivot-fantasy-e2e";
+  let worldIdAtContinue = "";
+  let createdWorldId = "";
+  let launchedWorldId = "";
   const pause = () =>
     stepDelayMs === 0
       ? Promise.resolve()
@@ -61,9 +66,24 @@ function v14CreateWorldPage({
     first() {
       return title;
     },
-    async fill() {
+    async fill(value) {
       await pause();
+      titleValue = String(value);
       events.push("title");
+    },
+  };
+  const dataPath = {
+    first() {
+      return dataPath;
+    },
+    async inputValue() {
+      return dataPathValue;
+    },
+    async evaluate(_fn, id) {
+      if (typeof id === "string") dataPathValue = id;
+    },
+    async fill(value) {
+      dataPathValue = String(value);
     },
   };
   const systemSelect = {
@@ -124,16 +144,32 @@ function v14CreateWorldPage({
     get launchCalls() {
       return launchCalls;
     },
+    get titleValue() {
+      return titleValue;
+    },
+    get worldIdAtContinue() {
+      return worldIdAtContinue;
+    },
+    get createdWorldId() {
+      return createdWorldId;
+    },
+    get launchedWorldId() {
+      return launchedWorldId;
+    },
     url() {
       return pageUrl;
     },
     async goto() {},
     async waitForFunction() {},
-    async evaluate(fn) {
+    async evaluate(fn, arg) {
       if (fn?.name === "silenceCoreTours") return { ready: false, notes: [] };
-      if (fn?.name === "ensureWorldRecord") return record;
+      if (fn?.name === "ensureWorldRecord") {
+        createdWorldId = arg?.id ?? "";
+        return record;
+      }
       if (fn?.name === "launchInstalledWorld") {
         launchCalls += 1;
+        launchedWorldId = String(arg ?? "");
         return true;
       }
       return false;
@@ -141,7 +177,9 @@ function v14CreateWorldPage({
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("select")) return systemSelect;
-      if (text.includes("title") || text.includes('name="name"')) return title;
+      if (text.includes('name="title"')) return title;
+      if (text.includes('name="name"')) return dataPath;
+      if (text.includes("title")) return title;
       return hidden();
     },
     getByRole(role, options = {}) {
@@ -197,6 +235,7 @@ function v14CreateWorldPage({
         return {
           async click() {
             await pause();
+            worldIdAtContinue = dataPathValue;
             events.push("continue");
             worldReady = true;
           },
@@ -273,6 +312,44 @@ describe("v14 create world", () => {
 
     expect(page.events).toEqual(["open-form", "title", "pick-system", "continue", "world-ready"]);
     expect(page.selectCalls.some((call) => call?.label instanceof RegExp)).toBe(false);
+  });
+
+  it("writes the expected world id into the data path before Continue", async () => {
+    const snapshot = await readFile(SNAPSHOT, "utf8");
+    expect(snapshot).toContain('textbox [disabled] "Data/worlds/"');
+    expect(snapshot).toContain('textbox "pivot-fantasy-e2e"');
+
+    const previous = process.env.PIVOT_E2E_WORLD_ID;
+    delete process.env.PIVOT_E2E_WORLD_ID;
+    try {
+      const page = v14CreateWorldPage();
+      await ensureE2EWorld(page, "admin-key-secret");
+
+      expect(page.titleValue).toBe("Pivot Fantasy E2E");
+      expect(page.createdWorldId).toBe("pivot-e2e");
+      expect(page.launchedWorldId).toBe("pivot-e2e");
+      expect(page.worldIdAtContinue).toBe("pivot-e2e");
+    } finally {
+      if (previous === undefined) delete process.env.PIVOT_E2E_WORLD_ID;
+      else process.env.PIVOT_E2E_WORLD_ID = previous;
+    }
+  });
+
+  it("writes PIVOT_E2E_WORLD_ID into the data path before Continue", async () => {
+    const previous = process.env.PIVOT_E2E_WORLD_ID;
+    process.env.PIVOT_E2E_WORLD_ID = "session-world";
+    try {
+      const page = v14CreateWorldPage();
+      await ensureE2EWorld(page, "admin-key-secret");
+
+      expect(page.titleValue).toBe("Pivot Fantasy E2E");
+      expect(page.createdWorldId).toBe("session-world");
+      expect(page.launchedWorldId).toBe("session-world");
+      expect(page.worldIdAtContinue).toBe("session-world");
+    } finally {
+      if (previous === undefined) delete process.env.PIVOT_E2E_WORLD_ID;
+      else process.env.PIVOT_E2E_WORLD_ID = previous;
+    }
   });
 
   it("clicks the Pivot Fantasy card without typing a system filter", async () => {
