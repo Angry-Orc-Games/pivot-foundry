@@ -66,9 +66,11 @@ test("creates a character, renders the sheet, and persists after reload", async 
     await actorDoc.sheet.render(true);
   }, actor.id);
 
-  await expect(page.locator(".pivot-character-sheet, .window-app, .application")).toContainText(
-    /E2E Hero/,
-  );
+  const sheet = page.locator("form.application.sheet.actor").filter({
+    has: page.locator(".window-title", { hasText: actor.name }),
+  });
+  await expect(sheet.locator(".window-title")).toContainText(actor.name);
+  await expect(sheet.getByRole("textbox", { name: "Character name" })).toHaveValue(actor.name);
 
   await page.evaluate(async (id) => {
     await (
