@@ -198,7 +198,6 @@ describe("v14 create world", () => {
     expect(page.events).toEqual([
       "open-form",
       "title",
-      "filter:Pivot Fantasy",
       "pick-system",
       "continue",
       "world-ready",

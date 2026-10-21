@@ -18,6 +18,9 @@ function v14FormControl(role, name) {
     },
     async click() {},
     async fill() {},
+    async inputValue() {
+      return "";
+    },
     async waitFor() {},
     async isVisible() {
       return true;
