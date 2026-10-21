@@ -10,6 +10,7 @@ interface CombatantLike {
   };
   token?: unknown;
   hidden?: boolean;
+  isOwner?: boolean;
   getInitiativeRoll?: (formula: string) => Promise<{
     toMessage?: (
       data: Record<string, unknown>,
@@ -87,11 +88,13 @@ export function createPivotCombatClass(
 
       // Roll initiative for each combatant
       const updates: Array<{ _id: string; initiative: number }> = [];
+      let messagesPosted = 0;
 
       for (const combatantId of combatantIds) {
         const combatant = combatantList.find((c) => (c.id ?? c._id) === combatantId);
         // Skip if combatant missing, no actor, or no getInitiativeRoll method
         if (!combatant?.actor || !combatant.getInitiativeRoll) continue;
+        if (combatant.isOwner === false) continue;
 
         // Resolve formula per combatant
         const formula = options.formula ?? combatant._getInitiativeFormula?.() ?? "1d20";
@@ -147,6 +150,9 @@ export function createPivotCombatClass(
             { rollMode: effectiveRollMode, create: false },
           );
         }
+
+        if (messagesPosted > 0) chatData.sound = null;
+        messagesPosted += 1;
 
         // Create message using ChatMessage.implementation.create for single message
         const Cls = ChatMessage?.implementation ?? ChatMessage;

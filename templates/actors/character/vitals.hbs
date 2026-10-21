@@ -1,0 +1,102 @@
+{{! Vitals section: 4 stat cards, 6 ability boxes, Initiative/Passive Perception line }}
+<section class="pf-vitals pf-print pf-print-wrap">
+  <div class="pf-stats">
+    {{! AC stat card }}
+    <div class="pf-stat" title="{{derived.armourClass.breakdown}}">
+      <b>ARMOUR CLASS</b>
+      <span>{{derived.armourClass.value}}</span>
+      <small>{{derived.armourClass.armourWorn}}</small>
+    </div>
+
+    {{! HP stat card }}
+    <div class="pf-stat">
+      <b>HIT POINTS</b>
+      <span>{{system.attributes.hp.value}} / {{system.attributes.hp.max}}</span>
+      <small>{{system.attributes.hitDie}} + Con {{conMod}}</small>
+    </div>
+
+    <div class="pf-stat">
+      <b>SPEED</b>
+      <span>{{derived.speed}} m</span>
+      <small>Prof. bonus +{{derived.proficiencyBonus}}</small>
+    </div>
+
+    <div class="pf-stat">
+      <b>POOL</b>
+      <span>{{system.resources.pool.value}}
+        /
+        {{derived.pool.max}}
+        ×
+        {{system.attributes.hitDie}}</span>
+      <small>{{#if system.magic.awakened}}MP
+          {{system.magic.mp.value}}/{{derived.magic.mp.max}}{{else}}Not Awakened{{/if}}</small>
+    </div>
+  </div>
+
+  {{! 6 Ability boxes }}
+  <div class="pf-abil">
+    {{#each abilityRows}}
+      <div class="{{abilityClass}}">
+        <div class="pf-ab-head">
+          <button
+            type="button"
+            class="pf-roll pf-ab-name"
+            data-action="roll"
+            data-roll-kind="ability"
+            data-key="{{key}}"
+            data-label="{{label}}"
+          ><b>{{short}}</b></button>
+          <label class="pf-prime-toggle"><input
+              class="pf-sr"
+              type="checkbox"
+              name="{{primaryPath}}"
+              aria-label="Primary {{label}}"
+              {{checked primary}}
+              {{disabledAttr}}
+            /><span class="pf-prime-mark" aria-hidden="true">{{#if
+                primary
+              }}★{{else}}☆{{/if}}</span></label>
+        </div>
+        <span><input
+            class="pf-inline pf-num pf-ab-score"
+            name="{{scorePath}}"
+            type="number"
+            min="1"
+            max="30"
+            step="1"
+            value="{{score}}"
+            aria-label="{{label}} score"
+            {{disabledAttr}}
+          /></span>
+        <small class="pf-ab-mod">{{mod}}</small>
+        <button
+          type="button"
+          class="pf-roll pf-ab-save"
+          data-action="roll"
+          data-roll-kind="save"
+          data-key="{{key}}"
+          data-label="{{label}} save"
+        ><small>Save {{save}}</small></button>
+      </div>
+    {{/each}}
+  </div>
+
+  {{#if scoreSourceText}}
+    <div class="pf-small">{{scoreSourceText}}</div>
+  {{/if}}
+
+  <div class="pf-small pf-init-line">
+    <button
+      type="button"
+      class="pf-roll"
+      data-action="roll"
+      data-roll-kind="initiative"
+      data-label="{{localize 'PIVOT.Rolls.Initiative'}}"
+    >Initiative
+      {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}</button>
+    <span aria-hidden="true">·</span>
+    <span>Passive Perception {{derived.passivePerception}}</span>
+  </div>
+
+  <div class="pf-small">★ Primary abilities add Proficiency Bonus to saves.</div>
+</section>
