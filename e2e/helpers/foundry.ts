@@ -36,7 +36,7 @@ const JOIN_PHASE_MS = 60_000;
 const GAME_READY_MS = 180_000;
 const TOUR_WAIT_MS = 2_000;
 const CREATE_WORLD_EVALUATE_MS = 20_000;
-const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 7 + TOUR_WAIT_MS * 4;
+const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 8 + TOUR_WAIT_MS * 4;
 export const CREATE_WORLD_PHASE_MS = CREATE_WORLD_EVALUATE_MS + CREATE_WORLD_UI_MS;
 const FIELD_CLEAR_MS = 1_000;
 const NAVIGATION_MS = 30_000;
@@ -557,7 +557,7 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");
   const filter = page.getByRole("searchbox", { name: /filter systems/i }).first();
-  await filter.fill("Pivot Fantasy");
+  if ((await filter.inputValue()) !== "") await filter.fill("");
   const card = page
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { name: "Pivot Fantasy", exact: true }) })
