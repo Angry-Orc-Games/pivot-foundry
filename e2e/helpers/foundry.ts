@@ -44,7 +44,7 @@ const NAVIGATION_MS = 30_000;
 export function setupPhaseBudgetMs(): number {
   const adminSignIn = ADMIN_SCREEN_TIMEOUT_MS * 3 + FIELD_CLEAR_MS;
   const eulaSign = SCREEN_TIMEOUT_MS * 3 + EULA_HIDDEN_MS;
-  const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS;
+  const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS * 3;
   const join = NAVIGATION_MS + JOIN_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS + FIELD_CLEAR_MS;
   return (
     LICENSE_PHASE_MS +
@@ -518,6 +518,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
         },
       );
       if (created === "unavailable") await createWorldThroughUi(current);
+      if (created === "created") await completeUserManagement(current);
     })(),
   );
 
@@ -574,14 +575,20 @@ async function screenShown(read: () => { isVisible: () => Promise<boolean> }): P
   }
 }
 
+async function completeUserManagement(page: Page): Promise<void> {
+  const showing = await screenShown(() =>
+    page.getByRole("heading", { name: "User Management", exact: true }),
+  );
+  if (!showing) return;
+  await page
+    .getByRole("button", { name: "Save and Continue", exact: true })
+    .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await waitForJoinOrGame(page);
+}
+
 async function worldAlreadyOpen(page: Page): Promise<boolean> {
   const url = typeof page.url === "function" ? page.url() : "";
   if (url.includes("/join") || url.includes("/game")) return true;
-  if (
-    await screenShown(() => page.getByRole("heading", { name: "User Management", exact: true }))
-  ) {
-    return true;
-  }
   return screenShown(() => page.getByRole("button", { name: /join game|join/i }).first());
 }
 
@@ -602,28 +609,24 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   await page
     .getByRole("button", { name: "Continue", exact: true })
     .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
-  const outcome = await Promise.any([
+  await Promise.any([
     page
       .getByRole("button", { name: /launch/i })
       .first()
-      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS })
-      .then(() => "launch" as const),
-    page
-      .getByRole("heading", { name: "User Management", exact: true })
-      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS })
-      .then(() => "users" as const),
+      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS }),
+    page.getByRole("heading", { name: "User Management", exact: true }).waitFor({
+      state: "visible",
+      timeout: ADMIN_SCREEN_TIMEOUT_MS,
+    }),
   ]).catch(() => {
     throw new Error("Foundry setup stalled during create world");
   });
-  if (outcome !== "users") return;
-  await page
-    .getByRole("button", { name: "Save and Continue", exact: true })
-    .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
-  await waitForJoinOrGame(page);
+  await completeUserManagement(page);
 }
 
 async function launchWorld(page: Page): Promise<void> {
   noteAuthPhase("launch");
+  await completeUserManagement(page);
   if (await worldAlreadyOpen(page)) return;
   const launched = await withPhaseTimeout(
     "launch",
