@@ -82,9 +82,6 @@ function v14CreateWorldPage({
     async evaluate(_fn, id) {
       if (typeof id === "string") dataPathValue = id;
     },
-    async fill(value) {
-      dataPathValue = String(value);
-    },
   };
   const systemSelect = {
     first() {

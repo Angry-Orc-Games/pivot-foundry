@@ -8,6 +8,22 @@ import { CREATE_WORLD_PHASE_MS, ensureE2EWorld } from "../e2e/helpers/foundry.ts
 
 const INTERCEPTS = '<div class="tour-overlay"></div> intercepts pointer events';
 
+function worldDataPath() {
+  let value = "";
+  const field = {
+    first() {
+      return field;
+    },
+    async evaluate(_fn, id) {
+      if (typeof id === "string") value = id;
+    },
+    async inputValue() {
+      return value;
+    },
+  };
+  return field;
+}
+
 function v14FormControl(role, name) {
   const node = {
     first() {
@@ -110,7 +126,8 @@ function tourPage({ attached = true } = {}) {
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("tour-overlay")) return overlay;
-      if (text.includes("title") || text.includes('name="name"')) return title;
+      if (text.includes('name="name"')) return worldDataPath();
+      if (text.includes("title")) return title;
       return hidden;
     },
     getByRole(role, options = {}) {
@@ -496,7 +513,8 @@ function lateTourPage({ hangComplete = false } = {}) {
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("tour-overlay")) return hidden;
-      if (text.includes("title") || text.includes('name="name"')) return title;
+      if (text.includes('name="name"')) return worldDataPath();
+      if (text.includes("title")) return title;
       return hidden;
     },
     getByRole(role, options = {}) {
@@ -727,7 +745,8 @@ function classToursPage({
         return shell;
       }
       if (text.includes("dialog") || text.includes("window-app")) return dialogRoot;
-      if (text.includes("title") || text.includes('name="name"')) return title;
+      if (text.includes('name="name"')) return worldDataPath();
+      if (text.includes("title")) return title;
       return hidden;
     },
     getByRole(role, options = {}) {

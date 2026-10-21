@@ -66,6 +66,10 @@ export function setupHookTimeoutMs(): number {
   return setupPhaseBudgetMs() + 5_000;
 }
 
+export function e2eWorldId(): string {
+  return process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e";
+}
+
 export async function waitForFoundryShell(page: Page): Promise<void> {
   await withPhaseTimeout(
     "license",
@@ -512,7 +516,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
           return "unavailable";
         },
         {
-          id: process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e",
+          id: e2eWorldId(),
           title: "Pivot Fantasy E2E",
           system: "pivot-fantasy",
         },
@@ -625,7 +629,7 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   await create.waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
   await dismissSetupTour(page);
   await create.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
-  const title = page.locator('input[name="title"], input[name="name"]').first();
+  const title = page.locator('input[name="title"]').first();
   await title.fill("Pivot Fantasy E2E");
   const filter = page.getByRole("searchbox", { name: /filter systems/i }).first();
   if ((await filter.inputValue()) !== "") await filter.fill("");
@@ -634,6 +638,15 @@ async function createWorldThroughUi(page: Page): Promise<void> {
     .filter({ has: page.getByRole("heading", { name: "Pivot Fantasy", exact: true }) })
     .first();
   await card.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  const worldId = e2eWorldId();
+  const dataPath = page.locator('input[name="name"]:not([disabled])').first();
+  await dataPath.evaluate((element, id) => {
+    const input = element as HTMLInputElement;
+    input.value = id;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, worldId);
+  expect(await dataPath.inputValue()).toBe(worldId);
   await page
     .getByRole("button", { name: "Continue", exact: true })
     .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
@@ -676,7 +689,7 @@ async function launchWorld(page: Page): Promise<void> {
         return true;
       }
       return false;
-    }, process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e"),
+    }, e2eWorldId()),
   );
 
   if (!launched) {
@@ -853,7 +866,7 @@ export async function expectPackageIdentity(page: Page): Promise<FoundryIdentity
   expect(identity.ready).toBe(true);
   expect(identity.systemId).toBe("pivot-fantasy");
   expect(identity.systemVersion).toBe(process.env.PIVOT_PACKAGE_VERSION || "0.1.0");
-  expect(identity.worldId).toBe(process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e");
+  expect(identity.worldId).toBe(e2eWorldId());
   expect(identity.version.startsWith("14.")).toBe(true);
   return identity;
 }
