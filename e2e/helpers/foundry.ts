@@ -392,7 +392,6 @@ async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promis
     if (typeof SidebarTour === "function" && tour instanceof SidebarTour) return false;
     if (typeof SetupTour === "function" && tour instanceof SetupTour) return true;
     if (stepsNeedUser(tour)) return false;
-    if (typeof SetupTour === "function" && tour.constructor !== Object) return false;
     return tour.namespace === undefined || tour.namespace === "core";
   }
 
@@ -428,18 +427,25 @@ async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promis
 
 async function dismissSuggestedNextTour(page: Page): Promise<void> {
   try {
-    const root = page.locator(".dialog, .window-app, dialog, .application");
+    const root = page.locator(".dialog, .window-app, dialog");
     if (typeof root.filter !== "function") return;
-    const dialog = root.filter({ hasText: /suggested next tour/i }).first();
+    const matches = root.filter({ hasText: /suggested next tour/i });
+    const dialog = typeof matches.last === "function" ? matches.last() : matches;
     const visible = await dialog
       .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
       .then(() => true)
       .catch(() => false);
     if (!visible) return;
     const decline = dialog
-      .getByRole("button", { name: /no thanks|decline|not now|cancel|close/i })
+      .getByRole("button", { name: /no thanks|decline|not now|cancel/i })
       .first();
-    await decline.click({ timeout: TOUR_WAIT_MS });
+    const declined = await decline
+      .click({ timeout: TOUR_WAIT_MS })
+      .then(() => true)
+      .catch(() => false);
+    if (declined) return;
+    const close = dialog.getByRole("button", { name: /^close$/i }).first();
+    await close.click({ timeout: TOUR_WAIT_MS });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     noteTourProblem(`suggested next tour: ${message}`.slice(0, 240));
