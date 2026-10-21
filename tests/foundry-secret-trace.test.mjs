@@ -63,6 +63,58 @@ function tracedAdminPage(trace) {
 
 function tracedJoinPage(trace) {
   let leaked = false;
+  const password = {
+    async count() {
+      return 1;
+    },
+    first() {
+      return password;
+    },
+    nth() {
+      return password;
+    },
+    async fill(value) {
+      if (trace.recording() && value === ADMIN_KEY) leaked = true;
+    },
+    async evaluate(_fn, value) {
+      if (trace.recording() && value === ADMIN_KEY) leaked = true;
+    },
+  };
+  const user = {
+    first() {
+      return user;
+    },
+    async selectOption() {},
+    async evaluate(read) {
+      return read({ selectedOptions: [{ label: "Player" }] });
+    },
+  };
+  const section = {
+    filter() {
+      return section;
+    },
+    first() {
+      return section;
+    },
+    locator() {
+      return password;
+    },
+    getByRole(role, options = {}) {
+      if (role === "combobox") return user;
+      if (role === "button" && options.name === "Join Game Session") {
+        return { async click() {} };
+      }
+      return {
+        first() {
+          return this;
+        },
+        async isVisible() {
+          return true;
+        },
+        async click() {},
+      };
+    },
+  };
   return {
     leaked: () => leaked,
     url() {
@@ -71,32 +123,9 @@ function tracedJoinPage(trace) {
     context() {
       return { tracing: trace.controls };
     },
-    getByText() {
-      return {
-        first() {
-          return {
-            async click() {},
-          };
-        },
-      };
-    },
-    locator() {
-      const field = {
-        async fill(value) {
-          if (trace.recording() && value === ADMIN_KEY) leaked = true;
-        },
-        async evaluate(_fn, value) {
-          if (trace.recording() && value === ADMIN_KEY) leaked = true;
-        },
-      };
-      return {
-        async count() {
-          return 1;
-        },
-        first() {
-          return field;
-        },
-      };
+    locator(selector = "") {
+      if (String(selector).includes("#join-game")) return section;
+      return password;
     },
     getByRole() {
       return {
@@ -277,6 +306,74 @@ describe("Foundry traces stay off", () => {
     expect(shots).not.toContain("secret");
     expect(shots).not.toContain(ADMIN_KEY);
   });
+
+  it("does not photograph a password when the clear never settles", async () => {
+    let filled = false;
+    const shots = [];
+    const password = {
+      first() {
+        return password;
+      },
+      async isVisible() {
+        return true;
+      },
+      async waitFor() {},
+      fill() {
+        return new Promise(() => {});
+      },
+      async evaluate(_fn, value) {
+        filled = value === ADMIN_KEY;
+      },
+      async count() {
+        return 1;
+      },
+      nth() {
+        return password;
+      },
+    };
+    const page = {
+      async screenshot() {
+        shots.push(filled ? "secret" : "clear");
+      },
+      locator() {
+        return password;
+      },
+      getByRole(role, options = {}) {
+        const name = options.name;
+        if (
+          role === "button" &&
+          name instanceof RegExp &&
+          /submit|log in|unlock|continue/i.test(name.source)
+        ) {
+          return {
+            async isVisible() {
+              return true;
+            },
+            async click() {
+              throw new Error("admin submit failed");
+            },
+          };
+        }
+        return {
+          async waitFor() {
+            throw new Error("setup hidden");
+          },
+        };
+      },
+    };
+
+    let error;
+    try {
+      await authenticateSetup(page, ADMIN_KEY);
+    } catch (caught) {
+      error = caught;
+    }
+    await page.screenshot();
+
+    expect(error?.message).toBe("admin submit failed");
+    expect(shots).not.toContain("secret");
+    expect(shots).not.toContain(ADMIN_KEY);
+  }, 20_000);
 
   it("writes a join phase without the password", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pivot-auth-steps-"));

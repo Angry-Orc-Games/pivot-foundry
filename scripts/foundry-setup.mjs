@@ -4,7 +4,18 @@ import { dirname } from "node:path";
 export const SETUP_FAILURE_MESSAGE =
   "Foundry setup failed. The End User License Agreement is on screen. Set FOUNDRY_E2E_ACCEPT_EULA=1 to sign it for this run. Tests were not run.";
 
-const SCREEN_TIMEOUT_MS = 15_000;
+export const SCREEN_TIMEOUT_MS = 15_000;
+export const EULA_HIDDEN_MS = 45_000;
+
+export function withPhaseTimeout(phase, ms, work) {
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = globalThis.setTimeout(() => {
+      reject(new Error(`Foundry setup stalled during ${phase}`));
+    }, ms);
+  });
+  return Promise.race([work, deadline]).finally(() => globalThis.clearTimeout(timer));
+}
 
 function firstScreen(entries, timeout) {
   return new Promise((resolve, reject) => {
@@ -61,9 +72,13 @@ export async function handleFoundryEula(page, env = process.env) {
     throw error;
   }
 
-  await checkbox.check();
-  await page.getByRole("button", { name: "Agree", exact: true }).click();
+  await checkbox.check({ timeout: SCREEN_TIMEOUT_MS });
   await page
-    .getByRole("heading", { name: "End User License Agreement" })
-    .waitFor({ state: "hidden" });
+    .getByRole("button", { name: "Agree", exact: true })
+    .click({ timeout: SCREEN_TIMEOUT_MS });
+  await withPhaseTimeout(
+    "eula",
+    EULA_HIDDEN_MS,
+    page.getByRole("heading", { name: "End User License Agreement" }).waitFor({ state: "hidden" }),
+  );
 }

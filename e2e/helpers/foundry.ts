@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
@@ -11,7 +11,12 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { handleFoundryEula } from "../../scripts/foundry-setup.mjs";
+import {
+  EULA_HIDDEN_MS,
+  SCREEN_TIMEOUT_MS,
+  handleFoundryEula,
+  withPhaseTimeout,
+} from "../../scripts/foundry-setup.mjs";
 
 export interface FoundryIdentity {
   ready: boolean;
@@ -22,27 +27,101 @@ export interface FoundryIdentity {
   version: string;
 }
 
-export async function waitForFoundryShell(page: Page): Promise<void> {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(
-    () => {
-      const title = document.title || "";
-      return (
-        title.includes("Foundry") ||
-        Boolean(document.querySelector("#join-game, #setup, .setup, .join-game")) ||
-        Boolean((window as unknown as { game?: { ready?: boolean } }).game)
-      );
-    },
-    { timeout: 180_000 },
+const LICENSE_PHASE_MS = 60_000;
+const ADMIN_SCREEN_TIMEOUT_MS = 15_000;
+const SETTLE_PHASE_MS = 15_000;
+const TOUR_CLOSE_PHASE_MS = 15_000;
+const LAUNCH_PHASE_MS = 30_000;
+const JOIN_PHASE_MS = 60_000;
+const GAME_READY_MS = 180_000;
+const UNPAUSE_MS = 15_000;
+const CANVAS_READY_MS = 120_000;
+const EXPECT_MS = 20_000;
+const PLAYER_CONSOLE_TAIL = 50;
+const TOUR_WAIT_MS = 2_000;
+const CREATE_WORLD_EVALUATE_MS = 20_000;
+const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 12 + TOUR_WAIT_MS * 4;
+export const CREATE_WORLD_PHASE_MS = CREATE_WORLD_EVALUATE_MS + CREATE_WORLD_UI_MS;
+const FIELD_CLEAR_MS = 1_000;
+const NAVIGATION_MS = 30_000;
+
+export function setupPhaseBudgetMs(): number {
+  const adminSignIn = ADMIN_SCREEN_TIMEOUT_MS * 3 + FIELD_CLEAR_MS;
+  const eulaSign = SCREEN_TIMEOUT_MS * 3 + EULA_HIDDEN_MS;
+  const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS * 6;
+  const join = NAVIGATION_MS + JOIN_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS + FIELD_CLEAR_MS;
+  return (
+    LICENSE_PHASE_MS +
+    adminSignIn +
+    eulaSign +
+    SETTLE_PHASE_MS +
+    adminSignIn +
+    SETTLE_PHASE_MS +
+    adminSignIn +
+    TOUR_CLOSE_PHASE_MS +
+    CREATE_WORLD_PHASE_MS +
+    launch +
+    join +
+    GAME_READY_MS +
+    UNPAUSE_MS
   );
 }
 
-const ADMIN_SCREEN_TIMEOUT_MS = 15_000;
+export function setupHookTimeoutMs(): number {
+  return setupPhaseBudgetMs() + 5_000;
+}
+
+export function joinAsCeilingMs(withPassword = false): number {
+  return NAVIGATION_MS + JOIN_PHASE_MS + (withPassword ? FIELD_CLEAR_MS : 0) + GAME_READY_MS;
+}
+
+export function playerSyncTimeoutMs(): number {
+  return joinAsCeilingMs(false) + joinAsCeilingMs(true) + EXPECT_MS;
+}
+
+export function sceneCanvasTimeoutMs(): number {
+  return joinAsCeilingMs(false) + EXPECT_MS + UNPAUSE_MS + CANVAS_READY_MS;
+}
+
+export function sheetSpecTimeoutMs(): number {
+  return joinAsCeilingMs(false) * 2 + EXPECT_MS * 2 + NAVIGATION_MS;
+}
+
+export function e2eWorldId(): string {
+  return process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e";
+}
+
+export async function waitForFoundryShell(page: Page): Promise<void> {
+  await withPhaseTimeout(
+    "license",
+    LICENSE_PHASE_MS,
+    (async () => {
+      await page.goto("/", { waitUntil: "domcontentloaded", timeout: LICENSE_PHASE_MS });
+      await page.waitForFunction(
+        () => {
+          const title = document.title || "";
+          return (
+            title.includes("Foundry") ||
+            Boolean(document.querySelector("#join-game, #setup, .setup, .join-game")) ||
+            Boolean((window as unknown as { game?: { ready?: boolean } }).game)
+          );
+        },
+        undefined,
+        { timeout: LICENSE_PHASE_MS },
+      );
+    })(),
+  );
+}
+
 const ADMIN_SCREEN_MISSING =
   "Foundry setup did not show the administrator password field or the Setup screen.";
 
 type ScreenLocator = {
   waitFor(options: { state: "visible"; timeout: number }): Promise<void>;
+  or?(other: ScreenLocator): ScreenLocator;
+  first?(): ScreenLocator;
+  visible?(): ScreenLocator;
+  isVisible?(): Promise<boolean>;
 };
 
 function asFirst<T>(locator: T): T {
@@ -50,7 +129,7 @@ function asFirst<T>(locator: T): T {
   return typeof withFirst.first === "function" ? withFirst.first() : locator;
 }
 
-type AuthPhase = "license" | "eula" | "admin" | "tour close" | "create world" | "join";
+type AuthPhase = "license" | "eula" | "admin" | "tour close" | "create world" | "launch" | "join";
 
 function absentScreen(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -61,7 +140,31 @@ function absentScreen(error: unknown): boolean {
   return name === "TimeoutError" && !/test timeout/i.test(message);
 }
 
+function visibleUnion(entries: Array<[string, ScreenLocator]>): ScreenLocator | undefined {
+  const [first, ...rest] = entries;
+  if (!first || rest.length === 0 || typeof first[1].or !== "function") return undefined;
+  let combined = first[1];
+  for (const [, locator] of rest) {
+    const widen = combined.or;
+    if (typeof widen !== "function") return undefined;
+    combined = widen.call(combined, locator);
+  }
+  return combined;
+}
+
 function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number): Promise<string> {
+  const [first] = entries;
+  const union = visibleUnion(entries);
+  if (first && union) {
+    const visible = typeof union.visible === "function" ? union.visible() : union;
+    const target = typeof visible.first === "function" ? visible.first() : visible;
+    return target.waitFor({ state: "visible", timeout }).then(async () => {
+      for (const [name, locator] of entries) {
+        if (await locator.isVisible?.().catch(() => false)) return name;
+      }
+      return first[0];
+    });
+  }
   return new Promise((resolve, reject) => {
     let pending = entries.length;
     let settled = false;
@@ -85,6 +188,7 @@ function firstVisible(entries: Array<[string, ScreenLocator]>, timeout: number):
           resolve(name);
         })
         .catch((error: unknown) => {
+          if (settled) return;
           if (!absentScreen(error)) fault = fault ?? error;
           pending -= 1;
           if (settled) return;
@@ -103,6 +207,38 @@ function noteAuthPhase(phase: AuthPhase): void {
   appendFileSync(file, `${phase}\n`);
 }
 
+function redactDiagnosticText(text: string, extras: readonly string[] = []): string {
+  let safe = text;
+  for (const secret of [
+    process.env.FOUNDRY_ADMIN_KEY,
+    process.env.FOUNDRY_LICENSE_KEY,
+    ...extras,
+  ]) {
+    if (secret) safe = safe.split(secret).join("[redacted]");
+  }
+  return safe;
+}
+
+function noteTourProblem(line: string): void {
+  const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+  if (!marker) return;
+  const safe = redactDiagnosticText(line);
+  const file = join(dirname(marker), "tour-notes.log");
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, `${safe}\n`);
+}
+
+function tourCloseOutcome(value: unknown): { ready: boolean; notes: string[] } {
+  if (value && typeof value === "object" && "ready" in value) {
+    const record = value as { ready?: unknown; notes?: unknown };
+    const notes = Array.isArray(record.notes)
+      ? record.notes.filter((line): line is string => typeof line === "string")
+      : [];
+    return { ready: record.ready === true, notes };
+  }
+  return { ready: value === true, notes: [] };
+}
+
 const BLANK_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
@@ -117,7 +253,21 @@ async function clearPasswordFields(page: Page): Promise<boolean> {
     const count = await fields.count();
     for (let index = 0; index < count; index += 1) {
       const field = typeof fields.nth === "function" ? fields.nth(index) : fields;
-      if (typeof field.fill === "function") await field.fill("");
+      if (typeof field.fill !== "function") continue;
+      let wiped = false;
+      const done = await Promise.race([
+        Promise.resolve(field.fill("")).then(
+          () => {
+            wiped = true;
+            return true;
+          },
+          () => false,
+        ),
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(false), FIELD_CLEAR_MS);
+        }),
+      ]);
+      if (!done || !wiped) return false;
     }
     return true;
   } catch {
@@ -142,6 +292,31 @@ function holdFailureShots(page: Page): void {
 
 function releaseFailureShots(page: Page): void {
   (page as ShotState).__pivotHoldShots = false;
+}
+
+export async function saveSecondaryPageFailure(
+  page: Page,
+  consoleLines: readonly string[],
+  secrets: readonly string[] = [],
+): Promise<void> {
+  const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+  if (!marker) return;
+  const dir = dirname(marker);
+  mkdirSync(dir, { recursive: true });
+  const cleared = await clearPasswordFields(page);
+  let shot: Buffer | undefined;
+  if (cleared && typeof page.screenshot === "function") {
+    try {
+      shot = await page.screenshot();
+    } catch {
+      shot = undefined;
+    }
+  }
+  if (shot) writeFileSync(join(dir, "player-page.png"), shot);
+  const tail = consoleLines
+    .slice(-PLAYER_CONSOLE_TAIL)
+    .map((line) => redactDiagnosticText(line, secrets));
+  writeFileSync(join(dir, "player-console.log"), `${tail.join("\n")}\n`);
 }
 
 export async function fillSecret(locator: Locator, value: string): Promise<void> {
@@ -183,7 +358,7 @@ async function openPage(page: Page, closedError?: unknown): Promise<Page> {
 async function settle(page: Page): Promise<void> {
   if (typeof page.waitForLoadState !== "function") return;
   try {
-    await page.waitForLoadState("domcontentloaded");
+    await withPhaseTimeout("eula", SETTLE_PHASE_MS, page.waitForLoadState("domcontentloaded"));
   } catch (error) {
     if (!closedTarget(error)) throw error;
   }
@@ -210,16 +385,132 @@ export async function authenticateSetup(page: Page, adminKey: string): Promise<v
     await fillSecret(password, adminKey);
     const submit = asFirst(page.getByRole("button", { name: /submit|log in|unlock|continue/i }));
     if (await submit.isVisible().catch(() => false)) {
-      await submit.click();
+      await submit.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
     } else {
-      await password.press("Enter");
+      await password.press("Enter", { timeout: ADMIN_SCREEN_TIMEOUT_MS });
     }
-    await password.fill("").catch(() => undefined);
+    await clearPasswordFields(page);
     await firstVisible(setup, ADMIN_SCREEN_TIMEOUT_MS);
     releaseFailureShots(page);
   } catch (error) {
     await clearPasswordFields(page);
     throw error;
+  }
+}
+
+type SetupTourLike = {
+  namespace?: string;
+  id?: string;
+  status?: string;
+  steps?: unknown;
+  exit?: () => void;
+  complete?: () => Promise<unknown> | unknown;
+};
+
+async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promise<{
+  ready: boolean;
+  notes: string[];
+}> {
+  const host = runtime as typeof globalThis & {
+    foundry?: {
+      nue?: {
+        Tour?: { activeTour?: SetupTourLike | null };
+        tours?: {
+          SetupTour?: new (...args: never[]) => unknown;
+          SidebarTour?: new (...args: never[]) => unknown;
+        };
+        SetupTour?: new (...args: never[]) => unknown;
+        SidebarTour?: new (...args: never[]) => unknown;
+      };
+    };
+    game?: {
+      ready?: boolean;
+      tours?: Iterable<SetupTourLike>;
+    };
+  };
+
+  function stepsNeedUser(tour: SetupTourLike): boolean {
+    try {
+      const steps = tour.steps;
+      if (!Array.isArray(steps)) return false;
+      return steps.some(
+        (step) =>
+          Boolean(step) &&
+          typeof step === "object" &&
+          ("sidebarTab" in step || "layer" in step || "tool" in step),
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  function setupContext(tour: SetupTourLike): boolean {
+    const nue = host.foundry?.nue;
+    const SetupTour = nue?.tours?.SetupTour ?? nue?.SetupTour;
+    const SidebarTour = nue?.tours?.SidebarTour ?? nue?.SidebarTour;
+    if (typeof SidebarTour === "function" && tour instanceof SidebarTour) return false;
+    if (typeof SetupTour === "function" && tour instanceof SetupTour) return true;
+    if (stepsNeedUser(tour)) return false;
+    return tour.namespace === undefined || tour.namespace === "core";
+  }
+
+  function problem(tour: SetupTourLike, error: unknown): string {
+    const id = [tour.namespace, tour.id].filter(Boolean).join(".") || "tour";
+    const message = error instanceof Error ? error.message : String(error);
+    return `${id}: ${message}`.slice(0, 240);
+  }
+
+  const notes: string[] = [];
+  const active = host.foundry?.nue?.Tour?.activeTour;
+  if (active && setupContext(active) && typeof active.exit === "function") {
+    try {
+      active.exit();
+    } catch (error) {
+      notes.push(problem(active, error));
+    }
+  }
+  const tours = host.game?.tours;
+  if (tours) {
+    for (const tour of tours) {
+      if (!tour || tour.status === "completed" || typeof tour.complete !== "function") continue;
+      if (!setupContext(tour)) continue;
+      try {
+        const result = tour.complete();
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          void (result as Promise<unknown>).catch((error: unknown) => {
+            notes.push(problem(tour, error));
+          });
+        }
+      } catch (error) {
+        notes.push(problem(tour, error));
+      }
+    }
+  }
+  return { ready: Boolean(host.game?.ready), notes };
+}
+
+async function dismissSuggestedNextTour(page: Page): Promise<void> {
+  try {
+    const root = page.locator(".dialog, .window-app, dialog");
+    if (typeof root.filter !== "function") return;
+    const matches = root.filter({ hasText: /suggested next tour/i });
+    const dialog = typeof matches.last === "function" ? matches.last() : matches;
+    const visible = await dialog
+      .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
+      .then(() => true)
+      .catch(() => false);
+    if (!visible) return;
+    const decline = dialog.getByRole("button", { name: /^no$/i }).first();
+    const declined = await decline
+      .click({ timeout: TOUR_WAIT_MS })
+      .then(() => true)
+      .catch(() => false);
+    if (declined) return;
+    const close = dialog.getByRole("button", { name: /close window/i }).first();
+    await close.click({ timeout: TOUR_WAIT_MS });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    noteTourProblem(`suggested next tour: ${message}`.slice(0, 240));
   }
 }
 
@@ -243,50 +534,62 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
     current = recovered;
   }
 
-  const ready = await current.evaluate(() =>
-    Boolean((window as unknown as { game?: { ready?: boolean } }).game?.ready),
+  noteAuthPhase("tour close");
+  noteTourProblem("tour close");
+  const ready = await withPhaseTimeout(
+    "tour close",
+    TOUR_CLOSE_PHASE_MS,
+    (async () => {
+      const outcome = tourCloseOutcome(await current.evaluate(silenceCoreTours));
+      for (const line of outcome.notes) noteTourProblem(line);
+      await dismissSuggestedNextTour(current);
+      return outcome.ready;
+    })(),
   );
   if (ready) return current;
 
-  const created = await current.evaluate(
-    async (world) => {
-      const runtime = window as unknown as {
-        World?: { create?: (data: Record<string, string>) => Promise<unknown> };
-        game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
-      };
-      if (runtime.game?.worlds?.get?.(world.id)) return "exists";
-      if (typeof runtime.World?.create === "function") {
-        await runtime.World.create({
-          id: world.id,
-          name: world.id,
-          title: world.title,
-          system: world.system,
-        });
-        return "created";
+  noteAuthPhase("create world");
+  await withPhaseTimeout(
+    "create world",
+    CREATE_WORLD_PHASE_MS,
+    (async () => {
+      const created = await current.evaluate(
+        async function ensureWorldRecord(world) {
+          const runtime = window as unknown as {
+            World?: { create?: (data: Record<string, string>) => Promise<unknown> };
+            game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
+          };
+          if (runtime.game?.worlds?.get?.(world.id)) return "exists";
+          if (typeof runtime.World?.create === "function") {
+            await runtime.World.create({
+              id: world.id,
+              name: world.id,
+              title: world.title,
+              system: world.system,
+            });
+            return "created";
+          }
+          return "unavailable";
+        },
+        {
+          id: e2eWorldId(),
+          title: "Pivot Fantasy E2E",
+          system: "pivot-fantasy",
+        },
+      );
+      if (created === "unavailable") await createWorldThroughUi(current);
+      if (created === "created") {
+        await waitForNextScreen(current, true);
+        await completeUserManagement(current);
       }
-      return "unavailable";
-    },
-    {
-      id: process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e",
-      title: "Pivot Fantasy E2E",
-      system: "pivot-fantasy",
-    },
+    })(),
   );
-
-  if (created === "unavailable") {
-    await createWorldThroughUi(current);
-  } else if (created === "created") {
-    noteAuthPhase("create world");
-  }
 
   await launchWorld(current);
   return current;
 }
 
-const TOUR_WAIT_MS = 2_000;
-
 async function dismissSetupTour(page: Page): Promise<void> {
-  noteAuthPhase("tour close");
   const overlay = page.locator("div.tour-overlay").first();
   const visible = await overlay
     .waitFor({ state: "visible", timeout: TOUR_WAIT_MS })
@@ -310,54 +613,142 @@ async function dismissSetupTour(page: Page): Promise<void> {
   await overlay.waitFor({ state: "detached", timeout: TOUR_WAIT_MS });
 }
 
+async function waitForJoinOrGame(page: Page): Promise<void> {
+  const waits: Array<Promise<unknown>> = [
+    page
+      .getByRole("button", { name: /join game|join/i })
+      .first()
+      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS }),
+  ];
+  if (typeof page.waitForURL === "function") {
+    waits.push(page.waitForURL(/\/(?:join|game)(?:\/|$|\?)/, { timeout: ADMIN_SCREEN_TIMEOUT_MS }));
+  }
+  try {
+    await Promise.any(waits);
+  } catch {
+    throw new Error("Foundry setup stalled during create world");
+  }
+}
+
+async function waitForNextScreen(page: Page, acceptLaunchButton: boolean): Promise<void> {
+  const waits: Array<Promise<unknown>> = [
+    Promise.resolve().then(() =>
+      page.getByRole("heading", { name: "User Management", exact: true }).waitFor({
+        state: "visible",
+        timeout: ADMIN_SCREEN_TIMEOUT_MS,
+      }),
+    ),
+  ];
+  if (acceptLaunchButton) {
+    waits.push(
+      Promise.resolve().then(() =>
+        page
+          .getByRole("button", { name: /launch/i })
+          .first()
+          .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS }),
+      ),
+    );
+  }
+  if (typeof page.waitForURL === "function") {
+    waits.push(page.waitForURL(/\/(?:join|game)(?:\/|$|\?)/, { timeout: ADMIN_SCREEN_TIMEOUT_MS }));
+  }
+  await Promise.any(waits).catch(() => undefined);
+}
+
+async function screenShown(read: () => { isVisible: () => Promise<boolean> }): Promise<boolean> {
+  try {
+    return await read().isVisible();
+  } catch {
+    return false;
+  }
+}
+
+async function completeUserManagement(page: Page): Promise<void> {
+  const showing = await screenShown(() =>
+    page.getByRole("heading", { name: "User Management", exact: true }),
+  );
+  if (!showing) return;
+  await page
+    .getByRole("button", { name: "Save and Continue", exact: true })
+    .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await waitForJoinOrGame(page);
+}
+
+async function worldAlreadyOpen(page: Page): Promise<boolean> {
+  const url = typeof page.url === "function" ? page.url() : "";
+  if (url.includes("/join") || url.includes("/game")) return true;
+  return screenShown(() => page.getByRole("button", { name: /join game|join/i }).first());
+}
+
 async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
-  await create.waitFor({ state: "visible", timeout: 30_000 });
+  await create.waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
   await dismissSetupTour(page);
-  noteAuthPhase("create world");
-  await create.click();
-  const title = page.locator('input[name="title"], input[name="name"]').first();
+  await create.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  const title = page.locator('input[name="title"]').first();
   await title.fill("Pivot Fantasy E2E");
-  const system = page.locator('select[name="system"], select#system');
-  if ((await system.count()) > 0) {
-    await system
-      .first()
-      .selectOption({ value: "pivot-fantasy" })
-      .catch(async () => {
-        await system.first().selectOption({ label: /pivot fantasy/i });
-      });
-  }
+  const filter = page.getByRole("searchbox", { name: /filter systems/i }).first();
+  if ((await filter.inputValue()) !== "") await filter.fill("");
+  const card = page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { name: "Pivot Fantasy", exact: true }) })
+    .first();
+  await card.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  const worldIdField = page.locator('form:has(input[name="title"]) input[name="world-id"]').first();
+  await worldIdField.fill(e2eWorldId());
+  expect(await worldIdField.inputValue()).toBe(e2eWorldId());
   await page
-    .getByRole("button", { name: /create world|create/i })
-    .last()
-    .click();
+    .getByRole("button", { name: "Continue", exact: true })
+    .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await Promise.any([
+    page
+      .getByRole("button", { name: /launch/i })
+      .first()
+      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS }),
+    page.getByRole("heading", { name: "User Management", exact: true }).waitFor({
+      state: "visible",
+      timeout: ADMIN_SCREEN_TIMEOUT_MS,
+    }),
+  ]).catch(() => {
+    throw new Error("Foundry setup stalled during create world");
+  });
+  await completeUserManagement(page);
 }
 
 async function launchWorld(page: Page): Promise<void> {
-  const launched = await page.evaluate(async (worldId) => {
-    const runtime = window as unknown as {
-      game?: {
-        worlds?: {
-          get?: (id: string) => { launch?: () => Promise<unknown> } | undefined;
-          contents?: Array<{ id?: string; launch?: () => Promise<unknown> }>;
+  noteAuthPhase("launch");
+  await completeUserManagement(page);
+  if (await worldAlreadyOpen(page)) return;
+  const launched = await withPhaseTimeout(
+    "launch",
+    LAUNCH_PHASE_MS,
+    page.evaluate(async function launchInstalledWorld(worldId) {
+      const runtime = window as unknown as {
+        game?: {
+          worlds?: {
+            get?: (id: string) => { launch?: () => Promise<unknown> } | undefined;
+            contents?: Array<{ id?: string; launch?: () => Promise<unknown> }>;
+          };
         };
       };
-    };
-    const world =
-      runtime.game?.worlds?.get?.(worldId) ||
-      runtime.game?.worlds?.contents?.find((item) => item.id === worldId);
-    if (world?.launch) {
-      await world.launch();
-      return true;
-    }
-    return false;
-  }, process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e");
+      const world =
+        runtime.game?.worlds?.get?.(worldId) ||
+        runtime.game?.worlds?.contents?.find((item) => item.id === worldId);
+      if (world?.launch) {
+        await world.launch();
+        return true;
+      }
+      return false;
+    }, e2eWorldId()),
+  );
 
   if (!launched) {
     const launch = page.getByRole("button", { name: /launch/i }).first();
-    await expect(launch).toBeVisible({ timeout: 30_000 });
-    await launch.click();
+    await expect(launch).toBeVisible({ timeout: LAUNCH_PHASE_MS });
+    await launch.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   }
+  await waitForNextScreen(page, false);
+  await completeUserManagement(page);
 }
 
 export async function joinAs(
@@ -368,25 +759,37 @@ export async function joinAs(
   holdFailureShots(page);
   try {
     if (!page.url().includes("/join")) {
-      await page.goto("/join", { waitUntil: "domcontentloaded" });
+      await page.goto("/join", { waitUntil: "domcontentloaded", timeout: NAVIGATION_MS });
     }
-    await page.getByText(name, { exact: true }).first().click({ timeout: 60_000 });
-    const submitJoin = async () => {
-      const join = page.getByRole("button", { name: /join game|join/i }).first();
-      if (await join.isVisible().catch(() => false)) await join.click();
-    };
-    if (password) {
-      const field = page.locator('input[type="password"]');
-      if ((await field.count()) > 0) await fillSecret(field.first(), password);
-      await submitJoin();
-      if ((await field.count()) > 0)
-        await field
-          .first()
-          .fill("")
-          .catch(() => undefined);
-    } else {
-      await submitJoin();
-    }
+    await withPhaseTimeout(
+      "join",
+      JOIN_PHASE_MS,
+      (async () => {
+        const form = page
+          .locator("#join-game, .window-content, section")
+          .filter({
+            has: page.getByRole("heading", { name: "Join Game Session", exact: true }),
+          })
+          .first();
+        const user = form.getByRole("combobox").first();
+        const choose = () =>
+          user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        await choose();
+        if (password) {
+          const field = form.locator('input[type="password"]');
+          if ((await field.count()) > 0) await fillSecret(field.first(), password);
+          await choose();
+        }
+        const selected = await user.evaluate(
+          (element: HTMLSelectElement) => element.selectedOptions[0]?.label ?? "",
+        );
+        await expect(selected).toBe(name);
+        await form
+          .getByRole("button", { name: "Join Game Session", exact: true })
+          .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+      })(),
+    );
+    if (password) await clearPasswordFields(page);
     await waitForGameReady(page);
     releaseFailureShots(page);
   } catch (error) {
@@ -398,9 +801,8 @@ export async function joinAs(
 export async function waitForGameReady(page: Page): Promise<FoundryIdentity> {
   await page.waitForFunction(
     () => (window as unknown as { game?: { ready?: boolean } }).game?.ready === true,
-    {
-      timeout: 180_000,
-    },
+    undefined,
+    { timeout: GAME_READY_MS },
   );
   return readIdentity(page);
 }
@@ -428,12 +830,34 @@ export async function readIdentity(page: Page): Promise<FoundryIdentity> {
   });
 }
 
+export async function ensureUnpaused(page: Page): Promise<void> {
+  const gm = await page.evaluate(() => {
+    const game = (
+      window as unknown as {
+        game?: {
+          user?: { isGM?: boolean } | null;
+          paused?: boolean;
+          togglePause?: (paused: boolean, options?: { broadcast?: boolean }) => void;
+        };
+      }
+    ).game;
+    if (game?.user?.isGM !== true) return false;
+    if (game.paused === true) game.togglePause?.(false, { broadcast: true });
+    return true;
+  });
+  if (!gm) return;
+  await page.waitForFunction(
+    () => (window as unknown as { game?: { paused?: boolean } }).game?.paused === false,
+    undefined,
+    { timeout: UNPAUSE_MS },
+  );
+}
+
 export async function waitForCanvasReady(page: Page): Promise<void> {
   await page.waitForFunction(
     () => (window as unknown as { canvas?: { ready?: boolean } }).canvas?.ready === true,
-    {
-      timeout: 120_000,
-    },
+    undefined,
+    { timeout: CANVAS_READY_MS },
   );
 }
 
@@ -513,7 +937,7 @@ export async function expectPackageIdentity(page: Page): Promise<FoundryIdentity
   expect(identity.ready).toBe(true);
   expect(identity.systemId).toBe("pivot-fantasy");
   expect(identity.systemVersion).toBe(process.env.PIVOT_PACKAGE_VERSION || "0.1.0");
-  expect(identity.worldId).toBe(process.env.PIVOT_E2E_WORLD_ID || "pivot-e2e");
+  expect(identity.worldId).toBe(e2eWorldId());
   expect(identity.version.startsWith("14.")).toBe(true);
   return identity;
 }

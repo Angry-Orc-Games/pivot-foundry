@@ -377,8 +377,19 @@ describe("workflows that start Foundry", () => {
     expect(nightlyPlan).toContain("issues: write");
     expect(nightlyPlan).not.toContain("npm ");
     const packageJob = nightly.slice(nightly.indexOf("  package:\n"), nightly.indexOf("  e2e:\n"));
-    expect(packageJob).not.toContain("secrets.");
-    expect(packageJob).not.toContain("environment:");
+    const packageScan = packageJob.indexOf("- name: Scan packaged system for credentials");
+    expect(packageScan).toBeGreaterThan(-1);
+    const packageBeforeScan = packageJob.slice(0, packageScan);
+    const packageScanStep = packageJob.slice(
+      packageScan,
+      packageJob.indexOf("\n      - name:", packageScan),
+    );
+    expect(packageBeforeScan).not.toContain("secrets.");
+    expect(packageBeforeScan.replace("environment: foundry-e2e", "")).not.toContain("environment:");
+    expect(packageJob).toContain("environment: foundry-e2e");
+    expect(packageScanStep).toContain("FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}");
+    expect(packageScanStep).toContain("FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}");
+    expect(packageJob.slice(packageScan + packageScanStep.length)).not.toContain("secrets.");
     expect(packageJob).toContain("npm run package:system");
     expect(packageJob).toContain("name: e2e-package-");
     expect(packageJob.indexOf("e2e-gate.sh license")).toBeLessThan(
@@ -419,7 +430,7 @@ describe("workflows that start Foundry", () => {
     expect(nightlyReport).toContain("bash trusted-gate/scripts/ci/e2e-publish-results.sh");
     const buildStep = packageJob.slice(
       packageJob.indexOf("- name: Build the system package"),
-      packageJob.indexOf("- name: Upload packaged system"),
+      packageJob.indexOf("- name: Scan packaged system for credentials"),
     );
     expect(buildStep).not.toContain("FOUNDRY_");
     expect(buildStep).toContain('GITHUB_TOKEN: ""');
