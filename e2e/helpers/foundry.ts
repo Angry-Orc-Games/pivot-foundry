@@ -789,7 +789,7 @@ export async function ensureUnpaused(page: Page): Promise<void> {
       }
     ).game;
     if (game?.user?.isGM !== true) return false;
-    game.togglePause?.(false, { broadcast: true });
+    if (game.paused === true) game.togglePause?.(false, { broadcast: true });
     return true;
   });
   if (!gm) return;
