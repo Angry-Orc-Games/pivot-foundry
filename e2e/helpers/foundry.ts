@@ -484,7 +484,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
     "create world",
     CREATE_WORLD_PHASE_MS,
     current.evaluate(
-      async (world) => {
+      async function ensureWorldRecord(world) {
         const runtime = window as unknown as {
           World?: { create?: (data: Record<string, string>) => Promise<unknown> };
           game?: { worlds?: { get?: (id: string) => { id?: string } | undefined } };
@@ -568,7 +568,7 @@ async function launchWorld(page: Page): Promise<void> {
   const launched = await withPhaseTimeout(
     "launch",
     LAUNCH_PHASE_MS,
-    page.evaluate(async (worldId) => {
+    page.evaluate(async function launchInstalledWorld(worldId) {
       const runtime = window as unknown as {
         game?: {
           worlds?: {

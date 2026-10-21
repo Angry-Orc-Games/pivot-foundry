@@ -16,7 +16,6 @@ const SETUP_FAILURE =
 function eulaPage({ agreementVisible }) {
   const clicks = [];
   let agreed = false;
-  let evals = 0;
   return {
     clicks,
     async goto() {},
@@ -33,10 +32,11 @@ function eulaPage({ agreementVisible }) {
         },
       };
     },
-    async evaluate() {
-      evals += 1;
-      if (evals === 1) return agreed;
-      return "unavailable";
+    async evaluate(fn) {
+      if (fn?.name === "silenceCoreTours") return { ready: false, notes: [] };
+      if (fn?.name === "ensureWorldRecord") return agreed ? "exists" : "unavailable";
+      if (fn?.name === "launchInstalledWorld") return true;
+      return false;
     },
     getByRole(role, options = {}) {
       const rawName = options.name;
