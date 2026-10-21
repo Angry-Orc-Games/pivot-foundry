@@ -34,6 +34,7 @@ const TOUR_CLOSE_PHASE_MS = 15_000;
 const LAUNCH_PHASE_MS = 30_000;
 const JOIN_PHASE_MS = 60_000;
 const GAME_READY_MS = 180_000;
+const UNPAUSE_MS = 15_000;
 const TOUR_WAIT_MS = 2_000;
 const CREATE_WORLD_EVALUATE_MS = 20_000;
 const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 10 + TOUR_WAIT_MS * 4;
@@ -58,7 +59,8 @@ export function setupPhaseBudgetMs(): number {
     CREATE_WORLD_PHASE_MS +
     launch +
     join +
-    GAME_READY_MS
+    GAME_READY_MS +
+    UNPAUSE_MS
   );
 }
 
@@ -773,6 +775,28 @@ export async function readIdentity(page: Page): Promise<FoundryIdentity> {
       version: game.version,
     };
   });
+}
+
+export async function ensureUnpaused(page: Page): Promise<void> {
+  const gm = await page.evaluate(() => {
+    const game = (
+      window as unknown as {
+        game?: {
+          user?: { isGM?: boolean } | null;
+          paused?: boolean;
+          togglePause?: (paused: boolean, options?: { broadcast?: boolean }) => void;
+        };
+      }
+    ).game;
+    if (game?.user?.isGM !== true) return false;
+    if (game.paused === true) game.togglePause?.(false, { broadcast: true });
+    return true;
+  });
+  if (!gm) return;
+  await page.waitForFunction(
+    () => (window as unknown as { game?: { paused?: boolean } }).game?.paused === false,
+    { timeout: UNPAUSE_MS },
+  );
 }
 
 export async function waitForCanvasReady(page: Page): Promise<void> {

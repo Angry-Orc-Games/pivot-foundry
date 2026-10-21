@@ -4,6 +4,7 @@ import {
   attachErrorSink,
   createPlayerUser,
   ensureE2EWorld,
+  ensureUnpaused,
   expectPackageIdentity,
   joinAs,
   setupHookTimeoutMs,
@@ -24,6 +25,7 @@ test.beforeAll(async ({ browser }) => {
   let page = await context.newPage();
   page = await ensureE2EWorld(page, adminKey);
   await joinAs(page, { name: "Gamemaster" });
+  await ensureUnpaused(page);
   await expectPackageIdentity(page);
   await createPlayerUser(page, playerName, playerPassword);
   await context.close();
@@ -122,10 +124,12 @@ test("posts a d20 roll to chat and activates a scene canvas", async ({ page }) =
     ).Roll("1d20").evaluate();
     await roll.toMessage({ speaker: { alias: "E2E Roller" }, flavor: "Pivot E2E d20" });
   });
-  await expect(page.locator("#chat-log, .chat-log, ol.chat-log")).toContainText(
-    /E2E Roller|Pivot E2E d20|1d20/,
-  );
+  const rollMessage = page
+    .locator("ol.chat-log:not(#chat-notifications .chat-log) .chat-message")
+    .last();
+  await expect(rollMessage).toContainText(/E2E Roller[\s\S]*Pivot E2E d20[\s\S]*1d20/);
 
+  await ensureUnpaused(page);
   await page.evaluate(async () => {
     const scene = await (
       window as unknown as {
