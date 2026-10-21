@@ -41,6 +41,8 @@ function v14CreateWorldPage({
   afterContinue = "launch",
   record = "unavailable",
   usersOpen = false,
+  usersAfterCreate = false,
+  usersAfterLaunch = false,
 } = {}) {
   const events = [];
   const selectCalls = [];
@@ -50,6 +52,7 @@ function v14CreateWorldPage({
   let joinVisible = false;
   let launchWaits = 0;
   let launchCalls = 0;
+  let usersLive = false;
   const pause = () =>
     stepDelayMs === 0
       ? Promise.resolve()
@@ -167,11 +170,16 @@ function v14CreateWorldPage({
       if (role === "heading" && name === "User Management" && options.exact === true) {
         return {
           async waitFor() {
+            if (usersAfterCreate || (usersAfterLaunch && launchCalls > 0)) {
+              usersLive = true;
+              events.push("user-management");
+              return;
+            }
             if (afterContinue !== "users") throw new Error("user management hidden");
             events.push("user-management");
           },
           async isVisible() {
-            return !joinVisible && (usersOpen || afterContinue === "users");
+            return !joinVisible && (usersOpen || afterContinue === "users" || usersLive);
           },
         };
       }
@@ -429,6 +437,27 @@ describe("v14 create world", () => {
 
     expect(page.events.filter((event) => event === "save-users")).toHaveLength(1);
     expect(page.events.filter((event) => event === "join")).toHaveLength(1);
+    expect(page.url()).toContain("/join");
+  });
+
+  it("saves users when User Management appears after World.create", async () => {
+    const page = v14CreateWorldPage({ record: "created", usersAfterCreate: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("save-users");
+    expect(page.events).toContain("join");
+    expect(page.events).not.toContain("gm-password");
+    expect(page.launchCalls).toBe(0);
+    expect(page.url()).toContain("/join");
+  });
+
+  it("saves users when launch opens User Management", async () => {
+    const page = v14CreateWorldPage({ record: "created", usersAfterLaunch: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("save-users");
+    expect(page.events).toContain("join");
+    expect(page.launchCalls).toBeGreaterThan(0);
     expect(page.url()).toContain("/join");
   });
 });

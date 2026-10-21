@@ -44,7 +44,7 @@ const NAVIGATION_MS = 30_000;
 export function setupPhaseBudgetMs(): number {
   const adminSignIn = ADMIN_SCREEN_TIMEOUT_MS * 3 + FIELD_CLEAR_MS;
   const eulaSign = SCREEN_TIMEOUT_MS * 3 + EULA_HIDDEN_MS;
-  const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS * 3;
+  const launch = LAUNCH_PHASE_MS * 2 + ADMIN_SCREEN_TIMEOUT_MS * 6;
   const join = NAVIGATION_MS + JOIN_PHASE_MS + ADMIN_SCREEN_TIMEOUT_MS + FIELD_CLEAR_MS;
   return (
     LICENSE_PHASE_MS +
@@ -518,7 +518,10 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
         },
       );
       if (created === "unavailable") await createWorldThroughUi(current);
-      if (created === "created") await completeUserManagement(current);
+      if (created === "created") {
+        await waitForNextScreen(current, true);
+        await completeUserManagement(current);
+      }
     })(),
   );
 
@@ -565,6 +568,31 @@ async function waitForJoinOrGame(page: Page): Promise<void> {
   } catch {
     throw new Error("Foundry setup stalled during create world");
   }
+}
+
+async function waitForNextScreen(page: Page, acceptLaunchButton: boolean): Promise<void> {
+  const waits: Array<Promise<unknown>> = [
+    Promise.resolve().then(() =>
+      page.getByRole("heading", { name: "User Management", exact: true }).waitFor({
+        state: "visible",
+        timeout: ADMIN_SCREEN_TIMEOUT_MS,
+      }),
+    ),
+  ];
+  if (acceptLaunchButton) {
+    waits.push(
+      Promise.resolve().then(() =>
+        page
+          .getByRole("button", { name: /launch/i })
+          .first()
+          .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS }),
+      ),
+    );
+  }
+  if (typeof page.waitForURL === "function") {
+    waits.push(page.waitForURL(/\/(?:join|game)(?:\/|$|\?)/, { timeout: ADMIN_SCREEN_TIMEOUT_MS }));
+  }
+  await Promise.any(waits).catch(() => undefined);
 }
 
 async function screenShown(read: () => { isVisible: () => Promise<boolean> }): Promise<boolean> {
@@ -656,6 +684,8 @@ async function launchWorld(page: Page): Promise<void> {
     await expect(launch).toBeVisible({ timeout: LAUNCH_PHASE_MS });
     await launch.click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
   }
+  await waitForNextScreen(page, false);
+  await completeUserManagement(page);
 }
 
 export async function joinAs(
@@ -673,7 +703,7 @@ export async function joinAs(
       JOIN_PHASE_MS,
       (async () => {
         const form = page
-          .locator("section")
+          .locator("#join-game, .window-content, section")
           .filter({
             has: page.getByRole("heading", { name: "Join Game Session", exact: true }),
           })
