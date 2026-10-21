@@ -36,7 +36,7 @@ const JOIN_PHASE_MS = 60_000;
 const GAME_READY_MS = 180_000;
 const TOUR_WAIT_MS = 2_000;
 const CREATE_WORLD_EVALUATE_MS = 20_000;
-const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 8 + TOUR_WAIT_MS * 4;
+const CREATE_WORLD_UI_MS = ADMIN_SCREEN_TIMEOUT_MS * 10 + TOUR_WAIT_MS * 4;
 export const CREATE_WORLD_PHASE_MS = CREATE_WORLD_EVALUATE_MS + CREATE_WORLD_UI_MS;
 const FIELD_CLEAR_MS = 1_000;
 const NAVIGATION_MS = 30_000;
@@ -549,6 +549,42 @@ async function dismissSetupTour(page: Page): Promise<void> {
   await overlay.waitFor({ state: "detached", timeout: TOUR_WAIT_MS });
 }
 
+async function waitForJoinOrGame(page: Page): Promise<void> {
+  const waits: Array<Promise<unknown>> = [
+    page
+      .getByRole("button", { name: /join game|join/i })
+      .first()
+      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS }),
+  ];
+  if (typeof page.waitForURL === "function") {
+    waits.push(page.waitForURL(/\/(?:join|game)(?:\/|$|\?)/, { timeout: ADMIN_SCREEN_TIMEOUT_MS }));
+  }
+  try {
+    await Promise.any(waits);
+  } catch {
+    throw new Error("Foundry setup stalled during create world");
+  }
+}
+
+async function screenShown(read: () => { isVisible: () => Promise<boolean> }): Promise<boolean> {
+  try {
+    return await read().isVisible();
+  } catch {
+    return false;
+  }
+}
+
+async function worldAlreadyOpen(page: Page): Promise<boolean> {
+  const url = typeof page.url === "function" ? page.url() : "";
+  if (url.includes("/join") || url.includes("/game")) return true;
+  if (
+    await screenShown(() => page.getByRole("heading", { name: "User Management", exact: true }))
+  ) {
+    return true;
+  }
+  return screenShown(() => page.getByRole("button", { name: /join game|join/i }).first());
+}
+
 async function createWorldThroughUi(page: Page): Promise<void> {
   const create = page.getByRole("button", { name: /create world|new world/i }).first();
   await create.waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
@@ -566,14 +602,29 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   await page
     .getByRole("button", { name: "Continue", exact: true })
     .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  const outcome = await Promise.any([
+    page
+      .getByRole("button", { name: /launch/i })
+      .first()
+      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS })
+      .then(() => "launch" as const),
+    page
+      .getByRole("heading", { name: "User Management", exact: true })
+      .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS })
+      .then(() => "users" as const),
+  ]).catch(() => {
+    throw new Error("Foundry setup stalled during create world");
+  });
+  if (outcome !== "users") return;
   await page
-    .getByRole("button", { name: /launch/i })
-    .first()
-    .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
+    .getByRole("button", { name: "Save and Continue", exact: true })
+    .click({ timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await waitForJoinOrGame(page);
 }
 
 async function launchWorld(page: Page): Promise<void> {
   noteAuthPhase("launch");
+  if (await worldAlreadyOpen(page)) return;
   const launched = await withPhaseTimeout(
     "launch",
     LAUNCH_PHASE_MS,

@@ -8,6 +8,9 @@ import { CREATE_WORLD_PHASE_MS, ensureE2EWorld } from "../e2e/helpers/foundry.ts
 const SNAPSHOT = fileURLToPath(
   new URL("./fixtures/foundry-v14-create-world.snapshot.txt", import.meta.url),
 );
+const USER_MANAGEMENT_SNAPSHOT = fileURLToPath(
+  new URL("./fixtures/foundry-v14-user-management.snapshot.txt", import.meta.url),
+);
 
 function hidden() {
   const node = {
@@ -35,11 +38,15 @@ function v14CreateWorldPage({
   hideOnFilter = false,
   filterText = "",
   missingCard = false,
+  afterContinue = "launch",
 } = {}) {
   const events = [];
   const selectCalls = [];
   let worldReady = false;
   let systemsFilter = filterText;
+  let pageUrl = "http://foundry.local/setup";
+  let joinVisible = false;
+  let launchWaits = 0;
   const pause = () =>
     stepDelayMs === 0
       ? Promise.resolve()
@@ -105,6 +112,12 @@ function v14CreateWorldPage({
     get filterText() {
       return systemsFilter;
     },
+    get launchWaits() {
+      return launchWaits;
+    },
+    url() {
+      return pageUrl;
+    },
     async goto() {},
     async waitForFunction() {},
     async evaluate(fn) {
@@ -142,6 +155,17 @@ function v14CreateWorldPage({
       if (role === "heading" && name === "Pivot Fantasy" && options.exact === true) {
         return pivotHeading;
       }
+      if (role === "heading" && name === "User Management" && options.exact === true) {
+        return {
+          async waitFor() {
+            if (afterContinue !== "users") throw new Error("user management hidden");
+            events.push("user-management");
+          },
+          async isVisible() {
+            return afterContinue === "users" && !joinVisible;
+          },
+        };
+      }
       if (role === "listitem") {
         return {
           filter(filterOptions = {}) {
@@ -167,7 +191,11 @@ function v14CreateWorldPage({
             return launch;
           },
           async waitFor() {
+            launchWaits += 1;
             await pause();
+            if (afterContinue !== "launch") {
+              throw new Error("locator.waitFor: Timeout 15000ms exceeded");
+            }
             if (!worldReady) throw new Error("launch hidden");
             events.push("world-ready");
           },
@@ -176,6 +204,37 @@ function v14CreateWorldPage({
           },
         };
         return launch;
+      }
+      if (role === "button" && name === "Save and Continue" && options.exact === true) {
+        return {
+          async click() {
+            events.push("save-users");
+            pageUrl = "http://foundry.local/join";
+            joinVisible = true;
+          },
+        };
+      }
+      if (role === "button" && name instanceof RegExp && name.test("Join Game")) {
+        const join = {
+          first() {
+            return join;
+          },
+          async waitFor() {
+            if (!joinVisible) throw new Error("join hidden");
+            events.push("join");
+          },
+          async isVisible() {
+            return joinVisible;
+          },
+        };
+        return join;
+      }
+      if (role === "textbox" && name instanceof RegExp && name.test("password")) {
+        return {
+          async fill() {
+            events.push("gm-password");
+          },
+        };
       }
       if (role === "checkbox" || role === "heading") return hidden();
       if (role === "button") return hidden();
@@ -292,5 +351,47 @@ describe("v14 create world", () => {
     expect(outcome.message).toMatch(/stalled during create world/);
     expect(page.events).toContain("pick-system");
     expect(page.events).not.toContain("continue");
+  });
+
+  it("reaches join from User Management without waiting on Launch", async () => {
+    const snapshot = await readFile(USER_MANAGEMENT_SNAPSHOT, "utf8");
+    expect(snapshot).toContain('heading "User Management"');
+    expect(snapshot).toContain('button "Save and Continue"');
+    expect(snapshot).toContain("textbox (password, empty)");
+
+    const page = v14CreateWorldPage({ afterContinue: "users" });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("user-management");
+    expect(page.events).toContain("save-users");
+    expect(page.events).toContain("join");
+    expect(page.events).not.toContain("world-ready");
+    expect(page.events).not.toContain("gm-password");
+    expect(page.url()).toContain("/join");
+  });
+
+  it("launches when Continue shows a Launch button", async () => {
+    const page = v14CreateWorldPage({ afterContinue: "launch" });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("world-ready");
+    expect(page.launchWaits).toBeGreaterThan(0);
+    expect(page.events).not.toContain("save-users");
+  });
+
+  it("stalls create world when Continue shows neither Launch nor User Management", async () => {
+    const page = v14CreateWorldPage({ afterContinue: "neither" });
+    let outcome = "hung";
+    try {
+      await ensureE2EWorld(page, "admin-key-secret");
+      outcome = "done";
+    } catch (error) {
+      outcome = error;
+    }
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during create world/);
+    expect(page.events).not.toContain("save-users");
+    expect(page.events).not.toContain("join");
   });
 });

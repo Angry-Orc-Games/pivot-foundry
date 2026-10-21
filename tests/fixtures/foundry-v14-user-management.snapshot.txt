@@ -1,0 +1,6 @@
+- banner: heading "Pivot Fantasy E2E" [level=1]
+- heading "User Management" [level=2]
+- list:
+  - listitem: textbox (user name) "Gamemaster", textbox (password, empty), combobox role [Gamemaster selected], button "Login as User", button "Delete User", paragraph "Setting a password for the Gamemaster account is strongly recommended."
+- contentinfo: button "Create Additional User", button "Configure User Permissions", button "Save and Continue"
+- footer: "Version 14 Build 361"
