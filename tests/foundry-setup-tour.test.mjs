@@ -290,6 +290,27 @@ describe("setup context tours", () => {
       page.events.indexOf("create-world"),
     );
   });
+
+  it("completes a core backups class while SetupTour is on the page", async () => {
+    const page = classToursPage({ backupsClass: true });
+    let error;
+    try {
+      await ensureE2EWorld(page, "admin-key-secret");
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeUndefined();
+    expect(page.completed).toEqual(["ui-overview", "backups-overview"]);
+  });
+
+  it("declines the suggested tour dialog instead of closing the setup window", async () => {
+    const page = classToursPage({ dialog: true, parentShell: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("dismiss-next-tour");
+    expect(page.events).not.toContain("close-setup");
+  });
 });
 
 function lateTourPage({ hangComplete = false } = {}) {
@@ -391,7 +412,13 @@ function lateTourPage({ hangComplete = false } = {}) {
   };
 }
 
-function classToursPage({ setupThrows = false, includeSidebar = false, dialog = false } = {}) {
+function classToursPage({
+  setupThrows = false,
+  includeSidebar = false,
+  dialog = false,
+  backupsClass = false,
+  parentShell = false,
+} = {}) {
   const completed = [];
   const events = [];
   function SetupTour() {
@@ -433,6 +460,21 @@ function classToursPage({ setupThrows = false, includeSidebar = false, dialog = 
       },
     });
     tours.push(sidebar);
+  }
+  if (backupsClass) {
+    function BackupsTour() {
+      this.kind = "backups";
+    }
+    tours.push(
+      Object.assign(new BackupsTour(), {
+        namespace: "core",
+        id: "backups-overview",
+        status: "unstarted",
+        complete() {
+          completed.push(this.id);
+        },
+      }),
+    );
   }
   const hidden = {
     first() {
@@ -477,6 +519,9 @@ function classToursPage({ setupThrows = false, includeSidebar = false, dialog = 
       return dialogRoot;
     },
     first() {
+      return dialogRoot;
+    },
+    last() {
       return dialogRoot;
     },
     async waitFor() {
@@ -526,6 +571,37 @@ function classToursPage({ setupThrows = false, includeSidebar = false, dialog = 
     },
     locator(selector = "") {
       const text = String(selector);
+      if (parentShell && text.includes(".application")) {
+        const shell = {
+          filter() {
+            return shell;
+          },
+          first() {
+            return shell;
+          },
+          last() {
+            return dialogRoot;
+          },
+          async waitFor() {
+            if (!dialogVisible) throw new Error("suggested next tour hidden");
+          },
+          getByRole(role, options = {}) {
+            const name = options.name;
+            if (role === "button" && name instanceof RegExp && name.test("Close")) {
+              return {
+                first() {
+                  return this;
+                },
+                async click() {
+                  events.push("close-setup");
+                },
+              };
+            }
+            throw new Error(`unexpected shell role ${role}`);
+          },
+        };
+        return shell;
+      }
       if (text.includes("dialog") || text.includes("window-app")) return dialogRoot;
       if (text.includes("title") || text.includes('name="name"')) return title;
       return hidden;
