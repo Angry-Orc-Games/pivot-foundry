@@ -311,6 +311,76 @@ describe("setup context tours", () => {
     expect(page.events).toContain("dismiss-next-tour");
     expect(page.events).not.toContain("close-setup");
   });
+
+  it("finishes tour close while complete waits and dismisses No", async () => {
+    vi.useFakeTimers();
+    const page = classToursPage({ hangComplete: true, dialog: true });
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(1_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(outcome).toBe("done");
+    expect(page.events).toContain("dismiss-no");
+    expect(page.events.indexOf("dismiss-no")).toBeLessThan(page.events.indexOf("create-world"));
+  });
+
+  it("closes a suggested next tour dialog that only offers Close Window", async () => {
+    const page = classToursPage({ closeWindowOnly: true });
+    await ensureE2EWorld(page, "admin-key-secret");
+
+    expect(page.events).toContain("close-window");
+    expect(page.events).not.toContain("dismiss-no");
+    expect(page.events.indexOf("close-window")).toBeLessThan(page.events.indexOf("create-world"));
+  });
+
+  it("writes tour notes when tour close stalls", async () => {
+    vi.useFakeTimers();
+    const dir = await mkdtemp(join(tmpdir(), "pivot-tour-stall-"));
+    const marker = join(dir, "setup-failure.txt");
+    const previousFailure = process.env.PIVOT_E2E_SETUP_FAILURE;
+    const previousKey = process.env.FOUNDRY_ADMIN_KEY;
+    process.env.PIVOT_E2E_SETUP_FAILURE = marker;
+    process.env.FOUNDRY_ADMIN_KEY = "admin-key-secret";
+    const page = classToursPage({ hangEvaluate: true });
+    let outcome = "hung";
+    const pending = ensureE2EWorld(page, "admin-key-secret").then(
+      () => {
+        outcome = "done";
+      },
+      (error) => {
+        outcome = error;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(20_000);
+      await Promise.race([pending, Promise.resolve()]);
+    } finally {
+      vi.useRealTimers();
+      if (previousFailure === undefined) delete process.env.PIVOT_E2E_SETUP_FAILURE;
+      else process.env.PIVOT_E2E_SETUP_FAILURE = previousFailure;
+      if (previousKey === undefined) delete process.env.FOUNDRY_ADMIN_KEY;
+      else process.env.FOUNDRY_ADMIN_KEY = previousKey;
+    }
+    const notes = await readFile(join(dir, "tour-notes.log"), "utf8").catch(() => "");
+    await rm(dir, { recursive: true, force: true });
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/stalled during tour close/);
+    expect(notes).toContain("tour close");
+    expect(notes).not.toContain("admin-key-secret");
+  });
 });
 
 function lateTourPage({ hangComplete = false } = {}) {
@@ -418,6 +488,9 @@ function classToursPage({
   dialog = false,
   backupsClass = false,
   parentShell = false,
+  hangComplete = false,
+  closeWindowOnly = false,
+  hangEvaluate = false,
 } = {}) {
   const completed = [];
   const events = [];
@@ -437,10 +510,11 @@ function classToursPage({
       if (setupThrows) {
         throw new TypeError("Cannot read properties of null (reading 'isGM')");
       }
-      if (dialog) {
+      if (dialog || hangComplete || closeWindowOnly) {
         dialogVisible = true;
         events.push("suggested-open");
       }
+      if (hangComplete) return new Promise(() => {});
     },
   });
   const tours = [setup];
@@ -540,7 +614,36 @@ function classToursPage({
           },
         };
       }
-      throw new Error(`unexpected dialog role ${role}`);
+      if (role === "button" && name instanceof RegExp && !closeWindowOnly && name.test("No")) {
+        return {
+          first() {
+            return this;
+          },
+          async click() {
+            events.push("dismiss-no");
+            dialogVisible = false;
+          },
+        };
+      }
+      if (role === "button" && name instanceof RegExp && name.test("Close Window")) {
+        return {
+          first() {
+            return this;
+          },
+          async click() {
+            events.push("close-window");
+            dialogVisible = false;
+          },
+        };
+      }
+      return {
+        first() {
+          return this;
+        },
+        async click() {
+          throw new Error("hidden");
+        },
+      };
     },
   };
   let evaluations = 0;
@@ -550,6 +653,7 @@ function classToursPage({
     async goto() {},
     async waitForFunction() {},
     async evaluate(fn) {
+      if (hangEvaluate && fn?.name === "silenceCoreTours") return new Promise(() => {});
       if (typeof fn === "function" && fn.toString().includes("activeTour")) {
         globalThis.foundry = {
           nue: {
