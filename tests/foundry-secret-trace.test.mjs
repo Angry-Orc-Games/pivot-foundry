@@ -124,7 +124,7 @@ function tracedJoinPage(trace) {
       return { tracing: trace.controls };
     },
     locator(selector = "") {
-      if (String(selector).includes("section")) return section;
+      if (String(selector).includes("#join-game")) return section;
       return password;
     },
     getByRole() {
