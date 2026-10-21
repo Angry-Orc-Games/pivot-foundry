@@ -195,13 +195,7 @@ describe("v14 create world", () => {
     const page = v14CreateWorldPage({ decoySelect: true });
     await ensureE2EWorld(page, "admin-key-secret");
 
-    expect(page.events).toEqual([
-      "open-form",
-      "title",
-      "pick-system",
-      "continue",
-      "world-ready",
-    ]);
+    expect(page.events).toEqual(["open-form", "title", "pick-system", "continue", "world-ready"]);
     expect(page.selectCalls.some((call) => call?.label instanceof RegExp)).toBe(false);
   });
 
