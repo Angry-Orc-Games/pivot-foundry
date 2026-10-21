@@ -14,8 +14,8 @@ function worldDataPath() {
     first() {
       return field;
     },
-    async evaluate(_fn, id) {
-      if (typeof id === "string") value = id;
+    async fill(id) {
+      value = String(id);
     },
     async inputValue() {
       return value;
@@ -126,7 +126,7 @@ function tourPage({ attached = true } = {}) {
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("tour-overlay")) return overlay;
-      if (text.includes('name="name"')) return worldDataPath();
+      if (text.includes('name="world-id"')) return worldDataPath();
       if (text.includes("title")) return title;
       return hidden;
     },
@@ -513,7 +513,7 @@ function lateTourPage({ hangComplete = false } = {}) {
     locator(selector = "") {
       const text = String(selector);
       if (text.includes("tour-overlay")) return hidden;
-      if (text.includes('name="name"')) return worldDataPath();
+      if (text.includes('name="world-id"')) return worldDataPath();
       if (text.includes("title")) return title;
       return hidden;
     },
@@ -745,7 +745,7 @@ function classToursPage({
         return shell;
       }
       if (text.includes("dialog") || text.includes("window-app")) return dialogRoot;
-      if (text.includes('name="name"')) return worldDataPath();
+      if (text.includes('name="world-id"')) return worldDataPath();
       if (text.includes("title")) return title;
       return hidden;
     },
