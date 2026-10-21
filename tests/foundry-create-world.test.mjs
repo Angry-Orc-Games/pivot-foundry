@@ -381,13 +381,10 @@ describe("v14 create world", () => {
 
   it("stalls create world when Continue shows neither Launch nor User Management", async () => {
     const page = v14CreateWorldPage({ afterContinue: "neither" });
-    let outcome = "hung";
-    try {
-      await ensureE2EWorld(page, "admin-key-secret");
-      outcome = "done";
-    } catch (error) {
-      outcome = error;
-    }
+    const outcome = await ensureE2EWorld(page, "admin-key-secret").then(
+      () => "done",
+      (error) => error,
+    );
 
     expect(outcome).toBeInstanceOf(Error);
     expect(outcome.message).toMatch(/stalled during create world/);
