@@ -5,6 +5,7 @@ import { joinAs } from "../e2e/helpers/foundry.ts";
 function v14JoinPage() {
   const events = [];
   const selectCalls = [];
+  const selectors = [];
   let selected = "";
   const option = {
     async click() {
@@ -80,9 +81,49 @@ function v14JoinPage() {
       };
     },
   };
+  const decoy = {
+    filter() {
+      return decoy;
+    },
+    first() {
+      return decoy;
+    },
+    locator() {
+      return {
+        async count() {
+          return 0;
+        },
+      };
+    },
+    getByRole(role) {
+      if (role === "combobox") {
+        return {
+          first() {
+            return this;
+          },
+          async selectOption() {},
+          async evaluate(read) {
+            return read({ selectedOptions: [{ label: "" }] });
+          },
+        };
+      }
+      return {
+        first() {
+          return this;
+        },
+        async isVisible() {
+          return false;
+        },
+        async click() {
+          events.push("click-other");
+        },
+      };
+    },
+  };
   return {
     events,
     selectCalls,
+    selectors,
     url() {
       return "http://foundry.local/join";
     },
@@ -95,8 +136,10 @@ function v14JoinPage() {
     },
     locator(selector = "") {
       const text = String(selector);
-      if (text.includes("section")) return section;
+      selectors.push(text);
+      if (text.includes("#join-game")) return section;
       if (text.includes("password")) return password;
+      if (text.includes("section")) return decoy;
       return {
         async count() {
           return 0;
@@ -187,5 +230,16 @@ describe("v14 join", () => {
     await joinAs(page, { name: "Gamemaster", password: "player-secret" });
 
     expect(page.events).not.toContain("click-option");
+  });
+
+  it("scopes the join form to #join-game", async () => {
+    const page = v14JoinPage();
+    const outcome = await joinAs(page, { name: "Gamemaster" }).then(
+      () => "done",
+      (error) => error,
+    );
+
+    expect(page.selectors.some((selector) => selector.includes("#join-game"))).toBe(true);
+    expect(outcome).toBe("done");
   });
 });
