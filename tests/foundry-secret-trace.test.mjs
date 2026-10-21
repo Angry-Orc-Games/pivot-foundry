@@ -63,6 +63,58 @@ function tracedAdminPage(trace) {
 
 function tracedJoinPage(trace) {
   let leaked = false;
+  const password = {
+    async count() {
+      return 1;
+    },
+    first() {
+      return password;
+    },
+    nth() {
+      return password;
+    },
+    async fill(value) {
+      if (trace.recording() && value === ADMIN_KEY) leaked = true;
+    },
+    async evaluate(_fn, value) {
+      if (trace.recording() && value === ADMIN_KEY) leaked = true;
+    },
+  };
+  const user = {
+    first() {
+      return user;
+    },
+    async selectOption() {},
+    async evaluate(read) {
+      return read({ selectedOptions: [{ label: "Player" }] });
+    },
+  };
+  const section = {
+    filter() {
+      return section;
+    },
+    first() {
+      return section;
+    },
+    locator() {
+      return password;
+    },
+    getByRole(role, options = {}) {
+      if (role === "combobox") return user;
+      if (role === "button" && options.name === "Join Game Session") {
+        return { async click() {} };
+      }
+      return {
+        first() {
+          return this;
+        },
+        async isVisible() {
+          return true;
+        },
+        async click() {},
+      };
+    },
+  };
   return {
     leaked: () => leaked,
     url() {
@@ -71,32 +123,9 @@ function tracedJoinPage(trace) {
     context() {
       return { tracing: trace.controls };
     },
-    getByText() {
-      return {
-        first() {
-          return {
-            async click() {},
-          };
-        },
-      };
-    },
-    locator() {
-      const field = {
-        async fill(value) {
-          if (trace.recording() && value === ADMIN_KEY) leaked = true;
-        },
-        async evaluate(_fn, value) {
-          if (trace.recording() && value === ADMIN_KEY) leaked = true;
-        },
-      };
-      return {
-        async count() {
-          return 1;
-        },
-        first() {
-          return field;
-        },
-      };
+    locator(selector = "") {
+      if (String(selector).includes("section")) return section;
+      return password;
     },
     getByRole() {
       return {
