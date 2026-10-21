@@ -416,7 +416,12 @@ async function silenceCoreTours(runtime: typeof globalThis = globalThis): Promis
       if (!tour || tour.status === "completed" || typeof tour.complete !== "function") continue;
       if (!setupContext(tour)) continue;
       try {
-        await tour.complete();
+        const result = tour.complete();
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          void (result as Promise<unknown>).catch((error: unknown) => {
+            notes.push(problem(tour, error));
+          });
+        }
       } catch (error) {
         notes.push(problem(tour, error));
       }
@@ -436,15 +441,13 @@ async function dismissSuggestedNextTour(page: Page): Promise<void> {
       .then(() => true)
       .catch(() => false);
     if (!visible) return;
-    const decline = dialog
-      .getByRole("button", { name: /no thanks|decline|not now|cancel/i })
-      .first();
+    const decline = dialog.getByRole("button", { name: /^no$/i }).first();
     const declined = await decline
       .click({ timeout: TOUR_WAIT_MS })
       .then(() => true)
       .catch(() => false);
     if (declined) return;
-    const close = dialog.getByRole("button", { name: /^close$/i }).first();
+    const close = dialog.getByRole("button", { name: /close window/i }).first();
     await close.click({ timeout: TOUR_WAIT_MS });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -473,6 +476,7 @@ export async function ensureE2EWorld(page: Page, adminKey: string): Promise<Page
   }
 
   noteAuthPhase("tour close");
+  noteTourProblem("tour close");
   const ready = await withPhaseTimeout(
     "tour close",
     TOUR_CLOSE_PHASE_MS,

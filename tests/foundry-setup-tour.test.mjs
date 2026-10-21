@@ -158,7 +158,7 @@ describe("setup phase deadlines", () => {
     expect(page.events).toContain("create-world");
   });
 
-  it("names tour close when core tour completion never returns", async () => {
+  it("does not stall tour close when core tour completion never returns", async () => {
     vi.useFakeTimers();
     const page = lateTourPage({ hangComplete: true });
     let outcome = "hung";
@@ -171,14 +171,14 @@ describe("setup phase deadlines", () => {
       },
     );
     try {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(1_000);
       await Promise.race([pending, Promise.resolve()]);
     } finally {
       vi.useRealTimers();
     }
 
-    expect(outcome).toBeInstanceOf(Error);
-    expect(outcome.message).toMatch(/stalled during tour close/);
+    expect(outcome).toBe("done");
+    expect(page.events).toContain("create-world");
   });
 
   it("names create world when World.create never returns", async () => {
@@ -285,10 +285,8 @@ describe("setup context tours", () => {
     await ensureE2EWorld(page, "admin-key-secret");
 
     expect(page.events).toContain("suggested-open");
-    expect(page.events).toContain("dismiss-next-tour");
-    expect(page.events.indexOf("dismiss-next-tour")).toBeLessThan(
-      page.events.indexOf("create-world"),
-    );
+    expect(page.events).toContain("dismiss-no");
+    expect(page.events.indexOf("dismiss-no")).toBeLessThan(page.events.indexOf("create-world"));
   });
 
   it("completes a core backups class while SetupTour is on the page", async () => {
@@ -308,7 +306,7 @@ describe("setup context tours", () => {
     const page = classToursPage({ dialog: true, parentShell: true });
     await ensureE2EWorld(page, "admin-key-secret");
 
-    expect(page.events).toContain("dismiss-next-tour");
+    expect(page.events).toContain("dismiss-no");
     expect(page.events).not.toContain("close-setup");
   });
 
@@ -396,7 +394,11 @@ function lateTourPage({ hangComplete = false } = {}) {
       this.status = "completed";
     },
     complete() {
-      if (hangComplete) return new Promise(() => {});
+      if (hangComplete) {
+        ended = true;
+        this.status = "completed";
+        return new Promise(() => {});
+      }
       ended = true;
       this.status = "completed";
       return Promise.resolve();
@@ -603,17 +605,6 @@ function classToursPage({
     },
     getByRole(role, options = {}) {
       const name = options.name;
-      if (role === "button" && name instanceof RegExp && name.test("No Thanks")) {
-        return {
-          first() {
-            return this;
-          },
-          async click() {
-            events.push("dismiss-next-tour");
-            dialogVisible = false;
-          },
-        };
-      }
       if (role === "button" && name instanceof RegExp && !closeWindowOnly && name.test("No")) {
         return {
           first() {
