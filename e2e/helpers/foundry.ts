@@ -555,7 +555,7 @@ async function createWorldThroughUi(page: Page): Promise<void> {
   const title = page.locator('input[name="title"], input[name="name"]').first();
   await title.fill("Pivot Fantasy E2E");
   const filter = page.getByRole("searchbox", { name: /filter systems/i }).first();
-  await filter.fill("Pivot Fantasy", { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+  await filter.fill("Pivot Fantasy");
   const card = page
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { name: "Pivot Fantasy", exact: true }) })
