@@ -25,18 +25,35 @@ close_gate() {
 }
 
 read_count() {
-  local url=$1
-  local body users
-  body=$(curl -fsS --max-time 20 "$url") || return 1
-  users=$(
-    printf '%s' "$body" | jq -r 'if (.users | type) == "number" and (.users | floor) == .users and .users >= 0 then (.users | tostring) else empty end' 2>/dev/null
-  ) || return 1
-  [[ $users =~ ^[0-9]+$ ]] || return 1
-  printf '%s' "$users"
+  local host=$1
+  local url=$2
+  local body decision curl_status
+  body=$(curl -fsS --max-time 20 "$url") && curl_status=0 || curl_status=$?
+  if ((curl_status != 0)); then
+    if ((curl_status == 22)); then
+      status_refusal="status request to ${host} was not HTTP success (shared Foundry license)"
+    else
+      status_refusal="could not reach ${host} (shared Foundry license)"
+    fi
+    return 1
+  fi
+  decision=$(
+    printf '%s' "$body" | jq -r 'if type != "object" then "bad-users" elif (.users | type) == "number" and (.users | floor) == .users and .users >= 0 then "count:\(.users)" elif .active == false and (has("users") | not) then "count:0" else "bad-users" end' 2>/dev/null
+  ) || true
+  if [[ $decision == count:* && ${decision#count:} =~ ^[0-9]+$ ]]; then
+    count=${decision#count:}
+    return 0
+  fi
+  if [[ -z $decision ]]; then
+    status_refusal="could not parse status JSON from ${host} (shared Foundry license)"
+  else
+    status_refusal="could not read user count from ${host} (shared Foundry license)"
+  fi
+  return 1
 }
 
 license_gate() {
-  local clock hour minute count host url reason
+  local clock hour minute count host url reason status_refusal
   local -a busy=()
   local skip_window=0
 
@@ -73,8 +90,8 @@ license_gate() {
     "build.angryorcgames.com|https://build.angryorcgames.com/api/status"; do
     host=${entry%%|*}
     url=${entry#*|}
-    if ! count=$(read_count "$url"); then
-      close_gate "could not read user count from ${host} (shared Foundry license)"
+    if ! read_count "$host" "$url"; then
+      close_gate "$status_refusal"
     fi
     if ((count > 0)); then
       busy+=("$host")
