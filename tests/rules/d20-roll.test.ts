@@ -4,6 +4,7 @@ import {
   applyAttackCrit,
   d20PoolFormula,
   dicePoolForRollMode,
+  parseRollMode,
   resolveDicePool,
   selectKeptD20,
 } from "../../src/rules/d20-roll";
@@ -27,19 +28,20 @@ describe("resolveDicePool", () => {
     expect(resolveDicePool(1, 1)).toEqual({ dieCount: 1, pick: "single" });
   });
 
-  it("Super-Advantage: N sources of advantage roll N dice, pick highest", () => {
-    // Line 258-260: Super-Advantage is passed as advantageSources > 1 with no disadvantage.
-    expect(resolveDicePool(3, 0)).toEqual({ dieCount: 3, pick: "highest" });
+  it("any number of advantage sources rolls two dice and keeps the highest", () => {
+    expect(resolveDicePool(2, 0)).toEqual({ dieCount: 2, pick: "highest" });
+    expect(resolveDicePool(3, 0)).toEqual({ dieCount: 2, pick: "highest" });
+    expect(resolveDicePool(5, 0)).toEqual({ dieCount: 2, pick: "highest" });
+    expect(d20PoolFormula(resolveDicePool(3, 0).dieCount)).toBe("2d20");
+    expect(d20PoolFormula(resolveDicePool(5, 0).dieCount)).toBe("2d20");
   });
 
-  it("Super-Advantage reduced to normal Advantage by any Disadvantage", () => {
-    // Line 262: any Disadvantage present reduces Super-Advantage to normal 2-die Advantage.
+  it("advantage with disadvantage keeps the higher die when disadvantage does not outweigh it", () => {
     expect(resolveDicePool(3, 1)).toEqual({ dieCount: 2, pick: "highest" });
     expect(resolveDicePool(2, 2)).toEqual({ dieCount: 2, pick: "highest" });
   });
 
-  it("Super-Advantage overwhelmed by multiple Disadvantage becomes normal Disadvantage", () => {
-    // Line 262: only if multiple Disadvantages outweigh all sources of Advantage does it flip to Disadvantage.
+  it("disadvantage that outweighs advantage keeps the lower of two dice", () => {
     expect(resolveDicePool(2, 3)).toEqual({ dieCount: 2, pick: "lowest" });
   });
 });
@@ -69,7 +71,28 @@ describe("dicePoolForRollMode", () => {
     expect(dicePoolForRollMode("normal")).toEqual({ dieCount: 1, pick: "single" });
     expect(dicePoolForRollMode("advantage")).toEqual({ dieCount: 2, pick: "highest" });
     expect(dicePoolForRollMode("disadvantage")).toEqual({ dieCount: 2, pick: "lowest" });
-    expect(dicePoolForRollMode("superAdvantage")).toEqual({ dieCount: 2, pick: "highest" });
+  });
+});
+
+describe("parseRollMode", () => {
+  it("returns current modes unchanged", () => {
+    expect(parseRollMode("normal")).toBe("normal");
+    expect(parseRollMode("advantage")).toBe("advantage");
+    expect(parseRollMode("disadvantage")).toBe("disadvantage");
+  });
+
+  it("reads a legacy superAdvantage value as advantage", () => {
+    const parsed = parseRollMode("superAdvantage");
+    expect(parsed).toBe("advantage");
+    expect(parseRollMode(parsed)).toBe("advantage");
+  });
+
+  it("returns null for values that are not a current or retired mode", () => {
+    expect(parseRollMode("toString")).toBeNull();
+    expect(parseRollMode("Advantage")).toBeNull();
+    expect(parseRollMode("Super-Advantage")).toBeNull();
+    expect(parseRollMode(2)).toBeNull();
+    expect(parseRollMode(null)).toBeNull();
   });
 });
 
@@ -86,8 +109,8 @@ describe("selectKeptD20", () => {
     expect(selectKeptD20([3, 18], { dieCount: 2, pick: "lowest" })).toBe(3);
   });
 
-  it("selects highest for Super-Advantage with two dice", () => {
-    expect(selectKeptD20([4, 12], dicePoolForRollMode("superAdvantage"))).toBe(12);
+  it("keeps the higher face when advantage sources stack", () => {
+    expect(selectKeptD20([4, 12], resolveDicePool(3, 0))).toBe(12);
   });
 
   it("throws for empty arrays, wrong counts, and invalid faces", () => {
@@ -104,6 +127,6 @@ describe("d20PoolFormula", () => {
   it("builds a Foundry pool formula from the resolved die count", () => {
     expect(d20PoolFormula(1)).toBe("1d20");
     expect(d20PoolFormula(2)).toBe("2d20");
-    expect(d20PoolFormula(3)).toBe("3d20");
+    expect(() => d20PoolFormula(3 as 1 | 2)).toThrow(RangeError);
   });
 });
