@@ -32,7 +32,7 @@ This document describes the acceptance test procedures for Milestone 3 (Initiati
    - Click Initiative roll button on Core tab
 
 3. **Expected:**
-   - DialogV2 prompts for roll mode (Normal/Advantage/Disadvantage/Super-Advantage)
+   - DialogV2 prompts for Normal, Advantage, or Disadvantage
    - After selecting and rolling:
      - Chat posts initiative result with kept d20 and modifier
      - Combat tracker updates the Character's combatant initiative
