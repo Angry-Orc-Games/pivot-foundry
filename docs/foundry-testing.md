@@ -27,7 +27,7 @@ npm run package:system
 4. Install the extracted zip into a disposable instance
 5. Start the owned Compose instance on loopback
 6. Wait for the Foundry shell, then `game.ready`
-7. Run Playwright (one worker)
+7. Run Playwright (one worker) at 1366x768. The End User License Agreement is not signed unless `FOUNDRY_E2E_ACCEPT_EULA` is exactly `1`. A `workflow_dispatch` sets that variable to `1` only when `accept_eula` is true. Schedule and every other run leave it empty. An agreement on screen with the variable off stops the run as a setup failure and does not click Agree.
 8. Write sanitized diagnostics on failure
 9. Stop and remove the disposable instance even if the run is interrupted
 
@@ -68,8 +68,8 @@ Staging checks HTTPS, WebSocket, package version, and GM/player login against th
 
 ## Debugging
 
-- HTML report: `playwright-report/` (gitignored)
-- Traces and screenshots: `test-results/` on failure
-- Server logs: `.foundry/instances/<id>/diagnostics/foundry.log` (license keys redacted)
+- JSON report: `playwright-report/results.json` (gitignored). The HTML reporter is off, so there is no `index.html` with an embedded zip.
+- Screenshots: `test-results/` on failure. Playwright traces are off. Password fields are set with `fillSecret`, which does not put the value in a step title. An auth failure clears password fields before a shot.
+- Server logs: `.foundry/instances/<id>/diagnostics/foundry.log` (license keys redacted, EULA signature kept) and `auth-steps.log` (phase names only)
 
 Do not commit traces that include session cookies. Do not upload Foundry binaries or `foundry-dist/` as CI artifacts.

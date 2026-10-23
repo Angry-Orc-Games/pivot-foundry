@@ -71,6 +71,40 @@ describe("foundry release download", () => {
     expect(saved.bytes).toBe("zip-bytes");
   });
 
+  it("round-trips a password that contains a colon and an at sign", async () => {
+    const colonUser = "cache-user";
+    const colonPass = "p:ss@word";
+    const colonUrl = `https://${encodeURIComponent(colonUser)}:${encodeURIComponent(colonPass)}@cache.example/foundry.zip`;
+    const calls = [];
+    const logs = [];
+    const fetchImpl = async (url, init) => {
+      calls.push({ url, init });
+      return httpResponse();
+    };
+    const dir = await mkdtemp(join(tmpdir(), "pivot-foundry-dist-"));
+    const originalLog = console.log;
+    console.log = (...args) => {
+      logs.push(args.join(" "));
+    };
+
+    try {
+      await downloadTo(colonUrl, join(dir, "foundry.zip"), fetchImpl);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const header = `Basic ${Buffer.from(`${colonUser}:${colonPass}`).toString("base64")}`;
+    const logged = logs.join("\n");
+    expect(authorization(calls[0].init)).toBe(header);
+    expect(new URL(calls[0].url).username).toBe("");
+    expect(new URL(calls[0].url).password).toBe("");
+    expect(calls[0].url).not.toContain("p%3Ass%40word");
+    expect(logged).not.toContain(colonUser);
+    expect(logged).not.toContain(colonPass);
+    expect(logged).not.toContain("p%3Ass%40word");
+    expect(logged).not.toContain(header);
+  });
+
   it("sends no authorization header when the URL has no credentials", async () => {
     const calls = [];
     const fetchImpl = async (url, init) => {

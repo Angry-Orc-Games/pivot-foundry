@@ -5,6 +5,7 @@ conclusion=${1:?usage: e2e-report.sh success|failure|neutral}
 sha=${E2E_SHA:?}
 summary=${E2E_SUMMARY:?}
 repo=${E2E_REPOSITORY:?}
+name=${E2E_CHECK_NAME:-Foundry E2E (nightly)}
 run_id=${E2E_RUN_ID:?}
 api=${GITHUB_API_URL:-https://api.github.com}
 server=${GITHUB_SERVER_URL:-https://github.com}
@@ -14,6 +15,14 @@ case $conclusion in
   success | failure | neutral) ;;
   *)
     printf '::error::Unknown check conclusion\n' >&2
+    exit 1
+    ;;
+esac
+
+case $name in
+  "Foundry E2E (nightly)" | "Foundry E2E (on-demand)") ;;
+  *)
+    printf '::error::Unknown Foundry E2E check name\n' >&2
     exit 1
     ;;
 esac
@@ -33,21 +42,48 @@ if [[ $summary != *"$details" ]]; then
   summary="${summary}"$'\n'"${details}"
 fi
 
-body=$(
-  jq -nc \
-    --arg sha "$sha" \
-    --arg conclusion "$conclusion" \
-    --arg summary "$summary" \
-    --arg details "$details" \
-    '{
-      name: "Foundry E2E (nightly)",
-      head_sha: $sha,
-      status: "completed",
-      conclusion: $conclusion,
-      details_url: $details,
-      output: { title: "Foundry E2E (nightly)", summary: $summary }
-    }'
-)
+started=${E2E_STARTED:-}
+case $started in
+  true | false) ;;
+  *) started="" ;;
+esac
+
+if [[ -n $started ]]; then
+  body=$(
+    jq -nc \
+      --arg sha "$sha" \
+      --arg conclusion "$conclusion" \
+      --arg summary "$summary" \
+      --arg name "$name" \
+      --arg details "$details" \
+      --arg text "started=${started}" \
+      '{
+        name: $name,
+        head_sha: $sha,
+        status: "completed",
+        conclusion: $conclusion,
+        details_url: $details,
+        output: { title: $name, summary: $summary, text: $text }
+      }'
+  )
+else
+  body=$(
+    jq -nc \
+      --arg sha "$sha" \
+      --arg conclusion "$conclusion" \
+      --arg summary "$summary" \
+      --arg name "$name" \
+      --arg details "$details" \
+      '{
+        name: $name,
+        head_sha: $sha,
+        status: "completed",
+        conclusion: $conclusion,
+        details_url: $details,
+        output: { title: $name, summary: $summary }
+      }'
+  )
+fi
 
 curl -fsS -X POST \
   -H "Authorization: Bearer ${token}" \
