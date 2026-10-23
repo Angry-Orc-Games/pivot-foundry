@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -22,7 +22,10 @@ import {
   dockerAvailable,
   followLogs,
   inspectOwnership,
+  prepareContainerCache,
+  prepareDataDir,
   prepareDevSystemDir,
+  removeFoundryTree,
   pullImage,
   readRuntime,
   requireDocker,
@@ -215,6 +218,8 @@ async function up() {
     world: process.env.PIVOT_FOUNDRY_WORLD || "",
   });
   prepareDevSystemDir(paths);
+  prepareDataDir(paths.foundryData);
+  prepareContainerCache(paths);
   if (role === "dev" && !existsSync(join(paths.root, "dist", "pivot.mjs"))) {
     console.log("Warning: dist/pivot.mjs is missing. Run npm run build before opening a world.");
   }
@@ -293,7 +298,7 @@ function reset() {
     assertOwned(paths);
     compose(paths, ["down", "--remove-orphans", "--volumes"]);
   }
-  rmSync(paths.foundryData, { force: true, recursive: true });
+  removeFoundryTree(paths.foundryData);
   console.log(
     `Reset disposable E2E data for ${paths.instanceId}. Distribution cache was preserved.`,
   );
