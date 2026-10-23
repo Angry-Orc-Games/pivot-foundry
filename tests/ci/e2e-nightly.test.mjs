@@ -22,6 +22,7 @@ const SAME = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const FORK = "cccccccccccccccccccccccccccccccccccccccc";
 const OTHER = "dddddddddddddddddddddddddddddddddddddddd";
 const TOKEN = "super-secret-token";
+const RUN_URL = "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242";
 
 const CURL_STUB = `#!/bin/sh
 url=
@@ -367,6 +368,7 @@ describe("nightly check run", () => {
     const result = await runScript(reportScript, ["success"], {
       ...ctx.env,
       E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
       E2E_SUMMARY: `Foundry started for E2E commit ${SAME}.`,
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -379,9 +381,10 @@ describe("nightly check run", () => {
       head_sha: SAME,
       status: "completed",
       conclusion: "success",
+      details_url: "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
       output: {
         title: "Foundry E2E (nightly)",
-        summary: `Foundry started for E2E commit ${SAME}.`,
+        summary: `Foundry started for E2E commit ${SAME}.\nhttps://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242`,
       },
     });
     expect(urls).toContain("/repos/Angry-Orc-Games/pivot-foundry/check-runs");
@@ -570,7 +573,13 @@ describe("nightly failure results", () => {
     expect(ctx.result.status).toBe(1);
     expect(body.conclusion).toBe("failure");
     expect(body.head_sha).toBe(SAME);
+    expect(body.details_url).toBe(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
     expect(body.output.summary).toContain("cancelled or timed out");
+    expect(body.output.summary).toContain(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
     expect(body.output.summary).not.toContain("Skipped");
     expect(ctx.urls).toContain("/actions/runs/4242/artifacts");
   });
@@ -593,8 +602,12 @@ describe("nightly failure results", () => {
       name: "Foundry E2E (nightly)",
       head_sha: SAME,
       conclusion: "failure",
-      output: { summary: "License gate closed. Foundry was not started." },
+      details_url: "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
     });
+    expect(body.output.summary).toContain("License gate closed. Foundry was not started.");
+    expect(body.output.summary).toContain(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
   });
 
   it("posts the listening signal from a recorded result", async () => {
@@ -606,7 +619,7 @@ describe("nightly failure results", () => {
     await rm(ctx.dir, { recursive: true, force: true });
 
     expect(ctx.result.status).toBe(1);
-    expect(body.output.summary).toBe(summary);
+    expect(body.output.summary).toBe(`${summary}\n${RUN_URL}`);
     expect(body.output.summary).not.toContain("not reported as started");
   });
 
@@ -708,7 +721,7 @@ describe("published result from the real writer", () => {
     expect(doc.started).toBe(true);
     expect(doc.summary).toBe(SETUP_FAILURE);
     expect(JSON.stringify(doc)).not.toContain("ABCD-EFGH");
-    expect(body.output.summary).toBe(SETUP_FAILURE);
+    expect(body.output.summary).toBe(`${SETUP_FAILURE}\n${RUN_URL}`);
     expect(body.output.summary).not.toContain("failed validation");
     expect(body.output.text).toBe("started=true");
     expect(body.output.summary + body.output.text).not.toContain("ABCD-EFGH");
@@ -722,7 +735,7 @@ describe("published result from the real writer", () => {
     expect(doc.started).toBe(true);
     expect(doc.summary).toContain("The run failed after Foundry started.");
     expect(doc.summary).not.toContain("End User License Agreement");
-    expect(body.output.summary).toBe(doc.summary);
+    expect(body.output.summary).toBe(`${doc.summary}\n${RUN_URL}`);
     expect(body.output.text).toBe("started=true");
   });
 
@@ -732,7 +745,7 @@ describe("published result from the real writer", () => {
 
     expect(doc.started).toBe(false);
     expect(doc.summary).toBe(timeout);
-    expect(body.output.summary).toBe(timeout);
+    expect(body.output.summary).toBe(`${timeout}\n${RUN_URL}`);
     expect(body.output.summary).not.toContain("failed validation");
     expect(body.output.text).toBe("started=false");
   });
@@ -924,7 +937,7 @@ describe("artifact download redirect", () => {
     expect(blobHits.length).toBeGreaterThan(0);
     expect(blobHits.every((header) => header === undefined)).toBe(true);
     expect(downloadAuth).toContain(`Bearer ${TOKEN}`);
-    expect(body.output.summary).toBe(SETUP_FAILURE);
+    expect(body.output.summary).toBe(`${SETUP_FAILURE}\n${RUN_URL}`);
     expect(body.output.text).toBe("started=true");
     expect(`${result.stdout}${result.stderr}${posted}`).not.toContain(TOKEN);
   }, 15000);
