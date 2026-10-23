@@ -18,7 +18,6 @@ const RETIRED_ROLL_MODES: ReadonlyMap<string, RollMode> = new Map([
   ["superAdvantage", "advantage"],
 ]);
 
-/** Resolves d20 count and kept face for advantage and disadvantage sources. */
 export function resolveDicePool(
   advantageSources: number,
   disadvantageSources: number,
