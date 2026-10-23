@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import en from "../lang/en.json";
+import { ROLL_MODE_LABEL_KEYS } from "../src/sheets/character-sheet";
 import manifestJson from "../system.json";
 
 type SystemManifest = {
@@ -45,9 +46,13 @@ describe("english localization", () => {
       "PIVOT.RollMode.Advantage": "Advantage",
       "PIVOT.RollMode.Disadvantage": "Disadvantage",
       "PIVOT.RollMode.Normal": "Normal",
-      "PIVOT.RollMode.SuperAdvantage": "Super-Advantage",
     });
     expect(en).not.toHaveProperty("PIVOT.RollMode.SuperAdvantage");
+    expect(
+      Object.keys(en)
+        .filter((key) => key.startsWith("PIVOT.RollMode."))
+        .sort(),
+    ).toEqual([...Object.values(ROLL_MODE_LABEL_KEYS)].sort());
   });
 
   it("defines effect and migration keys used by UC-008", () => {
