@@ -216,7 +216,7 @@ jobs:
 
       - name: Upload packaged system
         if: steps.recheck.outputs.ok == 'true' && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-package-${{ matrix.target.name }}
           path: |
@@ -373,7 +373,7 @@ jobs:
 
       - name: Upload tested artifact
         if: success() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}
           path: |
@@ -385,7 +385,7 @@ jobs:
 
       - name: Upload sanitized diagnostics
         if: failure() && steps.scan.outcome == 'success' && steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pivot-foundry-e2e-${{ matrix.target.name }}-diagnostics
           path: |
@@ -397,7 +397,7 @@ jobs:
 
       - name: Upload E2E result
         if: (always() || cancelled()) && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-result-${{ matrix.target.name }}
           path: trusted-gate/e2e-result/${{ matrix.target.name }}.json
