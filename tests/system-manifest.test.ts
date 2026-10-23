@@ -47,6 +47,7 @@ describe("english localization", () => {
       "PIVOT.RollMode.Normal": "Normal",
       "PIVOT.RollMode.SuperAdvantage": "Super-Advantage",
     });
+    expect(en).not.toHaveProperty("PIVOT.RollMode.SuperAdvantage");
   });
 
   it("defines effect and migration keys used by UC-008", () => {

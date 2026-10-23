@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveDicePool } from "../../src/rules/d20-roll";
 import { initiativeRollFormula, rollSheetInitiative } from "../../src/sheets/character-sheet";
 
 afterEach(() => {
@@ -98,6 +99,7 @@ describe("sheet initiative posts real d20 dice for Dice So Nice", () => {
     expect(initiativeRollFormula({ dieCount: 1, pick: "single" }, 2)).toBe("1d20+2");
     expect(initiativeRollFormula({ dieCount: 2, pick: "highest" }, -1)).toBe("2d20kh1-1");
     expect(initiativeRollFormula({ dieCount: 2, pick: "lowest" }, 0)).toBe("2d20kl1+0");
+    expect(initiativeRollFormula(resolveDicePool(3, 0), 3)).toBe("2d20kh1+3");
   });
 
   for (const c of cases) {
