@@ -33,7 +33,7 @@ git push origin v0.1.0
 [`release.yml`](../.github/workflows/release.yml) does not start Foundry and does not use the `foundry-e2e` environment:
 
 1. `nightly` checks out `github.sha` and runs `scripts/ci/require-nightly.sh` with the workflow token (`checks: read`, `actions: read`). The tagged commit passes only when its latest `Foundry E2E (nightly)` check is `success` from `github-actions`, and the Actions run named by that check's details link or summary is `.github/workflows/e2e.yml` with event `schedule` or `workflow_dispatch` and `head_branch` `main`. A missing, red, neutral, or unverifiable check fails the release at any hour.
-2. `package` checks out `refs/tags/${tag}` and runs `npm run verify`.
+2. `package` checks out `github.sha`, fails if the tag no longer points at that commit, then runs `npm run verify`.
 3. `npm run prepare:release` (rewrites version/download on the release copy of `system.json`).
 4. Builds that exact `system.zip` and `artifact-identity.json`.
 5. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only when both the package job and the nightly check succeeded.
