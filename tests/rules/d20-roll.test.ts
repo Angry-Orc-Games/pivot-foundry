@@ -27,9 +27,12 @@ describe("resolveDicePool", () => {
     expect(resolveDicePool(1, 1)).toEqual({ dieCount: 1, pick: "single" });
   });
 
-  it("Super-Advantage: N sources of advantage roll N dice, pick highest", () => {
-    // Line 258-260: Super-Advantage is passed as advantageSources > 1 with no disadvantage.
-    expect(resolveDicePool(3, 0)).toEqual({ dieCount: 3, pick: "highest" });
+  it("any number of advantage sources rolls two dice and keeps the highest", () => {
+    expect(resolveDicePool(2, 0)).toEqual({ dieCount: 2, pick: "highest" });
+    expect(resolveDicePool(3, 0)).toEqual({ dieCount: 2, pick: "highest" });
+    expect(resolveDicePool(5, 0)).toEqual({ dieCount: 2, pick: "highest" });
+    expect(d20PoolFormula(resolveDicePool(3, 0).dieCount)).toBe("2d20");
+    expect(d20PoolFormula(resolveDicePool(5, 0).dieCount)).toBe("2d20");
   });
 
   it("Super-Advantage reduced to normal Advantage by any Disadvantage", () => {
@@ -86,6 +89,10 @@ describe("selectKeptD20", () => {
     expect(selectKeptD20([3, 18], { dieCount: 2, pick: "lowest" })).toBe(3);
   });
 
+  it("keeps the higher face when advantage sources stack", () => {
+    expect(selectKeptD20([4, 12], resolveDicePool(3, 0))).toBe(12);
+  });
+
   it("selects highest for Super-Advantage with two dice", () => {
     expect(selectKeptD20([4, 12], dicePoolForRollMode("superAdvantage"))).toBe(12);
   });
@@ -104,6 +111,6 @@ describe("d20PoolFormula", () => {
   it("builds a Foundry pool formula from the resolved die count", () => {
     expect(d20PoolFormula(1)).toBe("1d20");
     expect(d20PoolFormula(2)).toBe("2d20");
-    expect(d20PoolFormula(3)).toBe("3d20");
+    expect(() => d20PoolFormula(3)).toThrow(RangeError);
   });
 });
