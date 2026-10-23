@@ -103,6 +103,7 @@ async function runGate(mode, options = {}) {
     stdout: child.stdout ?? "",
     stderr: child.stderr ?? "",
     ok: outputValue(githubOutput, "ok"),
+    onDemand: outputValue(githubOutput, "on_demand"),
     available: outputValue(githubOutput, "available"),
     curls: curlLog.split("\n").filter(Boolean),
     dateTz: dateTz.trim(),
@@ -185,7 +186,7 @@ describe("e2e license gate", () => {
     );
   });
 
-  it("skips when a status request fails", async () => {
+  it("fails closed when the status request is not HTTP success", async () => {
     const result = await runGate("license", {
       hour: "0200",
       foundryCode: 22,
@@ -194,7 +195,7 @@ describe("e2e license gate", () => {
     expect(result.status).toBe(1);
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
-      "::error::Foundry was not started. could not read user count from foundry.angryorcgames.com (shared Foundry license)",
+      "::error::Foundry was not started. status request to foundry.angryorcgames.com was not HTTP success (shared Foundry license)",
     );
   });
 
@@ -208,6 +209,172 @@ describe("e2e license gate", () => {
     expect(result.ok).toBe("false");
     expect(result.stdout.trim()).toBe(
       "::error::Foundry was not started. could not read user count from foundry.angryorcgames.com (shared Foundry license)",
+    );
+  });
+
+  it.each(['{"active":false}\n', '{"active":false,"version":"14.361"}\n'])(
+    "allows a reachable inactive world with no users field: %s",
+    async (buildBody) => {
+      const result = await runGate("license", {
+        hour: "0300",
+        foundryBody: '{"active":true,"users":0}\n',
+        buildBody,
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.ok).toBe("true");
+      expect(result.stdout).toBe("");
+      expect(result.curls).toEqual([
+        "https://foundry.angryorcgames.com/api/status",
+        "https://build.angryorcgames.com/api/status",
+      ]);
+      expect(result.stdout + result.stderr).not.toContain("super-secret-admin");
+    },
+  );
+
+  it("allows both hosts when neither has loaded a world", async () => {
+    const result = await runGate("license", {
+      hour: "0300",
+      foundryBody: '{"active":false}\n',
+      buildBody: '{"active":false,"version":"14.361"}\n',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.ok).toBe("true");
+    expect(result.stdout).toBe("");
+  });
+
+  it("allows an on-demand run outside quiet hours when the build host has no world", async () => {
+    const result = await runGate("license", {
+      hour: "2300",
+      env: { E2E_GATE_MODE: "dispatch" },
+      foundryBody: '{"active":true,"world":"pivot-test","users":0}\n',
+      buildBody: '{"active":false,"version":"14.361"}\n',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.ok).toBe("true");
+    expect(result.onDemand).toBe("true");
+    expect(result.stdout).toBe("");
+    expect(result.curls).toEqual([
+      "https://foundry.angryorcgames.com/api/status",
+      "https://build.angryorcgames.com/api/status",
+    ]);
+  });
+
+  it("allows an active world that reports zero users", async () => {
+    const result = await runGate("license", {
+      hour: "0300",
+      foundryBody: '{"active":true,"world":"pivot-test","users":0}\n',
+      buildBody: '{"active":true,"users":0}\n',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.ok).toBe("true");
+    expect(result.stdout).toBe("");
+    expect(result.curls).toHaveLength(2);
+  });
+
+  it("refuses an active world with users signed in", async () => {
+    const result = await runGate("license", {
+      hour: "0400",
+      buildBody: '{"active":true,"world":"pivot-test","users":2}\n',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      "::error::Foundry was not started. somebody is signed in on build.angryorcgames.com (shared Foundry license)",
+    );
+  });
+
+  it("refuses an inactive world that still reports signed-in users", async () => {
+    const result = await runGate("license", {
+      hour: "0300",
+      buildBody: '{"active":false,"users":1}\n',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      "::error::Foundry was not started. somebody is signed in on build.angryorcgames.com (shared Foundry license)",
+    );
+  });
+
+  it.each([6, 7, 28])(
+    "fails closed when the status host is unreachable (curl %s)",
+    async (buildCode) => {
+      const result = await runGate("license", {
+        hour: "0300",
+        buildCode,
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.ok).toBe("false");
+      expect(result.stdout.trim()).toBe(
+        "::error::Foundry was not started. could not reach build.angryorcgames.com (shared Foundry license)",
+      );
+    },
+  );
+
+  it.each([
+    ["not JSON", "not-json\n"],
+    ["empty", ""],
+    ["whitespace", "   \n"],
+  ])("fails closed when the status body is %s", async (_label, buildBody) => {
+    const result = await runGate("license", {
+      hour: "0300",
+      buildBody,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      "::error::Foundry was not started. could not parse status JSON from build.angryorcgames.com (shared Foundry license)",
+    );
+  });
+
+  it("fails closed when the status JSON is not an object", async () => {
+    const result = await runGate("license", {
+      hour: "0300",
+      buildBody: "[]\n",
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      "::error::Foundry was not started. could not read user count from build.angryorcgames.com (shared Foundry license)",
+    );
+  });
+
+  it.each([
+    ["fractional", '{"active":true,"users":1.5}\n'],
+    ["a string", '{"active":true,"users":"0"}\n'],
+    ["null", '{"active":true,"users":null}\n'],
+    ["negative", '{"active":true,"users":-1}\n'],
+  ])("fails closed when an active world has %s user count", async (_label, buildBody) => {
+    const result = await runGate("license", {
+      hour: "0300",
+      buildBody,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      "::error::Foundry was not started. could not read user count from build.angryorcgames.com (shared Foundry license)",
+    );
+  });
+
+  it("fails closed when an inactive world includes a non-numeric users field", async () => {
+    const result = await runGate("license", {
+      hour: "0300",
+      buildBody: '{"active":false,"users":"none"}\n',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.ok).toBe("false");
+    expect(result.stdout.trim()).toBe(
+      "::error::Foundry was not started. could not read user count from build.angryorcgames.com (shared Foundry license)",
     );
   });
 
@@ -275,6 +442,22 @@ describe("required license gate", () => {
     );
   });
 
+  it("allows a required run when a host is inactive and has no users field", async () => {
+    const result = await runGate("require", {
+      hour: "0300",
+      foundryBody: '{"users":0}\n',
+      buildBody: '{"active":false}\n',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.ok).toBe("true");
+    expect(result.stdout).toBe("");
+    expect(result.curls).toEqual([
+      "https://foundry.angryorcgames.com/api/status",
+      "https://build.angryorcgames.com/api/status",
+    ]);
+  });
+
   it("allows the caller at hour 03 when both hosts have zero users", async () => {
     const result = await runGate("require", { hour: "0300" });
 
@@ -289,7 +472,7 @@ describe("required license gate", () => {
 });
 
 describe("workflows that start Foundry", () => {
-  it("fails release and staging closed before Foundry, and leaves production promotion alone", async () => {
+  it("keeps release off Foundry, fails staging closed before Foundry, and leaves production promotion alone", async () => {
     const release = await readFile(
       fileURLToPath(new URL("../../.github/workflows/release.yml", import.meta.url)),
       "utf8",
@@ -307,27 +490,26 @@ describe("workflows that start Foundry", () => {
       "utf8",
     );
 
-    const releaseGate = release.slice(
-      release.indexOf("  gate:\n"),
+    const releaseNightly = release.slice(
+      release.indexOf("  nightly:\n"),
       release.indexOf("  package:\n"),
     );
-    expect(releaseGate).toContain("ref: ${{ github.sha }}");
-    expect(releaseGate).toContain("sparse-checkout: scripts/ci");
-    expect(releaseGate).toContain("bash trusted-gate/scripts/ci/e2e-gate.sh require");
-    expect(releaseGate).not.toContain("refs/tags/");
-    expect(release.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
-      release.indexOf("foundry:e2e"),
-    );
+    expect(releaseNightly).toContain("ref: ${{ github.sha }}");
+    expect(releaseNightly).toContain("sparse-checkout: scripts/ci");
+    expect(releaseNightly).toContain("bash trusted-gate/scripts/ci/require-nightly.sh");
+    expect(releaseNightly).toContain("checks: read");
+    expect(releaseNightly).toContain("actions: read");
+    expect(releaseNightly).not.toContain("environment:");
+    expect(releaseNightly).not.toContain("refs/tags/");
+    expect(releaseNightly).not.toContain("FOUNDRY_");
     expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
-    const releaseE2e = release.slice(release.indexOf("  e2e:\n"), release.indexOf("  publish:\n"));
-    expect(releaseE2e).toContain("path: package-artifact");
-    expect(releaseE2e).toContain("accept-artifact.sh");
-    expect(releaseE2e).not.toContain("refs/tags/");
-    expect(releaseE2e.indexOf("accept-artifact.sh")).toBeLessThan(
-      releaseE2e.indexOf("foundry:e2e"),
+    expect(release).not.toContain("foundry:e2e");
+    expect(release).not.toContain("foundry-cli");
+    expect(release).not.toContain("environment: foundry-e2e");
+    expect(release).toContain("needs: [package, nightly]");
+    expect(release).toContain(
+      "needs.package.result == 'success' && needs.nightly.result == 'success'",
     );
-    expect(release).toContain("needs.e2e.result == 'success'");
-    expect(release).toContain("group: release-e2e-${{ github.ref }}");
     expect(release).not.toContain("group: foundry-e2e");
 
     expect(staging).not.toContain("ref: ${{ github.event.workflow_run.head_sha }}");
@@ -378,8 +560,19 @@ describe("workflows that start Foundry", () => {
     expect(nightlyPlan).toContain("issues: write");
     expect(nightlyPlan).not.toContain("npm ");
     const packageJob = nightly.slice(nightly.indexOf("  package:\n"), nightly.indexOf("  e2e:\n"));
-    expect(packageJob).not.toContain("secrets.");
-    expect(packageJob).not.toContain("environment:");
+    const packageScan = packageJob.indexOf("- name: Scan packaged system for credentials");
+    expect(packageScan).toBeGreaterThan(-1);
+    const packageBeforeScan = packageJob.slice(0, packageScan);
+    const packageScanStep = packageJob.slice(
+      packageScan,
+      packageJob.indexOf("\n      - name:", packageScan),
+    );
+    expect(packageBeforeScan).not.toContain("secrets.");
+    expect(packageBeforeScan.replace("environment: foundry-e2e", "")).not.toContain("environment:");
+    expect(packageJob).toContain("environment: foundry-e2e");
+    expect(packageScanStep).toContain("FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}");
+    expect(packageScanStep).toContain("FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}");
+    expect(packageJob.slice(packageScan + packageScanStep.length)).not.toContain("secrets.");
     expect(packageJob).toContain("npm run package:system");
     expect(packageJob).toContain("name: e2e-package-");
     expect(packageJob.indexOf("e2e-gate.sh license")).toBeLessThan(
@@ -420,7 +613,7 @@ describe("workflows that start Foundry", () => {
     expect(nightlyReport).toContain("bash trusted-gate/scripts/ci/e2e-publish-results.sh");
     const buildStep = packageJob.slice(
       packageJob.indexOf("- name: Build the system package"),
-      packageJob.indexOf("- name: Upload packaged system"),
+      packageJob.indexOf("- name: Scan packaged system for credentials"),
     );
     expect(buildStep).not.toContain("FOUNDRY_");
     expect(buildStep).toContain('GITHUB_TOKEN: ""');

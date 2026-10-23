@@ -1,5 +1,6 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,7 @@ const SAME = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const FORK = "cccccccccccccccccccccccccccccccccccccccc";
 const OTHER = "dddddddddddddddddddddddddddddddddddddddd";
 const TOKEN = "super-secret-token";
+const RUN_URL = "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242";
 
 const CURL_STUB = `#!/bin/sh
 url=
@@ -366,6 +368,7 @@ describe("nightly check run", () => {
     const result = await runScript(reportScript, ["success"], {
       ...ctx.env,
       E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
       E2E_SUMMARY: `Foundry started for E2E commit ${SAME}.`,
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -378,9 +381,10 @@ describe("nightly check run", () => {
       head_sha: SAME,
       status: "completed",
       conclusion: "success",
+      details_url: "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
       output: {
         title: "Foundry E2E (nightly)",
-        summary: `Foundry started for E2E commit ${SAME}.`,
+        summary: `Foundry started for E2E commit ${SAME}.\nhttps://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242`,
       },
     });
     expect(urls).toContain("/repos/Angry-Orc-Games/pivot-foundry/check-runs");
@@ -503,7 +507,62 @@ describe("nightly failure results", () => {
       run_id: "4242",
       conclusion: "failure",
       summary: "License gate closed. Foundry was not started.",
+      started: false,
     });
+  });
+
+  it("records an unsigned EULA as a setup failure even after Foundry started", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+    const dest = join(dir, "main.json");
+    const log = join(dir, "foundry-e2e.log");
+    const setup =
+      "Foundry setup failed. The End User License Agreement is on screen. Set FOUNDRY_E2E_ACCEPT_EULA=1 to sign it for this run. Tests were not run.";
+    await writeFile(
+      log,
+      `Foundry started for E2E commit ${SAME}.\nServer started and listening\n${setup}\n`,
+    );
+    const result = await runScript(recordScript, [dest], {
+      ...process.env,
+      E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
+      E2E_OK: "true",
+      E2E_AVAILABLE: "true",
+      E2E_JOB_STATUS: "failure",
+      E2E_LOG: log,
+    });
+    const body = JSON.parse(await readFile(dest, "utf8"));
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(body.conclusion).toBe("failure");
+    expect(body.summary).toBe(setup);
+    expect(body.summary).not.toContain("failed after Foundry started");
+    expect(body.summary).not.toContain("did not start");
+  });
+
+  it("treats Server started and listening as Foundry having started", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+    const dest = join(dir, "main.json");
+    const log = join(dir, "foundry-e2e.log");
+    await writeFile(log, "Server started and listening on port 30000\n");
+    const result = await runScript(recordScript, [dest], {
+      ...process.env,
+      E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
+      E2E_OK: "true",
+      E2E_AVAILABLE: "true",
+      E2E_JOB_STATUS: "failure",
+      E2E_LOG: log,
+    });
+    const body = JSON.parse(await readFile(dest, "utf8"));
+    await rm(dir, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    expect(body.conclusion).toBe("failure");
+    expect(body.summary).toContain("Server started and listening");
+    expect(body.summary).toContain(`Foundry started for E2E commit ${SAME}.`);
+    expect(body.summary).not.toContain("did not start");
+    expect(body.summary).not.toContain("not reported as started");
   });
 
   it("posts a failure check when the run was cancelled before a result existed", async () => {
@@ -514,7 +573,13 @@ describe("nightly failure results", () => {
     expect(ctx.result.status).toBe(1);
     expect(body.conclusion).toBe("failure");
     expect(body.head_sha).toBe(SAME);
+    expect(body.details_url).toBe(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
     expect(body.output.summary).toContain("cancelled or timed out");
+    expect(body.output.summary).toContain(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
     expect(body.output.summary).not.toContain("Skipped");
     expect(ctx.urls).toContain("/actions/runs/4242/artifacts");
   });
@@ -526,6 +591,7 @@ describe("nightly failure results", () => {
         run_id: "4242",
         conclusion: "failure",
         summary: "License gate closed. Foundry was not started.",
+        started: false,
       },
     });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -536,14 +602,52 @@ describe("nightly failure results", () => {
       name: "Foundry E2E (nightly)",
       head_sha: SAME,
       conclusion: "failure",
-      output: { summary: "License gate closed. Foundry was not started." },
+      details_url: "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
     });
+    expect(body.output.summary).toContain("License gate closed. Foundry was not started.");
+    expect(body.output.summary).toContain(
+      "https://github.com/Angry-Orc-Games/pivot-foundry/actions/runs/4242",
+    );
+  });
+
+  it("posts the listening signal from a recorded result", async () => {
+    const summary = `Server started and listening. Foundry started for E2E commit ${SAME}. The run failed after Foundry started.`;
+    const ctx = await publishFixture({
+      doc: { sha: SAME, run_id: "4242", conclusion: "failure", summary, started: true },
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(body.output.summary).toBe(`${summary}\n${RUN_URL}`);
+    expect(body.output.summary).not.toContain("not reported as started");
+  });
+
+  it("posts a validation failure when the result download is not a zip", async () => {
+    const ctx = await publishFixture({
+      artifacts: [
+        {
+          name: "e2e-result-pr-80",
+          expired: false,
+          archive_download_url: "https://artifact.test/download",
+          workflow_run: { id: 4242 },
+        },
+      ],
+    });
+    const bodyText = await readFile(join(ctx.stub, "request-body"), "utf8").catch(() => "");
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(bodyText).not.toBe("");
+    const body = JSON.parse(bodyText);
+    expect(body.conclusion).toBe("failure");
+    expect(body.output.summary).toContain("failed validation");
+    expect(ctx.result.stderr).not.toContain("BadZipFile");
   });
 
   it.each([
     ["sha", { sha: MAIN, run_id: "4242", conclusion: "success", summary: "forged" }],
     ["run_id", { sha: SAME, run_id: "9999", conclusion: "success", summary: "forged" }],
-    ["extra", { sha: SAME, run_id: "4242", conclusion: "success", summary: "forged", extra: true }],
   ])("fails closed when the result %s does not match this run", async (_label, doc) => {
     const ctx = await publishFixture({ doc });
     const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
@@ -555,4 +659,286 @@ describe("nightly failure results", () => {
     expect(body.output.summary).toContain("failed validation");
     expect(body.output.summary).not.toContain("forged");
   });
+
+  it("appends a validation error to a readable summary instead of replacing it", async () => {
+    const ctx = await publishFixture({
+      doc: {
+        sha: SAME,
+        run_id: "4242",
+        conclusion: "success",
+        summary: "forged",
+        extra: true,
+      },
+    });
+    const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+    await rm(ctx.dir, { recursive: true, force: true });
+
+    expect(ctx.result.status).toBe(1);
+    expect(body.conclusion).toBe("failure");
+    expect(body.output.summary.startsWith("forged")).toBe(true);
+    expect(body.output.summary).toContain("Foundry E2E result failed validation for this run.");
+    expect(body.output.summary).not.toContain("not reported as started");
+  });
+});
+
+const SETUP_FAILURE =
+  "Foundry setup failed. The End User License Agreement is on screen. Set FOUNDRY_E2E_ACCEPT_EULA=1 to sign it for this run. Tests were not run.";
+
+async function recordPublishedResult(logText) {
+  const dir = await mkdtemp(join(tmpdir(), "e2e-record-"));
+  const dest = join(dir, "pr-114.json");
+  const log = join(dir, "foundry-e2e.log");
+  await writeFile(log, logText);
+  const recorded = await runScript(recordScript, [dest], {
+    ...process.env,
+    E2E_SHA: SAME,
+    E2E_RUN_ID: "4242",
+    E2E_OK: "true",
+    E2E_AVAILABLE: "true",
+    E2E_JOB_STATUS: "failure",
+    E2E_LOG: log,
+  });
+  const doc = JSON.parse(await readFile(dest, "utf8"));
+  const ctx = await publishFixture({ doc });
+  const body = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
+  await rm(dir, { recursive: true, force: true });
+  await rm(ctx.dir, { recursive: true, force: true });
+  return { recorded, doc, body };
+}
+
+describe("published result from the real writer", () => {
+  it("publishes a setup failure after listening as started with the EULA summary intact", async () => {
+    const { recorded, doc, body } = await recordPublishedResult(
+      [
+        "Server started and listening",
+        `Foundry started for E2E commit ${SAME}.`,
+        SETUP_FAILURE,
+        "FOUNDRY_LICENSE_KEY=ABCD-EFGH-IJKL-MNOP-QRST-UVWX",
+      ].join("\n"),
+    );
+
+    expect(recorded.status).toBe(0);
+    expect(doc.started).toBe(true);
+    expect(doc.summary).toBe(SETUP_FAILURE);
+    expect(JSON.stringify(doc)).not.toContain("ABCD-EFGH");
+    expect(body.output.summary).toBe(`${SETUP_FAILURE}\n${RUN_URL}`);
+    expect(body.output.summary).not.toContain("failed validation");
+    expect(body.output.text).toBe("started=true");
+    expect(body.output.summary + body.output.text).not.toContain("ABCD-EFGH");
+  });
+
+  it("publishes a test failure after listening as started", async () => {
+    const { doc, body } = await recordPublishedResult(
+      ["Server started and listening", "Error: expect(locator).toBeVisible() failed"].join("\n"),
+    );
+
+    expect(doc.started).toBe(true);
+    expect(doc.summary).toContain("The run failed after Foundry started.");
+    expect(doc.summary).not.toContain("End User License Agreement");
+    expect(body.output.summary).toBe(`${doc.summary}\n${RUN_URL}`);
+    expect(body.output.text).toBe("started=true");
+  });
+
+  it("publishes a readiness timeout before listening as not started", async () => {
+    const timeout = "Foundry did not log Server started and listening within 120s";
+    const { doc, body } = await recordPublishedResult(`${timeout}\n`);
+
+    expect(doc.started).toBe(false);
+    expect(doc.summary).toBe(timeout);
+    expect(body.output.summary).toBe(`${timeout}\n${RUN_URL}`);
+    expect(body.output.summary).not.toContain("failed validation");
+    expect(body.output.text).toBe("started=false");
+  });
+});
+
+function listenOn(server, port, host) {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen({ port, host }, () => resolve(server.address().port));
+  });
+}
+
+describe("artifact download redirect", () => {
+  it("follows a 302 to another host and posts the EULA summary as started", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "e2e-redirect-"));
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-keyout",
+        join(dir, "ca.key"),
+        "-out",
+        join(dir, "ca.crt"),
+        "-days",
+        "1",
+        "-nodes",
+        "-subj",
+        "/CN=e2e-test-ca",
+      ],
+      { stdio: "ignore" },
+    );
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-newkey",
+        "rsa:2048",
+        "-keyout",
+        join(dir, "srv.key"),
+        "-out",
+        join(dir, "srv.csr"),
+        "-nodes",
+        "-subj",
+        "/CN=api.localtest.me",
+      ],
+      { stdio: "ignore" },
+    );
+    await writeFile(
+      join(dir, "ext.cnf"),
+      "subjectAltName=DNS:api.localtest.me,DNS:blob.localtest.me\n",
+    );
+    execFileSync(
+      "openssl",
+      [
+        "x509",
+        "-req",
+        "-in",
+        join(dir, "srv.csr"),
+        "-CA",
+        join(dir, "ca.crt"),
+        "-CAkey",
+        join(dir, "ca.key"),
+        "-CAcreateserial",
+        "-out",
+        join(dir, "srv.crt"),
+        "-days",
+        "1",
+        "-extfile",
+        join(dir, "ext.cnf"),
+      ],
+      { stdio: "ignore" },
+    );
+    const doc = {
+      sha: SAME,
+      run_id: "4242",
+      conclusion: "failure",
+      summary: SETUP_FAILURE,
+      started: true,
+    };
+    const jsonPath = join(dir, "pr-114.json");
+    await writeFile(jsonPath, JSON.stringify(doc));
+    execFileSync("python3", [
+      "-c",
+      "import sys, zipfile\n" +
+        "with zipfile.ZipFile(sys.argv[1], 'w') as bundle:\n" +
+        "    bundle.write(sys.argv[2], 'pr-114.json')\n",
+      join(dir, "artifact.zip"),
+      jsonPath,
+    ]);
+    const zip = await readFile(join(dir, "artifact.zip"));
+    const tls = {
+      key: await readFile(join(dir, "srv.key")),
+      cert: await readFile(join(dir, "srv.crt")),
+    };
+    const blobHits = [];
+    const downloadAuth = [];
+    let posted = "";
+    let apiPort = 0;
+    const blobHandler = (req, res) => {
+      blobHits.push(req.headers.authorization);
+      res.writeHead(200, { "content-type": "application/zip" });
+      res.end(zip);
+    };
+    const blob6 = createServer(tls, blobHandler);
+    const blob4 = createServer(tls, blobHandler);
+    const blobPort = await listenOn(blob6, 0, "::1");
+    await listenOn(blob4, blobPort, "127.0.0.1");
+    const apiHandler = (req, res) => {
+      const chunks = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        const path = new URL(req.url ?? "/", "https://api.localtest.me").pathname;
+        if (path.endsWith("/artifacts")) {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              total_count: 1,
+              artifacts: [
+                {
+                  name: "e2e-result-pr-114",
+                  expired: false,
+                  archive_download_url: `https://api.localtest.me:${apiPort}/download`,
+                  workflow_run: { id: 4242 },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+        if (path === "/download") {
+          downloadAuth.push(req.headers.authorization);
+          res.writeHead(302, {
+            location: `https://blob.localtest.me:${blobPort}/artifact.zip`,
+          });
+          res.end();
+          return;
+        }
+        if (path.endsWith("/check-runs")) {
+          posted = chunks.map((chunk) => chunk.toString("utf8")).join("");
+          res.writeHead(201, { "content-type": "application/json" });
+          res.end("{}");
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+    };
+    const api6 = createServer(tls, apiHandler);
+    const api4 = createServer(tls, apiHandler);
+    apiPort = await listenOn(api6, 0, "::1");
+    await listenOn(api4, apiPort, "127.0.0.1");
+    const servers = [blob6, blob4, api6, api4];
+    let result;
+    try {
+      result = await new Promise((resolve) => {
+        const child = spawn("bash", [publishScript], {
+          env: {
+            PATH: process.env.PATH,
+            HOME: process.env.HOME,
+            LANG: "C",
+            SSL_CERT_FILE: join(dir, "ca.crt"),
+            GITHUB_API_URL: `https://api.localtest.me:${apiPort}`,
+            GITHUB_TOKEN: TOKEN,
+            E2E_REPOSITORY: "Angry-Orc-Games/pivot-foundry",
+            E2E_TARGETS: JSON.stringify([{ sha: SAME, name: "pr-114" }]),
+            E2E_RUN_ID: "4242",
+            E2E_MATRIX_RESULT: "failure",
+          },
+        });
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (chunk) => {
+          stdout += chunk;
+        });
+        child.stderr.on("data", (chunk) => {
+          stderr += chunk;
+        });
+        child.on("close", (status) => resolve({ status: status ?? 1, stdout, stderr }));
+      });
+    } finally {
+      for (const server of servers) server.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+
+    const body = JSON.parse(posted);
+    expect(blobHits.length).toBeGreaterThan(0);
+    expect(blobHits.every((header) => header === undefined)).toBe(true);
+    expect(downloadAuth).toContain(`Bearer ${TOKEN}`);
+    expect(body.output.summary).toBe(`${SETUP_FAILURE}\n${RUN_URL}`);
+    expect(body.output.text).toBe("started=true");
+    expect(`${result.stdout}${result.stderr}${posted}`).not.toContain(TOKEN);
+  }, 15000);
 });

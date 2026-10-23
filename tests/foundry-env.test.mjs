@@ -166,7 +166,9 @@ describe("foundry version pins", () => {
     expect(versions.foundryNodeMajor).toBe(24);
     expect(versions.container.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(pinnedImageRef(versions)).toContain("@sha256:");
-    expect(versions.container.supportsFoundryVersion).toBe("14.361");
+    expect(pinnedImageRef(versions).split("@")[0]).toBe(
+      `${versions.container.image}:${versions.foundryVersion}`,
+    );
   });
 
   it("uses isolated instance ids for worktrees and CI runs", () => {

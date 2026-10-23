@@ -1,7 +1,16 @@
-import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 
 import { EXIT, SYSTEM_LINK_ENTRIES, composeNames, pinnedImageRef } from "./foundry-env.mjs";
 
@@ -40,7 +49,7 @@ export function writeComposeEnv(paths, result, { port, hotReload, preserveConfig
     `PIVOT_FOUNDRY_INSTANCE=${paths.instanceId}`,
     `PIVOT_REPO_ROOT=${paths.root}`,
     `PIVOT_FOUNDRY_DATA_DIR=${paths.foundryData}`,
-    `PIVOT_FOUNDRY_DIST_DIR=${paths.distDir}`,
+    `PIVOT_FOUNDRY_CONTAINER_CACHE=${paths.containerCacheDir}`,
     `PIVOT_PRESERVE_CONFIG=${preserveConfig ? "true" : "false"}`,
     `PIVOT_HOT_RELOAD=${hotReload ? "true" : "false"}`,
     `PIVOT_FOUNDRY_WORLD=${world || ""}`,
@@ -160,6 +169,88 @@ export function pullImage(versions) {
   execFileSync("docker", ["pull", pinnedImageRef(versions)], { stdio: "inherit" });
 }
 
+export function prepareDataDir(dataDir, io = {}) {
+  const run = io.execFileSync ?? execFileSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  run("mkdir", ["-p", dataDir], quiet);
+  return chownFoundryTree(dataDir, io);
+}
+
+export function prepareContainerCache(paths, io = {}) {
+  const copy = io.copyFileSync ?? copyFileSync;
+  const exists = io.existsSync ?? existsSync;
+  const source = join(paths.distDir, paths.versions.cacheFileName);
+  if (!exists(source)) {
+    const error = new Error(`Missing verified Foundry archive ${paths.versions.cacheFileName}.`);
+    error.code = "DATA_DIR";
+    throw error;
+  }
+
+  const cacheDir = paths.containerCacheDir;
+  const run = io.execFileSync ?? execFileSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  run("mkdir", ["-p", cacheDir], quiet);
+  replaceFile(copy, source, join(cacheDir, paths.versions.cacheFileName), run);
+  chownFoundryTree(cacheDir, io, { force: true });
+  return cacheDir;
+}
+
+function privilegeDenied(error) {
+  if (error?.code === "EACCES" || error?.code === "EPERM") return true;
+  const text = `${error?.stderr || ""}\n${error?.message || ""}`;
+  return /Operation not permitted|Permission denied|EPERM|EACCES/i.test(text);
+}
+
+function replaceFile(copy, from, to, run) {
+  try {
+    copy(from, to);
+    return;
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+  }
+
+  const temp = join(tmpdir(), `.pivot-cache-${process.pid}-${basename(to)}`);
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  try {
+    copy(from, temp);
+    try {
+      run("mv", ["-f", temp, to], quiet);
+    } catch (error) {
+      if (!privilegeDenied(error)) throw error;
+      run("sudo", ["-n", "mv", "-f", temp, to], quiet);
+    }
+  } finally {
+    rmSync(temp, { force: true });
+  }
+}
+
+function chownFoundryTree(dir, io = {}, { force = false } = {}) {
+  const run = io.execFileSync ?? execFileSync;
+  const stat = io.statSync ?? statSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  const info = stat(dir);
+  if (!force && info.uid === 1000 && info.gid === 1000) return { usedSudo: false };
+
+  const own = ["-R", "1000:1000", dir];
+  try {
+    run("chown", own, quiet);
+    return { usedSudo: false };
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    try {
+      run("sudo", ["-n", "chown", ...own], quiet);
+    } catch (sudoError) {
+      const wrapped = new Error(
+        `Could not give uid 1000 write access to ${dir}. The Foundry container runs as 1000:1000.`,
+      );
+      wrapped.code = "DATA_DIR";
+      wrapped.cause = sudoError;
+      throw wrapped;
+    }
+    return { usedSudo: true };
+  }
+}
+
 export function prepareDevSystemDir(paths) {
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
   mkdirSync(systemDir, { recursive: true });
@@ -182,12 +273,37 @@ export function assertSafeZipEntries(zipPath) {
   }
 }
 
-export function installPackagedSystem(paths, zipPath) {
-  assertSafeZipEntries(zipPath);
+export function removeFoundryTree(target, io = {}) {
+  const remove = io.rmSync ?? rmSync;
+  const run = io.execFileSync ?? execFileSync;
+  try {
+    remove(target, { force: true, recursive: true });
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    run("sudo", ["-n", "rm", "-rf", target], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  }
+}
+
+export function installPackagedSystem(paths, zipPath, io = {}) {
+  const assertSafe = io.assertSafeZipEntries ?? assertSafeZipEntries;
+  assertSafe(zipPath);
   const systemDir = join(paths.foundryData, "Data", "systems", "pivot-fantasy");
-  rmSync(systemDir, { force: true, recursive: true });
-  mkdirSync(systemDir, { recursive: true });
-  execFileSync("unzip", ["-q", "-o", zipPath, "-d", systemDir], { stdio: "inherit" });
+  const mkdir = io.mkdirSync ?? mkdirSync;
+  const run = io.execFileSync ?? execFileSync;
+  const quiet = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
+  removeFoundryTree(systemDir, io);
+  try {
+    mkdir(systemDir, { recursive: true });
+    run("unzip", ["-q", "-o", zipPath, "-d", systemDir], { stdio: "inherit" });
+  } catch (error) {
+    if (!privilegeDenied(error)) throw error;
+    run("sudo", ["-n", "mkdir", "-p", systemDir], quiet);
+    run("sudo", ["-n", "unzip", "-q", "-o", zipPath, "-d", systemDir], quiet);
+    chownFoundryTree(systemDir, io, { force: true });
+  }
 }
 
 export function followLogs(paths) {
@@ -200,23 +316,11 @@ export function followLogs(paths) {
 
 export function collectDiagnostics(paths) {
   mkdirSync(paths.diagnosticsDir, { recursive: true });
-  try {
-    const logs = execFileSync(
-      "docker",
-      ["compose", ...composeArgs(paths), "logs", "--no-color", "--tail", "400"],
-      {
-        cwd: paths.root,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    writeFileSync(join(paths.diagnosticsDir, "foundry.log"), redactDiagnostics(logs));
-  } catch (error) {
-    writeFileSync(
-      join(paths.diagnosticsDir, "foundry.log"),
-      redactDiagnostics(String(error.stdout || error.stderr || error.message)),
-    );
-  }
+  const container = composeNames(paths).container;
+  const result = spawnSync("docker", ["logs", "--tail", "400", container], { encoding: "utf8" });
+  const logs = `${result.stdout || ""}${result.stderr || ""}`;
+  const text = logs || result.error?.message || "";
+  writeFileSync(join(paths.diagnosticsDir, "foundry.log"), redactDiagnostics(text));
 }
 
 export function redactDiagnostics(text) {
@@ -224,27 +328,130 @@ export function redactDiagnostics(text) {
     .replaceAll(/FOUNDRY_LICENSE_KEY=\S+/g, "FOUNDRY_LICENSE_KEY=<redacted>")
     .replaceAll(/FOUNDRY_ADMIN_KEY=\S+/g, "FOUNDRY_ADMIN_KEY=<redacted>")
     .replaceAll(/FOUNDRY_RELEASE_URL=\S+/g, "FOUNDRY_RELEASE_URL=<redacted>")
+    .replaceAll(/FOUNDRY_RELEASE_CACHE_URL=\S+/g, "FOUNDRY_RELEASE_CACHE_URL=<redacted>")
+    .replaceAll(/([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, "$1<redacted>@")
     .replaceAll(/[A-Z0-9]{4}(?:-[A-Z0-9]{4}){5}/g, "<redacted-license>");
 }
 
-export async function waitForHttp(baseUrl, timeoutMs) {
+const TERMINAL_STARTUP =
+  /Read-only file system|Failure \d+ detected|Exiting immediately|indefinite sleep|Unable to install Foundry/;
+
+export function describeStartupFailure(logs, status = "") {
+  const text = String(logs || "");
+  if (
+    /Volume write test failed|Volume read test failed|insufficient permissions on \/data/.test(text)
+  ) {
+    return "Foundry container aborted: insufficient permissions on /data";
+  }
+  if (/Aborting/.test(text)) return "Foundry container aborted";
+  if (
+    /No Foundry(?: Virtual Tabletop)? installation detected/.test(text) &&
+    TERMINAL_STARTUP.test(text)
+  ) {
+    return "Foundry container aborted: No Foundry installation detected";
+  }
+  if (TERMINAL_STARTUP.test(text)) return "Foundry container aborted";
+  const state = String(status || "").trim();
+  if (/^(exited|dead)\b/.test(state)) {
+    return `Foundry container stopped (${state})`;
+  }
+  return null;
+}
+
+export function readContainerLogs(paths) {
+  const container = composeNames(paths).container;
+  const logs = spawnSync("docker", ["logs", "--tail", "200", container], { encoding: "utf8" });
+  return `${logs.stdout || ""}${logs.stderr || ""}`;
+}
+
+export function startedAnnouncement(logs, sha) {
+  if (!String(logs || "").includes("Server started and listening")) return [];
+  return ["Server started and listening", `Foundry started for E2E commit ${sha}.`];
+}
+
+export async function waitForListening(readLog, timeoutMs, options = {}) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
-      const response = await fetch(baseUrl, { redirect: "manual" });
-      if (response.status > 0) return response.status;
-    } catch {
-      // Keep polling. A refused connection is the gap before the server binds.
+    const aborted = options.inspect?.();
+    if (aborted) {
+      const error = new Error(aborted);
+      error.code = "STARTUP_FAILED";
+      throw error;
     }
+    const logs = String(readLog() ?? "");
+    if (logs.includes("Server started and listening")) return logs;
+    const pause = Math.min(200, deadline - Date.now());
+    if (pause <= 0) break;
     await new Promise((resolve) => {
-      globalThis.setTimeout(resolve, 1000);
+      globalThis.setTimeout(resolve, pause);
     });
   }
   const error = new Error(
-    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s`,
+    `Foundry did not log Server started and listening within ${timeoutMs / 1000}s`,
   );
   error.code = "TIMEOUT";
   throw error;
+}
+
+export function containerStartupProblem(paths) {
+  const container = composeNames(paths).container;
+  const state = spawnSync(
+    "docker",
+    ["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", container],
+    { encoding: "utf8" },
+  );
+  return describeStartupFailure(readContainerLogs(paths), state.stdout || "");
+}
+
+export async function waitForHttp(baseUrl, timeoutMs, options = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = "no response";
+  while (Date.now() < deadline) {
+    const aborted = options.inspect?.();
+    if (aborted) {
+      const error = new Error(aborted);
+      error.code = "STARTUP_FAILED";
+      throw error;
+    }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    try {
+      const response = await fetch(baseUrl, {
+        redirect: "manual",
+        signal: globalThis.AbortSignal.timeout(remaining),
+      });
+      if (response.status > 0) return response.status;
+      lastError = `status ${response.status}`;
+    } catch (error) {
+      lastError = describeFetchFailure(error);
+    }
+    const pause = Math.min(1000, deadline - Date.now());
+    if (pause <= 0) break;
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, pause);
+    });
+  }
+  const error = new Error(
+    `Foundry did not answer HTTP at ${httpTarget(baseUrl)} within ${timeoutMs / 1000}s (${lastError})`,
+  );
+  error.code = "TIMEOUT";
+  throw error;
+}
+
+function describeFetchFailure(error) {
+  if (isRequestTimeout(error)) return "request timed out";
+  const code = error?.cause?.code;
+  if (typeof code === "string" && code) return code;
+  const message = String(error?.message || "request failed");
+  if (message.includes("credentials")) return "credentials in URL";
+  const line = message.split("\n")[0];
+  if (line.includes("://") || line.includes("@")) return "request failed";
+  return line.slice(0, 160);
+}
+
+function isRequestTimeout(error) {
+  const names = [error?.name, error?.cause?.name];
+  return names.includes("TimeoutError") || names.includes("AbortError");
 }
 
 function httpTarget(baseUrl) {

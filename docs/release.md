@@ -30,16 +30,15 @@ git push origin v0.1.0
 
 ## Workflow
 
-[`release.yml`](../.github/workflows/release.yml):
+[`release.yml`](../.github/workflows/release.yml) does not start Foundry and does not use the `foundry-e2e` environment:
 
-1. Runs `scripts/ci/e2e-gate.sh require` from a sparse checkout of the workflow commit (`github.sha`). The tag is not checked out in that job. Outside 02:00-05:30 America/New_York, at or after 05:30, or when prod or build has a signed-in user, the job fails and Foundry does not start.
-2. Checks out `refs/tags/${tag}` and runs `npm run verify`.
+1. `nightly` checks out `github.sha` and runs `scripts/ci/require-nightly.sh` with the workflow token (`checks: read`, `actions: read`). The tagged commit passes only when its latest `Foundry E2E (nightly)` check is `success` from `github-actions`, and the Actions run named by that check's details link or summary is `.github/workflows/e2e.yml` with event `schedule` or `workflow_dispatch` and `head_branch` `main`. A missing, red, neutral, or unverifiable check fails the release at any hour.
+2. `package` checks out `refs/tags/${tag}` and runs `npm run verify`.
 3. `npm run prepare:release` (rewrites version/download on the release copy of `system.json`).
 4. Builds that exact `system.zip` and `artifact-identity.json`.
-5. Checks the gate again from `github.sha`, then checks out `refs/tags/${tag}` and runs Foundry E2E against those bytes (`--skip-package`).
-6. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only if that E2E job succeeded.
+5. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only when both the package job and the nightly check succeeded.
 
-If step 3 changes artifact bytes, step 5 is what makes the new zip eligible. A failed gate or a failed E2E job does not publish. Re-run the tag workflow inside the 02:00-05:30 ET window when nobody is signed in.
+`scripts/ci/e2e-report.sh` posts `Foundry E2E (nightly)` from the nightly workflow and records that Actions run on the check. A tag whose commit has no green nightly fails closed. Run Foundry E2E on `main` inside the 02:00-05:30 ET window, then tag that commit after the check is green. `prepare:release` can change manifest bytes after that nightly run; release does not start Foundry again to retest them.
 
 Foundry installs use:
 
