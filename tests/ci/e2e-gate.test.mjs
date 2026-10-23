@@ -472,7 +472,7 @@ describe("required license gate", () => {
 });
 
 describe("workflows that start Foundry", () => {
-  it("fails release and staging closed before Foundry, and leaves production promotion alone", async () => {
+  it("keeps release off Foundry, fails staging closed before Foundry, and leaves production promotion alone", async () => {
     const release = await readFile(
       fileURLToPath(new URL("../../.github/workflows/release.yml", import.meta.url)),
       "utf8",
@@ -490,27 +490,27 @@ describe("workflows that start Foundry", () => {
       "utf8",
     );
 
-    const releaseGate = release.slice(
-      release.indexOf("  gate:\n"),
+    const releaseNightly = release.slice(
+      release.indexOf("  nightly:\n"),
       release.indexOf("  package:\n"),
     );
-    expect(releaseGate).toContain("ref: ${{ github.sha }}");
-    expect(releaseGate).toContain("sparse-checkout: scripts/ci");
-    expect(releaseGate).toContain("bash trusted-gate/scripts/ci/e2e-gate.sh require");
-    expect(releaseGate).not.toContain("refs/tags/");
-    expect(release.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
-      release.indexOf("foundry:e2e"),
-    );
+    expect(releaseNightly).toContain("ref: ${{ github.sha }}");
+    expect(releaseNightly).toContain("sparse-checkout: scripts/ci");
+    expect(releaseNightly).toContain("bash trusted-gate/scripts/ci/require-nightly.sh");
+    expect(releaseNightly).toContain("checks: read");
+    expect(releaseNightly).toContain("actions: read");
+    expect(releaseNightly).not.toContain("environment:");
+    expect(releaseNightly).not.toContain("refs/tags/");
+    expect(releaseNightly).not.toContain("FOUNDRY_");
     expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
-    const releaseE2e = release.slice(release.indexOf("  e2e:\n"), release.indexOf("  publish:\n"));
-    expect(releaseE2e).toContain("path: package-artifact");
-    expect(releaseE2e).toContain("accept-artifact.sh");
-    expect(releaseE2e).not.toContain("refs/tags/");
-    expect(releaseE2e.indexOf("accept-artifact.sh")).toBeLessThan(
-      releaseE2e.indexOf("foundry:e2e"),
+    expect(release).not.toContain("foundry:e2e");
+    expect(release).not.toContain("foundry-cli");
+    expect(release).not.toContain("environment: foundry-e2e");
+    expect(release).toContain("needs: [package, nightly]");
+    expect(release).toContain(
+      "needs.package.result == 'success' && needs.nightly.result == 'success'",
     );
-    expect(release).toContain("needs.e2e.result == 'success'");
-    expect(release).toContain("group: foundry-e2e");
+    expect(release).not.toContain("group: foundry-e2e");
 
     expect(staging).not.toContain("ref: ${{ github.event.workflow_run.head_sha }}");
     expect(staging).toContain(

@@ -333,6 +333,7 @@ describe("on-demand check name", () => {
     const onDemand = await runScript(reportScript, ["success"], {
       ...ctx.env,
       E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
       E2E_SUMMARY: `Foundry started for E2E commit ${SAME}.`,
       E2E_CHECK_NAME: ON_DEMAND,
     });
@@ -340,6 +341,7 @@ describe("on-demand check name", () => {
     const nightly = await runScript(reportScript, ["success"], {
       ...ctx.env,
       E2E_SHA: SAME,
+      E2E_RUN_ID: "4242",
       E2E_SUMMARY: `Foundry started for E2E commit ${SAME}.`,
     });
     const nightlyBody = JSON.parse(await readFile(join(ctx.stub, "request-body"), "utf8"));
