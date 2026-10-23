@@ -175,7 +175,7 @@ PR CI (no Foundry secrets) → trusted Foundry E2E → merge to main
 - Every PR: lint, format, types, unit tests, build, package validation
 - Same-repository PRs: isolated Foundry E2E with narrowly scoped secrets
 - External forks: CI only; review the exact commit, then `workflow_dispatch` Foundry E2E
-- Release tags: prepare the versioned manifest, test that exact zip, publish only after E2E
+- Release tags: prepare the versioned manifest and publish only when that commit has a green Foundry E2E (nightly) check
 
 See [docs/deployment.md](docs/deployment.md) for Environments, required checks, and remaining GitHub settings. Dependabot still opens weekly npm and Actions update PRs.
 
@@ -188,7 +188,7 @@ Releases are produced by pushing a version tag that matches `v*`, for example `v
 3. Validates the tag as a semantic version prefixed with `v`
 4. Updates the release copy of `system.json` to the tag version
 5. Builds and validates `system.zip`
-6. Uploads `system.json` and `system.zip` to the GitHub release
+6. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only when that commit's Foundry E2E (nightly) check is green
 
 Foundry installs use the manifest URL in `system.json`:
 
