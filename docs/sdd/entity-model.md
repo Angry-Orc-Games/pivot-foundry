@@ -23,9 +23,8 @@ Ephemeral choice for a d20 roll:
 - `normal`
 - `advantage`
 - `disadvantage`
-- `superAdvantage`
 
-It is not persisted on Character.
+It is not persisted on Character. `parseRollMode` reads the retired token `superAdvantage` as `advantage`.
 
 ### Roll Outcome
 
