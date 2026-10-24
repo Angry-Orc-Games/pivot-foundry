@@ -197,12 +197,26 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   });
 }
 
-function linkCharacterPrototypeToken(actor: {
-  type?: string;
-  updateSource?: (data: Record<string, unknown>) => unknown;
-}): void {
+function linkCharacterPrototypeToken(
+  actor: {
+    type?: string;
+    updateSource?: (data: Record<string, unknown>) => unknown;
+  },
+  data?: unknown,
+): void {
   if (actor.type !== "character" || !actor.updateSource) return;
+  if (creationSpecifiesActorLink(data)) return;
   actor.updateSource({ "prototypeToken.actorLink": true });
+}
+
+function creationSpecifiesActorLink(data: unknown): boolean {
+  const hasProperty = (
+    globalThis as {
+      foundry?: { utils?: { hasNestedProperty?: (object: unknown, path: string) => boolean } };
+    }
+  ).foundry?.utils?.hasNestedProperty;
+  if (hasProperty) return hasProperty(data, "prototypeToken.actorLink");
+  return hasNestedProperty(data, "prototypeToken.actorLink");
 }
 
 const pivotGlobals = globalThis as PivotGlobals & {

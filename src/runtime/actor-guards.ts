@@ -1,8 +1,10 @@
 import { validAmount } from "../rules/survival";
 import { warn } from "./ui";
 
+const DELETED_MAX = "-=max";
+
 export function guardHpMaximum(
-  actor: { system?: unknown },
+  actor: { system?: unknown; sheet?: { render?: (force?: boolean) => void } },
   changes: Record<string, unknown>,
 ): undefined {
   const max = submittedMax(changes);
@@ -11,15 +13,25 @@ export function guardHpMaximum(
   if (validAmount(max.value) && max.value >= hp) return;
   stripSubmittedMax(changes);
   warn("InvalidMaximum");
+  if (Object.keys(changes).length === 0) actor.sheet?.render?.(false);
 }
 
 function submittedMax(changes: Record<string, unknown>): { present: boolean; value: unknown } {
   if (Object.hasOwn(changes, "system.attributes.hp.max")) {
     return { present: true, value: changes["system.attributes.hp.max"] };
   }
-  const hp = nestedHp(changes);
-  if (hp && Object.hasOwn(hp, "max")) return { present: true, value: hp.max };
-  return { present: false, value: undefined };
+  const grouped = maxOnHp(asRecord(changes["system.attributes.hp"]));
+  if (grouped) return grouped;
+  return maxOnHp(nestedHp(changes)) ?? { present: false, value: undefined };
+}
+
+function maxOnHp(
+  hp: Record<string, unknown> | undefined,
+): { present: boolean; value: unknown } | undefined {
+  if (!hp) return undefined;
+  if (Object.hasOwn(hp, "max")) return { present: true, value: hp.max };
+  if (Object.hasOwn(hp, DELETED_MAX)) return { present: true, value: undefined };
+  return undefined;
 }
 
 function comparedHp(actor: { system?: unknown }, changes: Record<string, unknown>): number {
@@ -29,6 +41,8 @@ function comparedHp(actor: { system?: unknown }, changes: Record<string, unknown
   ) {
     return changes["system.attributes.hp.value"];
   }
+  const grouped = asRecord(changes["system.attributes.hp"]);
+  if (grouped && validAmount(grouped.value)) return grouped.value;
   const hp = nestedHp(changes);
   if (hp && Object.hasOwn(hp, "value") && validAmount(hp.value)) return hp.value;
   return storedHp(actor);
@@ -51,15 +65,20 @@ function stripSubmittedMax(changes: Record<string, unknown>): void {
   if (Object.hasOwn(changes, "system.attributes.hp.max")) {
     delete changes["system.attributes.hp.max"];
   }
+  const grouped = asRecord(changes["system.attributes.hp"]);
+  if (grouped) {
+    delete grouped.max;
+    Reflect.deleteProperty(grouped, DELETED_MAX);
+    if (Object.keys(grouped).length === 0) delete changes["system.attributes.hp"];
+  }
   const system = asRecord(changes.system);
   const attributes = asRecord(system?.attributes);
   const hp = asRecord(attributes?.hp);
-  if (!hp || !Object.hasOwn(hp, "max")) {
-    pruneEmpty(changes, system, attributes);
-    return;
+  if (hp) {
+    delete hp.max;
+    Reflect.deleteProperty(hp, DELETED_MAX);
+    if (attributes && Object.keys(hp).length === 0) delete attributes.hp;
   }
-  delete hp.max;
-  if (attributes && Object.keys(hp).length === 0) delete attributes.hp;
   pruneEmpty(changes, system, attributes);
 }
 

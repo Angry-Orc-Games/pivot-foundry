@@ -755,10 +755,53 @@ async function submitDocumentForm(
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
-  const submitted = normalizeSheetSubmitData(formData.object ?? {});
+  const submitted = expandObject(normalizeSheetSubmitData(formData.object ?? {}));
   const changed = diffSubmitAgainstSource(this.document, submitted);
   if (Object.keys(changed).length === 0) return undefined;
   return this.document?.update?.(changed);
+}
+
+function expandObject(data: Record<string, unknown>): Record<string, unknown> {
+  const expand = foundryUtils()?.expandObject;
+  if (expand) {
+    const expanded = expand(data);
+    return isDataRecord(expanded) ? expanded : {};
+  }
+  const expanded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    setDeep(expanded, key, isDataRecord(value) ? expandObject(value) : value);
+  }
+  return expanded;
+}
+
+function setDeep(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".");
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (!isDataRecord(next)) current[part] = {};
+    current = current[part] as Record<string, unknown>;
+  }
+  const leaf = parts.at(-1);
+  if (leaf) current[leaf] = value;
+}
+
+function foundryUtils():
+  | {
+      diffObject?: (original: unknown, other: unknown) => unknown;
+      expandObject?: (data: Record<string, unknown>) => unknown;
+    }
+  | undefined {
+  return (
+    globalThis as {
+      foundry?: {
+        utils?: {
+          diffObject?: (original: unknown, other: unknown) => unknown;
+          expandObject?: (data: Record<string, unknown>) => unknown;
+        };
+      };
+    }
+  ).foundry?.utils;
 }
 
 function diffSubmitAgainstSource(
@@ -766,11 +809,7 @@ function diffSubmitAgainstSource(
   submitted: Record<string, unknown>,
 ): Record<string, unknown> {
   const source = documentSource(document);
-  const utils = (
-    globalThis as {
-      foundry?: { utils?: { diffObject?: (original: unknown, other: unknown) => unknown } };
-    }
-  ).foundry?.utils;
+  const utils = foundryUtils();
   const diff = utils?.diffObject
     ? utils.diffObject(source, submitted)
     : diffObject(source, submitted);
