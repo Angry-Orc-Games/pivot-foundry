@@ -1,28 +1,99 @@
-.pivot-roll-mode-dialog {
+.pivot-fantasy .pivot-roll-mode-dialog {
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
 }
 
-.pivot-roll-mode-dialog label {
+.pivot-fantasy .pivot-roll-mode-dialog label {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--pf-space-2);
 }
 
+/* Content base and font settings per Pivot Fantasy UI Standard v1.0 */
+.pivot-fantasy .window-content {
+  background: var(--pf-bg);
+  color: var(--pf-ink);
+  font: 14px/1.45 var(--pf-font-body);
+  padding: var(--pf-space-3);
+}
+
+.pivot-fantasy .window-content :is(h1, h2, h3, h4) {
+  font-family: var(--pf-font-display);
+  line-height: 1.2;
+  margin: 0 0 0.4em;
+  border: none;
+}
+
+.pivot-fantasy .window-content h1 {
+  font-size: 1.5rem;
+}
+
+.pivot-fantasy .window-content h2 {
+  font-size: 1.3rem;
+}
+
+.pivot-fantasy .window-content h3 {
+  font-size: 1.1rem;
+  margin-top: 1.2em;
+}
+
+.pivot-fantasy .window-content h4 {
+  font-size: 1rem;
+}
+
+.pivot-fantasy .window-content :is(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+}
+
+/* Focus outline per §7.11 - 2px accent outline on :focus-visible, cancel core glow */
+.pivot-fantasy
+  :is(
+    .pivot-sheet-button,
+    .pivot-mod,
+    .pivot-ability > button,
+    .pivot-skill-row button,
+    .rollable,
+    input,
+    select,
+    textarea,
+    summary,
+    a
+  ):focus-visible {
+  outline: var(--pf-focus-outline);
+  outline-offset: var(--pf-focus-offset);
+}
+
+.pivot-fantasy :is(.pivot-sheet-button, input, select, textarea):is(:focus, :focus-visible) {
+  box-shadow: none;
+}
+
+.pivot-fantasy :is(.pivot-sheet-button, input, select, textarea):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Disabled state per §7.11 */
+.pivot-fantasy :is(button, input, select, textarea):disabled,
+.pivot-fantasy [aria-disabled="true"] {
+  opacity: var(--pf-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* Legacy variable mapping - keep for now (ticket 2 will rename classes) */
 .pivot-fantasy.sheet {
-  --pivot-ink: #19202a;
-  --pivot-blue: #073858;
-  --pivot-gold: #b78315;
-  --pivot-paper: #f1eadb;
-  --pivot-paper-deep: #e1d5bf;
-  --pivot-line: #8a7b68;
-  color: var(--pivot-ink);
+  --pivot-ink: var(--pf-ink);
+  --pivot-blue: var(--pf-accent);
+  --pivot-gold: var(--pf-accent);
+  --pivot-paper: var(--pf-bg);
+  --pivot-paper-deep: var(--pf-line);
+  --pivot-line: var(--pf-line);
+  color: var(--pf-ink);
 }
 
 .pivot-character-sheet,
 .pivot-item-sheet {
-  background: var(--pivot-paper);
-  padding: 14px;
+  background: var(--pf-bg);
+  padding: var(--pf-space-3);
 }
 
 .pivot-fantasy.sheet.actor .window-content {
@@ -52,42 +123,42 @@
 
 .pivot-sheet-header {
   align-items: end;
-  background: var(--pivot-blue);
-  border-bottom: 3px solid var(--pivot-gold);
-  color: white;
+  background: var(--pf-accent);
+  border-bottom: 3px solid var(--pf-accent);
+  color: var(--pf-accent-ink);
   display: grid;
-  gap: 16px;
+  gap: var(--pf-space-4);
   grid-template-columns: minmax(0, 1fr) auto;
-  margin: -14px -14px 12px;
-  padding: 18px 20px 16px;
+  margin: calc(-1 * var(--pf-space-3)) calc(-1 * var(--pf-space-3)) var(--pf-space-3);
+  padding: var(--pf-space-4) 20px var(--pf-space-4);
 }
 
 .pivot-sheet-header.compact {
-  margin-bottom: 16px;
+  margin-bottom: var(--pf-space-4);
 }
 
 .pivot-title-block label,
 .pivot-header-stats span,
 .pivot-panel h2,
 .pivot-tabs a {
-  color: var(--pivot-blue);
-  font-family: Georgia, "Times New Roman", serif;
+  color: var(--pf-accent);
+  font-family: var(--pf-font-body);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .pivot-sheet-header .pivot-title-block label,
 .pivot-sheet-header .pivot-header-stats span {
-  color: #f8d37d;
+  color: var(--pf-accent-ink);
   font-size: 12px;
 }
 
-.pivot-title-block input {
-  background: transparent;
+.pivot-fantasy .pivot-sheet-header .pivot-title-block input {
+  background: var(--pf-accent);
   border: 0;
-  border-bottom: 1px solid currentColor;
-  color: inherit;
-  font-family: Georgia, "Times New Roman", serif;
+  border-bottom: 1px solid var(--pf-accent-ink);
+  color: var(--pf-accent-ink);
+  font-family: var(--pf-font-display);
   font-size: 28px;
   font-weight: 700;
   width: 100%;
@@ -95,21 +166,18 @@
 
 .pivot-header-stats {
   display: grid;
-  gap: 12px;
+  gap: var(--pf-space-3);
   grid-template-columns: 84px 120px;
 }
 
-.pivot-header-stats input {
-  background: #fff8ea;
-  border-color: #f8d37d;
-  color: var(--pivot-ink);
+.pivot-fantasy .pivot-sheet-header .pivot-header-stats input {
+  -webkit-text-fill-color: var(--pf-accent-ink);
+  background: var(--pf-accent);
+  border: 1px solid var(--pf-accent-ink);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-accent-ink);
   font-weight: 700;
   text-align: center;
-}
-
-.pivot-header-stats input:focus {
-  outline: 2px solid #f8d37d;
-  outline-offset: 1px;
 }
 
 .pivot-abilities-panel {
@@ -117,12 +185,12 @@
 }
 
 .pivot-tabs {
-  border-bottom: 1px solid var(--pivot-line);
+  border-bottom: 1px solid var(--pf-line);
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--pf-space-1);
   flex: 0 0 auto;
-  margin-bottom: 12px;
+  margin-bottom: var(--pf-space-3);
 }
 
 .pivot-tabs a {
@@ -134,9 +202,9 @@
 }
 
 .pivot-tabs a.active {
-  background: #fff8ea;
-  border-color: var(--pivot-line);
-  color: var(--pivot-ink);
+  background: var(--pf-panel);
+  border-color: var(--pf-line);
+  color: var(--pf-ink);
 }
 
 .pivot-tab-body .tab {
@@ -151,34 +219,34 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: var(--pf-space-1);
 }
 
 .pivot-grid.two {
   display: grid;
-  gap: 12px;
+  gap: var(--pf-space-3);
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .pivot-panel {
-  border: 1px solid var(--pivot-line);
-  border-radius: 6px;
-  margin-bottom: 12px;
-  padding: 12px;
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
+  margin-bottom: var(--pf-space-3);
+  padding: var(--pf-space-3);
 }
 
 .pivot-panel h2 {
-  border-bottom: 2px solid var(--pivot-blue);
+  border-bottom: 2px solid var(--pf-accent);
   font-size: 15px;
-  margin: 0 0 10px;
-  padding-bottom: 4px;
+  margin: 0 0 var(--pf-space-2);
+  padding-bottom: var(--pf-space-1);
 }
 
 .pivot-field-grid,
 .pivot-resource-grid,
 .pivot-currency {
   display: grid;
-  gap: 10px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -187,14 +255,14 @@
 .pivot-currency label,
 .pivot-wide-field {
   display: grid;
-  gap: 4px;
+  gap: var(--pf-space-1);
 }
 
 .pivot-field-grid span,
 .pivot-resource-grid span,
 .pivot-currency span,
 .pivot-wide-field span {
-  color: var(--pivot-blue);
+  color: var(--pf-accent);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -202,29 +270,30 @@
 
 .pivot-stat-strip {
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-  margin-bottom: 12px;
+  margin-bottom: var(--pf-space-3);
 }
 
 .pivot-stat {
   align-content: center;
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 6px;
+  background: var(--pf-panel);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
   display: grid;
   min-height: 62px;
-  padding: 8px;
+  padding: var(--pf-space-2);
   text-align: center;
 }
 
 .pivot-stat span {
-  color: var(--pivot-blue);
+  color: var(--pf-accent);
   font-size: 10px;
   text-transform: uppercase;
 }
 
 .pivot-stat strong {
+  font-family: var(--pf-font-display);
   font-size: 21px;
 }
 
@@ -235,7 +304,7 @@
 .pivot-resource-actions {
   align-items: center;
   display: grid;
-  gap: 6px;
+  gap: var(--pf-space-1);
   grid-column: 1 / -1;
   grid-template-columns: 32px 1fr 32px;
 }
@@ -246,47 +315,47 @@
 
 .pivot-vitality,
 .pivot-survival {
-  border-top: 1px solid var(--pivot-paper-deep);
-  margin-top: 12px;
-  padding-top: 12px;
+  border-top: 1px solid var(--pf-line);
+  margin-top: var(--pf-space-3);
+  padding-top: var(--pf-space-3);
 }
 
 .pivot-vitality h3,
 .pivot-survival h3 {
-  color: var(--pivot-blue);
-  font-family: Georgia, "Times New Roman", serif;
+  color: var(--pf-accent);
+  font-family: var(--pf-font-body);
   font-size: 13px;
   letter-spacing: 0.04em;
-  margin: 0 0 8px;
+  margin: 0 0 var(--pf-space-2);
   text-transform: uppercase;
 }
 
 .pivot-vitality-grid {
   display: grid;
-  gap: 10px;
+  gap: var(--pf-space-2);
 }
 
 .pivot-meter-block {
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 6px;
+  background: var(--pf-panel);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
   display: grid;
-  gap: 8px;
-  padding: 10px;
+  gap: var(--pf-space-2);
+  padding: var(--pf-space-2);
 }
 
 .pivot-meter-heading {
   align-items: baseline;
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--pf-space-2);
 }
 
 .pivot-meter-heading span,
 .pivot-hit-die span,
 .pivot-temp-hp span,
 .pivot-death-track span {
-  color: var(--pivot-blue);
+  color: var(--pf-accent);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -294,12 +363,13 @@
 
 .pivot-meter-heading strong,
 .pivot-temp-hp strong {
+  font-family: var(--pf-font-display);
   font-size: 18px;
 }
 
 .pivot-meter {
-  background: var(--pivot-paper-deep);
-  border-radius: 999px;
+  background: var(--pf-chip);
+  border-radius: var(--pf-radius-pill);
   height: 10px;
   overflow: hidden;
 }
@@ -310,23 +380,23 @@
 }
 
 .pivot-meter-fill.hp {
-  background: #8a2a2a;
+  background: var(--pf-bad);
 }
 
 .pivot-meter-fill.pool {
-  background: var(--pivot-gold);
+  background: var(--pf-accent);
 }
 
 .pivot-meter-fields {
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .pivot-meter-fields label,
 .pivot-hit-die {
   display: grid;
-  gap: 4px;
+  gap: var(--pf-space-1);
 }
 
 .pivot-pool-value {
@@ -334,40 +404,45 @@
   text-align: center;
 }
 
-.pivot-resource-actions button {
-  background: var(--pivot-blue);
-  border: 1px solid var(--pivot-gold);
-  border-radius: 4px;
-  color: #fff8ea;
+.pivot-fantasy .pivot-resource-actions button {
+  background: var(--pf-accent);
+  border: 1px solid var(--pf-accent-ink);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-accent-ink);
   font-weight: 700;
   min-height: 32px;
 }
 
 .pivot-sheet-button {
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 4px;
-  color: var(--pivot-blue);
-  font-family: Georgia, "Times New Roman", serif;
+  background: var(--pf-panel);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-accent);
+  font-family: var(--pf-font-body);
   font-size: 12px;
   font-weight: 700;
   min-height: 34px;
-  padding: 6px 10px;
+  padding: var(--pf-space-1) var(--pf-space-2);
   text-align: center;
 }
 
-.pivot-sheet-button.primary {
-  background: var(--pivot-blue);
-  border-color: var(--pivot-gold);
-  color: #fff8ea;
+.pivot-fantasy .pivot-sheet-button.primary {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: var(--pf-accent-ink);
+}
+
+.pivot-sheet-button.primary:hover {
+  background: var(--pf-accent-hover);
+  border-color: var(--pf-accent-hover);
 }
 
 .pivot-survival-header {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: var(--pf-space-2);
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: var(--pf-space-2);
 }
 
 .pivot-survival-header h3 {
@@ -375,82 +450,82 @@
 }
 
 .pivot-status {
-  border-radius: 999px;
+  border-radius: var(--pf-radius-pill);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 4px 10px;
+  padding: var(--pf-space-1) var(--pf-space-2);
   text-transform: uppercase;
 }
 
 .pivot-status.alive {
-  background: #d7ead0;
-  color: #215c2a;
+  background: var(--pf-good-soft);
+  color: var(--pf-good);
 }
 
 .pivot-status.dying {
-  background: #f3d0c8;
-  color: #7a1f14;
+  background: var(--pf-bad-soft);
+  color: var(--pf-bad);
 }
 
 .pivot-status.stable {
-  background: #efe3c4;
-  color: #6a4a12;
+  background: var(--pf-warn-soft);
+  color: var(--pf-warn);
 }
 
 .pivot-status.dead,
 .pivot-status.unconfirmed {
-  background: #d9d4ce;
-  color: #3a3330;
+  background: var(--pf-chip);
+  color: var(--pf-muted);
 }
 
 .pivot-temp-hp {
   align-items: baseline;
   display: flex;
-  gap: 8px;
+  gap: var(--pf-space-2);
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: var(--pf-space-2);
 }
 
 .pivot-rest-actions,
 .pivot-survival-actions {
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-bottom: 10px;
+  margin-bottom: var(--pf-space-2);
 }
 
 .pivot-survival-note {
-  color: var(--pivot-line);
+  color: var(--pf-muted);
   font-size: 12px;
-  margin: 10px 0 0;
+  margin: var(--pf-space-2) 0 0;
 }
 
 .pivot-death-saves {
   align-items: stretch;
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 6px;
+  background: var(--pf-panel);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
   display: grid;
-  gap: 10px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 10px;
+  padding: var(--pf-space-2);
 }
 
 .pivot-death-track {
   display: grid;
-  gap: 6px;
+  gap: var(--pf-space-1);
   justify-items: center;
 }
 
 .pivot-pips {
   display: flex;
-  gap: 6px;
+  gap: var(--pf-space-1);
 }
 
 .pivot-pip {
   background: transparent;
-  border: 2px solid var(--pivot-blue);
+  border: 2px solid var(--pf-accent);
   border-radius: 50%;
   box-sizing: border-box;
   display: inline-block;
@@ -459,13 +534,13 @@
 }
 
 .pivot-pip.success.filled {
-  background: var(--pivot-gold);
-  border-color: var(--pivot-gold);
+  background: var(--pf-good);
+  border-color: var(--pf-good);
 }
 
 .pivot-pip.failure.filled {
-  background: #8a2a2a;
-  border-color: #8a2a2a;
+  background: var(--pf-bad);
+  border-color: var(--pf-bad);
 }
 
 .pivot-resource-actions button,
@@ -485,7 +560,7 @@
 
 .pivot-abilities {
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(6, minmax(110px, 1fr));
 }
 
@@ -528,17 +603,17 @@
 }
 
 .pivot-ability {
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 6px;
+  background: var(--pf-panel);
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius-md);
   display: grid;
-  gap: 4px;
+  gap: var(--pf-space-1);
   grid-template-areas:
     "name name"
     "score mod"
     "primary primary";
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  padding: 6px;
+  padding: var(--pf-space-1);
 }
 
 .pivot-ability > button:first-child {
@@ -549,7 +624,7 @@
 .pivot-ability > label:has(input[type="number"]) {
   align-items: center;
   display: flex;
-  gap: 4px;
+  gap: var(--pf-space-1);
   grid-area: score;
   min-width: 0;
 }
@@ -584,8 +659,8 @@
 .pivot-ability > button:first-child {
   background: transparent;
   border: 0;
-  color: var(--pivot-blue);
-  font-family: Georgia, "Times New Roman", serif;
+  color: var(--pf-accent);
+  font-family: var(--pf-font-body);
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -593,14 +668,14 @@
 .pivot-check {
   align-items: center;
   display: flex;
-  gap: 6px;
+  gap: var(--pf-space-1);
 }
 
 .pivot-check input[type="checkbox"] {
   appearance: none;
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 4px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: var(--pf-radius-sm);
   box-sizing: border-box;
   display: grid;
   flex: 0 0 18px;
@@ -611,7 +686,7 @@
 }
 
 .pivot-check input[type="checkbox"]::before {
-  box-shadow: inset 1em 1em var(--pivot-gold);
+  box-shadow: inset 1em 1em var(--pf-accent);
   clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 19%, 86% 6%, 36% 70%);
   content: "";
   height: 12px;
@@ -624,39 +699,32 @@
   transform: scale(1);
 }
 
-.pivot-check input[type="checkbox"]:focus-visible {
-  outline: 2px solid #2f6fed;
-  outline-offset: 2px;
-}
-
-.pivot-check input[type="checkbox"]:disabled {
-  opacity: 0.65;
-}
-
 .pivot-check.compact span {
   font-size: 10px;
 }
 
 .pivot-mod {
-  border: 2px solid var(--pivot-blue);
-  border-radius: 999px;
+  background: var(--pf-panel);
+  border: 2px solid var(--pf-accent);
+  border-radius: var(--pf-radius-pill);
+  color: var(--pf-ink);
   font-size: 12px;
   font-weight: 700;
   min-height: 28px;
-  padding: 2px 4px;
+  padding: 2px var(--pf-space-1);
   white-space: nowrap;
 }
 
 .pivot-skill-list {
   display: grid;
-  gap: 4px;
+  gap: var(--pf-space-1);
 }
 
 .pivot-skill-row {
   align-items: center;
-  border-bottom: 1px solid var(--pivot-paper-deep);
+  border-bottom: 1px solid var(--pf-line);
   display: grid;
-  gap: 6px;
+  gap: var(--pf-space-1);
   grid-template-columns: minmax(0, 1fr) 30px 42px 42px 64px 40px;
   min-height: 32px;
 }
@@ -678,34 +746,34 @@
 }
 
 .pivot-skill-ability {
-  color: var(--pivot-line);
+  color: var(--pf-muted);
   font-size: 11px;
   text-align: center;
 }
 
 .pivot-check-grid {
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .pivot-section-header {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: var(--pf-space-2);
   justify-content: space-between;
 }
 
 .pivot-table {
   display: grid;
-  gap: 3px;
+  gap: var(--pf-space-1);
 }
 
 .pivot-table-head,
 .pivot-table-row {
   align-items: center;
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
 }
 
 .pivot-weapon-table .pivot-table-head,
@@ -721,22 +789,22 @@
 }
 
 .pivot-table-head {
-  border-bottom: 1px solid var(--pivot-blue);
-  color: var(--pivot-blue);
+  border-bottom: 1px solid var(--pf-accent);
+  color: var(--pf-accent);
   font-size: 11px;
   text-transform: uppercase;
 }
 
 .pivot-table-row {
-  border-bottom: 1px solid var(--pivot-paper-deep);
+  border-bottom: 1px solid var(--pf-line);
   min-height: 34px;
 }
 
 .pivot-list-item {
   align-items: center;
-  border-bottom: 1px solid var(--pivot-paper-deep);
+  border-bottom: 1px solid var(--pf-line);
   display: grid;
-  gap: 8px;
+  gap: var(--pf-space-2);
   grid-template-columns: minmax(0, 1fr) auto repeat(2, 32px);
   min-height: 34px;
 }
@@ -748,7 +816,7 @@
 .pivot-item-name {
   background: transparent;
   border: 0;
-  color: var(--pivot-blue);
+  color: var(--pf-accent);
   cursor: pointer;
   font-weight: 700;
   overflow: hidden;
@@ -759,13 +827,13 @@
 }
 
 .pivot-breakdown {
-  color: var(--pivot-line);
+  color: var(--pf-muted);
   font-size: 12px;
-  margin: 0 0 8px;
+  margin: 0 0 var(--pf-space-2);
 }
 
 .pivot-item-type {
-  color: #f8d37d;
+  color: var(--pf-accent-ink);
   font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
@@ -784,16 +852,16 @@
 .pivot-item-sheet input,
 .pivot-item-sheet select,
 .pivot-item-sheet textarea {
-  background: #fff8ea;
-  border: 1px solid var(--pivot-line);
-  border-radius: 4px;
-  color: var(--pivot-ink);
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-ink);
   min-width: 0;
 }
 
 .pivot-effects-list {
   display: grid;
-  gap: 6px;
+  gap: var(--pf-space-1);
   margin: 0;
   padding-left: 1.25rem;
 }
@@ -801,7 +869,7 @@
 .pivot-effects-list li {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--pf-space-2);
 }
 
 .pivot-effect-type {
