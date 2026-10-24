@@ -510,78 +510,63 @@ describe("sheet interaction helpers", () => {
   });
 });
 
-describe("sheet edits survive a stale prepared copy", () => {
-  it("reopens a linked actor from persisted source, not the stale system", () => {
-    const actor = linkedActor();
-    const context = prepareCharacterSheetContext(actor);
-
-    expect(persistedView(context)).toEqual({
-      name: "Renamed Hera",
-      level: 4,
-      hp: 12,
-      hpPercent: 43,
-      equipment: ["Rope"],
-      features: ["Alert"],
-    });
-  });
-
-  it("keeps a linked edit after submit when prepared data is not refreshed", async () => {
-    const actor = linkedActor();
+describe("sheet edits follow update and prepareData", () => {
+  it("keeps a linked edit on prepared data after submit and render", async () => {
+    const actor = preparedActor(
+      characterSource({
+        name: "Hera",
+        level: 4,
+        hp: 12,
+        pool: 3,
+        dex: 14,
+        items: [ropeItem(), alertItem()],
+      }),
+    );
     const sheet = Object.assign(Object.create(sheetClass().prototype), { document: actor });
     await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
       object: { system: { progression: { level: 5 } } },
     });
 
-    expect(persistedView(prepareCharacterSheetContext(actor))).toMatchObject({
+    expect(sheetView(await openSheet(sheet))).toEqual({
+      name: "Hera",
       level: 5,
       hp: 12,
+      hpPercent: 43,
+      initiative: 3,
+      dexMod: 3,
       equipment: ["Rope"],
       features: ["Alert"],
     });
-    expect(actor.source.system.resources.pool.value).toBe(3);
+    expect(actor.source.system.abilities.dex.score).toBe(14);
+    expect(actor.source.system.progression.level).toBe(5);
   });
 
-  it("writes a pool change from persisted pool value, not the stale prepared value", async () => {
-    const actor = linkedActor();
-    const sheet = Object.assign(Object.create(sheetClass().prototype), { document: actor });
+  it("writes an unlinked token submit through the token actor, then renders its prepared data", async () => {
+    const { base, tokenActor, sheet } = unlinkedPair();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: { system: { progression: { level: 6 } } },
+    });
+
+    expect(sheetView(await openSheet(sheet))).toEqual({
+      name: "Token Hera",
+      level: 6,
+      hp: 9,
+      hpPercent: 32,
+      initiative: 3,
+      dexMod: 3,
+      equipment: ["Rope"],
+      features: ["Alert"],
+    });
+    expect(tokenActor.source.system.progression.level).toBe(6);
+    expect(base.source.system.progression.level).toBe(1);
+    expect(base.updates).toEqual([]);
+  });
+
+  it("changes pool, gear, and feats on the unlinked token actor", async () => {
+    const { base, tokenActor, sheet } = unlinkedPair();
     await sheetClass().DEFAULT_OPTIONS.actions.adjustResource.call(sheet, click(), {
       dataset: { path: "resources.pool.value", delta: "1" },
     } as unknown as HTMLElement);
-
-    expect(actor.source.system.resources.pool.value).toBe(4);
-    expect(persistedView(prepareCharacterSheetContext(actor)).hp).toBe(12);
-  });
-
-  it("reopens an unlinked token actor from its own persisted delta", async () => {
-    const { base, tokenActor, sheet } = unlinkedPair();
-    const context = await openSheet(sheet);
-
-    expect(persistedView(context)).toEqual({
-      name: "Token Hera",
-      level: 4,
-      hp: 9,
-      hpPercent: 32,
-      equipment: ["Rope"],
-      features: ["Alert"],
-    });
-    expect(base.updates).toEqual([]);
-    expect(tokenActor.updates).toEqual([]);
-  });
-
-  it("keeps token edits on the unlinked actor across submit, delete, and create", async () => {
-    const { base, tokenActor, sheet } = unlinkedPair();
-    const handler = sheetClass().DEFAULT_OPTIONS.form.handler;
-    await handler.call(sheet, click(), {} as HTMLFormElement, {
-      object: { system: { progression: { level: 6 } } },
-    });
-    const afterLevel = await openSheet(sheet);
-    expect(persistedView(afterLevel)).toMatchObject({
-      level: 6,
-      hp: 9,
-      equipment: ["Rope"],
-      features: ["Alert"],
-    });
-
     await sheetClass().DEFAULT_OPTIONS.actions.deleteItem.call(sheet, click(), {
       dataset: { itemId: "alert" },
     } as unknown as HTMLElement);
@@ -589,16 +574,16 @@ describe("sheet edits survive a stale prepared copy", () => {
       dataset: { type: "equipment" },
     } as unknown as HTMLElement);
 
-    expect(persistedView(await openSheet(sheet))).toEqual({
+    expect(sheetView(await openSheet(sheet))).toMatchObject({
       name: "Token Hera",
-      level: 6,
+      level: 4,
       hp: 9,
-      hpPercent: 32,
       equipment: ["Rope", "New Equipment"],
       features: [],
     });
+    expect(tokenActor.source.system.resources.pool.value).toBe(3);
     expect(base.updates).toEqual([]);
-    expect(tokenActor.updates).toEqual([{ system: { progression: { level: 6 } } }]);
+    expect(base.source.items).toEqual([]);
   });
 });
 
@@ -606,16 +591,19 @@ function click() {
   return { preventDefault() {} } as PointerEvent;
 }
 
-function persistedView(context: CharacterSheetContext & { name?: string }) {
+function sheetView(context: CharacterSheetContext) {
   const system = context.system as {
     progression?: { level?: number };
     attributes?: { hp?: { value?: number } };
+    initiative?: number;
   };
   return {
-    name: context.name,
+    name: context.actor.name,
     level: system.progression?.level,
     hp: system.attributes?.hp?.value,
     hpPercent: context.hpPercent,
+    initiative: system.initiative,
+    dexMod: context.derived.abilities.dex.mod,
     equipment: context.items.equipment.map((item) => item.name),
     features: context.items.features.map((item) => item.name),
   };
@@ -648,71 +636,27 @@ function openSheet(sheet: object) {
   return sheetClass().prototype._prepareContext.call(sheet, {});
 }
 
-function linkedActor() {
-  const source = characterSource({
-    name: "Renamed Hera",
-    level: 4,
-    hp: 12,
-    pool: 3,
-    items: [ropeItem(), alertItem()],
-  });
-  const actor = {
-    name: "Hera",
-    type: "character",
-    system: staleSystem(),
-    items: [] as ItemLike[],
-    source,
-    toObject() {
-      return structuredClone(source);
-    },
-    async update(data: Record<string, unknown>) {
-      mergeUpdate(source, data);
-    },
-  };
-  return actor;
-}
-
 function unlinkedPair() {
-  const source = characterSource({
-    name: "Token Hera",
-    level: 4,
-    hp: 9,
-    pool: 2,
-    items: [ropeItem(), alertItem()],
-  });
-  const updates: Record<string, unknown>[] = [];
-  const tokenActor = {
-    name: "Token Stale",
-    type: "character",
-    system: staleSystem(),
-    items: [] as ItemLike[],
-    updates,
-    toObject() {
-      return structuredClone(source);
-    },
-    async update(data: Record<string, unknown>) {
-      updates.push(structuredClone(data));
-      mergeUpdate(source, data);
-    },
-    async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
-      const created = data.map((entry) => ({ ...entry, _id: "created-gear" }));
-      source.items.push(...created);
-      return created;
-    },
-    async deleteEmbeddedDocuments(_type: string, ids: string[]) {
-      source.items = source.items.filter((item) => !ids.includes(String(item._id)));
-    },
-  };
-  const base = {
-    name: "Base Hera",
-    type: "character",
-    system: staleSystem(),
-    items: [] as ItemLike[],
-    updates: [] as string[],
-    async update() {
-      base.updates.push("base");
-    },
-  };
+  const base = preparedActor(
+    characterSource({
+      name: "Base Hera",
+      level: 1,
+      hp: 28,
+      pool: 0,
+      dex: 10,
+      items: [],
+    }),
+  );
+  const tokenActor = preparedActor(
+    characterSource({
+      name: "Token Hera",
+      level: 4,
+      hp: 9,
+      pool: 2,
+      dex: 14,
+      items: [ropeItem(), alertItem()],
+    }),
+  );
   const sheet = Object.assign(Object.create(sheetClass().prototype), {
     document: base,
     token: { actorLink: false as const, actor: tokenActor },
@@ -720,13 +664,72 @@ function unlinkedPair() {
   return { base, tokenActor, sheet };
 }
 
+function preparedActor(source: ActorSource) {
+  const updates: Record<string, unknown>[] = [];
+  const actor = {
+    name: source.name,
+    type: source.type,
+    system: structuredClone(source.system) as ActorSource["system"] & { initiative?: number },
+    items: [] as ItemLike[],
+    updates,
+    source,
+    prepareData() {
+      const system = structuredClone(source.system);
+      system.abilities.dex.score = source.system.abilities.dex.score + 2;
+      actor.name = source.name;
+      actor.system = Object.assign(system, { initiative: 3 });
+      actor.items = source.items.map((item) => ({
+        id: item._id,
+        name: item.name,
+        type: item.type,
+        system: structuredClone(item.system),
+      }));
+    },
+    async update(data: Record<string, unknown>) {
+      updates.push(structuredClone(data));
+      mergeUpdate(source as unknown as Record<string, unknown>, data);
+      actor.prepareData();
+    },
+    async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
+      const created = data.map((entry) => ({
+        _id: "created-gear",
+        name: String(entry.name ?? "New Item"),
+        type: String(entry.type ?? "equipment"),
+        system: {},
+      }));
+      source.items.push(...created);
+      actor.prepareData();
+      return created;
+    },
+    async deleteEmbeddedDocuments(_type: string, ids: string[]) {
+      source.items = source.items.filter((item) => !ids.includes(item._id));
+      actor.prepareData();
+    },
+  };
+  actor.prepareData();
+  return actor;
+}
+
+interface ActorSource {
+  name: string;
+  type: "character";
+  system: {
+    progression: { level: number };
+    attributes: { hp: { value: number; max: number; temp: number } };
+    resources: { pool: { value: number; maxBonus: number } };
+    abilities: { dex: { score: number; primary: boolean } };
+  };
+  items: Array<{ _id: string; name: string; type: string; system: Record<string, unknown> }>;
+}
+
 function characterSource(input: {
   name: string;
   level: number;
   hp: number;
   pool: number;
-  items: Array<Record<string, unknown>>;
-}) {
+  dex: number;
+  items: ActorSource["items"];
+}): ActorSource {
   return {
     name: input.name,
     type: "character",
@@ -734,16 +737,9 @@ function characterSource(input: {
       progression: { level: input.level },
       attributes: { hp: { value: input.hp, max: 28, temp: 0 } },
       resources: { pool: { value: input.pool, maxBonus: 0 } },
+      abilities: { dex: { score: input.dex, primary: false } },
     },
     items: input.items,
-  };
-}
-
-function staleSystem() {
-  return {
-    progression: { level: 1 },
-    attributes: { hp: { value: 28, max: 28, temp: 0 } },
-    resources: { pool: { value: 0, maxBonus: 0 } },
   };
 }
 

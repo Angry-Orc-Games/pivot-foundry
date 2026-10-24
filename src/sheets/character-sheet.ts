@@ -37,7 +37,6 @@ import {
   recoverPoolOnLongRest,
   spendBoundedResource,
 } from "../rules/resources";
-import { readPersistedDocument } from "./document-source";
 
 const CHARACTER_TEMPLATE = `systems/${SYSTEM_ID}/templates/actors/character-sheet.hbs`;
 
@@ -108,7 +107,6 @@ export interface CombatLike {
 
 export interface CharacterSheetContext {
   actor: ActorLike;
-  name: string;
   survivalLabel: string;
   survivalStatus: string;
   hpPercent: number;
@@ -265,9 +263,8 @@ export function prepareCharacterSheetContext(
   actor: ActorLike,
   editable = true,
 ): CharacterSheetContext {
-  const persisted = readPersistedDocument(actor);
-  const system = persisted.system;
-  const itemList = persisted.items ?? getActorItems(actor);
+  const system = actor.system ?? {};
+  const itemList = getActorItems(actor);
   const armour = itemList.filter((item) => item.type === "armour");
   const equipment = itemList.filter((item) =>
     ["equipment", "weapon", "armour"].includes(item.type),
@@ -354,15 +351,10 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = readSurvival({
-    name: persisted.name ?? actor.name,
-    type: actor.type,
-    system,
-  });
+  const survival = readSurvival(actor);
 
   return {
     actor,
-    name: persisted.name ?? actor.name,
     survivalLabel: `PIVOT.Survival.${survival.status}`,
     survivalStatus: survival.status,
     hpPercent: fillPercent(survival.hp, survival.max),
@@ -745,25 +737,20 @@ export function createEmbeddedItemData(type: string): Record<string, unknown> {
 }
 
 function getSheetDocument(sheet: object): ActorLike {
-  const candidate = sheet as {
-    document?: ActorLike;
-    actor?: ActorLike;
-    token?: { actorLink?: boolean; actor?: ActorLike | null };
-  };
-  if (candidate.token?.actorLink === false && candidate.token.actor) return candidate.token.actor;
+  const candidate = sheet as { document?: ActorLike; actor?: ActorLike };
   const actor = candidate.document ?? candidate.actor;
   if (!actor) throw new Error("PivotCharacterSheet requires an Actor document.");
   return actor;
 }
 
 async function submitDocumentForm(
-  this: object,
+  this: { document?: { update?: (data: Record<string, unknown>) => Promise<unknown> } },
   _event: Event,
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
   const data = normalizeSheetSubmitData(formData.object ?? {});
-  return getSheetDocument(this).update?.(data);
+  return this.document?.update?.(data);
 }
 
 export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
@@ -826,7 +813,7 @@ async function rollAction(
   target: HTMLElement,
 ): Promise<void> {
   event.preventDefault();
-  const actor = getSheetDocument(this);
+  const actor = this.document ?? getSheetDocument(this);
   const context = prepareCharacterSheetContext(actor);
   const request = resolveSheetRoll(target, context);
   if (!request) return;
@@ -952,11 +939,11 @@ async function adjustResourceAction(
   target: HTMLElement,
 ): Promise<void> {
   event.preventDefault();
-  const actor = getSheetDocument(this);
+  const actor = this.document ?? getSheetDocument(this);
   const path = target.dataset.path;
   const delta = Number(target.dataset.delta ?? 0);
   if (!path || !Number.isFinite(delta)) return;
-  const current = numberAt(readPersistedDocument(actor).system, path.split("."), 0);
+  const current = numberAt(actor.system, path.split("."), 0);
   const poolMax = prepareCharacterSheetContext(actor).derived.pool.max;
   await actor.update?.({
     [`system.${path}`]: nextResourceValue(path, current, delta, poolMax),
@@ -968,8 +955,8 @@ async function recoverPoolLongRestAction(
   event: PointerEvent,
 ): Promise<void> {
   event.preventDefault();
-  const actor = getSheetDocument(this);
-  const current = numberAt(readPersistedDocument(actor).system, ["resources", "pool", "value"], 0);
+  const actor = this.document ?? getSheetDocument(this);
+  const current = numberAt(actor.system, ["resources", "pool", "value"], 0);
   const poolMax = prepareCharacterSheetContext(actor).derived.pool.max;
   const next = recoverPoolOnLongRest(current, poolMax);
   if (next === current) {
@@ -988,7 +975,7 @@ async function createItemAction(
   const type = target.dataset.type;
   if (!type) return;
   const [item] =
-    ((await getSheetDocument(this).createEmbeddedDocuments?.("Item", [
+    ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
       createEmbeddedItemData(type),
     ])) as ItemLike[] | undefined) ?? [];
   item?.sheet?.render?.(true);
@@ -1002,7 +989,9 @@ async function openItemAction(
   event.preventDefault();
   const id = target.dataset.itemId;
   if (!id) return;
-  const item = getActorItems(getSheetDocument(this)).find((item) => item.id === id);
+  const item = getActorItems(this.document ?? getSheetDocument(this)).find(
+    (item) => item.id === id,
+  );
   item?.sheet?.render?.(true);
 }
 
@@ -1014,7 +1003,7 @@ async function deleteItemAction(
   event.preventDefault();
   const id = target.dataset.itemId;
   if (!id) return;
-  await getSheetDocument(this).deleteEmbeddedDocuments?.("Item", [id]);
+  await (this.document ?? getSheetDocument(this)).deleteEmbeddedDocuments?.("Item", [id]);
 }
 
 function getActorItems(actor: ActorLike): ItemLike[] {

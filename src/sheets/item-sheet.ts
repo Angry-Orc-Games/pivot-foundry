@@ -1,7 +1,6 @@
 import { armourCategories, featureCategories, SYSTEM_ID, weaponCategories } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { describeEffectRule, parseStoredEffect, type EffectRule } from "../rules/effects";
-import { readPersistedDocument, type StoredDocument } from "./document-source";
 
 const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 
@@ -77,35 +76,29 @@ export function createPivotItemSheetClass(foundry: FoundryRuntime): TypeDataMode
 
 export function itemWindowTitle(sheet: object): string {
   const candidate = sheet as {
-    document?: StoredDocument;
-    item?: StoredDocument;
+    document?: { name?: unknown };
+    item?: { name?: unknown };
   };
-  const document = candidate.document ?? candidate.item;
-  if (!document) return "";
-  const name = readPersistedDocument(document).name;
+  const name = candidate.document?.name ?? candidate.item?.name;
   return typeof name === "string" ? name.trim() : "";
 }
 
 export function prepareItemSheetContext(
-  document: { name: string; type: string; system: Record<string, unknown> } & StoredDocument,
+  document: { name: string; type: string; system: Record<string, unknown> },
   editable = true,
 ): ItemSheetContext {
-  const persisted = readPersistedDocument(document);
-  const name = persisted.name ?? document.name;
-  const type = persisted.type ?? document.type;
-  const system = persisted.system;
   const disabledAttr = editable ? "" : "disabled";
   return {
-    item: { name, type, system },
-    system,
+    item: document,
+    system: document.system ?? {},
     disabledAttr,
-    isWeapon: type === "weapon",
-    isArmour: type === "armour",
-    isEquipment: type === "equipment",
-    isFeature: type === "feature",
-    isMagicStream: type === "magicStream",
-    isMagicAbility: type === "magicAbility",
-    effects: readOnlyEffectRows(system),
+    isWeapon: document.type === "weapon",
+    isArmour: document.type === "armour",
+    isEquipment: document.type === "equipment",
+    isFeature: document.type === "feature",
+    isMagicStream: document.type === "magicStream",
+    isMagicAbility: document.type === "magicAbility",
+    effects: readOnlyEffectRows(document.system),
     config: {
       weaponCategories,
       armourCategories,
@@ -145,10 +138,10 @@ function getSheetDocument(sheet: object): {
   name: string;
   type: string;
   system: Record<string, unknown>;
-} & StoredDocument {
+} {
   const candidate = sheet as {
-    document?: { name: string; type: string; system: Record<string, unknown> } & StoredDocument;
-    item?: { name: string; type: string; system: Record<string, unknown> } & StoredDocument;
+    document?: { name: string; type: string; system: Record<string, unknown> };
+    item?: { name: string; type: string; system: Record<string, unknown> };
   };
   const document = candidate.document ?? candidate.item;
   if (!document) throw new Error("PivotItemSheet requires an Item document.");
