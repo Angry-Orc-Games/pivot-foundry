@@ -38,6 +38,7 @@ function hasNestedProperty(obj: unknown, path: string): boolean {
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
+  runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
 
   // Sync token status effects after HP or death state changes
@@ -194,6 +195,14 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
       }
     }
   });
+}
+
+function linkCharacterPrototypeToken(actor: {
+  type?: string;
+  updateSource?: (data: Record<string, unknown>) => unknown;
+}): void {
+  if (actor.type !== "character" || !actor.updateSource) return;
+  actor.updateSource({ "prototypeToken.actorLink": true });
 }
 
 const pivotGlobals = globalThis as PivotGlobals & {

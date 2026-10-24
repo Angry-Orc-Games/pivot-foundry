@@ -744,13 +744,84 @@ function getSheetDocument(sheet: object): ActorLike {
 }
 
 async function submitDocumentForm(
-  this: { document?: { update?: (data: Record<string, unknown>) => Promise<unknown> } },
+  this: {
+    document?: {
+      _source?: unknown;
+      toObject?: () => unknown;
+      update?: (data: Record<string, unknown>) => Promise<unknown>;
+    };
+  },
   _event: Event,
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
-  const data = normalizeSheetSubmitData(formData.object ?? {});
-  return this.document?.update?.(data);
+  const submitted = normalizeSheetSubmitData(formData.object ?? {});
+  const changed = diffSubmitAgainstSource(this.document, submitted);
+  if (Object.keys(changed).length === 0) return undefined;
+  return this.document?.update?.(changed);
+}
+
+function diffSubmitAgainstSource(
+  document: { _source?: unknown; toObject?: () => unknown } | undefined,
+  submitted: Record<string, unknown>,
+): Record<string, unknown> {
+  const source = documentSource(document);
+  const utils = (
+    globalThis as {
+      foundry?: { utils?: { diffObject?: (original: unknown, other: unknown) => unknown } };
+    }
+  ).foundry?.utils;
+  const diff = utils?.diffObject
+    ? utils.diffObject(source, submitted)
+    : diffObject(source, submitted);
+  return isDataRecord(diff) ? diff : {};
+}
+
+function documentSource(
+  document:
+    | {
+        _source?: unknown;
+        toObject?: () => unknown;
+      }
+    | undefined,
+): Record<string, unknown> {
+  if (isDataRecord(document?._source)) return document._source;
+  if (typeof document?.toObject !== "function") return {};
+  try {
+    const value = document.toObject();
+    return isDataRecord(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function diffObject(original: unknown, other: unknown): Record<string, unknown> {
+  if (!isDataRecord(other)) return {};
+  const base = isDataRecord(original) ? original : {};
+  const diff: Record<string, unknown> = {};
+  for (const key of Object.keys(other)) {
+    const value = other[key];
+    const previous = base[key];
+    if (isDataRecord(value)) {
+      const nested = diffObject(previous, value);
+      if (Object.keys(nested).length > 0) diff[key] = nested;
+      continue;
+    }
+    if (Array.isArray(value) || Array.isArray(previous)) {
+      if (!sameValue(previous, value)) diff[key] = value;
+      continue;
+    }
+    if (previous !== value) diff[key] = value;
+  }
+  return diff;
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function isDataRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
