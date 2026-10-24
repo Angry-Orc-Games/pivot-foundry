@@ -37,6 +37,27 @@ describe("prepareItemSheetContext", () => {
     ]);
   });
 
+  it("reopens an equipment edit from persisted source when prepared data is stale", () => {
+    const item = {
+      name: "Rope",
+      type: "equipment",
+      system: { quantity: 1, weight: 1, carried: true, notes: "" },
+      toObject() {
+        return {
+          name: "Silk Rope",
+          type: "equipment",
+          system: { quantity: 4, weight: 2, carried: true, notes: "coiled" },
+        };
+      },
+    };
+
+    const context = prepareItemSheetContext(item);
+
+    expect(context.item.name).toBe("Silk Rope");
+    expect(context.system).toMatchObject({ quantity: 4, weight: 2, notes: "coiled" });
+    expect(context.isEquipment).toBe(true);
+  });
+
   it("shows an empty effects list when none are present", () => {
     const context = prepareItemSheetContext({
       name: "Rope",

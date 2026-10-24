@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import type { FoundryRuntime } from "../../src/foundry-runtime";
 import {
   applyInitiativeRollToCombat,
   buildD20ChatFlavor,
   buildRollModeDialogContent,
   createEmbeddedItemData,
+  createPivotCharacterSheetClass,
   naturalResultsFromRoll,
   nextResourceValue,
   normalizeSheetSubmitData,
@@ -12,6 +14,7 @@ import {
   prepareCharacterSheetContext,
   resolveSheetRoll,
   type ActorLike,
+  type CharacterSheetContext,
 } from "../../src/sheets/character-sheet";
 
 function sampleActor(): ActorLike {
@@ -505,3 +508,322 @@ describe("sheet interaction helpers", () => {
     });
   });
 });
+
+describe("sheet edits survive a stale prepared copy", () => {
+  it("reopens a linked actor from persisted source, not the stale system", () => {
+    const actor = linkedActor();
+    const context = prepareCharacterSheetContext(actor);
+
+    expect(persistedView(context)).toEqual({
+      name: "Renamed Hera",
+      level: 4,
+      hp: 12,
+      hpPercent: 43,
+      equipment: ["Rope"],
+      features: ["Alert"],
+    });
+  });
+
+  it("keeps a linked edit after submit when prepared data is not refreshed", async () => {
+    const actor = linkedActor();
+    const sheet = Object.assign(Object.create(sheetClass().prototype), { document: actor });
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: { system: { progression: { level: 5 } } },
+    });
+
+    expect(persistedView(prepareCharacterSheetContext(actor))).toMatchObject({
+      level: 5,
+      hp: 12,
+      equipment: ["Rope"],
+      features: ["Alert"],
+    });
+    expect(actor.source.system.resources.pool.value).toBe(3);
+  });
+
+  it("writes a pool change from persisted pool value, not the stale prepared value", async () => {
+    const actor = linkedActor();
+    const sheet = Object.assign(Object.create(sheetClass().prototype), { document: actor });
+    await sheetClass().DEFAULT_OPTIONS.actions.adjustResource.call(sheet, click(), {
+      dataset: { path: "resources.pool.value", delta: "1" },
+    } as HTMLElement);
+
+    expect(actor.source.system.resources.pool.value).toBe(4);
+    expect(persistedView(prepareCharacterSheetContext(actor)).hp).toBe(12);
+  });
+
+  it("reopens an unlinked token actor from its own persisted delta", async () => {
+    const { base, tokenActor, sheet } = unlinkedPair();
+    const context = await openSheet(sheet);
+
+    expect(persistedView(context)).toEqual({
+      name: "Token Hera",
+      level: 4,
+      hp: 9,
+      hpPercent: 32,
+      equipment: ["Rope"],
+      features: ["Alert"],
+    });
+    expect(base.updates).toEqual([]);
+    expect(tokenActor.updates).toEqual([]);
+  });
+
+  it("keeps token edits on the unlinked actor across submit, delete, and create", async () => {
+    const { base, tokenActor, sheet } = unlinkedPair();
+    const handler = sheetClass().DEFAULT_OPTIONS.form.handler;
+    await handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: { system: { progression: { level: 6 } } },
+    });
+    const afterLevel = await openSheet(sheet);
+    expect(persistedView(afterLevel)).toMatchObject({
+      level: 6,
+      hp: 9,
+      equipment: ["Rope"],
+      features: ["Alert"],
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.actions.deleteItem.call(sheet, click(), {
+      dataset: { itemId: "alert" },
+    } as HTMLElement);
+    await sheetClass().DEFAULT_OPTIONS.actions.createItem.call(sheet, click(), {
+      dataset: { type: "equipment" },
+    } as HTMLElement);
+
+    expect(persistedView(await openSheet(sheet))).toEqual({
+      name: "Token Hera",
+      level: 6,
+      hp: 9,
+      hpPercent: 32,
+      equipment: ["Rope", "New Equipment"],
+      features: [],
+    });
+    expect(base.updates).toEqual([]);
+    expect(tokenActor.updates).toEqual([{ system: { progression: { level: 6 } } }]);
+  });
+});
+
+function click() {
+  return { preventDefault() {} } as PointerEvent;
+}
+
+function persistedView(context: CharacterSheetContext & { name?: string }) {
+  const system = context.system as {
+    progression?: { level?: number };
+    attributes?: { hp?: { value?: number } };
+  };
+  return {
+    name: context.name,
+    level: system.progression?.level,
+    hp: system.attributes?.hp?.value,
+    hpPercent: context.hpPercent,
+    equipment: context.items.equipment.map((item) => item.name),
+    features: context.items.features.map((item) => item.name),
+  };
+}
+
+function sheetClass() {
+  return createPivotCharacterSheetClass(sheetFoundry()) as unknown as {
+    prototype: {
+      _prepareContext(options: Record<string, unknown>): Promise<CharacterSheetContext>;
+    };
+    DEFAULT_OPTIONS: {
+      form: {
+        handler: (
+          this: object,
+          event: Event,
+          form: HTMLFormElement,
+          formData: { object?: Record<string, unknown> },
+        ) => Promise<unknown>;
+      };
+      actions: {
+        adjustResource: (this: object, event: PointerEvent, target: HTMLElement) => Promise<void>;
+        createItem: (this: object, event: PointerEvent, target: HTMLElement) => Promise<void>;
+        deleteItem: (this: object, event: PointerEvent, target: HTMLElement) => Promise<void>;
+      };
+    };
+  };
+}
+
+function openSheet(sheet: object) {
+  return sheetClass().prototype._prepareContext.call(sheet, {});
+}
+
+function linkedActor() {
+  const source = characterSource({
+    name: "Renamed Hera",
+    level: 4,
+    hp: 12,
+    pool: 3,
+    items: [ropeItem(), alertItem()],
+  });
+  const actor = {
+    name: "Hera",
+    type: "character",
+    system: staleSystem(),
+    items: [] as ItemLike[],
+    source,
+    toObject() {
+      return structuredClone(source);
+    },
+    async update(data: Record<string, unknown>) {
+      mergeUpdate(source, data);
+    },
+  };
+  return actor;
+}
+
+function unlinkedPair() {
+  const source = characterSource({
+    name: "Token Hera",
+    level: 4,
+    hp: 9,
+    pool: 2,
+    items: [ropeItem(), alertItem()],
+  });
+  const updates: Record<string, unknown>[] = [];
+  const tokenActor = {
+    name: "Token Stale",
+    type: "character",
+    system: staleSystem(),
+    items: [] as ItemLike[],
+    updates,
+    toObject() {
+      return structuredClone(source);
+    },
+    async update(data: Record<string, unknown>) {
+      updates.push(structuredClone(data));
+      mergeUpdate(source, data);
+    },
+    async createEmbeddedDocuments(_type: string, data: Array<Record<string, unknown>>) {
+      const created = data.map((entry) => ({ ...entry, _id: "created-gear" }));
+      source.items.push(...created);
+      return created;
+    },
+    async deleteEmbeddedDocuments(_type: string, ids: string[]) {
+      source.items = source.items.filter((item) => !ids.includes(String(item._id)));
+    },
+  };
+  const base = {
+    name: "Base Hera",
+    type: "character",
+    system: staleSystem(),
+    items: [] as ItemLike[],
+    updates: [] as string[],
+    async update() {
+      base.updates.push("base");
+    },
+  };
+  const sheet = Object.assign(Object.create(sheetClass().prototype), {
+    document: base,
+    token: { actorLink: false as const, actor: tokenActor },
+  });
+  return { base, tokenActor, sheet };
+}
+
+function characterSource(input: {
+  name: string;
+  level: number;
+  hp: number;
+  pool: number;
+  items: Array<Record<string, unknown>>;
+}) {
+  return {
+    name: input.name,
+    type: "character",
+    system: {
+      progression: { level: input.level },
+      attributes: { hp: { value: input.hp, max: 28, temp: 0 } },
+      resources: { pool: { value: input.pool, maxBonus: 0 } },
+    },
+    items: input.items,
+  };
+}
+
+function staleSystem() {
+  return {
+    progression: { level: 1 },
+    attributes: { hp: { value: 28, max: 28, temp: 0 } },
+    resources: { pool: { value: 0, maxBonus: 0 } },
+  };
+}
+
+function ropeItem() {
+  return {
+    _id: "rope",
+    name: "Rope",
+    type: "equipment",
+    system: { quantity: 1, weight: 1, carried: true },
+  };
+}
+
+function alertItem() {
+  return {
+    _id: "alert",
+    name: "Alert",
+    type: "feature",
+    system: { category: "feat" },
+  };
+}
+
+function mergeUpdate(target: Record<string, unknown>, update: Record<string, unknown>) {
+  for (const [key, value] of Object.entries(update)) {
+    if (key.includes(".")) {
+      const parts = key.split(".");
+      let current = target;
+      for (const part of parts.slice(0, -1)) {
+        const next = current[part];
+        if (typeof next !== "object" || next === null || Array.isArray(next)) current[part] = {};
+        current = current[part] as Record<string, unknown>;
+      }
+      const leaf = parts.at(-1);
+      if (leaf) current[leaf] = value;
+      continue;
+    }
+    if (isMergeRecord(value) && isMergeRecord(target[key])) {
+      mergeUpdate(target[key], value);
+      continue;
+    }
+    target[key] = value;
+  }
+}
+
+function isMergeRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function sheetFoundry(): FoundryRuntime {
+  class ActorSheetV2 {
+    readonly kind = "actor";
+  }
+  class ItemSheetV2 {
+    readonly kind = "item";
+  }
+  class TypeDataModel {
+    readonly kind = "model";
+  }
+  class NumberField {
+    readonly kind = "number";
+  }
+  class StringField {
+    readonly kind = "string";
+  }
+  class BooleanField {
+    readonly kind = "boolean";
+  }
+  class SchemaField {
+    readonly kind = "schema";
+  }
+  class ArrayField {
+    readonly kind = "array";
+  }
+  return {
+    abstract: { TypeDataModel },
+    data: {
+      fields: { NumberField, StringField, BooleanField, SchemaField, ArrayField },
+    },
+    applications: {
+      api: { HandlebarsApplicationMixin: (base) => base },
+      apps: { DocumentSheetConfig: { registerSheet() {} } },
+      sheets: { ActorSheetV2, ItemSheetV2 },
+    },
+  };
+}
