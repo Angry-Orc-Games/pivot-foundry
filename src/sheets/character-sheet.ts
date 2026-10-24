@@ -304,6 +304,16 @@ export function prepareCharacterSheetContext(
       ];
     }),
   ) as SkillSourceMap;
+  const specializationSkills = specializationSkillEntries(system);
+  for (const entry of specializationSkills) {
+    skillSources[entry.id] = {
+      ability: entry.ability,
+      proficient: entry.proficient,
+      deepening: entry.deepening,
+      expertise: entry.expertise,
+      bonus: entry.bonus,
+    };
+  }
 
   const effectSummary = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
   const derived = calculateCharacterDerived(
@@ -396,9 +406,20 @@ export function prepareCharacterSheetContext(
       save: derived.saves[key],
       disabledAttr,
     })),
-    skillRows: canonicalSkills.map((skill) => {
+    skillRows: [
+      ...canonicalSkills.map((skill) => ({
+        id: skill.id,
+        label: skill.label,
+        abilityPath: `system.skills.${skill.id}.ability`,
+        proficientPath: `system.skills.${skill.id}.proficient`,
+        deepeningPath: `system.skills.${skill.id}.deepening`,
+        expertisePath: `system.skills.${skill.id}.expertise`,
+        bonusPath: `system.skills.${skill.id}.bonus`,
+      })),
+      ...specializationSkills,
+    ].map((skill) => {
       const source = skillSources[skill.id] ?? {
-        ability: "int",
+        ability: "int" as AbilityKey,
         proficient: false,
         deepening: 0,
         expertise: false,
@@ -409,11 +430,11 @@ export function prepareCharacterSheetContext(
         id: skill.id,
         label: skill.label,
         ability: source.ability.toUpperCase(),
-        abilityPath: `system.skills.${skill.id}.ability`,
-        proficientPath: `system.skills.${skill.id}.proficient`,
-        deepeningPath: `system.skills.${skill.id}.deepening`,
-        expertisePath: `system.skills.${skill.id}.expertise`,
-        bonusPath: `system.skills.${skill.id}.bonus`,
+        abilityPath: skill.abilityPath,
+        proficientPath: skill.proficientPath,
+        deepeningPath: skill.deepeningPath,
+        expertisePath: skill.expertisePath,
+        bonusPath: skill.bonusPath,
         proficient: source.proficient,
         deepening: source.deepening ?? 0,
         expertise: source.expertise ?? false,
@@ -1058,6 +1079,47 @@ function stringArrayAt(source: RecordValue, path: string[]): string[] {
   return Array.isArray(current)
     ? current.filter((value): value is string => typeof value === "string")
     : [];
+}
+
+function specializationSkillEntries(system: RecordValue): Array<{
+  id: string;
+  label: string;
+  ability: AbilityKey;
+  proficient: boolean;
+  deepening: number;
+  expertise: boolean;
+  bonus: number;
+  abilityPath: string;
+  proficientPath: string;
+  deepeningPath: string;
+  expertisePath: string;
+  bonusPath: string;
+}> {
+  return Object.entries(objectAt(system, ["skillSpecializations"])).flatMap(([group, entries]) => {
+    if (!Array.isArray(entries)) return [];
+    return entries.flatMap((entry, index) => {
+      if (!isRecord(entry)) return [];
+      const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      if (!name) return [];
+      const base = `system.skillSpecializations.${group}.${index}`;
+      return [
+        {
+          id: `${group}:${name}`,
+          label: name,
+          ability: abilityAt(entry, ["ability"], "int"),
+          proficient: booleanAt(entry, ["proficient"], true),
+          deepening: numberAt(entry, ["deepening"], 0),
+          expertise: booleanAt(entry, ["expertise"], false),
+          bonus: numberAt(entry, ["bonus"], 0),
+          abilityPath: `${base}.ability`,
+          proficientPath: `${base}.proficient`,
+          deepeningPath: `${base}.deepening`,
+          expertisePath: `${base}.expertise`,
+          bonusPath: `${base}.bonus`,
+        },
+      ];
+    });
+  });
 }
 
 function specializationNamesAt(source: RecordValue, path: string[]): string[] {
