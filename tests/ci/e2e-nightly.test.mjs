@@ -783,61 +783,104 @@ function collectRequestBody(req) {
   });
 }
 
-function rememberJsonBody(current, next) {
-  if (next.length === 0) return current;
-  try {
-    JSON.parse(next);
-  } catch {
-    return current;
+function assertPostedCheckRuns({ bodies, targets, stdout = "", stderr = "", secret }) {
+  if (bodies.length !== targets) {
+    const detail = stderr ? `\n${stderr}` : "";
+    throw new Error(`expected ${targets} check-run body, received ${bodies.length}${detail}`);
   }
-  return next;
+  const parsed = bodies.map((body) => JSON.parse(body));
+  const visible = `${stdout}${stderr}${bodies.join("")}`;
+  if (visible.includes(secret)) {
+    throw new Error("Foundry E2E publish output contains the token");
+  }
+  return parsed;
+}
+
+function postCheckRun(port, payload, split) {
+  const message = Buffer.from(
+    `POST /repos/x/check-runs HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: ${Buffer.byteLength(payload)}\r\nConnection: close\r\n\r\n${payload}`,
+  );
+  return new Promise((resolve, reject) => {
+    const socket = connectTcp(port, "127.0.0.1", () => {
+      if (!split) {
+        socket.end(message);
+        return;
+      }
+      socket.write(message.subarray(0, 40));
+      globalThis.setTimeout(() => {
+        socket.write(message.subarray(40, 90));
+        globalThis.setTimeout(() => socket.end(message.subarray(90)), 15);
+      }, 15);
+    });
+    socket.on("data", () => {});
+    socket.on("end", resolve);
+    socket.on("error", reject);
+  });
+}
+
+async function captureCheckRunPosts(payloads, { split = false } = {}) {
+  const posted = [];
+  const server = createHttpServer((req, res) => {
+    res.on("error", () => {});
+    collectRequestBody(req).then((raw) => {
+      if ((req.url ?? "").endsWith("/check-runs")) {
+        posted.push(raw.toString("utf8"));
+      }
+      if (!res.writableEnded) {
+        res.writeHead(201, { "content-type": "application/json" });
+        res.end("{}");
+      }
+    });
+  });
+  const port = await listenOn(server, 0, "127.0.0.1");
+  let captured;
+  try {
+    for (const [index, payload] of payloads.entries()) {
+      await postCheckRun(port, payload, split && index === 0);
+    }
+    await new Promise((resolve) => globalThis.setImmediate(resolve));
+    captured = posted.slice();
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+  return captured;
 }
 
 describe("artifact download redirect", () => {
-  it("joins a split check-run body and ignores a later empty post", async () => {
-    let posted = "";
-    const server = createHttpServer((req, res) => {
-      res.on("error", () => {});
-      collectRequestBody(req).then((raw) => {
-        if ((req.url ?? "").endsWith("/check-runs")) {
-          posted = rememberJsonBody(posted, raw.toString("utf8"));
-        }
-        if (!res.writableEnded) {
-          res.writeHead(201, { "content-type": "application/json" });
-          res.end("{}");
-        }
-      });
-    });
-    const port = await listenOn(server, 0, "127.0.0.1");
+  it("joins a split check-run body into one recorded post", async () => {
     const payload = JSON.stringify({ ok: true, n: "x".repeat(50) });
-    const message = Buffer.from(
-      `POST /repos/x/check-runs HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: ${Buffer.byteLength(payload)}\r\nConnection: close\r\n\r\n${payload}`,
+    const bodies = await captureCheckRunPosts([payload], { split: true });
+    const [body] = assertPostedCheckRuns({ bodies, targets: 1, secret: TOKEN });
+    expect(bodies).toEqual([payload]);
+    expect(body).toEqual({ ok: true, n: "x".repeat(50) });
+  });
+
+  it("fails when an extra empty check-run post is recorded", async () => {
+    const payload = JSON.stringify({ ok: true });
+    const bodies = await captureCheckRunPosts([payload, ""]);
+    expect(bodies).toEqual([payload, ""]);
+    expect(() => assertPostedCheckRuns({ bodies, targets: 1, secret: TOKEN })).toThrow(
+      "expected 1 check-run body, received 2",
     );
-    await new Promise((resolve, reject) => {
-      const socket = connectTcp(port, "127.0.0.1", () => {
-        socket.write(message.subarray(0, 40));
-        globalThis.setTimeout(() => {
-          socket.write(message.subarray(40, 90));
-          globalThis.setTimeout(() => socket.end(message.subarray(90)), 15);
-        }, 15);
-      });
-      socket.on("data", () => {});
-      socket.on("end", resolve);
-      socket.on("error", reject);
-    });
-    await new Promise((resolve, reject) => {
-      const socket = connectTcp(port, "127.0.0.1", () => {
-        socket.end(
-          "POST /repos/x/check-runs HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-        );
-      });
-      socket.on("data", () => {});
-      socket.on("end", resolve);
-      socket.on("error", reject);
-    });
-    await new Promise((resolve) => globalThis.setImmediate(resolve));
-    server.close();
-    expect(JSON.parse(posted)).toEqual({ ok: true, n: "x".repeat(50) });
+  });
+
+  it("fails when the only check-run body is malformed", async () => {
+    const bodies = await captureCheckRunPosts(['{"ok":']);
+    expect(bodies).toEqual(['{"ok":']);
+    expect(() => assertPostedCheckRuns({ bodies, targets: 1, secret: TOKEN })).toThrow(SyntaxError);
+    expect(() => assertPostedCheckRuns({ bodies, targets: 1, secret: TOKEN })).toThrow(
+      "Unexpected end of JSON input",
+    );
+  });
+
+  it("fails when a recorded check-run body contains the token", async () => {
+    const payload = JSON.stringify({ output: { summary: TOKEN } });
+    const bodies = await captureCheckRunPosts([payload]);
+    expect(bodies).toEqual([payload]);
+    expect(() =>
+      assertPostedCheckRuns({ bodies, targets: 1, stdout: "", stderr: "", secret: TOKEN }),
+    ).toThrow("Foundry E2E publish output contains the token");
   });
 
   it("follows a 302 to another host and posts the EULA summary as started", async () => {
@@ -926,7 +969,7 @@ describe("artifact download redirect", () => {
     };
     const blobHits = [];
     const downloadAuth = [];
-    let posted = "";
+    const posted = [];
     let apiPort = 0;
     const blobHandler = (req, res) => {
       blobHits.push(req.headers.authorization);
@@ -971,7 +1014,7 @@ describe("artifact download redirect", () => {
           return;
         }
         if (path.endsWith("/check-runs")) {
-          posted = rememberJsonBody(posted, text);
+          posted.push(text);
           res.writeHead(201, { "content-type": "application/json" });
           res.end("{}");
           return;
@@ -1020,7 +1063,7 @@ describe("artifact download redirect", () => {
         child.on("close", (status) => resolve({ status: status ?? 1, stdout, stderr }));
       });
       await new Promise((resolve) => globalThis.setImmediate(resolve));
-      captured = posted;
+      captured = posted.slice();
     } finally {
       for (const server of servers) {
         server.closeAllConnections?.();
@@ -1029,17 +1072,17 @@ describe("artifact download redirect", () => {
       await rm(dir, { recursive: true, force: true });
     }
 
-    if (!captured) {
-      throw new Error(
-        `Foundry E2E publish exited ${result.status} without a check-run body\n${result.stderr}`,
-      );
-    }
-    const body = JSON.parse(captured);
+    const [body] = assertPostedCheckRuns({
+      bodies: captured,
+      targets: 1,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      secret: TOKEN,
+    });
     expect(blobHits.length).toBeGreaterThan(0);
     expect(blobHits.every((header) => header === undefined)).toBe(true);
     expect(downloadAuth).toContain(`Bearer ${TOKEN}`);
     expect(body.output.summary).toBe(`${SETUP_FAILURE}\n${RUN_URL}`);
     expect(body.output.text).toBe("started=true");
-    expect(`${result.stdout}${result.stderr}${captured}`).not.toContain(TOKEN);
   }, 15000);
 });
