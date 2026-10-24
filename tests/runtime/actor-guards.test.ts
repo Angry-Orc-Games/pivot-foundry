@@ -39,6 +39,7 @@ it("drops a grouped HP max and a -=max deletion, and re-renders when that was th
     sheet: { render: (force?: boolean) => warnings.push(`render:${String(force)}`) },
   };
   const grouped = {
+    _id: "actor1",
     name: "Hera",
     "system.attributes.hp": { max: 10 },
   };
@@ -49,12 +50,47 @@ it("drops a grouped HP max and a -=max deletion, and re-renders when that was th
   const onlyMax = { "system.attributes.hp.max": 10 };
 
   expect(guardHpMaximum(actor, grouped)).toBeUndefined();
-  expect(grouped).toEqual({ name: "Hera" });
+  expect(grouped).toEqual({ _id: "actor1", name: "Hera" });
   expect(guardHpMaximum(actor, deleted)).toBeUndefined();
   expect(deleted).toEqual({ name: "Hera" });
   expect(guardHpMaximum(actor, onlyMax)).toBeUndefined();
   expect(onlyMax).toEqual({});
   expect(warnings).toEqual(["InvalidMaximum", "InvalidMaximum", "InvalidMaximum", "render:false"]);
+});
+
+it("re-renders when _id is all that remains after a bad max", () => {
+  (globalThis as { ui?: unknown }).ui = {
+    notifications: { warn: (message: string) => warnings.push(message) },
+  };
+  const actor = {
+    system: { attributes: { hp: { value: 30, max: 28 } } },
+    sheet: { render: (force?: boolean) => warnings.push(`render:${String(force)}`) },
+  };
+  const changes = {
+    _id: "actor1",
+    system: { attributes: { hp: { max: 10 } } },
+  };
+
+  expect(guardHpMaximum(actor, changes)).toBeUndefined();
+  expect(changes).toEqual({ _id: "actor1" });
+  expect(warnings).toEqual(["InvalidMaximum", "render:false"]);
+});
+
+it("re-renders when a bad max leaves only _id and empty objects", () => {
+  (globalThis as { ui?: unknown }).ui = {
+    notifications: { warn: (message: string) => warnings.push(message) },
+  };
+  const actor = {
+    system: { attributes: { hp: { value: 30, max: 28 } } },
+    sheet: { render: (force?: boolean) => warnings.push(`render:${String(force)}`) },
+  };
+  const changes = {
+    _id: "actor1",
+    system: { attributes: { hp: { max: 10 } }, spare: {} },
+  };
+
+  expect(guardHpMaximum(actor, changes)).toBeUndefined();
+  expect(warnings).toEqual(["InvalidMaximum", "render:false"]);
 });
 
 it("keeps a max that is at least the HP in the same update", () => {
