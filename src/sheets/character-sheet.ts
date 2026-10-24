@@ -24,6 +24,7 @@ import {
   type WeaponProficiencyMap,
 } from "../rules/character-derived";
 import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
+import { visibleMagicEchelon } from "../rules/echelon";
 import {
   applyAttackCrit,
   d20PoolFormula,
@@ -172,7 +173,13 @@ export interface CharacterSheetContext {
     armour: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     equipment: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     features: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
-    magicStreams: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    magicStreams: Array<
+      ItemLike & {
+        disabledAttr: "" | "disabled";
+        echelonLabelKey: string;
+        echelonValue?: number;
+      }
+    >;
     magicAbilities: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
   };
 }
@@ -306,9 +313,10 @@ export function prepareCharacterSheetContext(
   ) as SkillSourceMap;
 
   const effectSummary = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
+  const level = numberAt(system, ["progression", "level"], 1);
   const derived = calculateCharacterDerived(
     {
-      level: numberAt(system, ["progression", "level"], 1),
+      level,
       abilities: abilitySources,
       skills: skillSources,
       magic: {
@@ -451,7 +459,16 @@ export function prepareCharacterSheetContext(
         disabledAttr,
       ),
       features: withDisabledAttr(features, disabledAttr),
-      magicStreams: withDisabledAttr(magicStreams, disabledAttr),
+      magicStreams: magicStreams.map((item) => {
+        const visible = visibleMagicEchelon(item.system.echelon, level);
+        return {
+          ...item,
+          id: itemDocumentId(item),
+          disabledAttr,
+          echelonLabelKey: visible.labelKey,
+          ...(visible.value === undefined ? {} : { echelonValue: visible.value }),
+        };
+      }),
       magicAbilities: withDisabledAttr(magicAbilities, disabledAttr),
     },
   };

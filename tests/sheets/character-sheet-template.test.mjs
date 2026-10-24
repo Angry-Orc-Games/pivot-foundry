@@ -54,4 +54,17 @@ describe("character sheet template structure", () => {
     expect(abilitiesPanelContent).toContain("{{scorePath}}");
     expect(abilitiesPanelContent).toContain("{{primaryPath}}");
   });
+
+  it("prints a magic stream's echelon label instead of the field caption and raw number", () => {
+    const templatePath = resolve(process.cwd(), "templates/actors/character-sheet.hbs");
+    const template = readFileSync(templatePath, "utf-8");
+    const streamRow = template.slice(
+      template.indexOf("{{#each items.magicStreams}}"),
+      template.indexOf("{{#each items.magicAbilities}}"),
+    );
+
+    expect(streamRow).toContain("{{localize echelonLabelKey}}");
+    expect(streamRow).not.toContain("system.echelon");
+    expect(streamRow).not.toContain("PIVOT.Fields.Echelon");
+  });
 });

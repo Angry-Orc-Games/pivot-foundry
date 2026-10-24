@@ -807,8 +807,8 @@
                 class="pivot-item-name"
                 data-action="openItem"
                 data-item-id="{{id}}"
-              >{{name}}</button><span>{{localize "PIVOT.Fields.Echelon"}}
-                {{system.echelon}}</span><button
+              >{{name}}</button><span>{{localize echelonLabelKey}}{{#if echelonValue}}
+                  {{echelonValue}}{{/if}}</span><button
                 type="button"
                 data-action="deleteItem"
                 data-item-id="{{id}}"
