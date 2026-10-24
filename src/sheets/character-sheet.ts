@@ -197,26 +197,26 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
-        survivalRoll: async function (this: object) {
-          await damageRollDialog(getSheetDocument(this));
+        survivalRoll: async function (this: { document: ActorLike }) {
+          await damageRollDialog(this.document);
         },
-        tempHp: async function (this: object) {
-          await tempHpDialog(getSheetDocument(this));
+        tempHp: async function (this: { document: ActorLike }) {
+          await tempHpDialog(this.document);
         },
-        deathSave: async function (this: object) {
-          await deathSaveDialog(getSheetDocument(this));
+        deathSave: async function (this: { document: ActorLike }) {
+          await deathSaveDialog(this.document);
         },
-        correctSurvival: async function (this: object) {
-          await correctSurvivalDialog(getSheetDocument(this));
+        correctSurvival: async function (this: { document: ActorLike }) {
+          await correctSurvivalDialog(this.document);
         },
-        clearTempHp: async function (this: object) {
-          await clearTempHpDialog(getSheetDocument(this));
+        clearTempHp: async function (this: { document: ActorLike }) {
+          await clearTempHpDialog(this.document);
         },
-        shortRest: async function (this: object) {
-          await shortRestDialog(getSheetDocument(this));
+        shortRest: async function (this: { document: ActorLike }) {
+          await shortRestDialog(this.document);
         },
-        longRest: async function (this: object) {
-          await longRestDialog(getSheetDocument(this));
+        longRest: async function (this: { document: ActorLike }) {
+          await longRestDialog(this.document);
         },
         adjustResource: adjustResourceAction,
         recoverPoolLongRest: recoverPoolLongRestAction,
@@ -737,12 +737,7 @@ export function createEmbeddedItemData(type: string): Record<string, unknown> {
 }
 
 function getSheetDocument(sheet: object): ActorLike {
-  const candidate = sheet as {
-    document?: ActorLike;
-    actor?: ActorLike;
-    token?: { actorLink?: boolean; actor?: ActorLike | null };
-  };
-  if (candidate.token?.actorLink === false && candidate.token.actor) return candidate.token.actor;
+  const candidate = sheet as { document?: ActorLike; actor?: ActorLike };
   const actor = candidate.document ?? candidate.actor;
   if (!actor) throw new Error("PivotCharacterSheet requires an Actor document.");
   return actor;
@@ -755,7 +750,7 @@ async function submitDocumentForm(
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
   const data = normalizeSheetSubmitData(formData.object ?? {});
-  return getSheetDocument(this).update?.(data);
+  return this.document?.update?.(data);
 }
 
 export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
@@ -818,7 +813,7 @@ async function rollAction(
   target: HTMLElement,
 ): Promise<void> {
   event.preventDefault();
-  const actor = getSheetDocument(this);
+  const actor = this.document ?? getSheetDocument(this);
   const context = prepareCharacterSheetContext(actor);
   const request = resolveSheetRoll(target, context);
   if (!request) return;
@@ -944,7 +939,7 @@ async function adjustResourceAction(
   target: HTMLElement,
 ): Promise<void> {
   event.preventDefault();
-  const actor = getSheetDocument(this);
+  const actor = this.document ?? getSheetDocument(this);
   const path = target.dataset.path;
   const delta = Number(target.dataset.delta ?? 0);
   if (!path || !Number.isFinite(delta)) return;
@@ -960,7 +955,7 @@ async function recoverPoolLongRestAction(
   event: PointerEvent,
 ): Promise<void> {
   event.preventDefault();
-  const actor = getSheetDocument(this);
+  const actor = this.document ?? getSheetDocument(this);
   const current = numberAt(actor.system, ["resources", "pool", "value"], 0);
   const poolMax = prepareCharacterSheetContext(actor).derived.pool.max;
   const next = recoverPoolOnLongRest(current, poolMax);
@@ -980,7 +975,7 @@ async function createItemAction(
   const type = target.dataset.type;
   if (!type) return;
   const [item] =
-    ((await getSheetDocument(this).createEmbeddedDocuments?.("Item", [
+    ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
       createEmbeddedItemData(type),
     ])) as ItemLike[] | undefined) ?? [];
   item?.sheet?.render?.(true);
@@ -994,7 +989,9 @@ async function openItemAction(
   event.preventDefault();
   const id = target.dataset.itemId;
   if (!id) return;
-  const item = getActorItems(getSheetDocument(this)).find((item) => item.id === id);
+  const item = getActorItems(this.document ?? getSheetDocument(this)).find(
+    (item) => item.id === id,
+  );
   item?.sheet?.render?.(true);
 }
 
@@ -1006,7 +1003,7 @@ async function deleteItemAction(
   event.preventDefault();
   const id = target.dataset.itemId;
   if (!id) return;
-  await getSheetDocument(this).deleteEmbeddedDocuments?.("Item", [id]);
+  await (this.document ?? getSheetDocument(this)).deleteEmbeddedDocuments?.("Item", [id]);
 }
 
 function getActorItems(actor: ActorLike): ItemLike[] {
