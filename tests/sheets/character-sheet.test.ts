@@ -15,6 +15,7 @@ import {
   resolveSheetRoll,
   type ActorLike,
   type CharacterSheetContext,
+  type ItemLike,
 } from "../../src/sheets/character-sheet";
 
 function sampleActor(): ActorLike {
@@ -545,7 +546,7 @@ describe("sheet edits survive a stale prepared copy", () => {
     const sheet = Object.assign(Object.create(sheetClass().prototype), { document: actor });
     await sheetClass().DEFAULT_OPTIONS.actions.adjustResource.call(sheet, click(), {
       dataset: { path: "resources.pool.value", delta: "1" },
-    } as HTMLElement);
+    } as unknown as HTMLElement);
 
     expect(actor.source.system.resources.pool.value).toBe(4);
     expect(persistedView(prepareCharacterSheetContext(actor)).hp).toBe(12);
@@ -583,10 +584,10 @@ describe("sheet edits survive a stale prepared copy", () => {
 
     await sheetClass().DEFAULT_OPTIONS.actions.deleteItem.call(sheet, click(), {
       dataset: { itemId: "alert" },
-    } as HTMLElement);
+    } as unknown as HTMLElement);
     await sheetClass().DEFAULT_OPTIONS.actions.createItem.call(sheet, click(), {
       dataset: { type: "equipment" },
-    } as HTMLElement);
+    } as unknown as HTMLElement);
 
     expect(persistedView(await openSheet(sheet))).toEqual({
       name: "Token Hera",
