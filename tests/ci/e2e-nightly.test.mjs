@@ -1,6 +1,9 @@
+import { Buffer } from "node:buffer";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:https";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import { connect as connectTcp } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,7 +86,11 @@ exit $?
 `;
 
 function git(cwd, args) {
-  const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+  // Throwaway fixtures must not inherit commit.gpgsign. The SSH signer stalls
+  // past the test timeout often enough to fail this file at random.
+  const result = spawnSync("git", ["-C", cwd, "-c", "commit.gpgsign=false", ...args], {
+    encoding: "utf8",
+  });
   if ((result.status ?? 1) !== 0) {
     throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
   }
@@ -758,7 +765,81 @@ function listenOn(server, port, host) {
   });
 }
 
+function collectRequestBody(req) {
+  const chunks = [];
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(Buffer.concat(chunks));
+    };
+    req.on("data", (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+    req.on("end", finish);
+    req.on("aborted", finish);
+    req.on("error", finish);
+  });
+}
+
+function rememberJsonBody(current, next) {
+  if (next.length === 0) return current;
+  try {
+    JSON.parse(next);
+  } catch {
+    return current;
+  }
+  return next;
+}
+
 describe("artifact download redirect", () => {
+  it("joins a split check-run body and ignores a later empty post", async () => {
+    let posted = "";
+    const server = createHttpServer((req, res) => {
+      res.on("error", () => {});
+      collectRequestBody(req).then((raw) => {
+        if ((req.url ?? "").endsWith("/check-runs")) {
+          posted = rememberJsonBody(posted, raw.toString("utf8"));
+        }
+        if (!res.writableEnded) {
+          res.writeHead(201, { "content-type": "application/json" });
+          res.end("{}");
+        }
+      });
+    });
+    const port = await listenOn(server, 0, "127.0.0.1");
+    const payload = JSON.stringify({ ok: true, n: "x".repeat(50) });
+    const message = Buffer.from(
+      `POST /repos/x/check-runs HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: ${Buffer.byteLength(payload)}\r\nConnection: close\r\n\r\n${payload}`,
+    );
+    await new Promise((resolve, reject) => {
+      const socket = connectTcp(port, "127.0.0.1", () => {
+        socket.write(message.subarray(0, 40));
+        globalThis.setTimeout(() => {
+          socket.write(message.subarray(40, 90));
+          globalThis.setTimeout(() => socket.end(message.subarray(90)), 15);
+        }, 15);
+      });
+      socket.on("data", () => {});
+      socket.on("end", resolve);
+      socket.on("error", reject);
+    });
+    await new Promise((resolve, reject) => {
+      const socket = connectTcp(port, "127.0.0.1", () => {
+        socket.end(
+          "POST /repos/x/check-runs HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        );
+      });
+      socket.on("data", () => {});
+      socket.on("end", resolve);
+      socket.on("error", reject);
+    });
+    await new Promise((resolve) => globalThis.setImmediate(resolve));
+    server.close();
+    expect(JSON.parse(posted)).toEqual({ ok: true, n: "x".repeat(50) });
+  });
+
   it("follows a 302 to another host and posts the EULA summary as started", async () => {
     const dir = await mkdtemp(join(tmpdir(), "e2e-redirect-"));
     execFileSync(
@@ -849,18 +930,21 @@ describe("artifact download redirect", () => {
     let apiPort = 0;
     const blobHandler = (req, res) => {
       blobHits.push(req.headers.authorization);
-      res.writeHead(200, { "content-type": "application/zip" });
-      res.end(zip);
+      res.on("error", () => {});
+      collectRequestBody(req).then(() => {
+        if (res.writableEnded) return;
+        res.writeHead(200, { "content-type": "application/zip" });
+        res.end(zip);
+      });
     };
-    const blob6 = createServer(tls, blobHandler);
-    const blob4 = createServer(tls, blobHandler);
-    const blobPort = await listenOn(blob6, 0, "::1");
-    await listenOn(blob4, blobPort, "127.0.0.1");
+    const blob = createHttpsServer(tls, blobHandler);
+    const blobPort = await listenOn(blob, 0, "127.0.0.1");
     const apiHandler = (req, res) => {
-      const chunks = [];
-      req.on("data", (chunk) => chunks.push(chunk));
-      req.on("end", () => {
+      res.on("error", () => {});
+      collectRequestBody(req).then((raw) => {
+        if (res.writableEnded) return;
         const path = new URL(req.url ?? "/", "https://api.localtest.me").pathname;
+        const text = raw.toString("utf8");
         if (path.endsWith("/artifacts")) {
           res.writeHead(200, { "content-type": "application/json" });
           res.end(
@@ -887,7 +971,7 @@ describe("artifact download redirect", () => {
           return;
         }
         if (path.endsWith("/check-runs")) {
-          posted = chunks.map((chunk) => chunk.toString("utf8")).join("");
+          posted = rememberJsonBody(posted, text);
           res.writeHead(201, { "content-type": "application/json" });
           res.end("{}");
           return;
@@ -896,17 +980,24 @@ describe("artifact download redirect", () => {
         res.end();
       });
     };
-    const api6 = createServer(tls, apiHandler);
-    const api4 = createServer(tls, apiHandler);
-    apiPort = await listenOn(api6, 0, "::1");
-    await listenOn(api4, apiPort, "127.0.0.1");
-    const servers = [blob6, blob4, api6, api4];
+    const api = createHttpsServer(tls, apiHandler);
+    apiPort = await listenOn(api, 0, "127.0.0.1");
+    const curlReal = execFileSync("bash", ["-c", "command -v curl"], { encoding: "utf8" }).trim();
+    const bin = join(dir, "bin");
+    await mkdir(bin);
+    await writeFile(
+      join(bin, "curl"),
+      `#!/bin/sh\nexec ${curlReal} --connect-to api.localtest.me::127.0.0.1: --connect-to blob.localtest.me::127.0.0.1: "$@"\n`,
+    );
+    await chmod(join(bin, "curl"), 0o755);
+    const servers = [blob, api];
     let result;
+    let captured;
     try {
       result = await new Promise((resolve) => {
         const child = spawn("bash", [publishScript], {
           env: {
-            PATH: process.env.PATH,
+            PATH: `${bin}:${process.env.PATH}`,
             HOME: process.env.HOME,
             LANG: "C",
             SSL_CERT_FILE: join(dir, "ca.crt"),
@@ -928,17 +1019,27 @@ describe("artifact download redirect", () => {
         });
         child.on("close", (status) => resolve({ status: status ?? 1, stdout, stderr }));
       });
+      await new Promise((resolve) => globalThis.setImmediate(resolve));
+      captured = posted;
     } finally {
-      for (const server of servers) server.close();
+      for (const server of servers) {
+        server.closeAllConnections?.();
+        server.close();
+      }
       await rm(dir, { recursive: true, force: true });
     }
 
-    const body = JSON.parse(posted);
+    if (!captured) {
+      throw new Error(
+        `Foundry E2E publish exited ${result.status} without a check-run body\n${result.stderr}`,
+      );
+    }
+    const body = JSON.parse(captured);
     expect(blobHits.length).toBeGreaterThan(0);
     expect(blobHits.every((header) => header === undefined)).toBe(true);
     expect(downloadAuth).toContain(`Bearer ${TOKEN}`);
     expect(body.output.summary).toBe(`${SETUP_FAILURE}\n${RUN_URL}`);
     expect(body.output.text).toBe("started=true");
-    expect(`${result.stdout}${result.stderr}${posted}`).not.toContain(TOKEN);
+    expect(`${result.stdout}${result.stderr}${captured}`).not.toContain(TOKEN);
   }, 15000);
 });
