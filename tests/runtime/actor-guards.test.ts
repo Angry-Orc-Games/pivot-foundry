@@ -30,6 +30,33 @@ it("drops a blank or too-small HP max and keeps the rest of the submit", () => {
   expect(warnings).toEqual(["InvalidMaximum", "InvalidMaximum"]);
 });
 
+it("drops a grouped HP max and a -=max deletion, and re-renders when that was the only change", () => {
+  (globalThis as { ui?: unknown }).ui = {
+    notifications: { warn: (message: string) => warnings.push(message) },
+  };
+  const actor = {
+    system: { attributes: { hp: { value: 30, max: 28 } } },
+    sheet: { render: (force?: boolean) => warnings.push(`render:${String(force)}`) },
+  };
+  const grouped = {
+    name: "Hera",
+    "system.attributes.hp": { max: 10 },
+  };
+  const deleted = {
+    name: "Hera",
+    system: { attributes: { hp: { "-=max": null } } },
+  };
+  const onlyMax = { "system.attributes.hp.max": 10 };
+
+  expect(guardHpMaximum(actor, grouped)).toBeUndefined();
+  expect(grouped).toEqual({ name: "Hera" });
+  expect(guardHpMaximum(actor, deleted)).toBeUndefined();
+  expect(deleted).toEqual({ name: "Hera" });
+  expect(guardHpMaximum(actor, onlyMax)).toBeUndefined();
+  expect(onlyMax).toEqual({});
+  expect(warnings).toEqual(["InvalidMaximum", "InvalidMaximum", "InvalidMaximum", "render:false"]);
+});
+
 it("keeps a max that is at least the HP in the same update", () => {
   (globalThis as { ui?: unknown }).ui = {
     notifications: { warn: (message: string) => warnings.push(message) },

@@ -207,11 +207,14 @@ describe("registerPivotFantasySystem", () => {
   it("links the prototype token of a new character and leaves other types alone", () => {
     const { foundry } = createMockFoundry();
     const listeners: Array<
-      (actor: {
-        type?: string;
-        system?: unknown;
-        updateSource?: (data: Record<string, unknown>) => unknown;
-      }) => void
+      (
+        actor: {
+          type?: string;
+          system?: unknown;
+          updateSource?: (data: Record<string, unknown>) => unknown;
+        },
+        data?: unknown,
+      ) => void
     > = [];
 
     registerPivotFantasySystem({
@@ -240,6 +243,12 @@ describe("registerPivotFantasySystem", () => {
 
     updateSource.mockClear();
     for (const listener of listeners) listener({ type: "npc", updateSource });
+    expect(updateSource).not.toHaveBeenCalled();
+
+    updateSource.mockClear();
+    for (const listener of listeners) {
+      listener(character, { prototypeToken: { actorLink: false } });
+    }
     expect(updateSource).not.toHaveBeenCalled();
   });
 });

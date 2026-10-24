@@ -514,10 +514,8 @@ describe("character sheet submit", () => {
     await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
       object: {
         name: "Hera",
-        system: {
-          progression: { level: 5 },
-          attributes: { hp: { max: 28 } },
-        },
+        "system.progression.level": 5,
+        "system.attributes.hp.max": 28,
       },
     });
 
@@ -529,10 +527,8 @@ describe("character sheet submit", () => {
     await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
       object: {
         name: "Renamed Hera",
-        system: {
-          progression: { level: 4 },
-          attributes: { hp: { max: 28 } },
-        },
+        "system.progression.level": 4,
+        "system.attributes.hp.max": 28,
       },
     });
 
@@ -544,10 +540,8 @@ describe("character sheet submit", () => {
     await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
       object: {
         name: "Hera",
-        system: {
-          progression: { level: 4 },
-          attributes: { hp: { max: 28 } },
-        },
+        "system.progression.level": 4,
+        "system.attributes.hp.max": 28,
       },
     });
 
