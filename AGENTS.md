@@ -9,6 +9,7 @@ Run these from the repository root:
 - Install dependencies: `npm ci`
 - Full verification: `npm run verify`
 - Fast rule tests: `npm run test`
+- Agent test feedback: `npm run --silent test:agent -- --json` or `npm run --silent test:changed`
 - TypeScript check: `npm run typecheck`
 - Lint: `npm run lint`
 - Format check: `npm run format:check`

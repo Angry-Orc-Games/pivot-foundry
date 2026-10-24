@@ -42,6 +42,12 @@ describe("resolveDicePool", () => {
     // Line 262: only if multiple Disadvantages outweigh all sources of Advantage does it flip to Disadvantage.
     expect(resolveDicePool(2, 3)).toEqual({ dieCount: 2, pick: "lowest" });
   });
+
+  it("rejects non-integer and negative source counts", () => {
+    expect(() => resolveDicePool(-1, 0)).toThrow(RangeError);
+    expect(() => resolveDicePool(1.5, 0)).toThrow(RangeError);
+    expect(() => resolveDicePool(0, -1)).toThrow(RangeError);
+  });
 });
 
 describe("applyAttackCrit", () => {
@@ -62,6 +68,12 @@ describe("applyAttackCrit", () => {
     expect(applyAttackCrit(20)).toBe("hit");
     expect(applyAttackCrit(1)).toBe("miss");
   });
+
+  it("rejects faces outside 1 to 20", () => {
+    expect(() => applyAttackCrit(0)).toThrow(RangeError);
+    expect(() => applyAttackCrit(21)).toThrow(RangeError);
+    expect(() => applyAttackCrit(1.5)).toThrow(RangeError);
+  });
 });
 
 describe("dicePoolForRollMode", () => {
@@ -70,6 +82,10 @@ describe("dicePoolForRollMode", () => {
     expect(dicePoolForRollMode("advantage")).toEqual({ dieCount: 2, pick: "highest" });
     expect(dicePoolForRollMode("disadvantage")).toEqual({ dieCount: 2, pick: "lowest" });
     expect(dicePoolForRollMode("superAdvantage")).toEqual({ dieCount: 2, pick: "highest" });
+  });
+
+  it("rejects an unknown mode", () => {
+    expect(() => dicePoolForRollMode("lucky" as never)).toThrow(RangeError);
   });
 });
 
@@ -105,5 +121,10 @@ describe("d20PoolFormula", () => {
     expect(d20PoolFormula(1)).toBe("1d20");
     expect(d20PoolFormula(2)).toBe("2d20");
     expect(d20PoolFormula(3)).toBe("3d20");
+  });
+
+  it("rejects a non-positive die count", () => {
+    expect(() => d20PoolFormula(0)).toThrow(RangeError);
+    expect(() => d20PoolFormula(1.5)).toThrow(RangeError);
   });
 });

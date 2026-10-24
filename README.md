@@ -150,8 +150,11 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 - `npm run format:check`: checks formatting without writing files
 - `npm run audit`: runs `npm audit` at moderate severity or higher
 - `npm run package:system`: builds and validates `system.zip`
-- `npm run verify`: runs lint, formatting, typecheck, tests, build, and audit
+- `npm run verify`: runs lint, formatting, typecheck, coverage-gated tests, build, and audit
 - `npm run test`: runs Vitest once
+- `npm run --silent test:agent -- --json`: runs Vitest and prints one JSON summary (`--testNamePattern` and file paths optional)
+- `npm run test:changed`: runs unit tests affected by the current git diff
+- `npm run test:coverage`: runs Vitest with v8 coverage thresholds
 - `npm run test:watch`: runs Vitest in watch mode
 - `npm run typecheck`: runs TypeScript without emitting files
 - `npm run foundry:check-env`: validates Foundry credentials and version pins without printing secrets
