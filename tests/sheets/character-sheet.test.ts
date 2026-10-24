@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -89,6 +91,53 @@ function sampleActor(): ActorLike {
     ],
   };
 }
+
+describe("magic stream echelon label", () => {
+  const lang = JSON.parse(
+    readFileSync(new URL("../../lang/en.json", import.meta.url), "utf8"),
+  ) as Record<string, string>;
+  const template = readFileSync(
+    new URL("../../templates/actors/character-sheet.hbs", import.meta.url),
+    "utf8",
+  );
+  const streamRow = template.slice(
+    template.indexOf("{{#each items.magicStreams}}"),
+    template.indexOf("{{#each items.magicAbilities}}"),
+  );
+
+  function visibleEchelon(actorLevel: number, storedEchelon: number): string {
+    const context = prepareCharacterSheetContext({
+      name: "Caster",
+      type: "character",
+      system: { progression: { level: actorLevel } },
+      items: [
+        {
+          id: "stream-1",
+          name: "Fire",
+          type: "magicStream",
+          system: { ability: "int", echelon: storedEchelon },
+        },
+      ],
+    });
+    const stream = context.items.magicStreams[0] as {
+      system: { echelon?: unknown };
+      echelonLabelKey?: string;
+      echelonValue?: number;
+    };
+    if (streamRow.includes("echelonLabelKey")) {
+      const label = lang[stream.echelonLabelKey ?? ""] ?? "";
+      return stream.echelonValue === undefined ? label : `${label} ${stream.echelonValue}`;
+    }
+    return `${lang["PIVOT.Fields.Echelon"]} ${String(stream.system.echelon)}`;
+  }
+
+  it("shows Core for a level 1 caster and Echelon 1 only once that tier is unlocked", () => {
+    expect(visibleEchelon(1, 1)).toBe("Core");
+    expect(visibleEchelon(1, 0)).toBe("Core");
+    expect(visibleEchelon(3, 1)).toBe("Echelon 1");
+    expect(visibleEchelon(5, 2)).toBe("Echelon 2");
+  });
+});
 
 describe("prepareCharacterSheetContext", () => {
   it("handles an empty new character cleanly", () => {
