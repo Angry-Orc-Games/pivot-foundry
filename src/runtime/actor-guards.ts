@@ -13,7 +13,16 @@ export function guardHpMaximum(
   if (validAmount(max.value) && max.value >= hp) return;
   stripSubmittedMax(changes);
   warn("InvalidMaximum");
-  if (Object.keys(changes).length === 0) actor.sheet?.render?.(false);
+  if (updateIsEmpty(changes, true)) actor.sheet?.render?.(false);
+}
+
+function updateIsEmpty(value: unknown, ignoreId = false): boolean {
+  if (Array.isArray(value)) return false;
+  const record = asRecord(value);
+  if (!record) return false;
+  return Object.entries(record).every(
+    ([key, child]) => (ignoreId && key === "_id") || updateIsEmpty(child),
+  );
 }
 
 function submittedMax(changes: Record<string, unknown>): { present: boolean; value: unknown } {
