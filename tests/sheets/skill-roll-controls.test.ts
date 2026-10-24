@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { canonicalSkills } from "../../src/config";
@@ -10,11 +7,7 @@ import {
   resolveSheetRoll,
   type ActorLike,
 } from "../../src/sheets/character-sheet";
-
-const sheetTemplatePath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../templates/actors/character-sheet.hbs",
-);
+import sheetTemplate from "../../templates/actors/character-sheet.hbs?raw";
 
 const abilityScores = {
   str: 16,
@@ -99,11 +92,11 @@ function scholar(): ActorLike {
 function rollableSkills(actor: ActorLike): RollableSkill[] {
   const system = actor.system;
   const storedSkills = isRecord(system.skills) ? system.skills : {};
-  const magicAbility = isAbilityName(readPath(system, ["magic", "ability"]))
-    ? readPath(system, ["magic", "ability"])
-    : "int";
+  const magicValue = readPath(system, ["magic", "ability"]);
+  const magicAbility: AbilityName = isAbilityName(magicValue) ? magicValue : "int";
   const catalog = canonicalSkills.map((skill) => {
-    const stored = isRecord(storedSkills[skill.id]) ? storedSkills[skill.id] : {};
+    const storedValue = storedSkills[skill.id];
+    const stored = isRecord(storedValue) ? storedValue : {};
     const fallback = skill.ability === "varies" ? magicAbility : skill.ability;
     return {
       id: skill.id,
@@ -151,16 +144,16 @@ function expectedModifier(skill: RollableSkill): number {
 }
 
 function renderSkillRows(rows: ReadonlyArray<{ id: string; label: string }>): string {
-  const template = readFileSync(sheetTemplatePath, "utf8");
-  const loop = template.match(/\{\{#each skillRows\}\}([\s\S]*?)\{\{\/each\}\}/);
-  if (!loop?.[1]) {
+  const loop = sheetTemplate.match(/\{\{#each skillRows\}\}([\s\S]*?)\{\{\/each\}\}/);
+  const body = loop?.[1];
+  if (!body) {
     throw new Error("character sheet template has no skillRows loop");
   }
   return rows
     .map((row) =>
-      loop[1].replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, key: string) => {
-        const value = row[key as "id" | "label"];
-        return value ?? "";
+      body.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match: string, key: string) => {
+        if (key !== "id" && key !== "label") return "";
+        return row[key];
       }),
     )
     .join("");
