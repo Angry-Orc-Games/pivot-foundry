@@ -1,4 +1,4 @@
-import { guardHpMaximum } from "./runtime/actor-guards";
+import { correctCreatedHp, guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
@@ -39,6 +39,7 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
   runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
+  runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
 
   // Sync token status effects after HP or death state changes
