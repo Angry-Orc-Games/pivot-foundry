@@ -1,5 +1,6 @@
 import { guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
+import { initializeEquippedMarker } from "./migrations/m004";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
   updateTokenStatusEffects,
@@ -38,6 +39,7 @@ function hasNestedProperty(obj: unknown, path: string): boolean {
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
+  runtime.Hooks.on?.("preCreateItem", initializeEquippedMarker);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
 
   // Sync token status effects after HP or death state changes

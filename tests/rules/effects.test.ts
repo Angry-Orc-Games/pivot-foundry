@@ -189,6 +189,127 @@ describe("calculateCharacterDerived with effect contributions", () => {
   });
 });
 
+describe("gear bonuses count only while equipped", () => {
+  const strengthBonus = {
+    type: "abilityScoreBonus" as const,
+    ability: "str" as const,
+    amount: 2,
+  };
+
+  function embedded(
+    type: string,
+    equipped: boolean,
+    effects: EffectRule[],
+    extra: Record<string, unknown> = {},
+  ) {
+    return { type, system: { equipped, effects, ...extra } };
+  }
+
+  function strengthTotal(items: readonly { type?: string; system?: unknown }[]): number {
+    return aggregateCharacterEffects(collectEmbeddedItemEffects(items)).abilityScoreBonuses.str;
+  }
+
+  it("counts an equipped weapon, armour, shield, and equipment ability bonus", () => {
+    expect(strengthTotal([embedded("weapon", true, [strengthBonus])])).toBe(2);
+    expect(strengthTotal([embedded("armour", true, [strengthBonus])])).toBe(2);
+    expect(strengthTotal([embedded("armour", true, [strengthBonus], { category: "shield" })])).toBe(
+      2,
+    );
+    expect(strengthTotal([embedded("equipment", true, [strengthBonus])])).toBe(2);
+  });
+
+  it("ignores the same ability bonus on an unequipped weapon, armour, shield, and equipment item", () => {
+    expect(strengthTotal([embedded("weapon", false, [strengthBonus])])).toBe(0);
+    expect(strengthTotal([embedded("armour", false, [strengthBonus])])).toBe(0);
+    expect(
+      strengthTotal([embedded("armour", false, [strengthBonus], { category: "shield" })]),
+    ).toBe(0);
+    expect(strengthTotal([embedded("equipment", false, [strengthBonus])])).toBe(0);
+  });
+
+  it("always counts feature, magic stream, and magic ability items", () => {
+    expect(
+      strengthTotal([embedded("feature", false, [strengthBonus], { category: "species" })]),
+    ).toBe(2);
+    expect(strengthTotal([embedded("magicStream", false, [strengthBonus])])).toBe(2);
+    expect(strengthTotal([embedded("magicAbility", false, [strengthBonus])])).toBe(2);
+  });
+
+  it("uses the highest gear bonus for one effect key instead of adding them", () => {
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [strengthBonus]),
+        embedded("armour", true, [strengthBonus]),
+      ]),
+    ).toBe(2);
+
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: 1 }]),
+        embedded("equipment", true, [{ type: "abilityScoreBonus", ability: "str", amount: 3 }]),
+      ]),
+    ).toBe(3);
+  });
+
+  it("adds the highest gear bonus to the sum of feature bonuses", () => {
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: 1 }]),
+        embedded("equipment", true, [{ type: "abilityScoreBonus", ability: "str", amount: 3 }]),
+        embedded("feature", false, [strengthBonus]),
+        embedded("magicAbility", false, [{ type: "abilityScoreBonus", ability: "str", amount: 1 }]),
+      ]),
+    ).toBe(6);
+  });
+
+  it("keeps different ability bonuses and sums only the non-gear copies", () => {
+    const summary = aggregateCharacterEffects(
+      collectEmbeddedItemEffects([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: 2 }]),
+        embedded("armour", true, [{ type: "abilityScoreBonus", ability: "dex", amount: 1 }]),
+        embedded("feature", false, [{ type: "abilityScoreBonus", ability: "dex", amount: 1 }]),
+      ]),
+    );
+
+    expect(summary.abilityScoreBonuses.str).toBe(2);
+    expect(summary.abilityScoreBonuses.dex).toBe(2);
+  });
+
+  it("uses the highest gear acBonus and mpMaxBonus, then adds feature bonuses, because damage reduction and damage-die step-ups are not effect types yet", () => {
+    const summary = aggregateCharacterEffects(
+      collectEmbeddedItemEffects([
+        embedded("weapon", true, [{ type: "acBonus", amount: 1 }]),
+        embedded("armour", true, [
+          { type: "acBonus", amount: 2 },
+          { type: "mpMaxBonus", amount: 4 },
+        ]),
+        embedded("equipment", true, [{ type: "mpMaxBonus", amount: 2 }]),
+        embedded("feature", false, [
+          { type: "acBonus", amount: 1 },
+          { type: "mpMaxBonus", amount: 1 },
+        ]),
+      ]),
+    );
+
+    expect(summary.acBonus).toBe(3);
+    expect(summary.mpMaxBonus).toBe(5);
+  });
+
+  it("keeps proficiency effects boolean and still drops them when the gear is unequipped", () => {
+    const summary = aggregateCharacterEffects(
+      collectEmbeddedItemEffects([
+        embedded("weapon", false, [{ type: "weaponProficiency", category: "bows" }]),
+        embedded("armour", true, [{ type: "armourProficiency", category: "shield" }]),
+        embedded("feature", false, [{ type: "armourProficiency", category: "light" }]),
+      ]),
+    );
+
+    expect(summary.weaponProficiencies.bows).toBe(false);
+    expect(summary.shieldProficiency).toBe(true);
+    expect(summary.armourProficiencies.light).toBe(true);
+  });
+});
+
 describe("describeEffectRule", () => {
   it("builds a read-only summary for item sheets", () => {
     expect(describeEffectRule({ type: "skillBonus", skill: "perception", amount: 2 })).toEqual({
