@@ -15,10 +15,17 @@ function typescriptFiles(dir) {
   return files;
 }
 
+function usesRemovedRollMode(text) {
+  const readsCoreRollMode =
+    /["']core["']\s*,\s*["']rollMode["']/.test(text) || /\bcore\.rollMode\b/.test(text);
+  const passesRollModeToToMessage = /toMessage\([\s\S]*?\brollMode\s*:/.test(text);
+  return readsCoreRollMode || passesRollModeToToMessage;
+}
+
 describe("legacy roll mode", () => {
   it("does not read core.rollMode or pass rollMode to Roll.toMessage", () => {
     const hits = typescriptFiles(SRC).filter((file) =>
-      /\brollMode\b/.test(readFileSync(file, "utf8")),
+      usesRemovedRollMode(readFileSync(file, "utf8")),
     );
     expect(hits).toEqual([]);
   });

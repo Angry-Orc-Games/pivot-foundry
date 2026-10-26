@@ -26,6 +26,39 @@ interface TurnLike {
   id?: string;
 }
 
+const LEGACY_ROLL_TO_MESSAGE: Record<string, string> = {
+  publicroll: "public",
+  gmroll: "gm",
+  blindroll: "blind",
+  selfroll: "self",
+};
+
+const PRIVATE_MESSAGE_MODES = new Set(["gm", "blind", "self"]);
+
+function resolveMessageMode(
+  options: { messageMode?: unknown; messageOptions?: Record<string, unknown> },
+  setting: unknown,
+  hidden: boolean | undefined,
+): string {
+  const fromSetting = typeof setting === "string" ? setting : undefined;
+  const messageOptions = options.messageOptions;
+  let mode: string;
+  if (typeof options.messageMode === "string") {
+    mode = options.messageMode;
+  } else if (typeof messageOptions?.messageMode === "string") {
+    mode = messageOptions.messageMode;
+  } else if (typeof messageOptions?.rollMode === "string") {
+    const legacy = messageOptions.rollMode;
+    if (legacy === "roll") mode = fromSetting ?? "public";
+    else mode = LEGACY_ROLL_TO_MESSAGE[legacy] ?? fromSetting ?? "public";
+  } else {
+    mode = fromSetting ?? "public";
+  }
+  // gm, blind, and self already limit who sees the roll. ic and public would not.
+  if (hidden && !PRIVATE_MESSAGE_MODES.has(mode)) return "gm";
+  return mode;
+}
+
 export function createPivotCombatClass(
   BaseCombat: TypeDataModelConstructor,
 ): TypeDataModelConstructor {
@@ -40,6 +73,7 @@ export function createPivotCombatClass(
       options: {
         formula?: string;
         updateTurn?: boolean;
+        messageMode?: string;
         messageOptions?: Record<string, unknown>;
       } = {},
     ): Promise<unknown> {
@@ -60,7 +94,6 @@ export function createPivotCombatClass(
         };
       };
       const rawMode = game.game?.settings?.get?.("core", "messageMode");
-      const messageMode = typeof rawMode === "string" ? rawMode : "public";
 
       // Get ChatMessage constructor
       const ChatMessage = (
@@ -114,17 +147,12 @@ export function createPivotCombatClass(
             name: combatant.actor.name ?? "Unknown",
           }) ?? `${combatant.actor.name ?? "Unknown"} rolls for Initiative!`;
 
-        const override =
-          options.messageOptions && "messageMode" in options.messageOptions
-            ? options.messageOptions.messageMode
-            : undefined;
-        const baseMode = typeof override === "string" ? override : messageMode;
-        // A hidden combatant stays with the GM when the chosen mode is public.
-        const effectiveMode = combatant.hidden && baseMode === "public" ? "gm" : baseMode;
-
+        const effectiveMode = resolveMessageMode(options, rawMode, combatant.hidden);
         const messageData = options.messageOptions
           ? Object.fromEntries(
-              Object.entries(options.messageOptions).filter(([key]) => key !== "messageMode"),
+              Object.entries(options.messageOptions).filter(
+                ([key]) => key !== "messageMode" && key !== "rollMode",
+              ),
             )
           : {};
 
