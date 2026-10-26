@@ -473,7 +473,12 @@ describe("rollInitiativeWithDiceAnimation (sheet path)", () => {
       modules: { get: () => undefined },
     });
     const roll = {
-      toMessage: vi.fn(async (data: Record<string, unknown>) => ({ ...data })),
+      toMessage: vi.fn<
+        (
+          data: Record<string, unknown>,
+          options?: Record<string, unknown>,
+        ) => Promise<Record<string, unknown>>
+      >(async (data) => ({ ...data })),
     };
     await rollInitiativeWithDiceAnimation({
       actor: { id: "a1", name: "Hero", type: "character" } as never,

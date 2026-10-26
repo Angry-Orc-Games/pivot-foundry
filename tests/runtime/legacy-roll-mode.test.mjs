@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "../../src");
 
-function typescriptFiles(dir: string): string[] {
-  const files: string[] = [];
+function typescriptFiles(dir) {
+  const files = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) files.push(...typescriptFiles(path));
