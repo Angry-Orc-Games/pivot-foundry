@@ -623,6 +623,110 @@ describe("character sheet submit", () => {
 
     expect(updates).toEqual([]);
   });
+
+  it("keeps stored specialization fields when only the name casing changes", async () => {
+    const history = {
+      ability: "wis",
+      proficient: false,
+      deepening: 3,
+      expertise: true,
+      bonus: 2,
+    };
+    const smithing = {
+      ability: "dex",
+      deepening: 2,
+      expertise: true,
+      bonus: 5,
+    };
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [specializationEntry("History", history)],
+        crafting: [specializationEntry("Smithing", smithing)],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "history",
+        "system.skillSpecializations.craftingText": "smithing",
+      },
+    });
+
+    expect(updates).toEqual([
+      {
+        system: {
+          skillSpecializations: {
+            academia: [specializationEntry("history", history)],
+            crafting: [specializationEntry("smithing", smithing)],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("matches a stored specialization name that has stray spaces", async () => {
+    const history = {
+      ability: "wis",
+      proficient: false,
+      deepening: 3,
+      expertise: true,
+      bonus: 2,
+    };
+    const smithing = {
+      ability: "dex",
+      deepening: 2,
+      expertise: true,
+      bonus: 5,
+    };
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [specializationEntry("History ", history)],
+        crafting: [specializationEntry("Smithing ", smithing)],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History",
+        "system.skillSpecializations.craftingText": "Smithing",
+      },
+    });
+
+    expect(updates).toEqual([
+      {
+        system: {
+          skillSpecializations: {
+            academia: [specializationEntry("History", history)],
+            crafting: [specializationEntry("Smithing", smithing)],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("keeps differing duplicate specialization entries in list order", async () => {
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [
+          specializationEntry("History", { deepening: 3, expertise: true, bonus: 2 }),
+          specializationEntry("History", { deepening: 1, bonus: 4, proficient: false }),
+        ],
+        crafting: [
+          specializationEntry("Smithing", { ability: "dex", deepening: 2, expertise: true }),
+          specializationEntry("Smithing", { ability: "str", bonus: 1, proficient: false }),
+        ],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History, History",
+        "system.skillSpecializations.craftingText": "Smithing, Smithing",
+      },
+    });
+
+    expect(updates).toEqual([]);
+  });
 });
 
 function specializationEntry(
