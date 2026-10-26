@@ -84,6 +84,6 @@ export function field(form: HTMLFormElement, name: string): string {
 export async function createChat(data: Record<string, unknown>): Promise<unknown> {
   const Chat = runtime().ChatMessage;
   if (!Chat) throw new Error("Chat unavailable");
-  const prepared = Chat.applyMode?.(data, "public") ?? data;
+  const prepared = Chat.applyMode?.(data) ?? data;
   return Chat.create(prepared);
 }

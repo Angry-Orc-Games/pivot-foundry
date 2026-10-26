@@ -24,7 +24,7 @@ describe("Initiative roll with Dice So Nice integration", () => {
         const impl = this.implementation;
         return data.map((d, i) => new impl({ ...(d as { id?: string }), id: `m${i}` }));
       }
-      static applyRollMode = vi.fn();
+      static applyMode = vi.fn();
     }
     class ChatMessageV14 extends BaseChatMessage {}
 
@@ -78,8 +78,8 @@ describe("Initiative roll with Dice So Nice integration", () => {
     const chatData = await roll.toMessage({ speaker: { alias: "Hero" }, flavor: "Initiative" });
 
     const ChatMessage = (globalThis as { ChatMessage?: typeof BaseChatMessage }).ChatMessage;
-    if (ChatMessage?.applyRollMode) {
-      ChatMessage.applyRollMode(chatData, "roll");
+    if (ChatMessage?.applyMode) {
+      ChatMessage.applyMode(chatData);
     }
 
     const Cls = ChatMessage?.implementation ?? ChatMessage;
@@ -137,7 +137,7 @@ describe("Initiative roll with Dice So Nice integration", () => {
         const impl = this.implementation;
         return data.map((d, i) => new impl({ ...(d as { id?: string }), id: `m${i}` }));
       }
-      static applyRollMode = vi.fn();
+      static applyMode = vi.fn();
     }
     class ChatMessageV14 extends BaseChatMessage {}
 
@@ -193,8 +193,8 @@ describe("Initiative roll with Dice So Nice integration", () => {
     const chatData = await roll.toMessage({ speaker: { alias: "Hero" }, flavor: "Initiative" });
 
     const ChatMessage = (globalThis as { ChatMessage?: typeof BaseChatMessage }).ChatMessage;
-    if (ChatMessage?.applyRollMode) {
-      ChatMessage.applyRollMode(chatData, "roll");
+    if (ChatMessage?.applyMode) {
+      ChatMessage.applyMode(chatData);
     }
 
     const Cls = ChatMessage?.implementation ?? ChatMessage;
@@ -253,7 +253,7 @@ describe("Initiative roll with Dice So Nice integration", () => {
         const impl = this.implementation;
         return data.map((d, i) => new impl({ ...(d as { id?: string }), id: `m${i}` }));
       }
-      static applyRollMode = vi.fn();
+      static applyMode = vi.fn();
     }
     class ChatMessageV14 extends BaseChatMessage {}
 
@@ -315,8 +315,8 @@ describe("Initiative roll with Dice So Nice integration", () => {
     const chatData = await roll.toMessage({ speaker: { alias: "Hero" }, flavor: "Initiative" });
 
     const ChatMessage = (globalThis as { ChatMessage?: typeof BaseChatMessage }).ChatMessage;
-    if (ChatMessage?.applyRollMode) {
-      ChatMessage.applyRollMode(chatData, "roll");
+    if (ChatMessage?.applyMode) {
+      ChatMessage.applyMode(chatData);
     }
 
     const Cls = ChatMessage?.implementation ?? ChatMessage;
