@@ -26,6 +26,8 @@ interface TurnLike {
   id?: string;
 }
 
+const V14_MESSAGE_MODES = new Set(["public", "gm", "blind", "self", "ic"]);
+
 const LEGACY_ROLL_TO_MESSAGE: Record<string, string> = {
   publicroll: "public",
   gmroll: "gm",
@@ -35,25 +37,31 @@ const LEGACY_ROLL_TO_MESSAGE: Record<string, string> = {
 
 const PRIVATE_MESSAGE_MODES = new Set(["gm", "blind", "self"]);
 
+function v14MessageMode(value: unknown): string | undefined {
+  return typeof value === "string" && V14_MESSAGE_MODES.has(value) ? value : undefined;
+}
+
+function messageModeFromRollMode(value: unknown): string | undefined {
+  const direct = v14MessageMode(value);
+  if (direct) return direct;
+  if (typeof value === "string" && Object.hasOwn(LEGACY_ROLL_TO_MESSAGE, value)) {
+    return LEGACY_ROLL_TO_MESSAGE[value];
+  }
+  return undefined;
+}
+
 function resolveMessageMode(
   options: { messageMode?: unknown; messageOptions?: Record<string, unknown> },
   setting: unknown,
   hidden: boolean | undefined,
 ): string {
-  const fromSetting = typeof setting === "string" ? setting : undefined;
   const messageOptions = options.messageOptions;
-  let mode: string;
-  if (typeof options.messageMode === "string") {
-    mode = options.messageMode;
-  } else if (typeof messageOptions?.messageMode === "string") {
-    mode = messageOptions.messageMode;
-  } else if (typeof messageOptions?.rollMode === "string") {
-    const legacy = messageOptions.rollMode;
-    if (legacy === "roll") mode = fromSetting ?? "public";
-    else mode = LEGACY_ROLL_TO_MESSAGE[legacy] ?? fromSetting ?? "public";
-  } else {
-    mode = fromSetting ?? "public";
-  }
+  const mode =
+    v14MessageMode(options.messageMode) ??
+    v14MessageMode(messageOptions?.messageMode) ??
+    messageModeFromRollMode(messageOptions?.rollMode) ??
+    v14MessageMode(setting) ??
+    "public";
   // gm, blind, and self already limit who sees the roll. ic and public would not.
   if (hidden && !PRIVATE_MESSAGE_MODES.has(mode)) return "gm";
   return mode;
