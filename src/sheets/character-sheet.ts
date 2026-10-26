@@ -755,7 +755,9 @@ async function submitDocumentForm(
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
-  const submitted = expandObject(normalizeSheetSubmitData(formData.object ?? {}));
+  const submitted = expandObject(
+    normalizeSheetSubmitData(formData.object ?? {}, documentSource(this.document)),
+  );
   const changed = diffSubmitAgainstSource(this.document, submitted);
   if (Object.keys(changed).length === 0) return undefined;
   return this.document?.update?.(changed);
@@ -863,7 +865,10 @@ function isDataRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
+export function normalizeSheetSubmitData(
+  data: Record<string, unknown>,
+  source: Record<string, unknown> = {},
+): Record<string, unknown> {
   const normalized = { ...data };
   const languagesPath = ["system", "identity", "languagesText"];
   const instrumentsPath = ["system", "proficiencies", "instrumentsText"];
@@ -899,7 +904,11 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       academiaPath,
       ["system", "skillSpecializations", "academia"],
-      specializationEntries(splitList(academia), "int"),
+      specializationEntries(
+        splitList(academia),
+        "int",
+        storedSpecializationEntries(source, "academia"),
+      ),
     );
     deleteSubmitPath(normalized, academiaPath);
   }
@@ -909,7 +918,11 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       craftingPath,
       ["system", "skillSpecializations", "crafting"],
-      specializationEntries(splitList(crafting), "int"),
+      specializationEntries(
+        splitList(crafting),
+        "int",
+        storedSpecializationEntries(source, "crafting"),
+      ),
     );
     deleteSubmitPath(normalized, craftingPath);
   }
@@ -1184,18 +1197,38 @@ function specializationNamesAt(source: RecordValue, path: string[]): string[] {
   });
 }
 
+function storedSpecializationEntries(
+  source: Record<string, unknown>,
+  group: "academia" | "crafting",
+): Array<Record<string, unknown>> {
+  const value = readPath(source, ["system", "skillSpecializations", group]);
+  if (!Array.isArray(value)) return [];
+  return value.filter(isDataRecord);
+}
+
 function specializationEntries(
   names: string[],
   ability: AbilityKey,
+  existing: Array<Record<string, unknown>> = [],
 ): Array<Record<string, unknown>> {
-  return names.map((name) => ({
-    name,
-    ability,
-    proficient: true,
-    deepening: 0,
-    expertise: false,
-    bonus: 0,
-  }));
+  const storedByName = new Map<string, Record<string, unknown>>();
+  for (const entry of existing) {
+    if (typeof entry.name === "string" && !storedByName.has(entry.name)) {
+      storedByName.set(entry.name, entry);
+    }
+  }
+  return names.map((name) => {
+    const stored = storedByName.get(name);
+    if (stored) return { ...stored, name };
+    return {
+      name,
+      ability,
+      proficient: true,
+      deepening: 0,
+      expertise: false,
+      bonus: 0,
+    };
+  });
 }
 
 function withDisabledAttr<T extends ItemLike>(
