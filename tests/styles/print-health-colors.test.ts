@@ -9,7 +9,32 @@ const sheet = readFileSync("styles/pivot-fantasy.css", "utf8");
 const alive = { background: "rgb(220, 235, 220)", color: "rgb(47, 107, 58)" };
 const dying = { background: "rgb(245, 217, 213)", color: "rgb(161, 40, 30)" };
 const stable = { background: "rgb(246, 234, 208)", color: "rgb(154, 106, 0)" };
-const dead = { background: "rgb(236, 227, 207)", color: "rgb(85, 85, 85)" };
+const dead = { background: "rgb(28, 26, 22)", color: "rgb(255, 255, 255)" };
+const unconfirmed = { background: "rgb(236, 227, 207)", color: "rgb(85, 85, 85)" };
+
+function contrastRatio(background: string, foreground: string): number {
+  const channels = (rgb: string) => {
+    const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    const red = match?.[1];
+    const green = match?.[2];
+    const blue = match?.[3];
+    if (red === undefined || green === undefined || blue === undefined) {
+      throw new Error(`unparsed color ${rgb}`);
+    }
+    return [Number(red), Number(green), Number(blue)] as const;
+  };
+  const linear = (value: number) => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = (rgb: string) => {
+    const [red, green, blue] = channels(rgb);
+    return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue);
+  };
+  const lighter = Math.max(luminance(background), luminance(foreground));
+  const darker = Math.min(luminance(background), luminance(foreground));
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 function render(theme: "theme-light" | "theme-dark") {
   const dom = new JSDOM(
@@ -33,6 +58,7 @@ function render(theme: "theme-light" | "theme-dark") {
               <span class="pf-status dying"></span>
               <span class="pf-status stable"></span>
               <span class="pf-status dead"></span>
+              <span class="pf-status unconfirmed"></span>
               <table class="pf-attacks">
                 <thead><tr><th>Weapon</th></tr></thead>
               </table>
@@ -66,6 +92,11 @@ function render(theme: "theme-light" | "theme-dark") {
       textAlign: style.textAlign,
       textTransform: style.textTransform,
       letterSpacing: style.letterSpacing,
+      paddingTop: style.paddingTop,
+      paddingRight: style.paddingRight,
+      paddingBottom: style.paddingBottom,
+      paddingLeft: style.paddingLeft,
+      borderRadius: style.borderRadius,
       borderTopWidth: style.borderTopWidth,
       borderRightWidth: style.borderRightWidth,
       borderBottomWidth: style.borderBottomWidth,
@@ -79,6 +110,7 @@ function render(theme: "theme-light" | "theme-dark") {
     dying: paint(".pf-status.dying"),
     stable: paint(".pf-status.stable"),
     dead: paint(".pf-status.dead"),
+    unconfirmed: paint(".pf-status.unconfirmed"),
     hp: paint(".pf-meter-fill.hp"),
     pool: paint(".pf-meter-fill.pool"),
     attacks: paint("table.pf-attacks thead th"),
@@ -93,6 +125,23 @@ describe("print sheet health and attacks header", () => {
       expect(painted.dying).toMatchObject(dying);
       expect(painted.stable).toMatchObject(stable);
       expect(painted.dead).toMatchObject(dead);
+      expect(painted.unconfirmed).toMatchObject(unconfirmed);
+      expect(contrastRatio(painted.dead.background, painted.dead.color)).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      for (const key of [
+        "fontSize",
+        "fontWeight",
+        "letterSpacing",
+        "textTransform",
+        "paddingTop",
+        "paddingRight",
+        "paddingBottom",
+        "paddingLeft",
+        "borderRadius",
+      ] as const) {
+        expect(painted.dead[key]).toBe(painted.alive[key]);
+      }
       const backgrounds = [alive, dying, stable, dead].map((entry) => entry.background);
       expect(new Set(backgrounds).size).toBe(4);
     });

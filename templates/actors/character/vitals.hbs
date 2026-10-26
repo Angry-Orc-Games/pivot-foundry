@@ -18,7 +18,6 @@
     <div class="pf-stat">
       <b>SPEED</b>
       <span>{{derived.speed}} m</span>
-      <small>Prof. bonus +{{derived.proficiencyBonus}}</small>
     </div>
 
     <div class="pf-stat">
@@ -96,6 +95,8 @@
       {{#if initiativeText}}{{initiativeText}}{{else}}{{derived.initiative}}{{/if}}</button>
     <span aria-hidden="true">·</span>
     <span>Passive Perception {{derived.passivePerception}}</span>
+    <span aria-hidden="true">·</span>
+    <span>Prof. bonus +{{derived.proficiencyBonus}}</span>
   </div>
 
   <div class="pf-small">★ Primary abilities add Proficiency Bonus to saves.</div>
