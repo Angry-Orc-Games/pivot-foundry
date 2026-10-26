@@ -882,3 +882,114 @@ describe("character sheet edit toggle", () => {
     expect(stillLocked.disabledAttr).toBe("disabled");
   });
 });
+
+describe("character sheet submit", () => {
+  it("writes only fields that differ from the actor source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await submitSheetClass().DEFAULT_OPTIONS.form.handler.call(
+      sheet,
+      submitClick(),
+      {} as HTMLFormElement,
+      {
+        object: {
+          name: "Hera",
+          "system.progression.level": 5,
+          "system.attributes.hp.max": 28,
+        },
+      },
+    );
+
+    expect(updates).toEqual([{ system: { progression: { level: 5 } } }]);
+  });
+
+  it("does not write a second sheet's unchanged fields over the shared source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await submitSheetClass().DEFAULT_OPTIONS.form.handler.call(
+      sheet,
+      submitClick(),
+      {} as HTMLFormElement,
+      {
+        object: {
+          name: "Renamed Hera",
+          "system.progression.level": 4,
+          "system.attributes.hp.max": 28,
+        },
+      },
+    );
+
+    expect(updates).toEqual([{ name: "Renamed Hera" }]);
+  });
+
+  it("skips update when the form matches the actor source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await submitSheetClass().DEFAULT_OPTIONS.form.handler.call(
+      sheet,
+      submitClick(),
+      {} as HTMLFormElement,
+      {
+        object: {
+          name: "Hera",
+          "system.progression.level": 4,
+          "system.attributes.hp.max": 28,
+        },
+      },
+    );
+
+    expect(updates).toEqual([]);
+  });
+});
+
+function worldActorSheet() {
+  const updates: Record<string, unknown>[] = [];
+  const document = {
+    name: "Hera",
+    type: "character",
+    token: null,
+    system: {
+      progression: { level: 4 },
+      attributes: { hp: { value: 12, max: 28 } },
+      initiative: 3,
+    },
+    _source: {
+      name: "Hera",
+      system: {
+        progression: { level: 4 },
+        attributes: { hp: { value: 12, max: 28 } },
+      },
+    },
+    async update(data: Record<string, unknown>) {
+      updates.push(structuredClone(data));
+    },
+  };
+  const sheet = Object.assign(Object.create(submitSheetClass().prototype), { document });
+  return { sheet, updates };
+}
+
+function submitClick() {
+  return { preventDefault() {} } as PointerEvent;
+}
+
+function submitSheetClass() {
+  return createPivotCharacterSheetClass({
+    applications: {
+      api: { HandlebarsApplicationMixin: (base: unknown) => base },
+      sheets: {
+        ActorSheetV2: class ActorSheetV2 {
+          static DEFAULT_OPTIONS = {};
+        },
+      },
+    },
+  } as never) as unknown as {
+    prototype: object;
+    DEFAULT_OPTIONS: {
+      form: {
+        handler: (
+          this: object,
+          event: Event,
+          form: HTMLFormElement,
+          formData: { object?: Record<string, unknown> },
+        ) => Promise<unknown>;
+      };
+    };
+  };
+}
