@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import type { FoundryRuntime } from "../../src/foundry-runtime";
 import {
   applyInitiativeRollToCombat,
   buildD20ChatFlavor,
   buildRollModeDialogContent,
   createEmbeddedItemData,
+  createPivotCharacterSheetClass,
   naturalResultsFromRoll,
   nextResourceValue,
   normalizeSheetSubmitData,
@@ -505,3 +507,128 @@ describe("sheet interaction helpers", () => {
     });
   });
 });
+
+describe("character sheet submit", () => {
+  it("writes only fields that differ from the actor source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        name: "Hera",
+        "system.progression.level": 5,
+        "system.attributes.hp.max": 28,
+      },
+    });
+
+    expect(updates).toEqual([{ system: { progression: { level: 5 } } }]);
+  });
+
+  it("does not write a second sheet's unchanged fields over the shared source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        name: "Renamed Hera",
+        "system.progression.level": 4,
+        "system.attributes.hp.max": 28,
+      },
+    });
+
+    expect(updates).toEqual([{ name: "Renamed Hera" }]);
+  });
+
+  it("skips update when the form matches the actor source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        name: "Hera",
+        "system.progression.level": 4,
+        "system.attributes.hp.max": 28,
+      },
+    });
+
+    expect(updates).toEqual([]);
+  });
+});
+
+function worldActorSheet() {
+  const updates: Record<string, unknown>[] = [];
+  const document = {
+    name: "Hera",
+    type: "character",
+    token: null,
+    system: {
+      progression: { level: 4 },
+      attributes: { hp: { value: 12, max: 28 } },
+      initiative: 3,
+    },
+    _source: {
+      name: "Hera",
+      system: {
+        progression: { level: 4 },
+        attributes: { hp: { value: 12, max: 28 } },
+      },
+    },
+    async update(data: Record<string, unknown>) {
+      updates.push(structuredClone(data));
+    },
+  };
+  const sheet = Object.assign(Object.create(sheetClass().prototype), { document });
+  return { sheet, updates };
+}
+
+function click() {
+  return { preventDefault() {} } as PointerEvent;
+}
+
+function sheetClass() {
+  return createPivotCharacterSheetClass(sheetFoundry()) as unknown as {
+    prototype: object;
+    DEFAULT_OPTIONS: {
+      form: {
+        handler: (
+          this: object,
+          event: Event,
+          form: HTMLFormElement,
+          formData: { object?: Record<string, unknown> },
+        ) => Promise<unknown>;
+      };
+    };
+  };
+}
+
+function sheetFoundry(): FoundryRuntime {
+  class ActorSheetV2 {
+    readonly kind = "actor";
+  }
+  class ItemSheetV2 {
+    readonly kind = "item";
+  }
+  class TypeDataModel {
+    readonly kind = "model";
+  }
+  class NumberField {
+    readonly kind = "number";
+  }
+  class StringField {
+    readonly kind = "string";
+  }
+  class BooleanField {
+    readonly kind = "boolean";
+  }
+  class SchemaField {
+    readonly kind = "schema";
+  }
+  class ArrayField {
+    readonly kind = "array";
+  }
+  return {
+    abstract: { TypeDataModel },
+    data: {
+      fields: { NumberField, StringField, BooleanField, SchemaField, ArrayField },
+    },
+    applications: {
+      api: { HandlebarsApplicationMixin: (base) => base },
+      apps: { DocumentSheetConfig: { registerSheet() {} } },
+      sheets: { ActorSheetV2, ItemSheetV2 },
+    },
+  };
+}
