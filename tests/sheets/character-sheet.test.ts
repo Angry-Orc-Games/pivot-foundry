@@ -975,6 +975,7 @@ function submitSheetClass() {
       api: { HandlebarsApplicationMixin: (base: unknown) => base },
       sheets: {
         ActorSheetV2: class ActorSheetV2 {
+          readonly kind = "actor";
           static DEFAULT_OPTIONS = {};
         },
       },
