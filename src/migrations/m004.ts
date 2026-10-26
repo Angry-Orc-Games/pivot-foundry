@@ -1,7 +1,7 @@
 import { validAmount } from "../rules/survival";
 import type { MigrationPlan } from "./m001";
 
-export const HP_LINK_MIGRATION_ID = "M003";
+export const HP_LINK_MIGRATION_ID = "M004";
 
 export function planHpLinkMigration(input: {
   type?: string;

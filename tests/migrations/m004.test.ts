@@ -114,7 +114,7 @@ function unlinkLocalize(key: string): string {
     : key;
 }
 
-describe("M003 HP max and prototype link", () => {
+describe("M004 HP max and prototype link", () => {
   it("repairs a blank, non-numeric, or too-small HP max on a base actor", async () => {
     const blank = createActor("Blank", settled({ value: 14, max: null }), { type: "character" });
     const text = createActor("Text", settled({ value: 9, max: "nope" }), { type: "character" });
