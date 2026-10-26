@@ -25,12 +25,47 @@ export function planHpLinkMigration(input: {
   return { ok: true, changed: true, update };
 }
 
+export function planTokenDeltaHp(input: {
+  deltaSystem: unknown;
+  baseSystem: unknown;
+}): MigrationPlan {
+  const max = tokenDeltaMax(input.deltaSystem, input.baseSystem);
+  if (max === undefined) return { ok: true, changed: false };
+  return { ok: true, changed: true, update: { "system.attributes.hp.max": max } };
+}
+
 function repairedHpMax(system: unknown): number | undefined {
   const hp = storedHp(system);
   if (!hp || !Object.hasOwn(hp, "max")) return undefined;
-  const compared = validAmount(hp.value) ? hp.value : 0;
-  if (validAmount(hp.max) && hp.max >= compared) return undefined;
-  return compared;
+  if (!validAmount(hp.value)) return undefined;
+  if (validAmount(hp.max) && hp.max >= hp.value) return undefined;
+  return hp.value;
+}
+
+function repairedBaseMax(system: unknown): number | undefined {
+  const hp = storedHp(system);
+  if (!hp || !validAmount(hp.value) || !Object.hasOwn(hp, "max")) return undefined;
+  if (validAmount(hp.max) && hp.max >= hp.value) return hp.max;
+  return hp.value;
+}
+
+function tokenDeltaMax(deltaSystem: unknown, baseSystem: unknown): number | undefined {
+  const deltaHp = storedHp(deltaSystem);
+  if (!deltaHp) return undefined;
+  const hasValue = Object.hasOwn(deltaHp, "value");
+  if (hasValue && !validAmount(deltaHp.value)) return undefined;
+  const ownValue = hasValue && validAmount(deltaHp.value) ? deltaHp.value : undefined;
+  const baseHp = storedHp(baseSystem);
+  const baseValue = baseHp && validAmount(baseHp.value) ? baseHp.value : undefined;
+  if (Object.hasOwn(deltaHp, "max")) {
+    const compared = ownValue ?? baseValue;
+    if (compared === undefined) return undefined;
+    if (validAmount(deltaHp.max) && deltaHp.max >= compared) return undefined;
+    return compared;
+  }
+  const baseMax = repairedBaseMax(baseSystem);
+  if (ownValue !== undefined && baseMax !== undefined && ownValue > baseMax) return ownValue;
+  return undefined;
 }
 
 function storedHp(system: unknown): Record<string, unknown> | undefined {

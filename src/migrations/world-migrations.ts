@@ -1,4 +1,4 @@
-import { HP_LINK_MIGRATION_ID, planHpLinkMigration } from "./m003";
+import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m003";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planActorMigration,
@@ -23,13 +23,20 @@ export interface WorldMigrationGame {
   actors?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   scenes?:
-    | Iterable<{ tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }> }>
+    | Iterable<{ tokens?: Iterable<SceneToken> }>
     | {
         contents: Iterable<{
-          tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }>;
+          tokens?: Iterable<SceneToken>;
         }>;
       };
   i18n?: { localize?: (key: string) => string };
+}
+
+interface SceneToken {
+  actorLink?: boolean;
+  actorId?: string;
+  actor?: MigratableDocument | null;
+  delta?: MigratableDocument | null;
 }
 
 export interface WorldMigrationDependencies {
@@ -61,24 +68,15 @@ export async function runWorldMigrations(
       : Array.from(game.scenes)
     : [];
   const sceneTokens = sceneList.flatMap((scene) => Array.from(scene.tokens ?? []));
-  for (const token of sceneTokens) {
-    if (token.actorLink !== false || token.actor?.type !== "character") continue;
-    dependencies.log?.(
-      formatMessage(
-        "PIVOT.Migration.TokenLeftUnlinked",
-        { name: token.actor.name ?? token.actor.id ?? "unknown" },
-        dependencies,
-      ),
-    );
-  }
-  const syntheticActors = sceneTokens.flatMap((token) =>
-    token.actorLink === false && token.actor ? [token.actor] : [],
+  const actors = listDocuments(game.actors);
+  const actorsById = new Map(
+    actors.flatMap((actor) => (actor.id ? [[actor.id, actor] as const] : [])),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
     game.items,
   ).map((document) => ({ document, plan: planItemMigration(readStoredSystem(document)) }));
-  for (const actor of listDocuments(game.actors)) {
+  for (const actor of actors) {
     planned.push({
       document: actor,
       plan: planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
@@ -86,22 +84,32 @@ export async function runWorldMigrations(
     for (const item of listDocuments(actor.items))
       planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
   }
-  for (const actor of syntheticActors) {
+  for (const token of sceneTokens) {
+    if (token.actorLink !== false || !token.actor) continue;
     planned.push({
-      document: actor,
-      plan: planAllActorMigrations(
-        readStoredSystem(actor),
-        actor.type,
-        prototypeLink(actor, false),
-      ),
+      document: token.actor,
+      plan: planUnlinkedToken(token, actorsById),
     });
-    for (const item of listDocuments(actor.items))
+    for (const item of listDocuments(token.actor.items))
       planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
   }
+  const wrote = new Set<MigratableDocument>();
   for (const entry of planned) {
     const result = await persistMigration(entry.document, entry.plan, dependencies);
+    if (result.updated > 0) wrote.add(entry.document);
     updated += result.updated;
     failed += result.failed;
+  }
+  for (const token of sceneTokens) {
+    if (token.actorLink !== false || token.actor?.type !== "character") continue;
+    if (!token.actor || !wrote.has(token.actor)) continue;
+    dependencies.log?.(
+      formatMessage(
+        "PIVOT.Migration.TokenLeftUnlinked",
+        { name: token.actor.name ?? token.actor.id ?? "unknown" },
+        dependencies,
+      ),
+    );
   }
 
   if (updated > 0 || failed > 0) {
@@ -204,6 +212,7 @@ export function planAllActorMigrations(
   source: unknown,
   type?: string,
   prototype?: { linkPrototype: boolean; hasPrototypeToken: boolean; actorLink?: unknown },
+  options?: { repairHp?: boolean },
 ): MigrationPlan {
   const first = planActorMigration(source);
   if (!first.ok) return first;
@@ -212,13 +221,16 @@ export function planAllActorMigrations(
       ? ({ ok: true, changed: false } as const)
       : planSurvivalMigration(source);
   if (!survival.ok) return survival;
-  const hp = planHpLinkMigration({
-    type,
-    system: source,
-    linkPrototype: prototype?.linkPrototype === true,
-    hasPrototypeToken: prototype?.hasPrototypeToken === true,
-    actorLink: prototype?.actorLink,
-  });
+  const hp =
+    options?.repairHp === false
+      ? ({ ok: true, changed: false } as const)
+      : planHpLinkMigration({
+          type,
+          system: source,
+          linkPrototype: prototype?.linkPrototype === true,
+          hasPrototypeToken: prototype?.hasPrototypeToken === true,
+          actorLink: prototype?.actorLink,
+        });
   if (!hp.ok) return hp;
   if (!first.changed && !survival.changed && !hp.changed) return { ok: true, changed: false };
   return {
@@ -228,6 +240,46 @@ export function planAllActorMigrations(
       ...(first.changed ? first.update : {}),
       ...(survival.changed ? survival.update : {}),
       ...(hp.changed ? hp.update : {}),
+    },
+  };
+}
+
+function planUnlinkedToken(
+  token: SceneToken,
+  actorsById: Map<string, MigratableDocument>,
+): MigrationPlan {
+  const actor = token.actor;
+  if (!actor) return { ok: true, changed: false };
+  const merged = readStoredSystem(actor);
+  const structural = planAllActorMigrations(merged, actor.type, prototypeLink(actor, false), {
+    repairHp: false,
+  });
+  if (!token.delta) {
+    return mergeMigrationPlans(
+      structural,
+      planHpLinkMigration({ type: actor.type, system: merged, linkPrototype: false }),
+    );
+  }
+  const base = token.actorId ? actorsById.get(token.actorId) : undefined;
+  return mergeMigrationPlans(
+    structural,
+    planTokenDeltaHp({
+      deltaSystem: readStoredSystem(token.delta),
+      baseSystem: base ? readStoredSystem(base) : undefined,
+    }),
+  );
+}
+
+function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): MigrationPlan {
+  if (!left.ok) return left;
+  if (!right.ok) return right;
+  if (!left.changed && !right.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      ...(left.changed ? left.update : {}),
+      ...(right.changed ? right.update : {}),
     },
   };
 }
