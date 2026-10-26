@@ -1,4 +1,5 @@
-import { planSurvivalMigration } from "./m002";
+import { HP_LINK_MIGRATION_ID, planHpLinkMigration } from "./m003";
+import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planActorMigration,
   planItemMigration,
@@ -11,8 +12,8 @@ export interface MigratableDocument {
   name?: string;
   type?: string;
   system?: unknown;
-  _source?: { system?: unknown };
-  toObject?: () => { system?: unknown };
+  _source?: { system?: unknown; prototypeToken?: { actorLink?: unknown } };
+  toObject?: () => { system?: unknown; prototypeToken?: { actorLink?: unknown } };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   update?: (data: Record<string, unknown>) => Promise<unknown>;
 }
@@ -59,19 +60,40 @@ export async function runWorldMigrations(
       ? Array.from(game.scenes.contents)
       : Array.from(game.scenes)
     : [];
-  const syntheticActors = sceneList.flatMap((scene) =>
-    Array.from(scene.tokens ?? []).flatMap((token) =>
-      token.actorLink === false && token.actor ? [token.actor] : [],
-    ),
+  const sceneTokens = sceneList.flatMap((scene) => Array.from(scene.tokens ?? []));
+  for (const token of sceneTokens) {
+    if (token.actorLink !== false || token.actor?.type !== "character") continue;
+    dependencies.log?.(
+      formatMessage(
+        "PIVOT.Migration.TokenLeftUnlinked",
+        { name: token.actor.name ?? token.actor.id ?? "unknown" },
+        dependencies,
+      ),
+    );
+  }
+  const syntheticActors = sceneTokens.flatMap((token) =>
+    token.actorLink === false && token.actor ? [token.actor] : [],
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
     game.items,
   ).map((document) => ({ document, plan: planItemMigration(readStoredSystem(document)) }));
-  for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
+  for (const actor of listDocuments(game.actors)) {
     planned.push({
       document: actor,
-      plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
+      plan: planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
+    });
+    for (const item of listDocuments(actor.items))
+      planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
+  }
+  for (const actor of syntheticActors) {
+    planned.push({
+      document: actor,
+      plan: planAllActorMigrations(
+        readStoredSystem(actor),
+        actor.type,
+        prototypeLink(actor, false),
+      ),
     });
     for (const item of listDocuments(actor.items))
       planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
@@ -86,7 +108,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -178,15 +200,75 @@ function formatMessage(
   );
 }
 
-export function planAllActorMigrations(source: unknown, type?: string): MigrationPlan {
+export function planAllActorMigrations(
+  source: unknown,
+  type?: string,
+  prototype?: { linkPrototype: boolean; hasPrototypeToken: boolean; actorLink?: unknown },
+): MigrationPlan {
   const first = planActorMigration(source);
-  if (!first.ok || (type && type !== "character")) return first;
-  const second = planSurvivalMigration(source);
-  if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  if (!first.ok) return first;
+  const survival =
+    type && type !== "character"
+      ? ({ ok: true, changed: false } as const)
+      : planSurvivalMigration(source);
+  if (!survival.ok) return survival;
+  const hp = planHpLinkMigration({
+    type,
+    system: source,
+    linkPrototype: prototype?.linkPrototype === true,
+    hasPrototypeToken: prototype?.hasPrototypeToken === true,
+    actorLink: prototype?.actorLink,
+  });
+  if (!hp.ok) return hp;
+  if (!first.changed && !survival.changed && !hp.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
-    update: { ...(first.changed ? first.update : {}), ...(second.changed ? second.update : {}) },
+    update: {
+      ...(first.changed ? first.update : {}),
+      ...(survival.changed ? survival.update : {}),
+      ...(hp.changed ? hp.update : {}),
+    },
   };
+}
+
+function prototypeLink(
+  actor: MigratableDocument,
+  linkPrototype: boolean,
+): { linkPrototype: boolean; hasPrototypeToken: boolean; actorLink?: unknown } {
+  const token = readStoredPrototypeToken(actor);
+  return {
+    linkPrototype: linkPrototype && actor.type === "character",
+    hasPrototypeToken: token !== undefined,
+    actorLink: token?.actorLink,
+  };
+}
+
+function readStoredPrototypeToken(
+  document: MigratableDocument,
+): { actorLink?: unknown } | undefined {
+  const root = readStoredRoot(document);
+  const token = root?.prototypeToken;
+  if (!isRecord(token)) return undefined;
+  return token;
+}
+
+function readStoredRoot(document: MigratableDocument): Record<string, unknown> | undefined {
+  const object = callToObject(document);
+  if (isRecord(object)) return object;
+  if (isRecord(document._source)) return document._source;
+  return undefined;
+}
+
+function callToObject(document: MigratableDocument): unknown {
+  if (typeof document.toObject !== "function") return undefined;
+  try {
+    return document.toObject();
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
