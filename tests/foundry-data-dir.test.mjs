@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,7 @@ import {
   prepareDataDir,
   waitForHttp,
 } from "../scripts/foundry-compose.mjs";
+import { createPrivilegeDouble, removeSandbox } from "./helpers/privilege-double.mjs";
 
 const abortLog = [
   "Volume write test failed.",
@@ -140,9 +141,26 @@ exit 1
 });
 
 describe("chowned Foundry data", () => {
+  it("does not grant privilege outside the temp sandbox", () => {
+    const root = mkdtempSync(join(tmpdir(), "pivot-priv-guard-"));
+    const hosts = statSync("/etc/hosts");
+    const privilege = createPrivilegeDouble(root);
+    expect(() =>
+      privilege.execFileSync("sudo", ["-n", "chown", "0:0", "/etc/hosts"], { stdio: "ignore" }),
+    ).toThrow(/outside sandbox/);
+    const after = statSync("/etc/hosts");
+    expect(after.mtimeMs).toBe(hosts.mtimeMs);
+    expect(after.mode).toBe(hosts.mode);
+    expect(after.uid).toBe(hosts.uid);
+    expect(after.gid).toBe(hosts.gid);
+    removeSandbox(root);
+  });
+
   it("replaces a chowned packaged system and removes the data dir afterward", async () => {
-    const { installPackagedSystem } = await import("../scripts/foundry-compose.mjs");
+    const { installPackagedSystem, removeFoundryTree } =
+      await import("../scripts/foundry-compose.mjs");
     const root = await mkdtemp(join(tmpdir(), "pivot-data-lock-"));
+    const privilege = createPrivilegeDouble(root);
     const dataDir = join(root, "foundry-data");
     const systemsDir = join(dataDir, "Data", "systems");
     const systemDir = join(systemsDir, "pivot-fantasy");
@@ -157,22 +175,24 @@ describe("chowned Foundry data", () => {
     chmodSync(systemsDir, 0o555);
 
     try {
-      installPackagedSystem({ foundryData: dataDir }, zipPath);
+      installPackagedSystem({ foundryData: dataDir }, zipPath, {
+        execFileSync: privilege.execFileSync,
+      });
       expect(readFileSync(join(systemDir, "system.json"), "utf8")).toContain('"title":"replaced"');
       expect(existsSync(join(systemDir, "old.txt"))).toBe(false);
       chmodSync(dataDir, 0o555);
-      const { removeFoundryTree } = await import("../scripts/foundry-compose.mjs");
-      removeFoundryTree(dataDir);
+      removeFoundryTree(dataDir, { execFileSync: privilege.execFileSync });
       expect(existsSync(dataDir)).toBe(false);
     } finally {
-      execFileSync("sudo", ["-n", "chmod", "-R", "a+rwx", root], { stdio: "ignore" });
-      rmSync(root, { recursive: true, force: true });
+      removeSandbox(root);
     }
   });
 
   it("repairs ownership after a privileged unzip when the data dir is already 1000", async () => {
     const { installPackagedSystem } = await import("../scripts/foundry-compose.mjs");
     const root = await mkdtemp(join(tmpdir(), "pivot-data-owner-"));
+    const privilege = createPrivilegeDouble(root);
+    const io = { execFileSync: privilege.execFileSync, statSync: privilege.statSync };
     const dataDir = join(root, "foundry-data");
     const systemsDir = join(dataDir, "Data", "systems");
     const systemDir = join(systemsDir, "pivot-fantasy");
@@ -185,24 +205,23 @@ describe("chowned Foundry data", () => {
     await writeFile(join(zipDir, "packs", "module.json"), "{}\n");
     await writeFile(outside, "keep");
     execFileSync("zip", ["-q", "-r", zipPath, "system.json", "packs"], { cwd: zipDir });
-    execFileSync("sudo", ["-n", "chown", "0:0", outside], { stdio: "ignore" });
+    privilege.execFileSync("sudo", ["-n", "chown", "0:0", outside], { stdio: "ignore" });
     chmodSync(systemDir, 0o555);
     chmodSync(systemsDir, 0o555);
 
     try {
-      installPackagedSystem({ foundryData: dataDir }, zipPath);
-      prepareDataDir(dataDir);
-      const systemFile = statSync(join(systemDir, "system.json"));
-      const nested = statSync(join(systemDir, "packs", "module.json"));
+      installPackagedSystem({ foundryData: dataDir }, zipPath, io);
+      prepareDataDir(dataDir, io);
+      const systemFile = privilege.statSync(join(systemDir, "system.json"));
+      const nested = privilege.statSync(join(systemDir, "packs", "module.json"));
       expect(systemFile.uid).toBe(1000);
       expect(systemFile.gid).toBe(1000);
       expect(nested.uid).toBe(1000);
       expect(nested.gid).toBe(1000);
-      expect(statSync(outside).uid).toBe(0);
-      expect(statSync(dataDir).uid).toBe(1000);
+      expect(privilege.statSync(outside).uid).toBe(0);
+      expect(privilege.statSync(dataDir).uid).toBe(1000);
     } finally {
-      execFileSync("sudo", ["-n", "chmod", "-R", "a+rwx", root], { stdio: "ignore" });
-      rmSync(root, { recursive: true, force: true });
+      removeSandbox(root);
     }
   });
 });

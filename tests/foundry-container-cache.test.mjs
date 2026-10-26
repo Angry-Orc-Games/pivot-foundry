@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { writeComposeEnv } from "../scripts/foundry-compose.mjs";
 import { createFoundryPaths } from "../scripts/foundry-env.mjs";
+import { createPrivilegeDouble, removeSandbox } from "./helpers/privilege-double.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -100,13 +100,14 @@ describe("writable Foundry release cache", () => {
       containerCacheDir: cacheDir,
       versions: { cacheFileName: zipName },
     };
+    const privilege = createPrivilegeDouble(root);
     const lockAfterChown = (command, args, options) => {
       if (command === "chown" || (command === "sudo" && args[1] === "chown")) {
         chmodSync(cacheDir, 0o555);
         chmodSync(dest, 0o444);
         return;
       }
-      return execFileSync(command, args, options);
+      return privilege.execFileSync(command, args, options);
     };
 
     try {
@@ -115,8 +116,7 @@ describe("writable Foundry release cache", () => {
       prepareContainerCache(paths, { execFileSync: lockAfterChown });
       expect(readFileSync(dest, "utf8")).toBe("second-bytes");
     } finally {
-      execFileSync("sudo", ["-n", "chmod", "-R", "a+rwx", root], { stdio: "ignore" });
-      rmSync(root, { recursive: true, force: true });
+      removeSandbox(root);
     }
   });
 });
