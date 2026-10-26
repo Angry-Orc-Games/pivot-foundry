@@ -165,28 +165,29 @@ describe("M004 HP max and prototype link", () => {
   });
 
   it("repairs a bad HP max on an unlinked token delta and logs the token left unlinked", async () => {
-    const token = createActor("Scout", settled({ value: 7, max: null }), { type: "character" });
+    const { base, synthetic, token } = createBaseAndDelta(
+      "Scout",
+      settled({ value: 10, max: 20 }),
+      {
+        attributes: { hp: { value: 7, max: null } },
+      },
+    );
     const logs: string[] = [];
 
     await runWorldMigrations({
       game: {
         user: { isGM: true },
-        actors: [],
+        actors: [base],
         items: [],
-        scenes: [{ tokens: [{ actorLink: false, actor: token }] }],
-        i18n: {
-          localize: (key) =>
-            key === "PIVOT.Migration.TokenLeftUnlinked"
-              ? "Left {name} unlinked. This placed scene token keeps its own HP delta."
-              : key,
-        },
-      },
+        scenes: [{ tokens: [token] }],
+        i18n: { localize: unlinkLocalize },
+      } as WorldMigrationGame,
       log: (message) => logs.push(message),
     });
 
-    expect(token.updates).toEqual([{ "system.attributes.hp.max": 7 }]);
-    expect(JSON.stringify(token.updates)).not.toMatch(/actorLink/);
-    expect(logs).toContain("Left Scout unlinked. This placed scene token keeps its own HP delta.");
+    expect(synthetic.updates).toEqual([{ "system.attributes.hp.max": 7 }]);
+    expect(JSON.stringify(synthetic.updates)).not.toMatch(/actorLink/);
+    expect(logs).toContain(leftUnlinked("Scout Token"));
   });
 
   it("raises HP max when current HP is above max and keeps the current HP", async () => {
@@ -352,18 +353,17 @@ describe("M004 HP max and prototype link", () => {
 
   it("logs an unlinked character token only when this run wrote it", async () => {
     const healthy = createActor("Healthy", settled({ value: 8, max: 8 }), { type: "character" });
-    const scout = createActor("Scout", settled({ value: 7, max: null }), { type: "character" });
+    const scout = createBaseAndDelta("Scout", settled({ value: 10, max: 20 }), {
+      attributes: { hp: { value: 7, max: null } },
+    });
     const logs: string[] = [];
     const game = {
       user: { isGM: true },
-      actors: [],
+      actors: [scout.base],
       items: [],
       scenes: [
         {
-          tokens: [
-            { actorLink: false, actor: healthy },
-            { actorLink: false, actor: scout },
-          ],
+          tokens: [{ actorLink: false, actor: healthy }, scout.token],
         },
       ],
       i18n: { localize: unlinkLocalize },
@@ -373,14 +373,15 @@ describe("M004 HP max and prototype link", () => {
 
     expect(healthy.updates).toEqual([]);
     expect(logs).not.toContain(leftUnlinked("Healthy"));
-    expect(logs).toContain(leftUnlinked("Scout"));
+    expect(scout.synthetic.updates).toEqual([{ "system.attributes.hp.max": 7 }]);
+    expect(logs).toContain(leftUnlinked("Scout Token"));
 
     logs.length = 0;
-    scout.updates.length = 0;
+    scout.synthetic.updates.length = 0;
     await runWorldMigrations({ game, log: (message) => logs.push(message) });
 
-    expect(scout.updates).toEqual([]);
-    expect(logs).not.toContain(leftUnlinked("Scout"));
+    expect(scout.synthetic.updates).toEqual([]);
+    expect(logs).not.toContain(leftUnlinked("Scout Token"));
   });
 
   it("skips HP max repair when current HP is not a safe non-negative integer", async () => {

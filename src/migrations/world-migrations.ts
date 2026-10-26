@@ -254,17 +254,11 @@ function planUnlinkedToken(
   const structural = planAllActorMigrations(merged, actor.type, prototypeLink(actor, false), {
     repairHp: false,
   });
-  if (!token.delta) {
-    return mergeMigrationPlans(
-      structural,
-      planHpLinkMigration({ type: actor.type, system: merged, linkPrototype: false }),
-    );
-  }
   const base = token.actorId ? actorsById.get(token.actorId) : undefined;
   return mergeMigrationPlans(
     structural,
     planTokenDeltaHp({
-      deltaSystem: readStoredSystem(token.delta),
+      deltaSystem: token.delta ? readStoredSystem(token.delta) : undefined,
       baseSystem: base ? readStoredSystem(base) : undefined,
     }),
   );
