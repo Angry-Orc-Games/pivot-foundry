@@ -72,6 +72,31 @@ function deepMerge(
   return result;
 }
 
+function createMissingDelta(baseName: string, delta: null | undefined) {
+  const base = createActor(baseName, settled({ value: 14, max: null }), {
+    id: `${baseName}-id`,
+    type: "character",
+  });
+  const writes: Record<string, unknown>[] = [];
+  const synthetic = {
+    id: `${baseName}-token`,
+    name: `${baseName} Token`,
+    type: "character" as const,
+    updates: writes,
+    toObject: () => ({ system: structuredClone(base.stored.system) }),
+    update: async (data: Record<string, unknown>) => {
+      writes.push(structuredClone(data));
+    },
+  };
+  const token = {
+    actorLink: false as const,
+    actorId: base.id,
+    actor: synthetic,
+    ...(delta === null ? { delta: null } : {}),
+  };
+  return { base, synthetic, token };
+}
+
 function createBaseAndDelta(
   baseName: string,
   baseSystem: Record<string, unknown>,
@@ -262,6 +287,38 @@ describe("M004 HP max and prototype link", () => {
     });
 
     expect(base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(synthetic.updates).toEqual([]);
+  });
+
+  it("does not write a base HP max onto a token whose delta is null", async () => {
+    const { base, synthetic, token } = createMissingDelta("Lazy", null);
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+      } as WorldMigrationGame,
+    });
+
+    expect(base.updates).toEqual([{ "system.attributes.hp.max": 14 }]);
+    expect(synthetic.updates).toEqual([]);
+  });
+
+  it("does not write a base HP max onto a token whose delta is missing", async () => {
+    const { base, synthetic, token } = createMissingDelta("Absent", undefined);
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+      } as WorldMigrationGame,
+    });
+
+    expect(base.updates).toEqual([{ "system.attributes.hp.max": 14 }]);
     expect(synthetic.updates).toEqual([]);
   });
 
