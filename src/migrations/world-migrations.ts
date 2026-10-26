@@ -1,3 +1,4 @@
+import { planMpClampMigration } from "./m005";
 import { planSurvivalMigration } from "./m002";
 import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
 import {
@@ -66,19 +67,20 @@ export async function runWorldMigrations(
     ),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
-  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
-    game.items,
-  ).map((document) => {
-    const stored = readStoredSystem(document);
-    return {
-      document,
-      plan: combineItemMigrations(stored),
-    };
-  });
+  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
+    listDocuments(game.items).map((document) => {
+      const stored = readStoredSystem(document);
+      return {
+        document,
+        plan: combineItemMigrations(stored),
+      };
+    });
   for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
+    const mpClamp = planMpClampMigration(actor);
     planned.push({
       document: actor,
-      plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
+      plan: combinePlans(planAllActorMigrations(readStoredSystem(actor), actor.type), mpClamp.plan),
+      notice: mpClamp.notice,
     });
     for (const item of listDocuments(actor.items)) {
       planned.push({
@@ -91,13 +93,17 @@ export async function runWorldMigrations(
     const result = await persistMigration(entry.document, entry.plan, dependencies);
     updated += result.updated;
     failed += result.failed;
+    if (result.updated > 0 && entry.notice) {
+      dependencies.notify?.("info", entry.notice);
+      dependencies.log?.(entry.notice);
+    }
   }
 
   if (updated > 0 || failed > 0) {
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
+        id: `${SCHEMA_MIGRATION_ID} / M002 / M003 / M005`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -204,6 +210,20 @@ export function planAllActorMigrations(source: unknown, type?: string): Migratio
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
       ...(third.changed ? third.update : {}),
+    },
+  };
+}
+
+function combinePlans(first: MigrationPlan, second: MigrationPlan): MigrationPlan {
+  if (!first.ok) return first;
+  if (!second.ok) return second;
+  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      ...(first.changed ? first.update : {}),
+      ...(second.changed ? second.update : {}),
     },
   };
 }
