@@ -609,7 +609,7 @@ export async function rollInitiativeWithDiceAnimation(options: {
   roll: {
     toMessage: (
       data: Record<string, unknown>,
-      options?: { rollMode?: string; create?: boolean },
+      options?: { messageMode?: string; create?: boolean },
     ) => Promise<unknown>;
   };
   total: number;
@@ -620,17 +620,16 @@ export async function rollInitiativeWithDiceAnimation(options: {
 }): Promise<void> {
   const { actor, roll, total, flavor, combat, notify, localize } = options;
 
-  // Get roll mode from game settings (defaults to "roll" = public)
   const game = globalThis as typeof globalThis & {
     game?: { settings?: { get?: (scope: string, key: string) => unknown } };
   };
-  const rawMode = game.game?.settings?.get?.("core", "rollMode");
-  const rollMode = typeof rawMode === "string" ? rawMode : "roll";
+  const rawMode = game.game?.settings?.get?.("core", "messageMode");
+  const messageMode = typeof rawMode === "string" ? rawMode : "public";
 
-  // Build message data only (create:false); roll mode is applied by toMessage.
+  // create:false so toMessage applies visibility and we create the one message Dice So Nice waits on.
   const chatData = (await roll.toMessage(
     { speaker: speakerForActor(actor), flavor, flags: { "core.initiativeRoll": true } },
-    { rollMode, create: false },
+    { messageMode, create: false },
   )) as Record<string, unknown>;
 
   const ChatMessage = (
@@ -1015,7 +1014,7 @@ type InitiativeRoll = {
   terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
   toMessage: (
     data: Record<string, unknown>,
-    options?: { rollMode?: string; create?: boolean },
+    options?: { messageMode?: string; create?: boolean },
   ) => Promise<unknown>;
 };
 
