@@ -147,6 +147,65 @@ describe("calculateArmourClass", () => {
       ],
     });
   });
+
+  it("adds the full Dexterity modifier for light armour", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [{ name: "Leather", category: "light", acBonus: 1, equipped: true }],
+    });
+
+    expect(result.value).toBe(15);
+    expect(result.breakdown).toContain("Dex +4");
+  });
+
+  it("adds no Dexterity for heavy armour", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [{ name: "Plate", category: "heavy", acBonus: 5, equipped: true }],
+    });
+
+    expect(result.value).toBe(15);
+    expect(result.breakdown).toContain("Dex +0");
+  });
+
+  it("adds the full Dexterity modifier for a shield with no body armour", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Shield", category: "shield", acBonus: 1, equipped: true }],
+    });
+
+    expect(result.breakdown).toContain("Dex +3");
+  });
+
+  it("adds the full Dexterity modifier for a helmet with no body armour", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Helm", category: "helmet", acBonus: 1, equipped: true }],
+    });
+
+    expect(result.breakdown).toContain("Dex +3");
+  });
+
+  it("adds the full Dexterity modifier for other armour", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 3,
+      armour: [{ name: "Bracers", category: "other", acBonus: 0, equipped: true }],
+    });
+
+    expect(result.value).toBe(13);
+    expect(result.breakdown).toContain("Dex +3");
+  });
+
+  it("keeps full Dexterity for an unknown armour category", () => {
+    const result = calculateArmourClass({
+      dexterityModifier: 4,
+      armour: [{ name: "Platemail", category: "plate-mail", acBonus: 2, equipped: true }],
+    });
+
+    expect(result.value).toBe(16);
+    expect(result.armourWorn).toBe("Platemail");
+    expect(result.breakdown).toContain("Dex +4");
+  });
 });
 
 describe("calculateTotalWeight", () => {
@@ -184,6 +243,111 @@ describe("calculateAttackSummary", () => {
       damageFormula: "1d8",
       range: { normal: 40, long: 160 },
       proficient: true,
+    });
+  });
+
+  it("does not add Constitution to the attack bonus", () => {
+    expect(
+      calculateAttackSummary({
+        proficiencyBonus: 0,
+        abilityModifiers: { str: 1, dex: 0, con: 4, int: 0, wis: 0, cha: 0 },
+        weaponProficiencies: {},
+        weapon: {
+          category: "meleeLight",
+          attackAbility: "con",
+          damageAbility: "str",
+          attackBonus: 0,
+          damageBonus: 0,
+          damageFormula: "1d4",
+          range: { normal: 0, long: 0 },
+        },
+      }).bth,
+    ).toBe(0);
+  });
+
+  it("adds no damage bonus when the damage ability is none", () => {
+    expect(
+      calculateAttackSummary({
+        proficiencyBonus: 0,
+        abilityModifiers: { str: 3, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+        weaponProficiencies: {},
+        weapon: {
+          category: "meleeLight",
+          attackAbility: "str",
+          damageAbility: "none",
+          attackBonus: 0,
+          damageBonus: 0,
+          damageFormula: "1d4",
+          range: { normal: 0, long: 0 },
+        },
+      }).btd,
+    ).toBe(0);
+  });
+
+  it("adds no damage bonus when the damage ability is Constitution", () => {
+    expect(
+      calculateAttackSummary({
+        proficiencyBonus: 0,
+        abilityModifiers: { str: 3, dex: 0, con: 4, int: 0, wis: 0, cha: 0 },
+        weaponProficiencies: {},
+        weapon: {
+          category: "meleeLight",
+          attackAbility: "str",
+          damageAbility: "con",
+          attackBonus: 0,
+          damageBonus: 0,
+          damageFormula: "1d4",
+          range: { normal: 0, long: 0 },
+        },
+      }).btd,
+    ).toBe(0);
+  });
+
+  it("does not treat thrown training as slings training", () => {
+    expect(
+      calculateAttackSummary({
+        proficiencyBonus: 2,
+        abilityModifiers: { str: 3, dex: 1, con: 0, int: 0, wis: 0, cha: 0 },
+        weaponProficiencies: { thrown: true, slings: false },
+        weapon: {
+          category: "slings",
+          attackAbility: "dex",
+          damageAbility: "str",
+          attackBonus: 0,
+          damageBonus: 0,
+          damageFormula: "1d4",
+          range: { normal: 10, long: 30 },
+        },
+      }),
+    ).toMatchObject({
+      proficient: false,
+      bth: 1,
+      btd: 3,
+      damageFormula: "1d4",
+    });
+  });
+
+  it("adds the proficiency bonus for a trained slings attack", () => {
+    expect(
+      calculateAttackSummary({
+        proficiencyBonus: 2,
+        abilityModifiers: { str: 3, dex: 1, con: 0, int: 0, wis: 0, cha: 0 },
+        weaponProficiencies: { thrown: true, slings: true },
+        weapon: {
+          category: "slings",
+          attackAbility: "dex",
+          damageAbility: "str",
+          attackBonus: 0,
+          damageBonus: 0,
+          damageFormula: "1d6",
+          range: { normal: 10, long: 30 },
+        },
+      }),
+    ).toMatchObject({
+      proficient: true,
+      bth: 3,
+      btd: 3,
+      damageFormula: "1d6",
     });
   });
 });

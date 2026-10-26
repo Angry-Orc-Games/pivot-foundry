@@ -63,6 +63,7 @@ describe("runWorldMigrations", () => {
         "system.survivalVersion": 1,
         "system.attributes.hp.temp": 0,
         "system.attributes.deathSaves.status": "unconfirmed",
+        "system.proficiencies.weapons.slings": false,
       },
     ]);
     expect(embeddedItem.updates).toEqual([

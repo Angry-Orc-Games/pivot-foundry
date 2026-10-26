@@ -120,6 +120,8 @@
   "PIVOT.Messages.NoTraits": "No traits yet",
   "PIVOT.Migration.Complete": "Pivot Fantasy migration {id} finished ({updated} updated, {failed} failed).",
   "PIVOT.Migration.DocumentFailed": "Pivot Fantasy migration {id} failed for {name}: {error}",
+  "PIVOT.Migration.FieldInvalid": "Pivot Fantasy migration M004 on {name}: {field} value \"{from}\" is not a legal choice and was left unchanged.",
+  "PIVOT.Migration.FieldRepaired": "Pivot Fantasy migration M004 on {name}: {field} changed from \"{from}\" to \"{to}\".",
   "PIVOT.Notifications.PoolAlreadyFull": "Pool is already at its maximum.",
   "PIVOT.Overlay.Alpha": "Alpha",
   "PIVOT.Overlay.Dire": "Dire",

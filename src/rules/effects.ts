@@ -1,5 +1,11 @@
-import { abilities, canonicalSkills, weaponCategories } from "../config";
+import { abilities, canonicalSkills } from "../config";
 import { type AbilityKey, abilityKeys, type DerivedEffectBonuses } from "./character-derived";
+import {
+  emptyWeaponTraining,
+  isWeaponCategoryId,
+  weaponCategories,
+  type WeaponCategoryId,
+} from "./item-choices";
 
 export const armourProficiencyCategories = ["light", "medium", "heavy", "shield"] as const;
 export const effectRuleTypes = [
@@ -15,7 +21,7 @@ export const effectRuleTypes = [
 ] as const;
 
 export type ArmourProficiencyCategory = (typeof armourProficiencyCategories)[number];
-export type WeaponCategory = (typeof weaponCategories)[number];
+export type WeaponCategory = WeaponCategoryId;
 export type EffectRuleType = (typeof effectRuleTypes)[number];
 
 export type EffectRule =
@@ -55,7 +61,6 @@ export const EFFECT_TYPE_LABEL_KEYS: Record<EffectRuleType, string> = {
 };
 
 const canonicalSkillIds = new Set(canonicalSkills.map((skill) => skill.id));
-const weaponCategorySet = new Set<string>(weaponCategories);
 const armourProficiencySet = new Set<string>(armourProficiencyCategories);
 const abilityKeySet = new Set<string>(abilityKeys);
 
@@ -72,16 +77,7 @@ export function emptyCharacterEffectSummary(): CharacterEffectSummary {
     skillBonuses: {},
     armourProficiencies: { light: false, medium: false, heavy: false },
     shieldProficiency: false,
-    weaponProficiencies: {
-      meleeLight: false,
-      meleeMedium: false,
-      meleeHeavy: false,
-      meleeTwoHandedHeavy: false,
-      bows: false,
-      crossbows: false,
-      thrown: false,
-      improvised: false,
-    },
+    weaponProficiencies: emptyWeaponTraining(),
     acBonus: 0,
     initiativeBonus: 0,
     speedBonus: 0,
@@ -259,7 +255,11 @@ export function describeEffectRule(effect: EffectRule): { typeLabelKey: string; 
     case "armourProficiency":
       return { typeLabelKey, detail: armourProficiencyLabel(effect.category) };
     case "weaponProficiency":
-      return { typeLabelKey, detail: weaponProficiencyLabel(effect.category) };
+      return {
+        typeLabelKey,
+        detail:
+          weaponCategories.find((entry) => entry.id === effect.category)?.label ?? effect.category,
+      };
     case "acBonus":
     case "initiativeBonus":
     case "speedBonus":
@@ -282,27 +282,6 @@ function armourProficiencyLabel(category: ArmourProficiencyCategory): string {
   }
 }
 
-function weaponProficiencyLabel(category: WeaponCategory): string {
-  switch (category) {
-    case "meleeLight":
-      return "Melee: Light";
-    case "meleeMedium":
-      return "Melee: Medium";
-    case "meleeHeavy":
-      return "Melee: Heavy";
-    case "meleeTwoHandedHeavy":
-      return "Melee: 2-Handed";
-    case "bows":
-      return "Bows";
-    case "crossbows":
-      return "Crossbows";
-    case "thrown":
-      return "Thrown Weapons";
-    case "improvised":
-      return "Improvised";
-  }
-}
-
 function requireAbilityKey(value: unknown): AbilityKey {
   if (typeof value === "string" && abilityKeySet.has(value)) return value as AbilityKey;
   throw new Error(`Unknown ability: ${String(value)}`);
@@ -321,7 +300,7 @@ function requireArmourProficiencyCategory(value: unknown): ArmourProficiencyCate
 }
 
 function requireWeaponCategory(value: unknown): WeaponCategory {
-  if (typeof value === "string" && weaponCategorySet.has(value)) return value as WeaponCategory;
+  if (isWeaponCategoryId(value)) return value;
   throw new Error(`Unknown weapon category: ${String(value)}`);
 }
 

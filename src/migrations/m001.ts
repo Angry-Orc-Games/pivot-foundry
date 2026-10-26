@@ -7,9 +7,21 @@ import {
 
 export { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION, SCHEMA_MIGRATION_ID };
 
+export interface MigrationNotice {
+  key: "PIVOT.Migration.FieldRepaired" | "PIVOT.Migration.FieldInvalid";
+  field: string;
+  from: string;
+  to?: string;
+}
+
 export type MigrationPlan =
-  | { ok: true; changed: false }
-  | { ok: true; changed: true; update: Record<string, unknown> }
+  | { ok: true; changed: false; notices?: readonly MigrationNotice[] }
+  | {
+      ok: true;
+      changed: true;
+      update: Record<string, unknown>;
+      notices?: readonly MigrationNotice[];
+    }
   | { ok: false; error: string };
 
 export function planActorMigration(storedSystem: unknown): MigrationPlan {

@@ -13,23 +13,24 @@
     <div class="pf-item-type">{{item.type}}</div>
   </header>
 
-  {{#if system.category}}
-    <label class="pf-wide-field">
-      <span>{{localize "PIVOT.Fields.Category"}}</span>
-      <input name="system.category" type="text" value="{{system.category}}" {{disabledAttr}} />
-    </label>
-  {{/if}}
-
   {{#if isWeapon}}
     <section class="pf-panel">
       <h2>{{localize "PIVOT.Sections.Attack"}}</h2>
       <div class="pf-field-grid">
-        <label><span>{{localize "PIVOT.Fields.AttackAbility"}}</span><input
-            name="system.attack.ability"
-            type="text"
-            value="{{system.attack.ability}}"
+        <label><span>{{localize "PIVOT.Fields.Category"}}</span><select
+            name="system.category"
             {{disabledAttr}}
-          /></label>
+          >{{selectOptions
+              weaponCategorySelect.options
+              selected=weaponCategorySelect.selected
+            }}</select></label>
+        <label><span>{{localize "PIVOT.Fields.AttackAbility"}}</span><select
+            name="system.attack.ability"
+            {{disabledAttr}}
+          >{{selectOptions
+              attackAbilitySelect.options
+              selected=attackAbilitySelect.selected
+            }}</select></label>
         <label><span>{{localize "PIVOT.Fields.Bonus"}}</span><input
             name="system.attack.bonus"
             type="number"
@@ -43,18 +44,20 @@
             value="{{system.damage.formula}}"
             {{disabledAttr}}
           /></label>
-        <label><span>{{localize "PIVOT.Fields.DamageType"}}</span><input
+        <label><span>{{localize "PIVOT.Fields.DamageType"}}</span><select
             name="system.damage.type"
-            type="text"
-            value="{{system.damage.type}}"
             {{disabledAttr}}
-          /></label>
-        <label><span>{{localize "PIVOT.Fields.DamageAbility"}}</span><input
+          >{{selectOptions
+              damageTypeSelect.options
+              selected=damageTypeSelect.selected
+            }}</select></label>
+        <label><span>{{localize "PIVOT.Fields.DamageAbility"}}</span><select
             name="system.damage.ability"
-            type="text"
-            value="{{system.damage.ability}}"
             {{disabledAttr}}
-          /></label>
+          >{{selectOptions
+              damageAbilitySelect.options
+              selected=damageAbilitySelect.selected
+            }}</select></label>
         <label><span>{{localize "PIVOT.Fields.Bonus"}}</span><input
             name="system.damage.bonus"
             type="number"
@@ -86,6 +89,13 @@
     <section class="pf-panel">
       <h2>{{localize "PIVOT.Sections.Armour"}}</h2>
       <div class="pf-field-grid">
+        <label><span>{{localize "PIVOT.Fields.Category"}}</span><select
+            name="system.category"
+            {{disabledAttr}}
+          >{{selectOptions
+              armourCategorySelect.options
+              selected=armourCategorySelect.selected
+            }}</select></label>
         <label><span>{{localize "PIVOT.Fields.ACBonus"}}</span><input
             name="system.acBonus"
             type="number"
@@ -205,6 +215,12 @@
     <section class="pf-panel">
       <h2>{{localize "PIVOT.Sections.FeatureUse"}}</h2>
       <div class="pf-field-grid">
+        <label><span>{{localize "PIVOT.Fields.Category"}}</span><input
+            name="system.category"
+            type="text"
+            value="{{system.category}}"
+            {{disabledAttr}}
+          /></label>
         <label><span>{{localize "PIVOT.Fields.Source"}}</span><input
             name="system.source"
             type="text"
