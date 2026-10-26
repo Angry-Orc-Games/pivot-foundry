@@ -948,6 +948,8 @@ describe("PivotCombat rollInitiative", () => {
     setting?: unknown;
     hidden?: boolean;
     messageOptions?: Record<string, unknown>;
+    messageMode?: string;
+    via?: "rollAll" | "rollNPC";
   }): Promise<{ data: Record<string, unknown>; options: Record<string, unknown> }> {
     let data: Record<string, unknown> = {};
     let options: Record<string, unknown> = {};
@@ -982,6 +984,7 @@ describe("PivotCombat rollInitiative", () => {
           actor: { id: "a1", name: "Hero" },
           token: { name: "Hero Token" },
           hidden: input.hidden ?? false,
+          isNPC: true,
           getInitiativeRoll: vi.fn(async () => ({
             total: 15,
             _evaluated: true,
@@ -1006,12 +1009,19 @@ describe("PivotCombat rollInitiative", () => {
     }
 
     const combat = new (createPivotCombatClass(BaseCombat as never))() as {
+      combatants: Array<{ id: string; isNPC?: boolean }>;
       rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
     };
-    await combat.rollInitiative(
-      ["c1"],
-      input.messageOptions ? { messageOptions: input.messageOptions } : {},
-    );
+    const initiativeOptions: Record<string, unknown> = {};
+    if (input.messageOptions) initiativeOptions.messageOptions = input.messageOptions;
+    if (input.messageMode !== undefined) initiativeOptions.messageMode = input.messageMode;
+    const ids =
+      input.via === "rollNPC"
+        ? combat.combatants.filter((combatant) => combatant.isNPC).map((combatant) => combatant.id)
+        : input.via === "rollAll"
+          ? combat.combatants.map((combatant) => combatant.id)
+          : ["c1"];
+    await combat.rollInitiative(ids, initiativeOptions);
     return { data, options };
   }
 
@@ -1044,6 +1054,67 @@ describe("PivotCombat rollInitiative", () => {
       messageOptions: { messageMode: "public" },
     });
     expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it.each([
+    ["publicroll", "public", "gm"],
+    ["gmroll", "gm", "public"],
+    ["blindroll", "blind", "public"],
+    ["selfroll", "self", "public"],
+  ])("honors messageOptions.rollMode %s when provided", async (legacy, mode, setting) => {
+    const { data, options } = await postedInitiative({
+      setting,
+      messageOptions: { rollMode: legacy, customField: "kept" },
+    });
+    expect(options).toEqual({ messageMode: mode, create: false });
+    expect(data.rollMode).toBeUndefined();
+    expect(data.messageMode).toBeUndefined();
+    expect(data.customField).toBe("kept");
+  });
+
+  it("maps legacy roll to the current core.messageMode", async () => {
+    const { data, options } = await postedInitiative({
+      setting: "self",
+      messageOptions: { rollMode: "roll" },
+    });
+    expect(options).toEqual({ messageMode: "self", create: false });
+    expect(data.rollMode).toBeUndefined();
+  });
+
+  it("honors messageMode passed by rollAll", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageMode: "gm",
+      messageOptions: { rollMode: "blindroll" },
+      via: "rollAll",
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("honors messageMode passed by rollNPC", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageMode: "blind",
+      messageOptions: { messageMode: "self" },
+      via: "rollNPC",
+    });
+    expect(options).toEqual({ messageMode: "blind", create: false });
+  });
+
+  it("sends a hidden combatant to the GM when the mode is ic", async () => {
+    const { options } = await postedInitiative({ setting: "ic", hidden: true });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("strips rollMode and messageMode from the chat data", async () => {
+    const { data, options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { customField: "test-value", messageMode: "self", rollMode: "gmroll" },
+    });
+    expect(data.customField).toBe("test-value");
+    expect(data.messageMode).toBeUndefined();
+    expect(data.rollMode).toBeUndefined();
+    expect(options).toEqual({ messageMode: "self", create: false });
   });
 });
 
