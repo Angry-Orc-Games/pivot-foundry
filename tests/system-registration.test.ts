@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import manifestJson from "../system.json";
 import { createPivotCharacterDataModel } from "../src/data/character-data";
@@ -202,5 +202,53 @@ describe("registerPivotFantasySystem", () => {
       DEFAULT_OPTIONS?: { actions?: Record<string, unknown> };
     };
     expect(npcSheetClass.DEFAULT_OPTIONS?.actions).toHaveProperty("editItem");
+  });
+
+  it("links the prototype token of a new character and leaves other types alone", () => {
+    const { foundry } = createMockFoundry();
+    const listeners: Array<
+      (
+        actor: {
+          type?: string;
+          system?: unknown;
+          updateSource?: (data: Record<string, unknown>) => unknown;
+        },
+        data?: unknown,
+      ) => void
+    > = [];
+
+    registerPivotFantasySystem({
+      Hooks: {
+        on(event, callback) {
+          if (event === "preCreateActor") listeners.push(callback as (typeof listeners)[number]);
+        },
+        once() {},
+      },
+      CONFIG: {
+        Actor: { dataModels: {}, trackableAttributes: {} },
+        Item: { dataModels: {} },
+      },
+      foundry,
+    });
+
+    const updateSource = vi.fn();
+    const character = {
+      type: "character",
+      system: { survivalVersion: 1 },
+      token: null,
+      updateSource,
+    };
+    for (const listener of listeners) listener(character);
+    expect(updateSource).toHaveBeenCalledWith({ "prototypeToken.actorLink": true });
+
+    updateSource.mockClear();
+    for (const listener of listeners) listener({ type: "npc", updateSource });
+    expect(updateSource).not.toHaveBeenCalled();
+
+    updateSource.mockClear();
+    for (const listener of listeners) {
+      listener(character, { prototypeToken: { actorLink: false } });
+    }
+    expect(updateSource).not.toHaveBeenCalled();
   });
 });

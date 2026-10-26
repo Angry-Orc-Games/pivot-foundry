@@ -85,7 +85,8 @@ export function applyHealth(
   }
   return s;
 }
-export function resolveDeathSave(source: SurvivalState, natural: number): SurvivalState {
+export function resolveDeathSave(raw: SurvivalState, natural: number): SurvivalState {
+  const source = reconcileSurvival(raw);
   validateSurvival(source);
   if (
     source.max < 1 ||
