@@ -147,6 +147,7 @@
   "PIVOT.RollMode.SuperAdvantage": "Super-Advantage",
   "PIVOT.Rolls.Attack": "Attack",
   "PIVOT.Rolls.Damage": "Damage",
+  "PIVOT.Rolls.ExplodingDice": "Exploding dice: a natural maximum is rolled again and added, with no cap.",
   "PIVOT.Rolls.Initiative": "Initiative",
   "PIVOT.Rolls.Save": "Save",
   "PIVOT.Sections.Abilities": "Abilities",

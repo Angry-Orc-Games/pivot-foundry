@@ -1,5 +1,6 @@
 import { planSurvivalMigration } from "./m002";
 import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
+import { planSpeciesSpeedMigration } from "./m004";
 import {
   planActorMigration,
   planItemMigration,
@@ -97,7 +98,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
+        id: `${SCHEMA_MIGRATION_ID} / M002 / M003 / M004`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -137,6 +138,9 @@ async function persistMigration(
   if (!plan.ok) {
     reportFailure(document, plan.error, dependencies);
     return { updated: 0, failed: 1 };
+  }
+  if (plan.log) {
+    dependencies.log?.(`${document.name ?? document.id ?? "unknown"}: ${plan.log}`);
   }
   if (!plan.changed) return { updated: 0, failed: 0 };
 
@@ -196,7 +200,14 @@ export function planAllActorMigrations(source: unknown, type?: string): Migratio
   if (!second.ok) return second;
   const third = planSchemaV2ActorMigration(source);
   if (!third.ok) return third;
-  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
+  const fourth = planSpeciesSpeedMigration(source);
+  if (!fourth.ok) return fourth;
+  const log = [first, second, third, fourth]
+    .flatMap((plan) => (plan.ok && plan.log ? [plan.log] : []))
+    .join("\n");
+  if (!first.changed && !second.changed && !third.changed && !fourth.changed) {
+    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
@@ -204,7 +215,9 @@ export function planAllActorMigrations(source: unknown, type?: string): Migratio
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
       ...(third.changed ? third.update : {}),
+      ...(fourth.changed ? fourth.update : {}),
     },
+    ...(log ? { log } : {}),
   };
 }
 

@@ -16,6 +16,8 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { craftingAbility } from "../rules/part7-skills";
+import { primaryAbilityWarnings } from "../rules/primary-abilities";
 import { applyChatMessageMode } from "../runtime/ui";
 import {
   type AbilityKey,
@@ -128,6 +130,7 @@ export interface CharacterSheetContext {
   backgroundLabel: string;
   tierLabel: string;
   conMod: string;
+  primaryWarnings: string[];
   proficiencyText: {
     weapons: string;
     armour: string;
@@ -374,6 +377,19 @@ export function prepareCharacterSheetContext(
       ];
     }),
   ) as SkillSourceMap;
+  if (skillSources.controlMagic) {
+    skillSources.controlMagic.ability = magicAbility(system);
+  }
+  const specializationSkills = readSpecializationSkills(system);
+  for (const entry of specializationSkills) {
+    skillSources[entry.id] = {
+      ability: entry.ability,
+      proficient: entry.proficient,
+      deepening: entry.deepening,
+      expertise: entry.expertise,
+      bonus: entry.bonus,
+    };
+  }
 
   const effectSummary = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
   const derived = calculateCharacterDerived(
@@ -395,12 +411,22 @@ export function prepareCharacterSheetContext(
         category: armourCategoryAt(item.system, ["category"]),
         acBonus: numberAt(item.system, ["acBonus"], 0),
         equipped: booleanAt(item.system, ["equipped"], false),
+        ...(stringAt(item.system, ["acStackKey"], "")
+          ? { stackKey: stringAt(item.system, ["acStackKey"], "") }
+          : {}),
+        ...(stringAt(item.system, ["naturalMode"], "") === "higher"
+          ? { naturalMode: "higher" as const }
+          : {}),
+        ...(stringAt(item.system, ["bodyLimit"], "") === "light"
+          ? { bodyLimit: "light" as const }
+          : {}),
       })),
       manualArmourBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
       initiativeBonus: numberAt(system, ["attributes", "initiative", "bonus"], 0),
       passivePerceptionMode: passiveModeAt(system, ["attributes", "passivePerception", "mode"]),
       poolBonus: numberAt(system, ["resources", "pool", "maxBonus"], 0),
       mpBonus: numberAt(system, ["magic", "mp", "maxBonus"], 0),
+      species: stringAt(system, ["identity", "speciesText"], ""),
       speed: {
         value: numberAt(system, ["attributes", "speed", "value"], 10),
         bonus: numberAt(system, ["attributes", "speed", "bonus"], 0),
@@ -476,6 +502,17 @@ export function prepareCharacterSheetContext(
 
   // Magic streams text
   const magicStreamsText = magicStreams.map((item) => item.name).join(", ");
+  const primaryWarnings = primaryAbilityWarnings({
+    primaries: abilities.flatMap(({ key }) => (abilitySources[key].primary ? [key] : [])),
+    magicAbility: nullableAbilityAt(system, ["magic", "ability"]),
+    level: numberAt(system, ["progression", "level"], 1),
+    hasAdaptOrDie: itemList.some(
+      (item) =>
+        item.type === "feature" &&
+        stringAt(item.system, ["category"], "") === "feat" &&
+        item.name.trim().toLowerCase() === "adapt or die",
+    ),
+  });
 
   return {
     actor,
@@ -493,6 +530,7 @@ export function prepareCharacterSheetContext(
     backgroundLabel,
     tierLabel,
     conMod,
+    primaryWarnings,
     proficiencyText: {
       weapons: weaponProfList.join(", ") || "None",
       armour: armourProfList.join(", ") || "None",
@@ -533,10 +571,31 @@ export function prepareCharacterSheetContext(
       abilityClass: abilitySources[key].primary ? "pf-ab pf-prime" : "pf-ab",
       disabledAttr,
     })),
-    skillRows: canonicalSkills
+    skillRows: [
+      ...canonicalSkills.map((skill) => ({
+        id: skill.id,
+        label: skill.label,
+        source: skillSources[skill.id],
+        abilityPath: `system.skills.${skill.id}.ability`,
+        proficientPath: `system.skills.${skill.id}.proficient`,
+        deepeningPath: `system.skills.${skill.id}.deepening`,
+        expertisePath: `system.skills.${skill.id}.expertise`,
+        bonusPath: `system.skills.${skill.id}.bonus`,
+      })),
+      ...specializationSkills.map((skill) => ({
+        id: skill.id,
+        label: skill.label,
+        source: skillSources[skill.id],
+        abilityPath: skill.abilityPath,
+        proficientPath: skill.proficientPath,
+        deepeningPath: skill.deepeningPath,
+        expertisePath: skill.expertisePath,
+        bonusPath: skill.bonusPath,
+      })),
+    ]
       .map((skill) => {
-        const source = skillSources[skill.id] ?? {
-          ability: "int",
+        const source = skill.source ?? {
+          ability: "int" as AbilityKey,
           proficient: false,
           deepening: 0,
           expertise: false,
@@ -547,11 +606,11 @@ export function prepareCharacterSheetContext(
           id: skill.id,
           label: skill.label,
           ability: abilityPrintCode(source.ability),
-          abilityPath: `system.skills.${skill.id}.ability`,
-          proficientPath: `system.skills.${skill.id}.proficient`,
-          deepeningPath: `system.skills.${skill.id}.deepening`,
-          expertisePath: `system.skills.${skill.id}.expertise`,
-          bonusPath: `system.skills.${skill.id}.bonus`,
+          abilityPath: skill.abilityPath,
+          proficientPath: skill.proficientPath,
+          deepeningPath: skill.deepeningPath,
+          expertisePath: skill.expertisePath,
+          bonusPath: skill.bonusPath,
           proficient: source.proficient,
           deepening: source.deepening ?? 0,
           expertise: source.expertise ?? false,
@@ -889,16 +948,19 @@ function getSheetDocument(sheet: object): ActorLike {
 }
 
 async function submitDocumentForm(
-  this: { document?: { update?: (data: Record<string, unknown>) => Promise<unknown> } },
+  this: { document?: ActorLike },
   _event: Event,
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
-  const data = normalizeSheetSubmitData(formData.object ?? {});
+  const data = normalizeSheetSubmitData(formData.object ?? {}, this.document?.system ?? {});
   return this.document?.update?.(data);
 }
 
-export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
+export function normalizeSheetSubmitData(
+  data: Record<string, unknown>,
+  current: RecordValue = {},
+): Record<string, unknown> {
   const normalized = { ...data };
   const languagesPath = ["system", "identity", "languagesText"];
   const instrumentsPath = ["system", "proficiencies", "instrumentsText"];
@@ -934,7 +996,12 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       academiaPath,
       ["system", "skillSpecializations", "academia"],
-      specializationEntries(splitList(academia), "int"),
+      specializationEntries(
+        splitList(academia),
+        "academia",
+        specializationRecords(current, ["skillSpecializations", "academia"]),
+        readSubmitPath(normalized, ["system", "skillSpecializations", "academia"]),
+      ),
     );
     deleteSubmitPath(normalized, academiaPath);
   }
@@ -944,7 +1011,12 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       craftingPath,
       ["system", "skillSpecializations", "crafting"],
-      specializationEntries(splitList(crafting), "int"),
+      specializationEntries(
+        splitList(crafting),
+        "crafting",
+        specializationRecords(current, ["skillSpecializations", "crafting"]),
+        readSubmitPath(normalized, ["system", "skillSpecializations", "crafting"]),
+      ),
     );
     deleteSubmitPath(normalized, craftingPath);
   }
@@ -1228,16 +1300,98 @@ function specializationNamesAt(source: RecordValue, path: string[]): string[] {
 
 function specializationEntries(
   names: string[],
-  ability: AbilityKey,
+  group: "academia" | "crafting",
+  previous: RecordValue[] = [],
+  formEntries: unknown = [],
 ): Array<Record<string, unknown>> {
-  return names.map((name) => ({
-    name,
-    ability,
-    proficient: true,
-    deepening: 0,
-    expertise: false,
-    bonus: 0,
-  }));
+  const submitted = Array.isArray(formEntries) ? formEntries : [];
+  const previousNames = previous.map((entry) =>
+    typeof entry.name === "string" ? entry.name.trim() : "",
+  );
+  const sameOrder =
+    names.length === previousNames.length &&
+    names.every((name, index) => name === previousNames[index]);
+
+  return names.map((name, index) => {
+    const prior = previous.find(
+      (entry) =>
+        typeof entry.name === "string" && entry.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    const formEntry = sameOrder && isRecord(submitted[index]) ? submitted[index] : undefined;
+    const storedAbility = prior && isAbilityKey(prior.ability) ? prior.ability : "int";
+    return {
+      name,
+      ability: group === "crafting" ? (craftingAbility(name) ?? storedAbility) : "int",
+      proficient:
+        formEntry && typeof formEntry.proficient === "boolean"
+          ? formEntry.proficient
+          : prior
+            ? prior.proficient !== false
+            : true,
+      deepening: numberFrom(formEntry?.deepening, numberFrom(prior?.deepening, 0)),
+      expertise:
+        formEntry && typeof formEntry.expertise === "boolean"
+          ? formEntry.expertise
+          : prior?.expertise === true,
+      bonus: numberFrom(formEntry?.bonus, numberFrom(prior?.bonus, 0)),
+    };
+  });
+}
+
+function numberFrom(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readSpecializationSkills(system: RecordValue): Array<{
+  id: string;
+  label: string;
+  ability: AbilityKey;
+  proficient: boolean;
+  deepening: number;
+  expertise: boolean;
+  bonus: number;
+  abilityPath: string;
+  proficientPath: string;
+  deepeningPath: string;
+  expertisePath: string;
+  bonusPath: string;
+}> {
+  return (["academia", "crafting"] as const).flatMap((group) => {
+    const entries = specializationRecords(system, ["skillSpecializations", group]);
+    return entries.flatMap((entry, index) => {
+      const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      if (!name) return [];
+      const storedAbility = isAbilityKey(entry.ability) ? entry.ability : "int";
+      const ability = group === "academia" ? "int" : (craftingAbility(name) ?? storedAbility);
+      const base = `system.skillSpecializations.${group}.${index}`;
+      return [
+        {
+          id: `${group}:${name}`,
+          label: name,
+          ability,
+          proficient: entry.proficient !== false,
+          deepening: typeof entry.deepening === "number" ? entry.deepening : 0,
+          expertise: entry.expertise === true,
+          bonus: typeof entry.bonus === "number" ? entry.bonus : 0,
+          abilityPath: `${base}.ability`,
+          proficientPath: `${base}.proficient`,
+          deepeningPath: `${base}.deepening`,
+          expertisePath: `${base}.expertise`,
+          bonusPath: `${base}.bonus`,
+        },
+      ];
+    });
+  });
+}
+
+function specializationRecords(source: RecordValue, path: string[]): RecordValue[] {
+  let current: unknown = source;
+  for (const part of path) {
+    if (!isRecord(current)) return [];
+    current = current[part];
+  }
+  if (!Array.isArray(current)) return [];
+  return current.filter(isRecord);
 }
 
 function withDisabledAttr<T extends ItemLike>(
@@ -1268,10 +1422,10 @@ function magicAbility(system: RecordValue): AbilityKey {
 function armourCategoryAt(
   source: RecordValue,
   path: string[],
-): "light" | "medium" | "heavy" | "shield" | "helmet" | "other" {
+): "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural" {
   const value = stringAt(source, path, "other");
-  return ["light", "medium", "heavy", "shield", "helmet", "other"].includes(value)
-    ? (value as "light" | "medium" | "heavy" | "shield" | "helmet" | "other")
+  return ["light", "medium", "heavy", "shield", "helmet", "other", "natural"].includes(value)
+    ? (value as "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural")
     : "other";
 }
 
