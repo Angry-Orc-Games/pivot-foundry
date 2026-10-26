@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
+import {
+  runWorldMigrations,
+  type MigratableDocument,
+  type WorldMigrationGame,
+} from "../../src/migrations/world-migrations";
 
 interface StoredActor {
   system: Record<string, unknown>;
@@ -14,7 +18,7 @@ function settled(hp: Record<string, unknown>): Record<string, unknown> {
 function createActor(
   name: string,
   system: Record<string, unknown>,
-  extras: { type?: string; prototypeToken?: { actorLink?: unknown } } = {},
+  extras: { id?: string; type?: string; prototypeToken?: { actorLink?: unknown } } = {},
 ): MigratableDocument & { updates: Record<string, unknown>[]; stored: StoredActor } {
   const stored: StoredActor = {
     system: structuredClone(system),
@@ -22,6 +26,7 @@ function createActor(
   };
   const updates: Record<string, unknown>[] = [];
   return {
+    id: extras.id,
     name,
     type: extras.type,
     updates,
@@ -48,6 +53,65 @@ function applyUpdate(stored: StoredActor, data: Record<string, unknown>): void {
     const leaf = parts[parts.length - 1] ?? "";
     target[leaf] = value;
   }
+}
+
+function isPlain(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function deepMerge(
+  base: Record<string, unknown>,
+  over: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = structuredClone(base);
+  for (const [key, value] of Object.entries(over)) {
+    const current = result[key];
+    if (isPlain(current) && isPlain(value)) result[key] = deepMerge(current, value);
+    else result[key] = structuredClone(value);
+  }
+  return result;
+}
+
+function createBaseAndDelta(
+  baseName: string,
+  baseSystem: Record<string, unknown>,
+  deltaSystem: Record<string, unknown>,
+  type = "character",
+) {
+  const base = createActor(baseName, baseSystem, { id: `${baseName}-id`, type });
+  const deltaStored: StoredActor = { system: structuredClone(deltaSystem) };
+  const deltaWrites: Record<string, unknown>[] = [];
+  const synthetic = {
+    id: `${baseName}-token`,
+    name: `${baseName} Token`,
+    type,
+    updates: deltaWrites,
+    toObject: () => ({ system: deepMerge(base.stored.system, deltaStored.system) }),
+    update: async (data: Record<string, unknown>) => {
+      deltaWrites.push(structuredClone(data));
+      applyUpdate(deltaStored, data);
+    },
+  };
+  const delta = {
+    name: `${baseName} Delta`,
+    toObject: () => structuredClone(deltaStored),
+  };
+  const token = {
+    actorLink: false as const,
+    actorId: base.id,
+    actor: synthetic,
+    delta,
+  };
+  return { base, synthetic, deltaStored, token };
+}
+
+const leftUnlinked = (name: string) =>
+  `Left ${name} unlinked. This placed scene token keeps its own HP delta.`;
+
+function unlinkLocalize(key: string): string {
+  return key === "PIVOT.Migration.TokenLeftUnlinked"
+    ? "Left {name} unlinked. This placed scene token keeps its own HP delta."
+    : key;
 }
 
 describe("M003 HP max and prototype link", () => {
@@ -179,5 +243,98 @@ describe("M003 HP max and prototype link", () => {
     expect(actor.updates).toEqual([]);
     expect(actor.stored.prototypeToken).toEqual({ actorLink: true });
     expect(actor.stored.system).toMatchObject({ attributes: { hp: { value: 12, max: 12 } } });
+  });
+
+  it("does not copy a base-only bad HP max into an unlinked token delta", async () => {
+    const { base, synthetic, token } = createBaseAndDelta(
+      "Hero",
+      settled({ value: 10, max: null }),
+      {},
+    );
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+      } as WorldMigrationGame,
+    });
+
+    expect(base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(synthetic.updates).toEqual([]);
+  });
+
+  it("writes a token delta HP max only from the delta's own data", async () => {
+    const badMax = createBaseAndDelta("BadMax", settled({ value: 10, max: 20 }), {
+      attributes: { hp: { value: 4, max: null } },
+    });
+    const above = createBaseAndDelta("Above", settled({ value: 10, max: null }), {
+      attributes: { hp: { value: 18 } },
+    });
+    const below = createBaseAndDelta("Below", settled({ value: 10, max: null }), {
+      attributes: { hp: { value: 4 } },
+    });
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [badMax.base, above.base, below.base],
+        items: [],
+        scenes: [{ tokens: [badMax.token, above.token, below.token] }],
+      } as WorldMigrationGame,
+    });
+
+    expect(badMax.base.updates).toEqual([]);
+    expect(badMax.synthetic.updates).toEqual([{ "system.attributes.hp.max": 4 }]);
+    expect(above.base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(above.synthetic.updates).toEqual([{ "system.attributes.hp.max": 18 }]);
+    expect(below.base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(below.synthetic.updates).toEqual([]);
+  });
+
+  it("logs an unlinked character token only when this run wrote it", async () => {
+    const healthy = createActor("Healthy", settled({ value: 8, max: 8 }), { type: "character" });
+    const scout = createActor("Scout", settled({ value: 7, max: null }), { type: "character" });
+    const logs: string[] = [];
+    const game = {
+      user: { isGM: true },
+      actors: [],
+      items: [],
+      scenes: [
+        {
+          tokens: [
+            { actorLink: false, actor: healthy },
+            { actorLink: false, actor: scout },
+          ],
+        },
+      ],
+      i18n: { localize: unlinkLocalize },
+    } as WorldMigrationGame;
+
+    await runWorldMigrations({ game, log: (message) => logs.push(message) });
+
+    expect(healthy.updates).toEqual([]);
+    expect(logs).not.toContain(leftUnlinked("Healthy"));
+    expect(logs).toContain(leftUnlinked("Scout"));
+
+    logs.length = 0;
+    scout.updates.length = 0;
+    await runWorldMigrations({ game, log: (message) => logs.push(message) });
+
+    expect(scout.updates).toEqual([]);
+    expect(logs).not.toContain(leftUnlinked("Scout"));
+  });
+
+  it("skips HP max repair when current HP is not a safe non-negative integer", async () => {
+    const actors = [null, -1, Number.NaN, "12", 1.5].map((value, index) =>
+      createActor(`BadHp${index}`, settled({ value, max: null }), { type: "character" }),
+    );
+
+    await runWorldMigrations({
+      game: { user: { isGM: true }, actors, items: [] },
+    });
+
+    for (const actor of actors) expect(actor.updates).toEqual([]);
   });
 });
