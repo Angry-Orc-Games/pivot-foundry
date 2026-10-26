@@ -1206,19 +1206,25 @@ function storedSpecializationEntries(
   return value.filter(isDataRecord);
 }
 
+function specializationMatchKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 function specializationEntries(
   names: string[],
   ability: AbilityKey,
   existing: Array<Record<string, unknown>> = [],
 ): Array<Record<string, unknown>> {
-  const storedByName = new Map<string, Record<string, unknown>>();
+  const remainingByKey = new Map<string, Array<Record<string, unknown>>>();
   for (const entry of existing) {
-    if (typeof entry.name === "string" && !storedByName.has(entry.name)) {
-      storedByName.set(entry.name, entry);
-    }
+    if (typeof entry.name !== "string") continue;
+    const key = specializationMatchKey(entry.name);
+    const queue = remainingByKey.get(key);
+    if (queue) queue.push(entry);
+    else remainingByKey.set(key, [entry]);
   }
   return names.map((name) => {
-    const stored = storedByName.get(name);
+    const stored = remainingByKey.get(specializationMatchKey(name))?.shift();
     if (stored) return { ...stored, name };
     return {
       name,
