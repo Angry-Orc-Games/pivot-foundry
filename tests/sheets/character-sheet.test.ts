@@ -547,25 +547,123 @@ describe("character sheet submit", () => {
 
     expect(updates).toEqual([]);
   });
+
+  it("keeps stored specialization fields when academia or crafting text changes", async () => {
+    const academia = [
+      specializationEntry("History", {
+        ability: "wis",
+        proficient: false,
+        deepening: 3,
+        expertise: true,
+        bonus: 2,
+      }),
+      specializationEntry("Theology", { deepening: 1, bonus: 4 }),
+    ];
+    const crafting = [
+      specializationEntry("Smithing", {
+        ability: "dex",
+        deepening: 2,
+        expertise: true,
+        bonus: 5,
+      }),
+    ];
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: { academia, crafting },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History, Arcana",
+        "system.skillSpecializations.craftingText": "Smithing, Alchemy",
+      },
+    });
+
+    expect(updates).toEqual([
+      {
+        system: {
+          skillSpecializations: {
+            academia: [academia[0], specializationEntry("Arcana")],
+            crafting: [crafting[0], specializationEntry("Alchemy")],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("does not write academia or crafting when the submitted names match the source", async () => {
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [
+          specializationEntry("History", {
+            ability: "wis",
+            proficient: false,
+            deepening: 3,
+            expertise: true,
+            bonus: 2,
+          }),
+          specializationEntry("Theology", { deepening: 1, bonus: 4 }),
+        ],
+        crafting: [
+          specializationEntry("Smithing", {
+            ability: "dex",
+            deepening: 2,
+            expertise: true,
+            bonus: 5,
+          }),
+        ],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History, Theology",
+        "system.skillSpecializations.craftingText": "Smithing",
+      },
+    });
+
+    expect(updates).toEqual([]);
+  });
 });
 
-function worldActorSheet() {
+function specializationEntry(
+  name: string,
+  fields: {
+    ability?: string;
+    proficient?: boolean;
+    deepening?: number;
+    expertise?: boolean;
+    bonus?: number;
+  } = {},
+): Record<string, unknown> {
+  return {
+    name,
+    ability: "int",
+    proficient: true,
+    deepening: 0,
+    expertise: false,
+    bonus: 0,
+    ...fields,
+  };
+}
+
+function worldActorSheet(extraSystem: Record<string, unknown> = {}) {
   const updates: Record<string, unknown>[] = [];
+  const storedSystem = {
+    progression: { level: 4 },
+    attributes: { hp: { value: 12, max: 28 } },
+    ...structuredClone(extraSystem),
+  };
   const document = {
     name: "Hera",
     type: "character",
     token: null,
     system: {
-      progression: { level: 4 },
-      attributes: { hp: { value: 12, max: 28 } },
+      ...structuredClone(storedSystem),
       initiative: 3,
     },
     _source: {
       name: "Hera",
-      system: {
-        progression: { level: 4 },
-        attributes: { hp: { value: 12, max: 28 } },
-      },
+      system: storedSystem,
     },
     async update(data: Record<string, unknown>) {
       updates.push(structuredClone(data));
