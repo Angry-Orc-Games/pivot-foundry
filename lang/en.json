@@ -120,6 +120,7 @@
   "PIVOT.Messages.NoTraits": "No traits yet",
   "PIVOT.Migration.Complete": "Pivot Fantasy migration {id} finished ({updated} updated, {failed} failed).",
   "PIVOT.Migration.DocumentFailed": "Pivot Fantasy migration {id} failed for {name}: {error}",
+  "PIVOT.Migration.M006CoreReview": "These magic abilities were stored as echelon 1. The old sheet could not save Core, so switch any Core abilities to Core by hand.",
   "PIVOT.Notifications.PoolAlreadyFull": "Pool is already at its maximum.",
   "PIVOT.Overlay.Alpha": "Alpha",
   "PIVOT.Overlay.Dire": "Dire",
