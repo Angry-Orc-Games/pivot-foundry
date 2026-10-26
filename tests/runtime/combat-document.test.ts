@@ -1116,6 +1116,56 @@ describe("PivotCombat rollInitiative", () => {
     expect(data.rollMode).toBeUndefined();
     expect(options).toEqual({ messageMode: "self", create: false });
   });
+
+  it("honors v14 rollMode gm when core.messageMode is public", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { rollMode: "gm" },
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("honors v14 rollMode gm from rollAll when core.messageMode is public", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { rollMode: "gm" },
+      via: "rollAll",
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("honors v14 rollMode self", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { rollMode: "self" },
+    });
+    expect(options).toEqual({ messageMode: "self", create: false });
+  });
+
+  it("honors v14 rollMode blind when core.messageMode is ic", async () => {
+    const { options } = await postedInitiative({
+      setting: "ic",
+      messageOptions: { rollMode: "blind" },
+    });
+    expect(options).toEqual({ messageMode: "blind", create: false });
+  });
+
+  it("skips rollMode toString and uses core.messageMode", async () => {
+    const { options } = await postedInitiative({
+      setting: "gm",
+      messageOptions: { rollMode: "toString" },
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("skips an empty top-level messageMode", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageMode: "",
+      messageOptions: { messageMode: "self" },
+    });
+    expect(options).toEqual({ messageMode: "self", create: false });
+  });
 });
 
 describe("PivotCombat rollInitiative with unevaluated v14 rolls", () => {
