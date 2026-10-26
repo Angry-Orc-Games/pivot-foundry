@@ -13,15 +13,20 @@ function visibilityFor(mode: string): { whisper: string[]; blind: boolean } {
 }
 
 it.each(CLIENT_MESSAGE_MODES)(
-  "posts custom chat as public when the client message mode is %s",
+  "posts custom chat with the client message mode %s",
   async (messageMode) => {
     const create = vi.fn(async (data: Record<string, unknown>) => data);
     const applyRollMode = vi.fn();
-    const applyMode = vi.fn((data: Record<string, unknown>, mode: string) => ({
-      ...data,
-      ...visibilityFor(mode),
-    }));
+    const applyMode = vi.fn((data: Record<string, unknown>, mode?: string) => {
+      const game = globalThis as {
+        game?: { settings?: { get?: (scope: string, key: string) => unknown } };
+      };
+      const fromSettings = game.game?.settings?.get?.("core", "messageMode");
+      const selected = mode ?? (typeof fromSettings === "string" ? fromSettings : "public");
+      return { ...data, ...visibilityFor(selected) };
+    });
     vi.stubGlobal("game", {
+      user: { id: "user-1" },
       settings: {
         get: (scope: string, key: string) =>
           scope === "core" && key === "messageMode" ? messageMode : undefined,
@@ -32,7 +37,7 @@ it.each(CLIENT_MESSAGE_MODES)(
     await createChat({ content: "damage" });
 
     expect(applyRollMode).not.toHaveBeenCalled();
-    expect(applyMode).toHaveBeenCalledWith({ content: "damage" }, "public");
-    expect(create).toHaveBeenCalledWith({ content: "damage", whisper: [], blind: false });
+    expect(applyMode).toHaveBeenCalledWith({ content: "damage" });
+    expect(create).toHaveBeenCalledWith({ content: "damage", ...visibilityFor(messageMode) });
   },
 );
