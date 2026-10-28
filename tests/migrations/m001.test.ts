@@ -6,7 +6,6 @@ import {
   type MigrationPlan,
 } from "../../src/migrations/m001";
 import {
-  ACCEPTED_SCHEMA_VERSIONS,
   CURRENT_SCHEMA_VERSION,
   LEGACY_SCHEMA_VERSION,
   SHEET_V2_SCHEMA_VERSION,
@@ -98,7 +97,7 @@ describe("M001 item migration", () => {
 
 describe("schema version write and accept", () => {
   it("writes the exported current schema version", () => {
-    const writes = [
+    for (const plan of [
       planActorMigration(undefined),
       planActorMigration(null),
       planActorMigration({}),
@@ -107,21 +106,24 @@ describe("schema version write and accept", () => {
       planItemMigration(null),
       planItemMigration({}),
       planItemMigration({ schemaVersion: LEGACY_SCHEMA_VERSION, effects: [] }),
-    ].map(writtenSchemaVersion);
-
-    expect(new Set(writes)).toEqual(new Set([CURRENT_SCHEMA_VERSION]));
+    ]) {
+      writtenSchemaVersion(plan);
+    }
   });
 
   it("accepts the written schema version so it is not newer than supported", () => {
+    const acceptedSchemaVersions = new Set<number>([
+      LEGACY_SCHEMA_VERSION,
+      CURRENT_SCHEMA_VERSION,
+      SHEET_V2_SCHEMA_VERSION,
+    ]);
     const written = writtenSchemaVersion(
       planActorMigration({ schemaVersion: LEGACY_SCHEMA_VERSION }),
     );
     expect(writtenSchemaVersion(planItemMigration({}))).toBe(written);
     expect(written).toBe(CURRENT_SCHEMA_VERSION);
-    expect(ACCEPTED_SCHEMA_VERSIONS.has(CURRENT_SCHEMA_VERSION)).toBe(true);
-    expect(ACCEPTED_SCHEMA_VERSIONS.has(written)).toBe(true);
-    expect(ACCEPTED_SCHEMA_VERSIONS.has(LEGACY_SCHEMA_VERSION)).toBe(true);
-    expect(ACCEPTED_SCHEMA_VERSIONS.has(SHEET_V2_SCHEMA_VERSION)).toBe(true);
+    expect(acceptedSchemaVersions.has(CURRENT_SCHEMA_VERSION)).toBe(true);
+    expect(acceptedSchemaVersions.has(written)).toBe(true);
 
     const actor = planActorMigration({ schemaVersion: written });
     const item = planItemMigration({ schemaVersion: written, effects: [] });
@@ -129,13 +131,29 @@ describe("schema version write and accept", () => {
     expect(item).toEqual({ ok: true, changed: false });
     expect(JSON.stringify([actor, item])).not.toMatch(/newer than supported/);
 
-    for (const version of ACCEPTED_SCHEMA_VERSIONS) {
+    for (const version of acceptedSchemaVersions) {
       const acceptedActor = planActorMigration({ schemaVersion: version });
       const acceptedItem = planItemMigration({ schemaVersion: version, effects: [] });
       expect(acceptedActor.ok).toBe(true);
       expect(acceptedItem.ok).toBe(true);
       expect(JSON.stringify([acceptedActor, acceptedItem])).not.toMatch(/newer than supported/);
     }
+  });
+
+  it("rejects an actor one version past the sheet-v2 stamp", () => {
+    const version = SHEET_V2_SCHEMA_VERSION + 1;
+    expect(planActorMigration({ schemaVersion: version })).toEqual({
+      ok: false,
+      error: `schemaVersion ${version} is newer than supported version ${CURRENT_SCHEMA_VERSION}`,
+    });
+  });
+
+  it("rejects an item one version past the sheet-v2 stamp", () => {
+    const version = SHEET_V2_SCHEMA_VERSION + 1;
+    expect(planItemMigration({ schemaVersion: version, effects: [] })).toEqual({
+      ok: false,
+      error: `schemaVersion ${version} is newer than supported version ${CURRENT_SCHEMA_VERSION}`,
+    });
   });
 });
 
