@@ -21,7 +21,7 @@ function setup(uuid = "Actor.death", hp = 0, status = "dying") {
   vi.stubGlobal("foundry", {
     applications: { api: { DialogV2: { prompt: async () => "normal" } } },
   });
-  vi.stubGlobal("ChatMessage", { create: vi.fn(async () => {}), applyRollMode: vi.fn() });
+  vi.stubGlobal("ChatMessage", { create: vi.fn(async () => {}) });
   return actor;
 }
 it("writes natural20 recovery once even when chat reporting fails", async () => {
