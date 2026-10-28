@@ -1489,8 +1489,8 @@ function getRollMode(): string {
       };
     };
   };
-  const mode = globals.game?.settings?.get?.("core", "rollMode");
-  return typeof mode === "string" ? mode : "roll";
+  const mode = globals.game?.settings?.get?.("core", "messageMode");
+  return typeof mode === "string" ? mode : "public";
 }
 
 function getRollConstructor():

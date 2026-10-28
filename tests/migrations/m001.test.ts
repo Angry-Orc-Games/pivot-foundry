@@ -35,7 +35,7 @@ describe("M001 actor migration", () => {
     expect(planActorMigration({ schemaVersion: 99 })).toMatchObject({ ok: false });
   });
 
-  it("leaves a sheet-v2 schemaVersion 2 document in place and still writes version 1 for legacy data", () => {
+  it("leaves a sheet-v2 schemaVersion 2 document in place and writes the current version for legacy data", () => {
     expect(planActorMigration({ schemaVersion: 2, notes: { special: "" } })).toEqual({
       ok: true,
       changed: false,
@@ -49,7 +49,7 @@ describe("M001 actor migration", () => {
       changed: true,
       update: { "system.schemaVersion": CURRENT_SCHEMA_VERSION },
     });
-    expect(CURRENT_SCHEMA_VERSION).toBe(1);
+    expect(CURRENT_SCHEMA_VERSION).toBe(2);
   });
 });
 

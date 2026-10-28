@@ -16,7 +16,7 @@ describe("Roll mode preservation", () => {
     vi.stubGlobal("game", {
       settings: {
         get: (scope: string, key: string) => {
-          if (scope === "core" && key === "rollMode") return "gmroll";
+          if (scope === "core" && key === "messageMode") return "gm";
           return undefined;
         },
       },
@@ -95,7 +95,7 @@ describe("Roll mode preservation", () => {
       } as never,
     );
 
-    expect(capturedRollMode).toBe("gmroll");
+    expect(capturedRollMode).toBe("gm");
   });
 });
 
