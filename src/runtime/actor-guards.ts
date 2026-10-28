@@ -17,7 +17,7 @@ function createdHpPatch(system: unknown): Record<string, unknown> | undefined {
   const hp = asRecord(attributes?.hp);
   if (!hp) return undefined;
   const value = validAmount(hp.value) ? hp.value : 0;
-  const max = validAmount(hp.max) ? hp.max : value;
+  const max = validAmount(hp.max) && hp.max > 0 ? hp.max : value;
   const clamped = Math.min(value, max);
   const patch: Record<string, unknown> = {};
   if (hp.value !== clamped) patch["system.attributes.hp.value"] = clamped;
