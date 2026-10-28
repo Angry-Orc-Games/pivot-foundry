@@ -24,7 +24,7 @@ describe("Initiative roll with Dice So Nice integration", () => {
         const impl = this.implementation;
         return data.map((d, i) => new impl({ ...(d as { id?: string }), id: `m${i}` }));
       }
-      static applyRollMode = vi.fn();
+      static applyMode = vi.fn();
     }
     class ChatMessageV14 extends BaseChatMessage {}
 
@@ -78,8 +78,8 @@ describe("Initiative roll with Dice So Nice integration", () => {
     const chatData = await roll.toMessage({ speaker: { alias: "Hero" }, flavor: "Initiative" });
 
     const ChatMessage = (globalThis as { ChatMessage?: typeof BaseChatMessage }).ChatMessage;
-    if (ChatMessage?.applyRollMode) {
-      ChatMessage.applyRollMode(chatData, "roll");
+    if (ChatMessage?.applyMode) {
+      ChatMessage.applyMode(chatData);
     }
 
     const Cls = ChatMessage?.implementation ?? ChatMessage;
@@ -137,7 +137,7 @@ describe("Initiative roll with Dice So Nice integration", () => {
         const impl = this.implementation;
         return data.map((d, i) => new impl({ ...(d as { id?: string }), id: `m${i}` }));
       }
-      static applyRollMode = vi.fn();
+      static applyMode = vi.fn();
     }
     class ChatMessageV14 extends BaseChatMessage {}
 
@@ -193,8 +193,8 @@ describe("Initiative roll with Dice So Nice integration", () => {
     const chatData = await roll.toMessage({ speaker: { alias: "Hero" }, flavor: "Initiative" });
 
     const ChatMessage = (globalThis as { ChatMessage?: typeof BaseChatMessage }).ChatMessage;
-    if (ChatMessage?.applyRollMode) {
-      ChatMessage.applyRollMode(chatData, "roll");
+    if (ChatMessage?.applyMode) {
+      ChatMessage.applyMode(chatData);
     }
 
     const Cls = ChatMessage?.implementation ?? ChatMessage;
@@ -253,7 +253,7 @@ describe("Initiative roll with Dice So Nice integration", () => {
         const impl = this.implementation;
         return data.map((d, i) => new impl({ ...(d as { id?: string }), id: `m${i}` }));
       }
-      static applyRollMode = vi.fn();
+      static applyMode = vi.fn();
     }
     class ChatMessageV14 extends BaseChatMessage {}
 
@@ -315,8 +315,8 @@ describe("Initiative roll with Dice So Nice integration", () => {
     const chatData = await roll.toMessage({ speaker: { alias: "Hero" }, flavor: "Initiative" });
 
     const ChatMessage = (globalThis as { ChatMessage?: typeof BaseChatMessage }).ChatMessage;
-    if (ChatMessage?.applyRollMode) {
-      ChatMessage.applyRollMode(chatData, "roll");
+    if (ChatMessage?.applyMode) {
+      ChatMessage.applyMode(chatData);
     }
 
     const Cls = ChatMessage?.implementation ?? ChatMessage;
@@ -380,7 +380,9 @@ describe("rollInitiativeWithDiceAnimation (sheet path)", () => {
       callOrder.push(`dsn:${id}`);
     });
     vi.stubGlobal("game", {
-      settings: { get: () => "gmroll" },
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? "gm" : "gmroll"),
+      },
       modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: { waitFor3DAnimationByMessageID: waitFor },
     });
@@ -417,7 +419,7 @@ describe("rollInitiativeWithDiceAnimation (sheet path)", () => {
     expect(roll.toMessage).toHaveBeenCalledTimes(1);
     expect(roll.toMessage).toHaveBeenCalledWith(
       expect.objectContaining({ flags: { "core.initiativeRoll": true } }),
-      { rollMode: "gmroll", create: false },
+      { messageMode: "gm", create: false },
     );
     expect(create).toHaveBeenCalledTimes(1);
     expect(createDocuments).not.toHaveBeenCalled();
@@ -431,7 +433,12 @@ describe("rollInitiativeWithDiceAnimation (sheet path)", () => {
       data.map(() => ({ id: "fallback-msg" })),
     );
     vi.stubGlobal("ChatMessage", { implementation: { createDocuments } });
-    vi.stubGlobal("game", { settings: { get: () => "roll" }, modules: { get: () => undefined } });
+    vi.stubGlobal("game", {
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? "public" : "roll"),
+      },
+      modules: { get: () => undefined },
+    });
     const roll = {
       toMessage: vi.fn<
         (data: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<unknown>
@@ -450,7 +457,49 @@ describe("rollInitiativeWithDiceAnimation (sheet path)", () => {
     });
 
     expect(createDocuments).toHaveBeenCalledTimes(1);
-    expect(roll.toMessage.mock.calls[0]?.[1]).toEqual({ rollMode: "roll", create: false });
+    expect(roll.toMessage.mock.calls[0]?.[1]).toEqual({ messageMode: "public", create: false });
     expect(update).toHaveBeenCalledWith({ initiative: 9 });
+  });
+
+  async function sheetMessageOptions(setting: unknown): Promise<Record<string, unknown>> {
+    const { rollInitiativeWithDiceAnimation } = await import("../../src/sheets/character-sheet");
+    vi.stubGlobal("ChatMessage", {
+      implementation: { create: vi.fn(async () => ({ id: "sheet-mode" })) },
+    });
+    vi.stubGlobal("game", {
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? setting : "gmroll"),
+      },
+      modules: { get: () => undefined },
+    });
+    const roll = {
+      toMessage: vi.fn<
+        (
+          data: Record<string, unknown>,
+          options?: Record<string, unknown>,
+        ) => Promise<Record<string, unknown>>
+      >(async (data) => ({ ...data })),
+    };
+    await rollInitiativeWithDiceAnimation({
+      actor: { id: "a1", name: "Hero", type: "character" } as never,
+      roll,
+      total: 10,
+      flavor: "Initiative",
+      combat: { combatants: [{ id: "c1", actorId: "a1", update: vi.fn(async () => {}) }] } as never,
+      notify: vi.fn(),
+      localize: (key: string) => key,
+    });
+    return (roll.toMessage.mock.calls[0]?.[1] ?? {}) as Record<string, unknown>;
+  }
+
+  it.each(["public", "gm", "blind", "self"])(
+    "passes messageMode %s from core.messageMode",
+    async (mode) => {
+      expect(await sheetMessageOptions(mode)).toEqual({ messageMode: mode, create: false });
+    },
+  );
+
+  it("defaults a missing sheet message mode to public", async () => {
+    expect(await sheetMessageOptions(undefined)).toEqual({ messageMode: "public", create: false });
   });
 });

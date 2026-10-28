@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import manifestJson from "../system.json";
 import { createPivotCharacterDataModel } from "../src/data/character-data";
@@ -281,6 +281,118 @@ describe("registerPivotFantasySystem", () => {
     expect(character.updateSource).not.toHaveBeenCalled();
   });
 });
+
+describe("preCreateActor actorLink", () => {
+  let restoreFoundry: () => void;
+
+  beforeEach(() => {
+    restoreFoundry = installFoundryV14PropertyUtils();
+  });
+
+  afterEach(() => {
+    restoreFoundry();
+  });
+
+  it("keeps a flat prototypeToken.actorLink of false", () => {
+    const updateSource = runPreCreateActor({ "prototypeToken.actorLink": false });
+    expect(updateSource).not.toHaveBeenCalled();
+  });
+
+  it("keeps a nested prototypeToken.actorLink of false", () => {
+    const updateSource = runPreCreateActor({ prototypeToken: { actorLink: false } });
+    expect(updateSource).not.toHaveBeenCalled();
+  });
+
+  it("keeps a flat prototypeToken.actorLink of true", () => {
+    const updateSource = runPreCreateActor({ "prototypeToken.actorLink": true });
+    expect(updateSource).not.toHaveBeenCalled();
+  });
+
+  it("links a character when creation data omits actorLink", () => {
+    const updateSource = runPreCreateActor(undefined);
+    expect(updateSource).toHaveBeenCalledWith({ "prototypeToken.actorLink": true });
+  });
+});
+
+function runPreCreateActor(data: unknown): ReturnType<typeof vi.fn> {
+  const { foundry } = createMockFoundry();
+  const listeners: Array<
+    (actor: { type?: string; updateSource?: (data: unknown) => unknown }, data?: unknown) => void
+  > = [];
+  registerPivotFantasySystem({
+    Hooks: {
+      on(event, callback) {
+        if (event === "preCreateActor") listeners.push(callback as (typeof listeners)[number]);
+      },
+      once() {},
+    },
+    CONFIG: {
+      Actor: { dataModels: {}, trackableAttributes: {} },
+      Item: { dataModels: {} },
+    },
+    foundry,
+  });
+  const updateSource = vi.fn();
+  const character = {
+    type: "character",
+    system: { survivalVersion: 1 },
+    token: null,
+    updateSource,
+  };
+  for (const listener of listeners) listener(character, data);
+  return updateSource;
+}
+
+function installFoundryV14PropertyUtils(): () => void {
+  const host = globalThis as { foundry?: { utils?: object } };
+  const previous = host.foundry;
+  host.foundry = {
+    utils: {
+      hasProperty: foundryV14HasProperty,
+      expandObject: foundryV14ExpandObject,
+    },
+  };
+  return () => {
+    if (previous === undefined) delete host.foundry;
+    else host.foundry = previous;
+  };
+}
+
+function foundryV14HasProperty(object: object, key: string): boolean {
+  let current: unknown = object;
+  for (const part of key.split(".")) {
+    if (typeof current !== "object" || current === null || !(part in current)) return false;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return true;
+}
+
+function foundryV14ExpandObject(obj: object): object {
+  const expanded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const nested = isPlainRecord(value) ? foundryV14ExpandObject(value) : value;
+    assignDottedKey(expanded, key, nested);
+  }
+  return expanded;
+}
+
+function assignDottedKey(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".");
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (!isPlainRecord(next)) current[part] = {};
+    current = current[part] as Record<string, unknown>;
+  }
+  const leaf = parts.at(-1);
+  if (leaf) current[leaf] = value;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
 
 function capturePreCreate(): {
   listeners: Array<

@@ -211,13 +211,20 @@ function linkCharacterPrototypeToken(
 }
 
 function creationSpecifiesActorLink(data: unknown): boolean {
-  const hasProperty = (
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const utils = (
     globalThis as {
-      foundry?: { utils?: { hasNestedProperty?: (object: unknown, path: string) => boolean } };
+      foundry?: {
+        utils?: {
+          expandObject?: (object: object) => object;
+          hasProperty?: (object: object, key: string) => boolean;
+        };
+      };
     }
-  ).foundry?.utils?.hasNestedProperty;
-  if (hasProperty) return hasProperty(data, "prototypeToken.actorLink");
-  return hasNestedProperty(data, "prototypeToken.actorLink");
+  ).foundry?.utils;
+  const expanded = utils?.expandObject?.(data) ?? data;
+  if (utils?.hasProperty) return utils.hasProperty(expanded, "prototypeToken.actorLink");
+  return hasNestedProperty(expanded, "prototypeToken.actorLink");
 }
 
 const pivotGlobals = globalThis as PivotGlobals & {

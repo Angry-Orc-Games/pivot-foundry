@@ -482,8 +482,8 @@ describe("PivotCombat rollInitiative", () => {
     ]);
   });
 
-  it("passes gmroll mode for hidden combatant with roll mode", async () => {
-    let passedRollMode: string | undefined;
+  it("passes gm messageMode for a hidden combatant on a public roll", async () => {
+    let passedOptions: { messageMode?: string; rollMode?: string; create?: boolean } | undefined;
     let chatDataType: number | undefined;
 
     // Mock globalThis
@@ -506,7 +506,9 @@ describe("PivotCombat rollInitiative", () => {
     };
 
     mockGlobal.game = {
-      settings: { get: () => "roll" },
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? "public" : "roll"),
+      },
       modules: { get: () => ({ active: false }) },
       i18n: {
         format: vi.fn((key: string, data: Record<string, unknown>) => {
@@ -535,16 +537,21 @@ describe("PivotCombat rollInitiative", () => {
             name: "Hero",
           },
           token: { name: "Hero Token" },
-          hidden: true, // Hidden combatant
+          hidden: true,
           getInitiativeRoll: vi.fn(async () => ({
             total: 15,
-            toMessage: vi.fn(async (_data, options?: { rollMode?: string }) => {
-              passedRollMode = options?.rollMode;
-              return {
-                speaker: { alias: "Hero" },
-                flavor: "Hero rolls for Initiative!",
-              };
-            }),
+            toMessage: vi.fn(
+              async (
+                _data,
+                options?: { messageMode?: string; rollMode?: string; create?: boolean },
+              ) => {
+                passedOptions = options;
+                return {
+                  speaker: { alias: "Hero" },
+                  flavor: "Hero rolls for Initiative!",
+                };
+              },
+            ),
           })),
           _getInitiativeFormula: vi.fn(() => "1d20"),
         },
@@ -565,14 +572,12 @@ describe("PivotCombat rollInitiative", () => {
       }
     ).rollInitiative(["c1"]);
 
-    // Hidden combatant with 'roll' mode should get 'gmroll'
-    expect(passedRollMode).toBe("gmroll");
-    // Should not have type field set (toMessage handles it)
+    expect(passedOptions).toEqual({ messageMode: "gm", create: false });
     expect(chatDataType).toBeUndefined();
   });
 
-  it("honors messageOptions.rollMode when provided", async () => {
-    let passedRollMode: string | undefined;
+  it("honors messageOptions.messageMode when provided", async () => {
+    let passedOptions: { messageMode?: string; rollMode?: string; create?: boolean } | undefined;
 
     // Mock globalThis
     const mockGlobal = globalThis as typeof globalThis & {
@@ -594,7 +599,9 @@ describe("PivotCombat rollInitiative", () => {
     };
 
     mockGlobal.game = {
-      settings: { get: () => "roll" },
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? "public" : "roll"),
+      },
       modules: { get: () => ({ active: false }) },
       i18n: {
         format: vi.fn((key: string, data: Record<string, unknown>) => {
@@ -623,13 +630,18 @@ describe("PivotCombat rollInitiative", () => {
           hidden: false,
           getInitiativeRoll: vi.fn(async () => ({
             total: 15,
-            toMessage: vi.fn(async (_data, options?: { rollMode?: string }) => {
-              passedRollMode = options?.rollMode;
-              return {
-                speaker: { alias: "Hero" },
-                flavor: "Hero rolls for Initiative!",
-              };
-            }),
+            toMessage: vi.fn(
+              async (
+                _data,
+                options?: { messageMode?: string; rollMode?: string; create?: boolean },
+              ) => {
+                passedOptions = options;
+                return {
+                  speaker: { alias: "Hero" },
+                  flavor: "Hero rolls for Initiative!",
+                };
+              },
+            ),
           })),
           _getInitiativeFormula: vi.fn(() => "1d20"),
         },
@@ -648,15 +660,14 @@ describe("PivotCombat rollInitiative", () => {
       combat as {
         rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
       }
-    ).rollInitiative(["c1"], { messageOptions: { rollMode: "blindroll" } });
+    ).rollInitiative(["c1"], { messageOptions: { messageMode: "blind" } });
 
-    // messageOptions.rollMode should be honored
-    expect(passedRollMode).toBe("blindroll");
+    expect(passedOptions).toEqual({ messageMode: "blind", create: false });
   });
 
-  it("merges messageOptions correctly without duplicating rollMode", async () => {
+  it("merges messageOptions without copying messageMode onto the chat data", async () => {
     let receivedMessageData: Record<string, unknown> = {};
-    let receivedOptions: { rollMode?: string; create?: boolean } = {};
+    let receivedOptions: { messageMode?: string; rollMode?: string; create?: boolean } = {};
 
     // Mock globalThis
     const mockGlobal = globalThis as typeof globalThis & {
@@ -678,7 +689,9 @@ describe("PivotCombat rollInitiative", () => {
     };
 
     mockGlobal.game = {
-      settings: { get: () => "roll" },
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? "public" : "roll"),
+      },
       modules: { get: () => ({ active: false }) },
       i18n: {
         format: vi.fn((key: string, data: Record<string, unknown>) => {
@@ -710,7 +723,7 @@ describe("PivotCombat rollInitiative", () => {
             toMessage: vi.fn(
               async (
                 data: Record<string, unknown>,
-                options?: { rollMode?: string; create?: boolean },
+                options?: { messageMode?: string; rollMode?: string; create?: boolean },
               ) => {
                 receivedMessageData = data;
                 receivedOptions = options ?? {};
@@ -740,15 +753,13 @@ describe("PivotCombat rollInitiative", () => {
         rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
       }
     ).rollInitiative(["c1"], {
-      messageOptions: { customField: "test-value", rollMode: "gmroll" },
+      messageOptions: { customField: "test-value", messageMode: "gm" },
     });
 
-    // customField should be in the message data
     expect(receivedMessageData.customField).toBe("test-value");
-    // rollMode should NOT be in the message data (passed separately)
+    expect(receivedMessageData.messageMode).toBeUndefined();
     expect(receivedMessageData.rollMode).toBeUndefined();
-    // rollMode should be in the options
-    expect(receivedOptions.rollMode).toBe("gmroll");
+    expect(receivedOptions).toEqual({ messageMode: "gm", create: false });
   });
 
   it("continues when DSN wait times out", async () => {
@@ -931,6 +942,229 @@ describe("PivotCombat rollInitiative", () => {
 
     // Initiative should be updated even though wait rejected
     expect(updateCalled).toBe(true);
+  });
+
+  async function postedInitiative(input: {
+    setting?: unknown;
+    hidden?: boolean;
+    messageOptions?: Record<string, unknown>;
+    messageMode?: string;
+    via?: "rollAll" | "rollNPC";
+  }): Promise<{ data: Record<string, unknown>; options: Record<string, unknown> }> {
+    let data: Record<string, unknown> = {};
+    let options: Record<string, unknown> = {};
+    const mockGlobal = globalThis as typeof globalThis & {
+      game?: {
+        settings?: { get?: (scope: string, key: string) => unknown };
+        modules?: { get?: (id: string) => { active?: boolean } | undefined };
+        i18n?: { format?: (key: string, data: Record<string, unknown>) => string };
+      };
+      ChatMessage?: {
+        implementation?: { create?: (data: Record<string, unknown>) => Promise<unknown> };
+        getSpeaker?: () => Record<string, unknown>;
+      };
+    };
+    mockGlobal.game = {
+      settings: {
+        get: (_scope: string, key: string) => (key === "messageMode" ? input.setting : "gmroll"),
+      },
+      modules: { get: () => ({ active: false }) },
+      i18n: { format: (_key: string, payload: Record<string, unknown>) => `${payload.name} rolls` },
+    };
+    mockGlobal.ChatMessage = {
+      implementation: { create: vi.fn(async () => ({ id: "msg1" })) },
+      getSpeaker: () => ({ alias: "Test" }),
+    };
+
+    class BaseCombat {
+      combatants = [
+        {
+          id: "c1",
+          _id: "c1",
+          actor: { id: "a1", name: "Hero" },
+          token: { name: "Hero Token" },
+          hidden: input.hidden ?? false,
+          isNPC: true,
+          getInitiativeRoll: vi.fn(async () => ({
+            total: 15,
+            _evaluated: true,
+            toMessage: vi.fn(
+              async (
+                messageData: Record<string, unknown>,
+                messageOptions?: Record<string, unknown>,
+              ) => {
+                data = messageData;
+                options = messageOptions ?? {};
+                return { speaker: { alias: "Hero" } };
+              },
+            ),
+          })),
+          _getInitiativeFormula: () => "1d20",
+        },
+      ];
+      updateEmbeddedDocuments = vi.fn(async () => {});
+      update = vi.fn(async () => {});
+      combatant = undefined;
+      turns: unknown[] = [];
+    }
+
+    const combat = new (createPivotCombatClass(BaseCombat as never))() as {
+      combatants: Array<{ id: string; isNPC?: boolean }>;
+      rollInitiative: (ids: string[], options?: Record<string, unknown>) => Promise<unknown>;
+    };
+    const initiativeOptions: Record<string, unknown> = {};
+    if (input.messageOptions) initiativeOptions.messageOptions = input.messageOptions;
+    if (input.messageMode !== undefined) initiativeOptions.messageMode = input.messageMode;
+    const ids =
+      input.via === "rollNPC"
+        ? combat.combatants.filter((combatant) => combatant.isNPC).map((combatant) => combatant.id)
+        : input.via === "rollAll"
+          ? combat.combatants.map((combatant) => combatant.id)
+          : ["c1"];
+    await combat.rollInitiative(ids, initiativeOptions);
+    return { data, options };
+  }
+
+  it.each(["public", "gm", "blind", "self"])(
+    "follows core.messageMode %s for a visible combatant",
+    async (mode) => {
+      const { data, options } = await postedInitiative({ setting: mode });
+      expect(options).toEqual({ messageMode: mode, create: false });
+      expect(data.messageMode).toBeUndefined();
+      expect(data.rollMode).toBeUndefined();
+    },
+  );
+
+  it.each(["gm", "blind", "self"])("keeps messageMode %s for a hidden combatant", async (mode) => {
+    const { options } = await postedInitiative({ setting: mode, hidden: true });
+    expect(options).toEqual({ messageMode: mode, create: false });
+  });
+
+  it("defaults a missing or non-string message mode to public", async () => {
+    const missing = await postedInitiative({ setting: undefined });
+    const numeric = await postedInitiative({ setting: 4 });
+    expect(missing.options).toEqual({ messageMode: "public", create: false });
+    expect(numeric.options).toEqual({ messageMode: "public", create: false });
+  });
+
+  it("sends a hidden combatant to the GM when messageOptions asks for public", async () => {
+    const { options } = await postedInitiative({
+      setting: "self",
+      hidden: true,
+      messageOptions: { messageMode: "public" },
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it.each([
+    ["publicroll", "public", "gm"],
+    ["gmroll", "gm", "public"],
+    ["blindroll", "blind", "public"],
+    ["selfroll", "self", "public"],
+  ])("honors messageOptions.rollMode %s when provided", async (legacy, mode, setting) => {
+    const { data, options } = await postedInitiative({
+      setting,
+      messageOptions: { rollMode: legacy, customField: "kept" },
+    });
+    expect(options).toEqual({ messageMode: mode, create: false });
+    expect(data.rollMode).toBeUndefined();
+    expect(data.messageMode).toBeUndefined();
+    expect(data.customField).toBe("kept");
+  });
+
+  it("maps legacy roll to the current core.messageMode", async () => {
+    const { data, options } = await postedInitiative({
+      setting: "self",
+      messageOptions: { rollMode: "roll" },
+    });
+    expect(options).toEqual({ messageMode: "self", create: false });
+    expect(data.rollMode).toBeUndefined();
+  });
+
+  it("honors messageMode passed by rollAll", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageMode: "gm",
+      messageOptions: { rollMode: "blindroll" },
+      via: "rollAll",
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("honors messageMode passed by rollNPC", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageMode: "blind",
+      messageOptions: { messageMode: "self" },
+      via: "rollNPC",
+    });
+    expect(options).toEqual({ messageMode: "blind", create: false });
+  });
+
+  it("sends a hidden combatant to the GM when the mode is ic", async () => {
+    const { options } = await postedInitiative({ setting: "ic", hidden: true });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("strips rollMode and messageMode from the chat data", async () => {
+    const { data, options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { customField: "test-value", messageMode: "self", rollMode: "gmroll" },
+    });
+    expect(data.customField).toBe("test-value");
+    expect(data.messageMode).toBeUndefined();
+    expect(data.rollMode).toBeUndefined();
+    expect(options).toEqual({ messageMode: "self", create: false });
+  });
+
+  it("honors v14 rollMode gm when core.messageMode is public", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { rollMode: "gm" },
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("honors v14 rollMode gm from rollAll when core.messageMode is public", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { rollMode: "gm" },
+      via: "rollAll",
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("honors v14 rollMode self", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageOptions: { rollMode: "self" },
+    });
+    expect(options).toEqual({ messageMode: "self", create: false });
+  });
+
+  it("honors v14 rollMode blind when core.messageMode is ic", async () => {
+    const { options } = await postedInitiative({
+      setting: "ic",
+      messageOptions: { rollMode: "blind" },
+    });
+    expect(options).toEqual({ messageMode: "blind", create: false });
+  });
+
+  it("skips rollMode toString and uses core.messageMode", async () => {
+    const { options } = await postedInitiative({
+      setting: "gm",
+      messageOptions: { rollMode: "toString" },
+    });
+    expect(options).toEqual({ messageMode: "gm", create: false });
+  });
+
+  it("skips an empty top-level messageMode", async () => {
+    const { options } = await postedInitiative({
+      setting: "public",
+      messageMode: "",
+      messageOptions: { messageMode: "self" },
+    });
+    expect(options).toEqual({ messageMode: "self", create: false });
   });
 });
 
