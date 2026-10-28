@@ -56,6 +56,8 @@ describe("english localization", () => {
       "PIVOT.Migration.Complete":
         "Pivot Fantasy migration {id} finished ({updated} updated, {failed} failed).",
       "PIVOT.Migration.DocumentFailed": "Pivot Fantasy migration {id} failed for {name}: {error}",
+      "PIVOT.Migration.TokenLeftUnlinked":
+        "Left {name} unlinked. This placed scene token keeps its own HP delta.",
       "PIVOT.Sections.Effects": "Effects",
       "PIVOT.Fields.Speed": "Speed",
       "PIVOT.Sections.Survival": "Survival",
