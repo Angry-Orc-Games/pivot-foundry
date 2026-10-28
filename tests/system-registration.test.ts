@@ -261,17 +261,28 @@ describe("registerPivotFantasySystem", () => {
     const text = importedActor({ value: 12, max: "nope" });
     runPreCreate(listeners, text.actor, { prototypeToken: { actorLink: false } });
     expect(text.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 12 }]]);
+
+    const negative = importedActor({ value: 15, max: -3 });
+    runPreCreate(listeners, negative.actor, { prototypeToken: { actorLink: false } });
+    expect(negative.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 15 }]]);
+
+    const npc = importedActor({ value: 40, max: 0 }, "npc");
+    runPreCreate(listeners, npc.actor, { prototypeToken: { actorLink: false } });
+    expect(npc.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 40 }]]);
   });
 
-  it("clamps current HP to a numeric max when an export is created above that max", () => {
+  it("leaves a zero HP pair unchanged when an export is created", () => {
+    const { listeners } = capturePreCreate();
+    const zero = importedActor({ value: 0, max: 0 });
+    runPreCreate(listeners, zero.actor, { prototypeToken: { actorLink: false } });
+    expect(zero.updateSource).not.toHaveBeenCalled();
+  });
+
+  it("clamps current HP to a positive numeric max when an export is created above that max", () => {
     const { listeners } = capturePreCreate();
     const character = importedActor({ value: 50, max: 20 });
     runPreCreate(listeners, character.actor, { prototypeToken: { actorLink: false } });
     expect(character.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.value": 20 }]]);
-
-    const npc = importedActor({ value: 40, max: 0 }, "npc");
-    runPreCreate(listeners, npc.actor, { prototypeToken: { actorLink: false } });
-    expect(npc.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.value": 0 }]]);
   });
 
   it("leaves a valid imported HP pair unchanged", () => {
