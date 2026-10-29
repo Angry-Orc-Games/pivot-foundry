@@ -38,6 +38,7 @@ function hasNestedProperty(obj: unknown, path: string): boolean {
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
+  runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
 
   // Sync token status effects after HP or death state changes
@@ -194,6 +195,35 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
       }
     }
   });
+}
+
+function linkCharacterPrototypeToken(
+  actor: {
+    type?: string;
+    updateSource?: (data: Record<string, unknown>) => unknown;
+  },
+  data?: unknown,
+): void {
+  if (actor.type !== "character" || !actor.updateSource) return;
+  if (creationSpecifiesActorLink(data)) return;
+  actor.updateSource({ "prototypeToken.actorLink": true });
+}
+
+function creationSpecifiesActorLink(data: unknown): boolean {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const utils = (
+    globalThis as {
+      foundry?: {
+        utils?: {
+          expandObject?: (object: object) => object;
+          hasProperty?: (object: object, key: string) => boolean;
+        };
+      };
+    }
+  ).foundry?.utils;
+  const expanded = utils?.expandObject?.(data) ?? data;
+  if (utils?.hasProperty) return utils.hasProperty(expanded, "prototypeToken.actorLink");
+  return hasNestedProperty(expanded, "prototypeToken.actorLink");
 }
 
 const pivotGlobals = globalThis as PivotGlobals & {

@@ -12,10 +12,10 @@ Pins live in [`foundry/versions.json`](../foundry/versions.json):
 | ----------------- | ---------------------------------------------------------------------------------------------------------- |
 | Foundry           | **14.361**                                                                                                 |
 | Foundry host Node | **24** (inside the container)                                                                              |
-| Container image   | `ghcr.io/felddy/foundryvtt:14.367@sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac` |
+| Container image   | `ghcr.io/felddy/foundryvtt:14.361@sha256:88399d7707a5ee548283a66947e54f69eaad68f27433c0f57c8940b44794fdfc` |
 | Playwright        | `@playwright/test` **1.63.0** / Chromium                                                                   |
 
-The container image stays `14.367` at the digest above. Felddy `v14.367.0` `src/entrypoint.sh` warns when `FOUNDRY_VERSION` is not `14.367` and continues. It installs `CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip` and does not reject a **14.361** Node zip. Confirm the digest again before moving the image pin.
+The container tag is `foundryVersion`, so `FOUNDRY_VERSION` and `felddy/foundryvtt:14.361` stay the same pin. The digest above is the `14.361` multi-arch index. Felddy installs `CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip` and writes `CACHEDIR.TAG` in that directory, so the mounted cache is a writable copy owned by uid 1000. The checksummed archive in `foundry-dist/` is not mounted.
 
 Do not upgrade an existing v13 campaign world as part of this workflow. Keep v13 user data out of `foundry-data-v14/`.
 

@@ -14,7 +14,9 @@ write_output() {
 close_gate() {
   local reason=$1
   write_output ok false
-  if [[ $mode == require ]]; then
+  if [[ ${E2E_GATE_MODE:-} == dispatch ]]; then
+    printf '::error::Foundry was not started. %s\n' "$reason"
+  elif [[ $mode == require ]]; then
     printf '::error::Re-run inside the 02:00-05:30 ET window. Foundry was not started. %s\n' "$reason"
   else
     printf '::error::Foundry was not started. %s\n' "$reason"
@@ -23,48 +25,73 @@ close_gate() {
 }
 
 read_count() {
-  local url=$1
-  local body users
-  body=$(curl -fsS --max-time 20 "$url") || return 1
-  users=$(
-    printf '%s' "$body" | jq -r 'if (.users | type) == "number" and (.users | floor) == .users and .users >= 0 then (.users | tostring) else empty end' 2>/dev/null
-  ) || return 1
-  [[ $users =~ ^[0-9]+$ ]] || return 1
-  printf '%s' "$users"
+  local host=$1
+  local url=$2
+  local body decision curl_status
+  body=$(curl -fsS --max-time 20 "$url") && curl_status=0 || curl_status=$?
+  if ((curl_status != 0)); then
+    if ((curl_status == 22)); then
+      status_refusal="status request to ${host} was not HTTP success (shared Foundry license)"
+    else
+      status_refusal="could not reach ${host} (shared Foundry license)"
+    fi
+    return 1
+  fi
+  decision=$(
+    printf '%s' "$body" | jq -r 'if type != "object" then "bad-users" elif (.users | type) == "number" and (.users | floor) == .users and .users >= 0 then "count:\(.users)" elif .active == false and (has("users") | not) then "count:0" else "bad-users" end' 2>/dev/null
+  ) || true
+  if [[ $decision == count:* && ${decision#count:} =~ ^[0-9]+$ ]]; then
+    count=${decision#count:}
+    return 0
+  fi
+  if [[ -z $decision ]]; then
+    status_refusal="could not parse status JSON from ${host} (shared Foundry license)"
+  else
+    status_refusal="could not read user count from ${host} (shared Foundry license)"
+  fi
+  return 1
 }
 
 license_gate() {
-  local clock hour minute count host url
+  local clock hour minute count host url reason status_refusal
   local -a busy=()
+  local skip_window=0
 
-  if ! clock=$(TZ=America/New_York date +%H%M); then
-    close_gate "could not read America/New_York clock (shared Foundry license)"
-  fi
-  if [[ ! $clock =~ ^[0-9]{4}$ ]]; then
-    close_gate "could not read America/New_York clock (shared Foundry license)"
+  if [[ ${E2E_GATE_MODE:-} == dispatch ]]; then
+    skip_window=1
+    write_output on_demand true
   fi
 
-  hour=${clock:0:2}
-  minute=${clock:2:2}
-  case $hour in
-    02|03|04) ;;
-    05)
-      if ((10#$minute >= 30)); then
+  if ((skip_window == 0)); then
+    if ! clock=$(TZ=America/New_York date +%H%M); then
+      close_gate "could not read America/New_York clock (shared Foundry license)"
+    fi
+    if [[ ! $clock =~ ^[0-9]{4}$ ]]; then
+      close_gate "could not read America/New_York clock (shared Foundry license)"
+    fi
+
+    hour=${clock:0:2}
+    minute=${clock:2:2}
+    case $hour in
+      02|03|04) ;;
+      05)
+        if ((10#$minute >= 30)); then
+          close_gate "outside 02:00-05:30 ET quiet hours (shared Foundry license)"
+        fi
+        ;;
+      *)
         close_gate "outside 02:00-05:30 ET quiet hours (shared Foundry license)"
-      fi
-      ;;
-    *)
-      close_gate "outside 02:00-05:30 ET quiet hours (shared Foundry license)"
-      ;;
-  esac
+        ;;
+    esac
+  fi
 
   for entry in \
     "foundry.angryorcgames.com|https://foundry.angryorcgames.com/api/status" \
     "build.angryorcgames.com|https://build.angryorcgames.com/api/status"; do
     host=${entry%%|*}
     url=${entry#*|}
-    if ! count=$(read_count "$url"); then
-      close_gate "could not read user count from ${host} (shared Foundry license)"
+    if ! read_count "$host" "$url"; then
+      close_gate "$status_refusal"
     fi
     if ((count > 0)); then
       busy+=("$host")
@@ -72,10 +99,22 @@ license_gate() {
   done
 
   if ((${#busy[@]} == 2)); then
-    close_gate "somebody is signed in on ${busy[0]} and ${busy[1]} (shared Foundry license)"
+    reason="somebody is signed in on ${busy[0]} and ${busy[1]} (shared Foundry license)"
+  elif ((${#busy[@]} == 1)); then
+    reason="somebody is signed in on ${busy[0]} (shared Foundry license)"
   fi
-  if ((${#busy[@]} == 1)); then
-    close_gate "somebody is signed in on ${busy[0]} (shared Foundry license)"
+  if [[ -n ${reason:-} ]]; then
+    if [[ ${E2E_GATE_MODE:-} == dispatch && ${E2E_GATE_SOFT_SKIP:-} == true ]]; then
+      write_output ok false
+      write_output skipped true
+      write_output skip_reason "$reason"
+      printf 'Foundry was not started. %s\n' "$reason"
+      exit 0
+    fi
+    if [[ ${E2E_GATE_MODE:-} == dispatch ]]; then
+      write_output skipped true
+    fi
+    close_gate "$reason"
   fi
 
   write_output ok true

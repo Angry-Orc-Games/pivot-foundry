@@ -31,7 +31,7 @@ export interface RuntimeGlobals {
   Roll?: new (formula: string, data?: Record<string, unknown>) => RuntimeRoll;
   ChatMessage?: {
     create(data: Record<string, unknown>): Promise<unknown>;
-    applyMode?(data: Record<string, unknown>, mode: string): unknown;
+    applyMode?(data: Record<string, unknown>, mode?: string): Record<string, unknown>;
     applyRollMode?(data: Record<string, unknown>, mode: string): unknown;
   };
   ui?: { notifications?: { warn(message: string): void } };
@@ -113,6 +113,6 @@ export function applyChatMessageMode(data: Record<string, unknown>, mode: string
 export async function createChat(data: Record<string, unknown>): Promise<unknown> {
   const Chat = runtime().ChatMessage;
   if (!Chat) throw new Error("Chat unavailable");
-  applyChatMessageMode(data, "roll");
-  return Chat.create(data);
+  const prepared = Chat.applyMode?.(data) ?? data;
+  return Chat.create(prepared);
 }

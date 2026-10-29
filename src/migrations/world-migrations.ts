@@ -1,5 +1,10 @@
-import { planSurvivalMigration } from "./m002";
-import { planSchemaV2ActorMigration, planSchemaV2ItemMigration } from "./m003";
+import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
+import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
+import {
+  planSchemaV2ActorMigration,
+  planSchemaV2ItemMigration,
+  SCHEMA_V2_MIGRATION_ID,
+} from "./m003";
 import {
   planActorMigration,
   planItemMigration,
@@ -12,8 +17,8 @@ export interface MigratableDocument {
   name?: string;
   type?: string;
   system?: unknown;
-  _source?: { system?: unknown };
-  toObject?: () => { system?: unknown };
+  _source?: { system?: unknown; prototypeToken?: { actorLink?: unknown } };
+  toObject?: () => { system?: unknown; prototypeToken?: { actorLink?: unknown } };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   update?: (data: Record<string, unknown>) => Promise<unknown>;
 }
@@ -23,13 +28,20 @@ export interface WorldMigrationGame {
   actors?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   scenes?:
-    | Iterable<{ tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }> }>
+    | Iterable<{ tokens?: Iterable<SceneToken> }>
     | {
         contents: Iterable<{
-          tokens?: Iterable<{ actorLink?: boolean; actor?: MigratableDocument | null }>;
+          tokens?: Iterable<SceneToken>;
         }>;
       };
   i18n?: { localize?: (key: string) => string };
+}
+
+interface SceneToken {
+  actorLink?: boolean;
+  actorId?: string;
+  actor?: MigratableDocument | null;
+  delta?: MigratableDocument | null;
 }
 
 export interface WorldMigrationDependencies {
@@ -60,44 +72,56 @@ export async function runWorldMigrations(
       ? Array.from(game.scenes.contents)
       : Array.from(game.scenes)
     : [];
-  const syntheticActors = sceneList.flatMap((scene) =>
-    Array.from(scene.tokens ?? []).flatMap((token) =>
-      token.actorLink === false && token.actor ? [token.actor] : [],
-    ),
+  const sceneTokens = sceneList.flatMap((scene) => Array.from(scene.tokens ?? []));
+  const actors = listDocuments(game.actors);
+  const actorsById = new Map(
+    actors.flatMap((actor) => (actor.id ? [[actor.id, actor] as const] : [])),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
     game.items,
-  ).map((document) => {
-    const stored = readStoredSystem(document);
-    return {
-      document,
-      plan: combineItemMigrations(stored),
-    };
-  });
-  for (const actor of [...listDocuments(game.actors), ...syntheticActors]) {
+  ).map((document) => ({ document, plan: combineItemMigrations(readStoredSystem(document)) }));
+  for (const actor of actors) {
     planned.push({
       document: actor,
-      plan: planAllActorMigrations(readStoredSystem(actor), actor.type),
+      plan: planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
     });
-    for (const item of listDocuments(actor.items)) {
-      planned.push({
-        document: item,
-        plan: combineItemMigrations(readStoredSystem(item)),
-      });
-    }
+    for (const item of listDocuments(actor.items))
+      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
   }
+  for (const token of sceneTokens) {
+    if (token.actorLink !== false || !token.actor) continue;
+    planned.push({
+      document: token.actor,
+      plan: planUnlinkedToken(token, actorsById),
+    });
+    for (const item of listDocuments(token.actor.items))
+      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
+  }
+  const wrote = new Set<MigratableDocument>();
   for (const entry of planned) {
     const result = await persistMigration(entry.document, entry.plan, dependencies);
+    if (result.updated > 0) wrote.add(entry.document);
     updated += result.updated;
     failed += result.failed;
+  }
+  for (const token of sceneTokens) {
+    if (token.actorLink !== false || token.actor?.type !== "character") continue;
+    if (!token.actor || !wrote.has(token.actor)) continue;
+    dependencies.log?.(
+      formatMessage(
+        "PIVOT.Migration.TokenLeftUnlinked",
+        { name: token.actor.name ?? token.actor.id ?? "unknown" },
+        dependencies,
+      ),
+    );
   }
 
   if (updated > 0 || failed > 0) {
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / M002 / M003`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -189,21 +213,45 @@ function formatMessage(
   );
 }
 
-export function planAllActorMigrations(source: unknown, type?: string): MigrationPlan {
+export function planAllActorMigrations(
+  source: unknown,
+  type?: string,
+  prototype?: { linkPrototype: boolean; hasPrototypeToken: boolean; actorLink?: unknown },
+  options?: { repairHp?: boolean },
+): MigrationPlan {
   const first = planActorMigration(source);
-  if (!first.ok || (type && type !== "character")) return first;
-  const second = planSurvivalMigration(source);
-  if (!second.ok) return second;
-  const third = planSchemaV2ActorMigration(source);
-  if (!third.ok) return third;
-  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
+  if (!first.ok) return first;
+  const character = !type || type === "character";
+  const survival = character
+    ? planSurvivalMigration(source)
+    : ({ ok: true, changed: false } as const);
+  if (!survival.ok) return survival;
+  const schemaV2 = character
+    ? planSchemaV2ActorMigration(source)
+    : ({ ok: true, changed: false } as const);
+  if (!schemaV2.ok) return schemaV2;
+  const hp =
+    options?.repairHp === false
+      ? ({ ok: true, changed: false } as const)
+      : planHpLinkMigration({
+          type,
+          system: source,
+          linkPrototype: prototype?.linkPrototype === true,
+          hasPrototypeToken: prototype?.hasPrototypeToken === true,
+          actorLink: prototype?.actorLink,
+        });
+  if (!hp.ok) return hp;
+  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed) {
+    return { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
     update: {
       ...(first.changed ? first.update : {}),
-      ...(second.changed ? second.update : {}),
-      ...(third.changed ? third.update : {}),
+      ...(survival.changed ? survival.update : {}),
+      ...(schemaV2.changed ? schemaV2.update : {}),
+      ...(hp.changed ? hp.update : {}),
     },
   };
 }
@@ -222,4 +270,79 @@ function combineItemMigrations(source: unknown): MigrationPlan {
       ...(second.changed ? second.update : {}),
     },
   };
+}
+
+function planUnlinkedToken(
+  token: SceneToken,
+  actorsById: Map<string, MigratableDocument>,
+): MigrationPlan {
+  const actor = token.actor;
+  if (!actor) return { ok: true, changed: false };
+  const merged = readStoredSystem(actor);
+  const structural = planAllActorMigrations(merged, actor.type, prototypeLink(actor, false), {
+    repairHp: false,
+  });
+  const base = token.actorId ? actorsById.get(token.actorId) : undefined;
+  return mergeMigrationPlans(
+    structural,
+    planTokenDeltaHp({
+      deltaSystem: token.delta ? readStoredSystem(token.delta) : undefined,
+      baseSystem: base ? readStoredSystem(base) : undefined,
+    }),
+  );
+}
+
+function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): MigrationPlan {
+  if (!left.ok) return left;
+  if (!right.ok) return right;
+  if (!left.changed && !right.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      ...(left.changed ? left.update : {}),
+      ...(right.changed ? right.update : {}),
+    },
+  };
+}
+
+function prototypeLink(
+  actor: MigratableDocument,
+  linkPrototype: boolean,
+): { linkPrototype: boolean; hasPrototypeToken: boolean; actorLink?: unknown } {
+  const token = readStoredPrototypeToken(actor);
+  return {
+    linkPrototype: linkPrototype && actor.type === "character",
+    hasPrototypeToken: token !== undefined,
+    actorLink: token?.actorLink,
+  };
+}
+
+function readStoredPrototypeToken(
+  document: MigratableDocument,
+): { actorLink?: unknown } | undefined {
+  const root = readStoredRoot(document);
+  const token = root?.prototypeToken;
+  if (!isRecord(token)) return undefined;
+  return token;
+}
+
+function readStoredRoot(document: MigratableDocument): Record<string, unknown> | undefined {
+  const object = callToObject(document);
+  if (isRecord(object)) return object;
+  if (isRecord(document._source)) return document._source;
+  return undefined;
+}
+
+function callToObject(document: MigratableDocument): unknown {
+  if (typeof document.toObject !== "function") return undefined;
+  try {
+    return document.toObject();
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

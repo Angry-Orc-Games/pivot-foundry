@@ -63,6 +63,26 @@ describe("HP and survival", () => {
     for (const status of ["stable", "dead", "alive"] as const)
       expect(() => resolveDeathSave(state({ status }), 10)).toThrow();
   });
+  it("applies damage when HP was raised without clearing dying", () => {
+    expect(applyHealth(state({ hp: 10, temp: 0, status: "dying" }), "damage", 3)).toMatchObject({
+      hp: 7,
+      status: "alive",
+      successes: 0,
+      failures: 0,
+    });
+  });
+  it("lets a death save resolve once that character is damaged to 0 HP", () => {
+    const down = applyHealth(state({ hp: 10, temp: 0, status: "dying" }), "damage", 10);
+    expect(down).toMatchObject({ hp: 0, status: "dying", successes: 0, failures: 0 });
+    expect(resolveDeathSave(down, 9)).toMatchObject({ hp: 0, status: "dying", failures: 1 });
+  });
+  it("records a death save at 0 HP when status is still alive", () => {
+    expect(resolveDeathSave(state({ hp: 0, temp: 0, status: "alive" }), 9)).toMatchObject({
+      hp: 0,
+      status: "dying",
+      failures: 1,
+    });
+  });
 });
 it("preserves accumulated successes on damage while dying", () => {
   expect(applyHealth(state({ hp: 0, status: "dying", successes: 2 }), "damage", 1).successes).toBe(

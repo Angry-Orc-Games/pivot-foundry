@@ -10,10 +10,8 @@
   "releaseSha256": "",
   "container": {
     "image": "ghcr.io/felddy/foundryvtt",
-    "tag": "14.367",
-    "digest": "sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac",
-    "supportsFoundryVersion": "14.361",
-    "notes": "Image tag stays 14.367 at digest sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac. Checked 2026-10-18 against felddy/foundryvtt-docker v14.367.0 src/entrypoint.sh: a FOUNDRY_VERSION other than 14.367 logs a warning and continues. Install uses CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip and does not reject a 14.361 Node zip."
+    "digest": "sha256:88399d7707a5ee548283a66947e54f69eaad68f27433c0f57c8940b44794fdfc",
+    "notes": "Image tag is foundryVersion. Digest is the ghcr.io/felddy/foundryvtt:14.361 multi-arch index, checked 2026-10-19."
   },
   "node": {
     "verify": ["20", "22"],
