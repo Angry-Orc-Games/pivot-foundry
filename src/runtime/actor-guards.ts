@@ -3,6 +3,28 @@ import { warn } from "./ui";
 
 const DELETED_MAX = "-=max";
 
+export function correctCreatedHp(actor: {
+  system?: unknown;
+  updateSource?: (data: Record<string, unknown>) => unknown;
+}): void {
+  if (!actor.updateSource) return;
+  const patch = createdHpPatch(actor.system);
+  if (patch) actor.updateSource(patch);
+}
+
+function createdHpPatch(system: unknown): Record<string, unknown> | undefined {
+  const attributes = asRecord(asRecord(system)?.attributes);
+  const hp = asRecord(attributes?.hp);
+  if (!hp) return undefined;
+  const value = validAmount(hp.value) ? hp.value : 0;
+  const max = validAmount(hp.max) && hp.max > 0 ? hp.max : value;
+  const clamped = Math.min(value, max);
+  const patch: Record<string, unknown> = {};
+  if (hp.value !== clamped) patch["system.attributes.hp.value"] = clamped;
+  if (hp.max !== max) patch["system.attributes.hp.max"] = max;
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
 export function guardHpMaximum(
   actor: { system?: unknown; sheet?: { render?: (force?: boolean) => void } },
   changes: Record<string, unknown>,
