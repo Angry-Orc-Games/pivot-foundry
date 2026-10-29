@@ -251,6 +251,46 @@ describe("registerPivotFantasySystem", () => {
     }
     expect(updateSource).not.toHaveBeenCalled();
   });
+
+  it("corrects a blank or non-numeric HP max when an export is created", () => {
+    const { listeners } = capturePreCreate();
+    const blank = importedActor({ value: 30, max: null });
+    runPreCreate(listeners, blank.actor, { prototypeToken: { actorLink: false } });
+    expect(blank.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 30 }]]);
+
+    const text = importedActor({ value: 12, max: "nope" });
+    runPreCreate(listeners, text.actor, { prototypeToken: { actorLink: false } });
+    expect(text.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 12 }]]);
+
+    const negative = importedActor({ value: 15, max: -3 });
+    runPreCreate(listeners, negative.actor, { prototypeToken: { actorLink: false } });
+    expect(negative.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 15 }]]);
+
+    const npc = importedActor({ value: 40, max: 0 }, "npc");
+    runPreCreate(listeners, npc.actor, { prototypeToken: { actorLink: false } });
+    expect(npc.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 40 }]]);
+  });
+
+  it("leaves a zero HP pair unchanged when an export is created", () => {
+    const { listeners } = capturePreCreate();
+    const zero = importedActor({ value: 0, max: 0 });
+    runPreCreate(listeners, zero.actor, { prototypeToken: { actorLink: false } });
+    expect(zero.updateSource).not.toHaveBeenCalled();
+  });
+
+  it("clamps current HP to a positive numeric max when an export is created above that max", () => {
+    const { listeners } = capturePreCreate();
+    const character = importedActor({ value: 50, max: 20 });
+    runPreCreate(listeners, character.actor, { prototypeToken: { actorLink: false } });
+    expect(character.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.value": 20 }]]);
+  });
+
+  it("leaves a valid imported HP pair unchanged", () => {
+    const { listeners } = capturePreCreate();
+    const character = importedActor({ value: 18, max: 28 });
+    runPreCreate(listeners, character.actor, { prototypeToken: { actorLink: false } });
+    expect(character.updateSource).not.toHaveBeenCalled();
+  });
 });
 
 describe("preCreateActor actorLink", () => {
@@ -363,4 +403,65 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+function capturePreCreate(): {
+  listeners: Array<
+    (
+      actor: {
+        type?: string;
+        system?: unknown;
+        updateSource?: (data: Record<string, unknown>) => unknown;
+      },
+      data?: unknown,
+    ) => void
+  >;
+} {
+  const { foundry } = createMockFoundry();
+  const listeners: Array<
+    (
+      actor: {
+        type?: string;
+        system?: unknown;
+        updateSource?: (data: Record<string, unknown>) => unknown;
+      },
+      data?: unknown,
+    ) => void
+  > = [];
+  registerPivotFantasySystem({
+    Hooks: {
+      on(event, callback) {
+        if (event === "preCreateActor") listeners.push(callback as (typeof listeners)[number]);
+      },
+      once() {},
+    },
+    CONFIG: {
+      Actor: { dataModels: {}, trackableAttributes: {} },
+      Item: { dataModels: {} },
+    },
+    foundry,
+  });
+  return { listeners };
+}
+
+function importedActor(hp: { value: unknown; max: unknown }, type = "character") {
+  const updateSource = vi.fn();
+  return {
+    updateSource,
+    actor: {
+      type,
+      system: { survivalVersion: 1, attributes: { hp } },
+      updateSource,
+    },
+  };
+}
+
+function runPreCreate(
+  listeners: Array<
+    (actor: { updateSource?: (data: Record<string, unknown>) => unknown }, data?: unknown) => void
+  >,
+  actor: { updateSource?: (data: Record<string, unknown>) => unknown },
+  data?: unknown,
+): void {
+  for (const listener of listeners) listener(actor, data);
 }
