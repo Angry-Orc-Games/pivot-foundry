@@ -361,7 +361,7 @@ Initial roll interactions:
 - Death save roll: d20 death save workflow. Exact thresholds and effects should be verified against the full rules before automation.
 - Magic ability roll/use: spend MP and roll Control Magic only when the ability calls for it; do not invent per-spell rules.
 
-Roll dialogs should support advantage/disadvantage/super-advantage source counts because the rule module already models that resolution.
+Roll dialogs offer Normal, Advantage, and Disadvantage. Any number of advantage sources rolls two d20s and keeps the highest.
 
 ## 10. Item/Inventory Interactions
 

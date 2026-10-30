@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { FoundryRuntime } from "../../src/foundry-runtime";
 import {
@@ -12,6 +12,7 @@ import {
   normalizeSheetSubmitData,
   POOL_VALUE_PATH,
   prepareCharacterSheetContext,
+  promptRollMode,
   resolveSheetRoll,
   type ActorLike,
 } from "../../src/sheets/character-sheet";
@@ -362,13 +363,12 @@ describe("sheet interaction helpers", () => {
     });
   });
 
-  it("builds a roll-mode dialog with four labeled choices and Normal selected", () => {
+  it("builds a roll-mode dialog with Normal, Advantage, and Disadvantage", () => {
     const content = buildRollModeDialogContent((key) => key);
+    const values = [...content.matchAll(/value="([^"]+)"/g)].map((match) => match[1]);
+    expect(values).toEqual(["normal", "advantage", "disadvantage"]);
     expect(content).toContain('value="normal" checked');
-    expect(content).toContain('value="advantage"');
-    expect(content).toContain('value="disadvantage"');
-    expect(content).toContain('value="superAdvantage"');
-    expect(content).toContain("PIVOT.RollMode.Normal");
+    expect(content).not.toContain("superAdvantage");
   });
 
   it("builds chat flavor from kept die, modifier, and attack natural results", () => {
@@ -628,6 +628,33 @@ describe("sheet interaction helpers", () => {
       "system.identity.languages": ["Common", "Giant"],
       "system.proficiencies.instruments": ["Drums"],
     });
+  });
+});
+
+describe("promptRollMode", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads a legacy superAdvantage dialog result as advantage", async () => {
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "superAdvantage") } } },
+    });
+    await expect(promptRollMode()).resolves.toBe("advantage");
+  });
+
+  it("treats a null dialog result as cancel", async () => {
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => null) } } },
+    });
+    await expect(promptRollMode()).resolves.toBeNull();
+  });
+
+  it("treats an unparseable dialog result as cancel", async () => {
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "nope") } } },
+    });
+    await expect(promptRollMode()).resolves.toBeNull();
   });
 });
 
