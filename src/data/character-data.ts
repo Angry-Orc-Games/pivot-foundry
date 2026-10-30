@@ -1,6 +1,12 @@
 import { abilities, canonicalSkills } from "../config";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 import { abilityModifier } from "../rules/modifiers";
+import {
+  reconcileSurvival,
+  SURVIVAL_STATUSES,
+  type SurvivalState,
+  type SurvivalStatus,
+} from "../rules/survival";
 import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
 import {
   arrayField,
@@ -64,6 +70,31 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
       // Matches character-derived.ts: abilities.dex.mod + initiativeBonus + effects.initiativeBonus
       // where dex.mod is computed from the effective (base + abilityScoreBonus) score
       this.initiative = dexMod + initiativeBonus + effectsInitiativeBonus;
+      const saves = attrs.deathSaves as
+        { status?: string; successes?: number; failures?: number } | undefined;
+      const hp = attrs.hp as { value?: number; max?: number; temp?: number } | undefined;
+      if (saves) {
+        const stored: SurvivalState = {
+          hp: typeof hp?.value === "number" ? hp.value : 0,
+          max: typeof hp?.max === "number" ? hp.max : 0,
+          temp: typeof hp?.temp === "number" ? hp.temp : 0,
+          successes: typeof saves.successes === "number" ? saves.successes : 0,
+          failures: typeof saves.failures === "number" ? saves.failures : 0,
+          status: SURVIVAL_STATUSES.includes(saves.status as SurvivalStatus)
+            ? (saves.status as SurvivalStatus)
+            : "unconfirmed",
+        };
+        const reconciled = reconcileSurvival(stored);
+        if (
+          reconciled.status !== stored.status ||
+          reconciled.successes !== stored.successes ||
+          reconciled.failures !== stored.failures
+        ) {
+          saves.status = reconciled.status;
+          saves.successes = reconciled.successes;
+          saves.failures = reconciled.failures;
+        }
+      }
     }
 
     static defineSchema(): Record<string, DataField> {
@@ -77,6 +108,15 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
         }),
         identity: schemaField(fields, {
           player: stringField(fields, { required: true, initial: "" }),
+          concept: stringField(fields, { required: true, initial: "" }),
+          focus: stringField(fields, { required: true, initial: "" }),
+          backgroundTier: numberField(fields, {
+            required: true,
+            integer: true,
+            min: 0,
+            max: 3,
+            initial: 0,
+          }),
           backgroundText: stringField(fields, { required: true, initial: "" }),
           speciesText: stringField(fields, { required: true, initial: "" }),
           languages: arrayField(fields, stringField(fields, { required: true, initial: "" })),

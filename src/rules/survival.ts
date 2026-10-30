@@ -12,7 +12,7 @@ export type HealthKind = "damage" | "healing" | "temp";
 export function validAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
-function reconcileSurvival(source: SurvivalState): SurvivalState {
+export function reconcileSurvival(source: SurvivalState): SurvivalState {
   if (source.hp > 0 && (source.status === "dying" || source.status === "stable")) {
     return { ...source, status: "alive", successes: 0, failures: 0 };
   }

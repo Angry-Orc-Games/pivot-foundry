@@ -1,6 +1,11 @@
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
+  planSchemaV2ActorMigration,
+  planSchemaV2ItemMigration,
+  SCHEMA_V2_MIGRATION_ID,
+} from "./m003";
+import {
   planActorMigration,
   planItemMigration,
   SCHEMA_MIGRATION_ID,
@@ -75,14 +80,14 @@ export async function runWorldMigrations(
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
     game.items,
-  ).map((document) => ({ document, plan: planItemMigration(readStoredSystem(document)) }));
+  ).map((document) => ({ document, plan: combineItemMigrations(readStoredSystem(document)) }));
   for (const actor of actors) {
     planned.push({
       document: actor,
       plan: planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
     });
     for (const item of listDocuments(actor.items))
-      planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
+      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
@@ -91,7 +96,7 @@ export async function runWorldMigrations(
       plan: planUnlinkedToken(token, actorsById),
     });
     for (const item of listDocuments(token.actor.items))
-      planned.push({ document: item, plan: planItemMigration(readStoredSystem(item)) });
+      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
   }
   const wrote = new Set<MigratableDocument>();
   for (const entry of planned) {
@@ -116,7 +121,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID}`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -216,11 +221,15 @@ export function planAllActorMigrations(
 ): MigrationPlan {
   const first = planActorMigration(source);
   if (!first.ok) return first;
-  const survival =
-    type && type !== "character"
-      ? ({ ok: true, changed: false } as const)
-      : planSurvivalMigration(source);
+  const character = !type || type === "character";
+  const survival = character
+    ? planSurvivalMigration(source)
+    : ({ ok: true, changed: false } as const);
   if (!survival.ok) return survival;
+  const schemaV2 = character
+    ? planSchemaV2ActorMigration(source)
+    : ({ ok: true, changed: false } as const);
+  if (!schemaV2.ok) return schemaV2;
   const hp =
     options?.repairHp === false
       ? ({ ok: true, changed: false } as const)
@@ -232,14 +241,33 @@ export function planAllActorMigrations(
           actorLink: prototype?.actorLink,
         });
   if (!hp.ok) return hp;
-  if (!first.changed && !survival.changed && !hp.changed) return { ok: true, changed: false };
+  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed) {
+    return { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
     update: {
       ...(first.changed ? first.update : {}),
       ...(survival.changed ? survival.update : {}),
+      ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
+    },
+  };
+}
+
+function combineItemMigrations(source: unknown): MigrationPlan {
+  const first = planItemMigration(source);
+  if (!first.ok) return first;
+  const second = planSchemaV2ItemMigration(source);
+  if (!second.ok) return second;
+  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    update: {
+      ...(first.changed ? first.update : {}),
+      ...(second.changed ? second.update : {}),
     },
   };
 }

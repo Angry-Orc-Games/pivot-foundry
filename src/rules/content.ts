@@ -239,12 +239,13 @@ function requirePlainString(value: unknown, field: string): string {
   return value;
 }
 
-function requireCost(value: unknown): { pool?: number; mp?: number } {
+function requireCost(value: unknown): { pool?: number; mp?: number; bp?: number } {
   if (!isPlainObject(value)) throw new Error("cost must be a plain object.");
-  assertAllowedKeys(value, new Set(["pool", "mp"]), "cost");
-  const cost: { pool?: number; mp?: number } = {};
+  assertAllowedKeys(value, new Set(["pool", "mp", "bp"]), "cost");
+  const cost: { pool?: number; mp?: number; bp?: number } = {};
   if (value.pool !== undefined) cost.pool = requireNonNegativeInteger(value.pool, "cost.pool");
   if (value.mp !== undefined) cost.mp = requireNonNegativeInteger(value.mp, "cost.mp");
+  if (value.bp !== undefined) cost.bp = requireNonNegativeInteger(value.bp, "cost.bp");
   return cost;
 }
 

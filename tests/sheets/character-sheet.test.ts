@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { FoundryRuntime } from "../../src/foundry-runtime";
 import {
@@ -106,6 +106,8 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.derived.abilities.str.mod).toBe(0);
     expect(context.derived.pool.max).toBe(1);
     expect(context.derived.magic.mp.max).toBe(0);
+    expect(context.derived.initiative).toBe(0);
+    expect(context.initiativeText).toBe("+0");
     expect(context.items.weapons).toEqual([]);
   });
 
@@ -115,6 +117,7 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.derived.proficiencyBonus).toBe(3);
     expect(context.derived.armourClass.value).toBe(16);
     expect(context.derived.initiative).toBe(4);
+    expect(context.initiativeText).toBe("+4");
     expect(context.derived.totalWeight).toBe(32);
     expect(context.items.weapons[0]?.summary).toMatchObject({
       bth: 6,
@@ -157,13 +160,42 @@ describe("prepareCharacterSheetContext", () => {
 
     expect(baseline.abilityRows.find((row) => row.key === "dex")?.score).toBe(14);
     expect(boosted.abilityRows.find((row) => row.key === "dex")?.score).toBe(14);
-    expect(baseline.abilityRows.find((row) => row.key === "dex")?.mod).toBe(2);
-    expect(boosted.abilityRows.find((row) => row.key === "dex")?.mod).toBe(3);
-    expect(baseline.skillRows.find((row) => row.id === "perception")?.total).toBe(4);
-    expect(boosted.skillRows.find((row) => row.id === "perception")?.total).toBe(6);
+    expect(baseline.abilityRows.find((row) => row.key === "dex")?.mod).toBe("+2");
+    expect(boosted.abilityRows.find((row) => row.key === "dex")?.mod).toBe("+3");
+    expect(baseline.skillRows.find((row) => row.id === "perception")?.total).toBe("+4");
+    expect(boosted.skillRows.find((row) => row.id === "perception")?.total).toBe("+6");
     expect(boosted.derived.proficiencies.weapons.bows).toBe(true);
     expect(baseline.derived.initiative).toBe(4);
     expect(boosted.derived.initiative).toBe(5);
+    expect(baseline.scoreSourceText).toBe("");
+    expect(boosted.scoreSourceText).toBe("Score sources. Dex: base 14, Bow Training +2.");
+    expect(baseline.skillRows.find((row) => row.id === "athletics")?.ability).toBe("Str");
+    expect(baseline.skillRows.find((row) => row.id === "perception")?.ability).toBe("Wis");
+  });
+
+  it("lists body modifications apart from traits", () => {
+    const actor = sampleActor();
+    const withMods = {
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "mod-1",
+          name: "Gills",
+          type: "feature",
+          system: { category: "bodyModification" },
+        },
+        {
+          id: "trait-1",
+          name: "Darkvision",
+          type: "feature",
+          system: { category: "species" },
+        },
+      ],
+    };
+    const context = prepareCharacterSheetContext(withMods);
+    expect(context.items.bodyModifications.map((item) => item.name)).toEqual(["Gills"]);
+    expect(context.items.traits.map((item) => item.name)).toEqual(["Darkvision"]);
   });
 
   it("keeps non-enumerable Foundry document ids available for item row actions", () => {
@@ -207,12 +239,53 @@ describe("prepareCharacterSheetContext", () => {
       },
     });
 
-    expect(context.survivalStatus).toBe("dying");
-    expect(context.survivalLabel).toBe("PIVOT.Survival.dying");
+    expect(context.survivalStatus).toBe("alive");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
     expect(context.hpPercent).toBe(50);
     expect(context.poolPercent).toBe(20);
-    expect(context.deathSaveSuccessPips).toEqual([true, true, false]);
-    expect(context.deathSaveFailurePips).toEqual([true, false, false]);
+    expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
+    expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+  });
+
+  it("shows alive after prepare when stored HP is positive and status is dying", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 10, max: 10, temp: 0 },
+          deathSaves: { status: "dying", successes: 1, failures: 2 },
+        },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("alive");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
+    expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
+    expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+  });
+
+  it("keeps zero HP dying, zero HP stable, and dead characters on the sheet", () => {
+    const actor = sampleActor();
+    const statusFor = (hp: number, status: string) =>
+      prepareCharacterSheetContext({
+        ...actor,
+        system: {
+          ...actor.system,
+          attributes: {
+            ...(actor.system.attributes as Record<string, unknown>),
+            hp: { value: hp, max: 10, temp: 0 },
+            deathSaves: { status, successes: 2, failures: 1 },
+          },
+        },
+      }).survivalStatus;
+
+    expect(statusFor(0, "dying")).toBe("dying");
+    expect(statusFor(0, "stable")).toBe("stable");
+    expect(statusFor(10, "dead")).toBe("dead");
+    expect(statusFor(0, "dead")).toBe("dead");
   });
 });
 
@@ -443,6 +516,56 @@ describe("sheet interaction helpers", () => {
       name: "New Magic Ability",
       type: "magicAbility",
     });
+    expect(createEmbeddedItemData("feature", "other")).toEqual({
+      name: "New Trait",
+      type: "feature",
+      system: { category: "other" },
+    });
+  });
+
+  it("passes a trait category through createItem and opens the new sheet", async () => {
+    const created: unknown[] = [];
+    let rendered = false;
+    const SheetClass = createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+          },
+        },
+      },
+    } as never);
+    const sheet = new SheetClass();
+    Object.defineProperty(sheet, "document", {
+      value: {
+        async createEmbeddedDocuments(_type: string, data: unknown[]) {
+          created.push(...data);
+          return [{ sheet: { render: (force?: boolean) => (rendered = force === true) } }];
+        },
+      },
+    });
+    const createItem = (
+      SheetClass as {
+        DEFAULT_OPTIONS?: {
+          actions?: {
+            createItem?: (
+              this: unknown,
+              event: Event,
+              target: { dataset: Record<string, string> },
+            ) => Promise<void>;
+          };
+        };
+      }
+    ).DEFAULT_OPTIONS?.actions?.createItem;
+    await createItem?.call(sheet, new Event("click"), {
+      dataset: { type: "feature", category: "other" },
+    });
+    expect(created).toEqual([
+      { name: "New Trait", type: "feature", system: { category: "other" } },
+    ]);
+    expect(rendered).toBe(true);
   });
 
   it("normalizes comma-separated sheet fields into source arrays", () => {
@@ -508,6 +631,258 @@ describe("sheet interaction helpers", () => {
   });
 });
 
+describe("D20 roll attachments for Dice So Nice!", () => {
+  it("attaches pool roll with dice to ChatMessage.create", async () => {
+    const chatCreate = vi.fn(async (data: Record<string, unknown>) => ({
+      id: "msg-pool",
+      ...(data as object),
+    }));
+
+    vi.stubGlobal("game", {
+      settings: { get: () => "roll" },
+      i18n: { localize: (key: string) => key },
+    });
+
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "advantage") } } },
+    });
+
+    vi.stubGlobal("ChatMessage", {
+      create: chatCreate,
+      applyRollMode: vi.fn(),
+      getSpeaker: () => ({ alias: "Hero" }),
+    });
+
+    vi.stubGlobal(
+      "Roll",
+      class {
+        dice = [{ faces: 20, results: [{ result: 15 }, { result: 8 }] }];
+        async evaluate() {
+          return this;
+        }
+        async render() {
+          return "<div>18</div>";
+        }
+        constructor(public formula: string) {}
+      },
+    );
+
+    const actor = {
+      name: "Hero",
+      type: "character",
+      system: {
+        progression: { level: 5 },
+        abilities: { str: { score: 16, primary: true } },
+        skills: {},
+      },
+      items: [],
+    };
+
+    const { createPivotCharacterSheetClass, prepareCharacterSheetContext } =
+      await import("../../src/sheets/character-sheet");
+
+    prepareCharacterSheetContext(actor);
+
+    const SheetClass = createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+          },
+        },
+      },
+    } as never);
+
+    const sheet = new SheetClass();
+    Object.defineProperty(sheet, "document", { value: actor, writable: true });
+
+    const rollAction = (SheetClass as { DEFAULT_OPTIONS?: { actions?: { roll?: unknown } } })
+      .DEFAULT_OPTIONS?.actions?.roll as (
+      this: unknown,
+      event: Event,
+      target: { dataset: Record<string, string> },
+    ) => Promise<void>;
+
+    expect(rollAction).toBeTypeOf("function");
+    await rollAction.call(
+      sheet,
+      new Event("click") as never,
+      {
+        dataset: { rollKind: "save", key: "str", label: "Strength Save" },
+      } as never,
+    );
+
+    expect(chatCreate).toHaveBeenCalledTimes(1);
+    const messageData = chatCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+    const rolls = messageData.rolls as { formula?: string; dice?: unknown[] }[];
+    expect(rolls).toBeDefined();
+    expect(rolls.length).toBe(1);
+    expect(rolls[0]?.formula).toBe("2d20");
+    expect(rolls[0]?.dice).toBeDefined();
+  });
+
+  it("message content equals resultRoll.render() output", async () => {
+    const renderedContent = "<div class='dice-roll'>Result: 18</div>";
+    const chatCreate = vi.fn(async (data: Record<string, unknown>) => ({
+      id: "msg-render",
+      ...(data as object),
+    }));
+
+    vi.stubGlobal("game", {
+      settings: { get: () => "roll" },
+      i18n: { localize: (key: string) => key },
+      dice3d: {
+        waitFor3DAnimationByMessageID: vi.fn(async () => {}),
+      },
+    });
+
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "normal") } } },
+    });
+
+    vi.stubGlobal("ChatMessage", {
+      create: chatCreate,
+      applyRollMode: vi.fn(),
+      getSpeaker: () => ({ alias: "Hero" }),
+    });
+
+    vi.stubGlobal(
+      "Roll",
+      class {
+        dice = [{ faces: 20, results: [{ result: 15 }] }];
+        async evaluate() {
+          return this;
+        }
+        async render() {
+          return renderedContent;
+        }
+        constructor(public formula: string) {}
+      },
+    );
+
+    const actor = {
+      name: "Hero",
+      type: "character",
+      system: {
+        progression: { level: 5 },
+        abilities: { str: { score: 16, primary: true } },
+        skills: {},
+      },
+      items: [],
+    };
+
+    const { createPivotCharacterSheetClass, prepareCharacterSheetContext } =
+      await import("../../src/sheets/character-sheet");
+
+    prepareCharacterSheetContext(actor);
+
+    const SheetClass = createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+          },
+        },
+      },
+    } as never);
+
+    const sheet = new SheetClass();
+    Object.defineProperty(sheet, "document", { value: actor, writable: true });
+
+    const rollAction = (SheetClass as { DEFAULT_OPTIONS?: { actions?: { roll?: unknown } } })
+      .DEFAULT_OPTIONS?.actions?.roll as (
+      this: unknown,
+      event: Event,
+      target: { dataset: Record<string, string> },
+    ) => Promise<void>;
+
+    expect(rollAction).toBeTypeOf("function");
+    await rollAction.call(
+      sheet,
+      new Event("click") as never,
+      {
+        dataset: { rollKind: "save", key: "str", label: "Save" },
+      } as never,
+    );
+
+    expect(chatCreate).toHaveBeenCalledTimes(1);
+    const messageData = chatCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(messageData.content).toBe(renderedContent);
+  });
+});
+
+describe("character sheet edit toggle", () => {
+  function sheetClass(ownerEditable: boolean) {
+    return createPivotCharacterSheetClass({
+      applications: {
+        api: { HandlebarsApplicationMixin: (base: unknown) => base },
+        sheets: {
+          ActorSheetV2: class ActorSheetV2 {
+            static DEFAULT_OPTIONS = {};
+            async _prepareContext() {
+              return { editable: ownerEditable };
+            }
+          },
+        },
+      },
+    } as never);
+  }
+
+  it("switches an owner between edit and view, and keeps a non-owner in view", async () => {
+    type SheetInstance = {
+      editorOpen?: boolean;
+      document: ActorLike;
+      render: () => void;
+      _prepareContext: (options: Record<string, unknown>) => Promise<{
+        editable: boolean;
+        disabledAttr: string;
+      }>;
+    };
+    const SheetClass = sheetClass(true);
+    const sheet = new SheetClass() as SheetInstance;
+    sheet.document = sampleActor();
+    sheet.render = () => undefined;
+    const toggle = (
+      SheetClass as unknown as {
+        DEFAULT_OPTIONS: { actions: { toggleEditMode: (this: SheetInstance) => void } };
+      }
+    ).DEFAULT_OPTIONS.actions.toggleEditMode;
+
+    const editing = await sheet._prepareContext({});
+    expect(editing.editable).toBe(true);
+    expect(editing.disabledAttr).toBe("");
+
+    toggle.call(sheet);
+    const viewing = await sheet._prepareContext({});
+    expect(sheet.editorOpen).toBe(false);
+    expect(viewing.editable).toBe(false);
+    expect(viewing.disabledAttr).toBe("disabled");
+
+    toggle.call(sheet);
+    const editingAgain = await sheet._prepareContext({});
+    expect(editingAgain.editable).toBe(true);
+    expect(editingAgain.disabledAttr).toBe("");
+
+    const LockedSheet = sheetClass(false);
+    const locked = new LockedSheet() as SheetInstance;
+    locked.document = sampleActor();
+    locked.render = () => undefined;
+    const lockedToggle = (
+      LockedSheet as unknown as {
+        DEFAULT_OPTIONS: { actions: { toggleEditMode: (this: SheetInstance) => void } };
+      }
+    ).DEFAULT_OPTIONS.actions.toggleEditMode;
+    lockedToggle.call(locked);
+    lockedToggle.call(locked);
+    const stillLocked = await locked._prepareContext({});
+    expect(stillLocked.editable).toBe(false);
+    expect(stillLocked.disabledAttr).toBe("disabled");
+  });
+});
 describe("character sheet submit", () => {
   it("writes only fields that differ from the actor source", async () => {
     const { sheet, updates } = worldActorSheet();

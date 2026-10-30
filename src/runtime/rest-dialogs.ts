@@ -13,6 +13,7 @@ import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
+import { waitForDiceSoNiceAnimation } from "./dice-so-nice";
 
 interface RestContext {
   actor: ActorLike;
@@ -117,7 +118,9 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
   );
 
-  if (!inputs) return;
+  // Cancel / dismiss must be a clean no-op (DialogV2 may return a string or partial object).
+  if (!inputs || typeof inputs !== "object") return;
+  if (typeof inputs.poolSpendsRaw !== "string") return;
 
   const poolSpends = parsePoolSpends(inputs.poolSpendsRaw, maxSpends);
 
@@ -135,6 +138,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   let poolRemaining = ctx.poolCurrent;
   let totalHealed = 0;
   const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
+  const diceRolls: InstanceType<typeof Roll>[] = [];
 
   try {
     const progress = rollProgress();
@@ -163,6 +167,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
         async (faces) => {
           const die = new Roll(`1d${faces}`);
           await progress.wait(die.evaluate());
+          diceRolls.push(die);
           if (die.total === undefined) throw new Error("Incomplete");
           return die.total;
         },
@@ -200,18 +205,6 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   });
 
   const newHp = Math.min(ctx.hpMax, ctx.hpCurrent + totalHealed);
-  const update: Record<string, unknown> = {
-    "system.attributes.hp.value": newHp,
-    "system.resources.pool.value": poolRemaining,
-    "system.magic.mp.value": mpResult.mpFinal,
-  };
-
-  try {
-    await actor.update?.(update);
-  } catch {
-    warnRest("RestFailed");
-    return;
-  }
 
   const diceChains = diceResults
     .map((d) => `d${d.faces}: [${d.results.join(" → ")}] ${formatSigned(ctx.conMod)} = ${d.total}`)
@@ -229,11 +222,26 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     .join(" • ");
 
   try {
-    await createChat({
+    const message = await createChat({
       content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
+      rolls: diceRolls,
     });
+    await waitForDiceSoNiceAnimation(message);
   } catch {
     warnRest("ChatFailed");
+  }
+
+  const update: Record<string, unknown> = {
+    "system.attributes.hp.value": newHp,
+    "system.resources.pool.value": poolRemaining,
+    "system.magic.mp.value": mpResult.mpFinal,
+  };
+
+  try {
+    await actor.update?.(update);
+  } catch {
+    warnRest("RestFailed");
+    return;
   }
 }
 

@@ -46,25 +46,28 @@ export async function damageRollDialog(
       await ordinary.toMessage({
         speaker: { alias: actor.name },
         flavor: escapeHtml(localize("OrdinaryWarning")),
+        rolls: [ordinary],
       });
       return;
     }
     const progress = rollProgress();
+    const diceRolls: InstanceType<typeof Roll>[] = [];
     const result = await rollExploding(
       input.formula,
       { critical: input.kind === "damage" && input.critical, enhanced: input.enhanced },
       async (faces) => {
         const die = new Roll(`1d${faces}`);
         await progress.wait(die.evaluate());
+        diceRolls.push(die);
         if (die.total === undefined) throw new Error("Incomplete");
         return die.total;
       },
     ).finally(() => progress.close());
-    const content = `<section class="pivot-survival-roll"><h3>${escapeHtml(actor.name)} — ${localize(input.kind === "damage" ? "Damage" : "Healing")}</h3>
+    const content = `<section class="pf-survival-roll"><h3>${escapeHtml(actor.name)} — ${localize(input.kind === "damage" ? "Damage" : "Healing")}</h3>
       <p>${escapeHtml(input.formula)} ${input.critical && input.kind === "damage" ? localize("Critical") : ""} ${input.enhanced ? localize("Enhanced") : ""}</p>
       <p>${result.chains.map((chain) => `d${chain.faces}: [${chain.results.join(" → ")}]`).join("; ")} ${result.modifier >= 0 ? "+" : ""}${result.modifier}</p>
       <strong>${result.complete ? result.total : localize("Incomplete")}</strong>
-      ${result.complete ? `<button type="button" data-pivot-apply>${localize("Apply")}</button>` : ""}</section>`;
+      ${result.complete ? `<button type="button" data-pf-apply>${localize("Apply")}</button>` : ""}</section>`;
     const payload: DamagePayload | null =
       result.complete && result.total !== null
         ? {
@@ -80,6 +83,7 @@ export async function damageRollDialog(
       speaker: { alias: actor.name },
       content,
       flags: { [SYSTEM_ID]: { survivalRoll: payload } },
+      rolls: diceRolls,
     });
   } catch {
     warn("RollFailed");
