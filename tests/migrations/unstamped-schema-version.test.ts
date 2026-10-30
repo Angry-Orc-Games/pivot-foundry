@@ -4,19 +4,10 @@ import { createPivotCharacterDataModel } from "../../src/data/character-data";
 import { createPivotItemDataModels } from "../../src/data/item-data";
 import { createPivotNpcDataModel } from "../../src/data/npc-data";
 import type { FoundryRuntime } from "../../src/foundry-runtime";
-import {
-  planActorMigration,
-  planItemMigration,
-  type MigrationPlan,
-} from "../../src/migrations/m001";
+import { planActorMigration, planItemMigration } from "../../src/migrations/m001";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { registerPivotFantasySystem } from "../../src/pivot";
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from "../../src/rules/schema-version";
-
-type VersionedPlanner = (
-  storedSystem: unknown,
-  options?: { currentVersion?: number },
-) => MigrationPlan;
 
 class NumberField {
   constructor(readonly options?: { initial?: number }) {}
@@ -76,12 +67,12 @@ function modelInitials(): { character: number; npc: number; weapon: number } {
   };
 }
 
-function planActor(storedSystem: unknown, currentVersion: number): MigrationPlan {
-  return (planActorMigration as VersionedPlanner)(storedSystem, { currentVersion });
+function planActor(storedSystem: unknown, currentVersion: number) {
+  return planActorMigration(storedSystem, { currentVersion });
 }
 
-function planItem(storedSystem: unknown, currentVersion: number): MigrationPlan {
-  return (planItemMigration as VersionedPlanner)(storedSystem, { currentVersion });
+function planItem(storedSystem: unknown, currentVersion: number) {
+  return planItemMigration(storedSystem, { currentVersion });
 }
 
 describe("schemaVersion model default", () => {

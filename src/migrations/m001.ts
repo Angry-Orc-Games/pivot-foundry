@@ -13,17 +13,35 @@ export type MigrationPlan =
   | { ok: true; changed: true; update: Record<string, unknown> }
   | { ok: false; error: string };
 
-export function planActorMigration(storedSystem: unknown): MigrationPlan {
-  return planDocumentMigration(storedSystem, "actor");
+export interface SchemaMigrationOptions {
+  currentVersion?: number;
 }
 
-export function planItemMigration(storedSystem: unknown): MigrationPlan {
-  return planDocumentMigration(storedSystem, "item");
+export function planActorMigration(
+  storedSystem: unknown,
+  options?: SchemaMigrationOptions,
+): MigrationPlan {
+  return planDocumentMigration(storedSystem, "actor", currentVersion(options));
 }
 
-function planDocumentMigration(storedSystem: unknown, kind: "actor" | "item"): MigrationPlan {
+export function planItemMigration(
+  storedSystem: unknown,
+  options?: SchemaMigrationOptions,
+): MigrationPlan {
+  return planDocumentMigration(storedSystem, "item", currentVersion(options));
+}
+
+function currentVersion(options?: SchemaMigrationOptions): number {
+  return options?.currentVersion ?? CURRENT_SCHEMA_VERSION;
+}
+
+function planDocumentMigration(
+  storedSystem: unknown,
+  kind: "actor" | "item",
+  current: number,
+): MigrationPlan {
   if (storedSystem === undefined || storedSystem === null) {
-    return migrateFromLegacy(kind, {});
+    return migrateFromLegacy(kind, {}, current);
   }
   if (!isPlainObject(storedSystem)) {
     return { ok: false, error: "system data is not an object" };
@@ -33,10 +51,10 @@ function planDocumentMigration(storedSystem: unknown, kind: "actor" | "item"): M
   if (version === "invalid") {
     return { ok: false, error: "schemaVersion is not a finite integer >= 0" };
   }
-  if (version > CURRENT_SCHEMA_VERSION && version !== SHEET_V2_SCHEMA_VERSION) {
+  if (version > current && version !== SHEET_V2_SCHEMA_VERSION) {
     return {
       ok: false,
-      error: `schemaVersion ${version} is newer than supported version ${CURRENT_SCHEMA_VERSION}`,
+      error: `schemaVersion ${version} is newer than supported version ${current}`,
     };
   }
 
@@ -45,22 +63,26 @@ function planDocumentMigration(storedSystem: unknown, kind: "actor" | "item"): M
     if (!effectsResult.ok) return effectsResult;
   }
 
-  if (version === CURRENT_SCHEMA_VERSION || version === SHEET_V2_SCHEMA_VERSION) {
+  if (
+    version === current ||
+    (version === SHEET_V2_SCHEMA_VERSION && current < SHEET_V2_SCHEMA_VERSION)
+  ) {
     return { ok: true, changed: false };
   }
 
-  return migrateFromLegacy(kind, storedSystem);
+  return migrateFromLegacy(kind, storedSystem, current);
 }
 
 function migrateFromLegacy(
   kind: "actor" | "item",
   storedSystem: Record<string, unknown>,
+  current: number,
 ): MigrationPlan {
   if (kind === "item") {
     const effectsResult = inspectStoredEffects(storedSystem.effects);
     if (!effectsResult.ok) return effectsResult;
     const update: Record<string, unknown> = {
-      "system.schemaVersion": CURRENT_SCHEMA_VERSION,
+      "system.schemaVersion": current,
     };
     if (storedSystem.effects === undefined) {
       update["system.effects"] = [];
@@ -71,7 +93,7 @@ function migrateFromLegacy(
   return {
     ok: true,
     changed: true,
-    update: { "system.schemaVersion": CURRENT_SCHEMA_VERSION },
+    update: { "system.schemaVersion": current },
   };
 }
 
@@ -88,6 +110,17 @@ function inspectStoredEffects(effects: unknown): MigrationPlan {
   }
 
   return { ok: true, changed: false };
+}
+
+/** Foundry copies `initial` into source before M001 reads it. Stamp only a new document. */
+export function initializeSchemaVersion(document: {
+  system?: unknown;
+  updateSource?: (data: Record<string, unknown>) => unknown;
+}): void {
+  if (!document.updateSource) return;
+  const version = isPlainObject(document.system) ? document.system.schemaVersion : undefined;
+  if (version !== undefined && version !== null && version !== LEGACY_SCHEMA_VERSION) return;
+  document.updateSource({ "system.schemaVersion": CURRENT_SCHEMA_VERSION });
 }
 
 function readStoredSchemaVersion(value: unknown): number | "invalid" {

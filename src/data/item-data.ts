@@ -8,7 +8,7 @@ import {
   stringField,
   type TypeDataModelConstructor,
 } from "../foundry-runtime";
-import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
+import { LEGACY_SCHEMA_VERSION } from "../rules/schema-version";
 
 type TypeDataModelWithSchema = TypeDataModelConstructor & {
   defineSchema(): Record<string, DataField>;
@@ -134,7 +134,7 @@ function withItemInfrastructure(
       required: true,
       integer: true,
       min: 0,
-      initial: CURRENT_SCHEMA_VERSION,
+      initial: LEGACY_SCHEMA_VERSION,
     }),
     effects: arrayField(fields, effectRuleField(fields)),
     ...schema,
