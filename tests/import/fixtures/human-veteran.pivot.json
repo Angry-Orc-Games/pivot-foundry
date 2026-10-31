@@ -1,0 +1,201 @@
+{
+  "system": "pivot",
+  "format": 2,
+  "schemaVersion": 2,
+  "generatorVersion": "0.0.0",
+  "exportedAt": "2026-10-23T00:00:00.000Z",
+  "choices": {
+    "name": "Human Veteran",
+    "concept": "A heavy-armoured veteran called back to the road.",
+    "focus": "Up-close fighter",
+    "species": "human",
+    "cust": {
+      "mode": "p21",
+      "plus2": "str",
+      "plus1": "dex",
+      "size": "Medium",
+      "nativeLang": ""
+    },
+    "sp": {
+      "skType": "skill",
+      "skVal": "Perception",
+      "vOrigin": "",
+      "vGeneral": "",
+      "lang": "Elvish",
+      "craft": "",
+      "grade": "",
+      "elfGrade": ""
+    },
+    "bg": "Veteran",
+    "bgp": {
+      "0": { "o": 0 },
+      "1": { "o": 0, "v": "Heavy Melee", "v2": "Medium Melee" },
+      "2": { "v": "Dwarvish" }
+    },
+    "issue": "Heavy",
+    "survFeat": "",
+    "scores": { "str": "15", "dex": "13", "con": "14", "int": "10", "wis": "12", "cha": "8" },
+    "adj": { "str": 0, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0 },
+    "prim": ["str", "con"],
+    "magicAb": "",
+    "flaws": [],
+    "hd": 3,
+    "hpRoll": "7",
+    "aw": false,
+    "streams": [],
+    "wprof": [],
+    "aprof": "None",
+    "shield": false,
+    "feats": [
+      "Olympian",
+      "Tough Guy",
+      "Get Down",
+      "Just a Scratch",
+      "Combat Reflexes",
+      "Lucky",
+      "Intestinal Fortitude"
+    ],
+    "asiPicks": { "Olympian": "con" },
+    "freeO": "Fearless",
+    "freeG": "I Am A Warrior",
+    "skills": ["Medicine", "Insight", "Intimidation", "Survival"],
+    "mods": [],
+    "modPicks": {},
+    "habil": [],
+    "gearBP": false,
+    "roadWeapon": "Arming sword",
+    "roadType": "Light or Medium Melee weapon",
+    "blocks": ["Sidearms", "Explorer"],
+    "blockPicks": {},
+    "armourBlock": "",
+    "money": "",
+    "moneyRolls": [],
+    "look": "",
+    "home": "",
+    "loyalty": "The company that hauled him out of the breach.",
+    "notes": ""
+  },
+  "computed": {
+    "abilities": {
+      "str": { "score": 16, "mod": 3, "primary": true },
+      "dex": { "score": 14, "mod": 2, "primary": false },
+      "con": { "score": 16, "mod": 3, "primary": true },
+      "int": { "score": 11, "mod": 0, "primary": false },
+      "wis": { "score": 14, "mod": 2, "primary": false },
+      "cha": { "score": 9, "mod": -1, "primary": false }
+    },
+    "hp": 12,
+    "hitDie": "d10",
+    "ac": 16,
+    "acArmour": "Heavy armour",
+    "speed": 10,
+    "pool": 1,
+    "mp": null,
+    "buildPoints": { "income": 8, "spent": 8, "remaining": 0 },
+    "skills": {
+      "Acrobatics": { "ability": "dex", "proficient": false, "expertise": false, "total": 2 },
+      "Alchemy": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Animal Handling": { "ability": "wis", "proficient": false, "expertise": false, "total": 2 },
+      "Athletics": { "ability": "str", "proficient": true, "expertise": false, "total": 5 },
+      "Control Magic": { "ability": null, "proficient": false, "expertise": false, "total": 0 },
+      "Deception": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Insight": { "ability": "wis", "proficient": true, "expertise": false, "total": 4 },
+      "Intimidation": { "ability": "cha", "proficient": true, "expertise": false, "total": 1 },
+      "Investigation": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Medicine": { "ability": "int", "proficient": true, "expertise": false, "total": 2 },
+      "Medicine: Holistic": {
+        "ability": "wis",
+        "proficient": false,
+        "expertise": false,
+        "total": 2
+      },
+      "Nature": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Navigation": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Perception": { "ability": "wis", "proficient": true, "expertise": false, "total": 4 },
+      "Performance": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Persuasion": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Religion": { "ability": "wis", "proficient": false, "expertise": false, "total": 2 },
+      "Sleight of Hand": { "ability": "dex", "proficient": false, "expertise": false, "total": 2 },
+      "Stealth": { "ability": "dex", "proficient": false, "expertise": false, "total": 2 },
+      "Survival": { "ability": "wis", "proficient": true, "expertise": false, "total": 4 },
+      "Thievery": { "ability": "dex", "proficient": false, "expertise": false, "total": 2 }
+    },
+    "attacks": [
+      {
+        "category": "Light Melee",
+        "proficient": false,
+        "attack": 2,
+        "ability": "dex",
+        "die": "1d4",
+        "melee": true
+      },
+      {
+        "category": "Medium Melee",
+        "proficient": true,
+        "attack": 5,
+        "ability": "str",
+        "die": "1d6",
+        "melee": true
+      },
+      {
+        "category": "Heavy Melee",
+        "proficient": true,
+        "attack": 5,
+        "ability": "str",
+        "die": "1d8 (1d10 two hands)",
+        "melee": true
+      },
+      {
+        "category": "Two-Handed Heavy Melee",
+        "proficient": false,
+        "attack": 3,
+        "ability": "str",
+        "die": "1d12",
+        "melee": true
+      },
+      {
+        "category": "Improvised",
+        "proficient": false,
+        "attack": 3,
+        "ability": "str",
+        "die": "",
+        "melee": true
+      },
+      {
+        "category": "Bows",
+        "proficient": false,
+        "attack": 2,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Crossbows",
+        "proficient": false,
+        "attack": 2,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Slings",
+        "proficient": false,
+        "attack": 2,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Thrown",
+        "proficient": false,
+        "attack": 2,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      }
+    ],
+    "armourProf": "Heavy",
+    "shieldProf": false,
+    "languages": ["Common", "Elvish", "Dwarvish"]
+  }
+}

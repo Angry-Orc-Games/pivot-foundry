@@ -1,0 +1,216 @@
+{
+  "system": "pivot",
+  "format": 2,
+  "schemaVersion": 2,
+  "generatorVersion": "0.0.0",
+  "exportedAt": "2026-10-23T00:00:00.000Z",
+  "choices": {
+    "name": "Custom Humanoid",
+    "concept": "A small custom humanoid prodigy with a carapace and quick hands.",
+    "focus": "Sneak",
+    "species": "custom",
+    "cust": {
+      "mode": "p21",
+      "plus2": "dex",
+      "plus1": "int",
+      "size": "Small",
+      "nativeLang": "Orcish"
+    },
+    "sp": {
+      "skType": "skill",
+      "skVal": "",
+      "vOrigin": "",
+      "vGeneral": "",
+      "lang": "",
+      "craft": "",
+      "grade": "",
+      "elfGrade": ""
+    },
+    "bg": "Prodigy",
+    "bgp": {
+      "0": { "o": 0, "v": "Thievery" },
+      "1": { "o": 0, "v": "Fine Arts" },
+      "2": { "v": "Light Melee" }
+    },
+    "issue": "",
+    "survFeat": "",
+    "scores": { "str": "8", "dex": "15", "con": "12", "int": "14", "wis": "13", "cha": "10" },
+    "adj": { "str": 0, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0 },
+    "prim": ["dex", "int"],
+    "magicAb": "",
+    "flaws": [],
+    "hd": 1,
+    "hpRoll": "4",
+    "aw": false,
+    "streams": [],
+    "wprof": [],
+    "aprof": "None",
+    "shield": false,
+    "feats": [
+      "Ambidexterity",
+      "Power to Weight Ratio",
+      "Lucky",
+      "Alert",
+      "Get Me Outta Here",
+      "Dodgy",
+      "Combat Reflexes",
+      "Finesse",
+      "Vigilant"
+    ],
+    "asiPicks": {},
+    "freeO": "Acute Touch",
+    "freeG": "",
+    "skills": [
+      "Stealth",
+      "Sleight of Hand",
+      "Acrobatics",
+      "Perception",
+      "Insight",
+      "Investigation"
+    ],
+    "mods": [],
+    "modPicks": {},
+    "habil": ["Chitinous Carapace", "Adapted Vision"],
+    "gearBP": false,
+    "roadWeapon": "Dagger",
+    "roadType": "Light or Medium Melee weapon",
+    "blocks": ["Sidearms", "Tool"],
+    "blockPicks": { "Tool": 0 },
+    "armourBlock": "",
+    "money": "",
+    "moneyRolls": [],
+    "look": "",
+    "home": "",
+    "loyalty": "The crew that smuggled the carapace out of the pits.",
+    "notes": ""
+  },
+  "computed": {
+    "abilities": {
+      "str": { "score": 7, "mod": -2, "primary": false },
+      "dex": { "score": 19, "mod": 4, "primary": true },
+      "con": { "score": 12, "mod": 1, "primary": false },
+      "int": { "score": 15, "mod": 2, "primary": true },
+      "wis": { "score": 13, "mod": 1, "primary": false },
+      "cha": { "score": 10, "mod": 0, "primary": false }
+    },
+    "hp": 5,
+    "hitDie": "d6",
+    "ac": 16,
+    "acArmour": "Chitinous Carapace",
+    "speed": 7,
+    "pool": 1,
+    "mp": null,
+    "buildPoints": { "income": 12, "spent": 12, "remaining": 0 },
+    "skills": {
+      "Acrobatics": { "ability": "dex", "proficient": true, "expertise": false, "total": 6 },
+      "Alchemy": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Animal Handling": { "ability": "wis", "proficient": false, "expertise": false, "total": -1 },
+      "Athletics": { "ability": "dex", "proficient": false, "expertise": false, "total": 2 },
+      "Control Magic": { "ability": null, "proficient": false, "expertise": false, "total": -2 },
+      "Crafting: Fine Arts": {
+        "ability": "dex",
+        "proficient": true,
+        "expertise": false,
+        "total": 6
+      },
+      "Deception": { "ability": "cha", "proficient": false, "expertise": false, "total": -2 },
+      "Insight": { "ability": "wis", "proficient": true, "expertise": false, "total": 3 },
+      "Intimidation": { "ability": "cha", "proficient": false, "expertise": false, "total": -2 },
+      "Investigation": { "ability": "int", "proficient": true, "expertise": false, "total": 4 },
+      "Medicine": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Medicine: Holistic": {
+        "ability": "wis",
+        "proficient": false,
+        "expertise": false,
+        "total": -1
+      },
+      "Nature": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Navigation": { "ability": "int", "proficient": false, "expertise": false, "total": 0 },
+      "Perception": { "ability": "wis", "proficient": true, "expertise": false, "total": 3 },
+      "Performance": { "ability": "cha", "proficient": false, "expertise": false, "total": -2 },
+      "Persuasion": { "ability": "cha", "proficient": false, "expertise": false, "total": -2 },
+      "Religion": { "ability": "wis", "proficient": false, "expertise": false, "total": -1 },
+      "Sleight of Hand": { "ability": "dex", "proficient": true, "expertise": false, "total": 6 },
+      "Stealth": { "ability": "dex", "proficient": true, "expertise": false, "total": 6 },
+      "Survival": { "ability": "wis", "proficient": false, "expertise": false, "total": -1 },
+      "Thievery": { "ability": "dex", "proficient": true, "expertise": true, "total": 8 }
+    },
+    "attacks": [
+      {
+        "category": "Light Melee",
+        "proficient": true,
+        "attack": 6,
+        "ability": "dex",
+        "die": "1d4",
+        "melee": true
+      },
+      {
+        "category": "Medium Melee",
+        "proficient": false,
+        "attack": -2,
+        "ability": "str",
+        "die": "1d6",
+        "melee": true
+      },
+      {
+        "category": "Heavy Melee",
+        "proficient": false,
+        "attack": -2,
+        "ability": "str",
+        "die": "1d8 (1d10 two hands)",
+        "melee": true
+      },
+      {
+        "category": "Two-Handed Heavy Melee",
+        "proficient": false,
+        "attack": -2,
+        "ability": "str",
+        "die": "1d12",
+        "melee": true
+      },
+      {
+        "category": "Improvised",
+        "proficient": false,
+        "attack": -2,
+        "ability": "str",
+        "die": "",
+        "melee": true
+      },
+      {
+        "category": "Bows",
+        "proficient": false,
+        "attack": 4,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Crossbows",
+        "proficient": false,
+        "attack": 4,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Slings",
+        "proficient": false,
+        "attack": 4,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Thrown",
+        "proficient": false,
+        "attack": 4,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      }
+    ],
+    "armourProf": "None",
+    "shieldProf": false,
+    "languages": ["Common", "Orcish"]
+  }
+}

@@ -1,0 +1,217 @@
+{
+  "system": "pivot",
+  "format": 2,
+  "schemaVersion": 2,
+  "generatorVersion": "0.0.0",
+  "exportedAt": "2026-10-23T00:00:00.000Z",
+  "choices": {
+    "name": "Dwarf Recluse",
+    "concept": "A dwarf recluse who left the hold and does not want to be found.",
+    "focus": "Survivor",
+    "species": "dwarf",
+    "cust": {
+      "mode": "p21",
+      "plus2": "str",
+      "plus1": "dex",
+      "size": "Medium",
+      "nativeLang": ""
+    },
+    "sp": {
+      "skType": "skill",
+      "skVal": "Perception",
+      "vOrigin": "",
+      "vGeneral": "",
+      "lang": "",
+      "craft": "Stoneworking",
+      "grade": "Medium Melee",
+      "elfGrade": ""
+    },
+    "bg": "Recluse",
+    "bgp": {
+      "0": { "o": 1 },
+      "2": { "v": "Slings" },
+      "3": { "v": "Leatherworking" },
+      "4": { "o": 0, "v": "Light" }
+    },
+    "issue": "",
+    "survFeat": "",
+    "scores": { "str": "14", "dex": "13", "con": "10", "int": "12", "wis": "15", "cha": "8" },
+    "adj": { "str": 0, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0 },
+    "prim": ["wis", "str"],
+    "magicAb": "",
+    "flaws": [{ "n": "Chronically Ill", "bp": 3 }],
+    "hd": 3,
+    "hpRoll": "6",
+    "aw": false,
+    "streams": [],
+    "wprof": ["Bows"],
+    "aprof": "None",
+    "shield": false,
+    "feats": [
+      "Fearless",
+      "Olympian",
+      "Lucky",
+      "Acute Taste",
+      "Dodgy",
+      "Get Me Outta Here",
+      "Acute Hearing",
+      "Athletic",
+      "Acute Smell"
+    ],
+    "asiPicks": { "Athletic": "str", "Olympian": "str" },
+    "freeO": "Alert",
+    "freeG": "",
+    "skills": ["Nature", "Animal Handling", "Insight", "Investigation", "Navigation"],
+    "mods": [],
+    "modPicks": {},
+    "habil": [],
+    "gearBP": false,
+    "roadWeapon": "Hand axe",
+    "roadType": "Light or Medium Melee weapon",
+    "blocks": ["Shield"],
+    "blockPicks": { "Shield": 0 },
+    "armourBlock": "Light",
+    "money": "",
+    "moneyRolls": [],
+    "look": "",
+    "home": "",
+    "loyalty": "The sister who still leaves food at the tree line.",
+    "notes": ""
+  },
+  "computed": {
+    "abilities": {
+      "str": { "score": 16, "mod": 3, "primary": true },
+      "dex": { "score": 13, "mod": 1, "primary": false },
+      "con": { "score": 12, "mod": 1, "primary": false },
+      "int": { "score": 12, "mod": 1, "primary": false },
+      "wis": { "score": 17, "mod": 3, "primary": true },
+      "cha": { "score": 8, "mod": -1, "primary": false }
+    },
+    "hp": 7,
+    "hitDie": "d10",
+    "ac": 14,
+    "acArmour": "Light armour",
+    "speed": 8,
+    "pool": 1,
+    "mp": null,
+    "buildPoints": { "income": 11, "spent": 11, "remaining": 0 },
+    "skills": {
+      "Academia: Geology": { "ability": "int", "proficient": true, "expertise": false, "total": 3 },
+      "Acrobatics": { "ability": "dex", "proficient": false, "expertise": false, "total": 1 },
+      "Alchemy": { "ability": "int", "proficient": false, "expertise": false, "total": 1 },
+      "Animal Handling": { "ability": "wis", "proficient": true, "expertise": false, "total": 5 },
+      "Athletics": { "ability": "str", "proficient": false, "expertise": false, "total": 3 },
+      "Control Magic": { "ability": null, "proficient": false, "expertise": false, "total": 0 },
+      "Crafting: Leatherworking": {
+        "ability": "dex",
+        "proficient": true,
+        "expertise": false,
+        "total": 3
+      },
+      "Crafting: Stoneworking": {
+        "ability": "str",
+        "proficient": true,
+        "expertise": false,
+        "total": 5
+      },
+      "Deception": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Insight": { "ability": "wis", "proficient": true, "expertise": false, "total": 5 },
+      "Intimidation": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Investigation": { "ability": "int", "proficient": true, "expertise": false, "total": 3 },
+      "Medicine": { "ability": "int", "proficient": false, "expertise": false, "total": 1 },
+      "Medicine: Holistic": {
+        "ability": "wis",
+        "proficient": false,
+        "expertise": false,
+        "total": 3
+      },
+      "Nature": { "ability": "int", "proficient": true, "expertise": false, "total": 3 },
+      "Navigation": { "ability": "int", "proficient": true, "expertise": false, "total": 3 },
+      "Perception": { "ability": "wis", "proficient": true, "expertise": false, "total": 5 },
+      "Performance": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Persuasion": { "ability": "cha", "proficient": false, "expertise": false, "total": -1 },
+      "Religion": { "ability": "wis", "proficient": false, "expertise": false, "total": 3 },
+      "Sleight of Hand": { "ability": "dex", "proficient": false, "expertise": false, "total": 1 },
+      "Stealth": { "ability": "dex", "proficient": true, "expertise": false, "total": 3 },
+      "Survival": { "ability": "wis", "proficient": true, "expertise": false, "total": 5 },
+      "Thievery": { "ability": "dex", "proficient": false, "expertise": false, "total": 1 }
+    },
+    "attacks": [
+      {
+        "category": "Light Melee",
+        "proficient": false,
+        "attack": 1,
+        "ability": "dex",
+        "die": "1d4",
+        "melee": true
+      },
+      {
+        "category": "Medium Melee",
+        "proficient": true,
+        "attack": 5,
+        "ability": "str",
+        "die": "1d6",
+        "melee": true
+      },
+      {
+        "category": "Heavy Melee",
+        "proficient": false,
+        "attack": 3,
+        "ability": "str",
+        "die": "1d8 (1d10 two hands)",
+        "melee": true
+      },
+      {
+        "category": "Two-Handed Heavy Melee",
+        "proficient": false,
+        "attack": 3,
+        "ability": "str",
+        "die": "1d12",
+        "melee": true
+      },
+      {
+        "category": "Improvised",
+        "proficient": false,
+        "attack": 3,
+        "ability": "str",
+        "die": "",
+        "melee": true
+      },
+      {
+        "category": "Bows",
+        "proficient": true,
+        "attack": 3,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Crossbows",
+        "proficient": false,
+        "attack": 1,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Slings",
+        "proficient": true,
+        "attack": 3,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Thrown",
+        "proficient": false,
+        "attack": 1,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      }
+    ],
+    "armourProf": "Light",
+    "shieldProf": true,
+    "languages": ["Common", "Dwarvish"]
+  }
+}
