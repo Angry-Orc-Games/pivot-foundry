@@ -161,3 +161,29 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
   return value as Record<string, unknown>;
 }
+
+/**
+ * Character HP only changes through survival transactions, which always write the status
+ * alongside HP. A bare HP write (such as the token HUD bar) would leave the status stale.
+ */
+export function guardCharacterHpWrite(
+  actor: { type?: string; system?: unknown },
+  changes: Record<string, unknown>,
+): false | undefined {
+  if (actor.type !== "character") return;
+  const nested = changes.system as
+    { attributes?: { hp?: { value?: unknown }; deathSaves?: { status?: unknown } } } | undefined;
+  const grouped = changes["system.attributes.hp"] as { value?: unknown } | undefined;
+  const hp =
+    changes["system.attributes.hp.value"] ?? grouped?.value ?? nested?.attributes?.hp?.value;
+  if (hp === undefined) return;
+  const status =
+    changes["system.attributes.deathSaves.status"] ?? nested?.attributes?.deathSaves?.status;
+  if (status !== undefined) return;
+  const system = actor.system as { attributes?: { hp?: { value?: unknown } } } | undefined;
+  if (hp === system?.attributes?.hp?.value) return;
+  // guardHpMaximum lowers HP to a lowered max; that clamp keeps the status consistent.
+  if (validAmount(hp) && hp === numericMax(changes) && hp < storedHp(actor)) return;
+  warn("UseHealthTools");
+  return false;
+}

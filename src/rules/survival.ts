@@ -12,12 +12,25 @@ export type HealthKind = "damage" | "healing" | "temp";
 export function validAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
+/** Align a stale HP / death-save status pair before a survival transaction. */
 export function reconcileSurvival(source: SurvivalState): SurvivalState {
   if (source.hp > 0 && (source.status === "dying" || source.status === "stable")) {
     return { ...source, status: "alive", successes: 0, failures: 0 };
   }
   if (source.hp === 0 && source.status === "alive" && source.max > 0) {
     return { ...source, status: "dying", successes: 0, failures: 0 };
+  }
+  return source;
+}
+/**
+ * Label for the sheet and the damage-target list.
+ * Dying or Stable above 0 HP is leftover from a heal that did not clear status.
+ * Show Conscious with cleared counters. This does not write, and it does not add
+ * Exhaustion: that level belongs to the heal that already raised HP.
+ */
+export function survivalForDisplay(source: SurvivalState): SurvivalState {
+  if (source.hp > 0 && (source.status === "dying" || source.status === "stable")) {
+    return { ...source, status: "alive", successes: 0, failures: 0 };
   }
   return source;
 }
