@@ -6,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFromFile } from "../../src/import/create-from-file";
 import { readPrepared, registerImportButton } from "../../src/import/import-dialog";
 import { compareDrift, toActorData, validate } from "../../src/import/pivot-character";
+import { calculateManaMaximum } from "../../src/rules/character-derived";
 import { prepareCharacterSheetContext } from "../../src/sheets/character-sheet";
 
 type JsonRecord = Record<string, unknown>;
 
 interface CreatedActor {
   id: string;
+  name: string;
+  type: string;
+  system: JsonRecord;
   delete: ReturnType<typeof vi.fn>;
   createEmbeddedDocuments: ReturnType<typeof vi.fn>;
 }
@@ -52,9 +56,12 @@ function install(options: {
 }): World {
   const users = options.users ?? [{ id: "player-1", name: "Ada" }];
   const actors: CreatedActor[] = [];
-  const create = vi.fn(async () => {
+  const create = vi.fn(async (data: { name?: string; type?: string; system?: JsonRecord }) => {
     const actor: CreatedActor = {
       id: `actor-${actors.length + 1}`,
+      name: data.name ?? "",
+      type: data.type ?? "",
+      system: data.system ?? {},
       delete: vi.fn(async () => {
         if (options.deleteFails) throw new Error("delete failed");
       }),
@@ -405,6 +412,59 @@ describe("createFromFile", () => {
     });
     expect(context.derived.armourClass.value).toBe(16);
     expect(context.derived.magic.mp.max).toBe(20);
+  });
+
+  it("drift: actor keeps file computed values", async () => {
+    const edited = structuredClone(elf) as {
+      choices: { aw: boolean; magicAb: string };
+      computed: {
+        ac: number;
+        mp: number;
+        abilities: Record<string, { score: number; mod: number }>;
+      };
+    };
+    const rules = structuredClone(edited.computed);
+    edited.computed.ac = 16;
+    edited.computed.mp = 20;
+    const world = install({ isGM: true });
+    const created = await createFromFile(edited, "player-1");
+    expect(created.ok).toBe(true);
+
+    const actor = world.actors[0];
+    if (!actor) throw new Error("missing actor");
+    const system = actor.system as {
+      attributes: { ac: { bonus: number } };
+      magic: { mp: { value: number; maxBonus: number } };
+    };
+    const dex = edited.computed.abilities.dex?.mod;
+    if (dex === undefined) throw new Error("missing dexterity");
+    const ability = edited.computed.abilities[edited.choices.magicAb];
+    if (!ability) throw new Error("missing magic ability");
+    const base = calculateManaMaximum({
+      awakened: edited.choices.aw,
+      level: 1,
+      abilityScore: ability.score,
+    });
+    const fileAcBonus = edited.computed.ac - 10 - dex;
+    const rulesAcBonus = rules.ac - 10 - dex;
+
+    expect(system.attributes.ac.bonus).toBe(fileAcBonus);
+    expect(system.attributes.ac.bonus).not.toBe(rulesAcBonus);
+    expect(system.magic.mp.value).toBe(edited.computed.mp);
+    expect(system.magic.mp.value).not.toBe(rules.mp);
+    expect(system.magic.mp.maxBonus).toBe(edited.computed.mp - base);
+    expect(system.magic.mp.maxBonus).not.toBe(rules.mp - base);
+
+    const context = prepareCharacterSheetContext({
+      name: actor.name,
+      type: actor.type,
+      system,
+      items: [],
+    });
+    expect(context.derived.armourClass.value).toBe(edited.computed.ac);
+    expect(context.derived.magic.mp.max).toBe(edited.computed.mp);
+    expect(context.derived.armourClass.value).not.toBe(rules.ac);
+    expect(context.derived.magic.mp.max).not.toBe(rules.mp);
   });
 
   it("creates a second actor on a second success", async () => {
