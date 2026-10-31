@@ -348,7 +348,7 @@ describe("toActorData", () => {
       "weapon:Arming sword",
       "equipment:Sidearms",
       "equipment:Explorer",
-      "equipment:Heavy",
+      "equipment:Heavy armour",
     ]);
     expect(draft.items.find((item) => item.name === "Olympian")).toEqual({
       type: "feature",
@@ -369,9 +369,9 @@ describe("toActorData", () => {
       system: {
         schemaVersion: CURRENT_SCHEMA_VERSION,
         effects: [],
-        category: "meleeLight",
+        category: "meleeMedium",
         attack: { ability: "str", bonus: 0 },
-        damage: { formula: "", type: "", ability: null, bonus: 0 },
+        damage: { formula: "1d6", type: "", ability: "str", bonus: 0 },
         range: { normal: 0, long: 0 },
         weight: 0,
         quantity: 1,
@@ -379,9 +379,9 @@ describe("toActorData", () => {
         notes: "Light or Medium Melee weapon",
       },
     });
-    expect(draft.items.find((item) => item.name === "Heavy")).toEqual({
+    expect(draft.items.find((item) => item.name === "Heavy armour")).toEqual({
       type: "equipment",
-      name: "Heavy",
+      name: "Heavy armour",
       system: {
         schemaVersion: CURRENT_SCHEMA_VERSION,
         effects: [],
@@ -405,7 +405,7 @@ describe("toActorData", () => {
     expect(draft.actor.system.magic).toEqual({
       awakened: true,
       ability: "int",
-      mp: { value: 15, maxBonus: 0 },
+      mp: { value: 15, maxBonus: 4 },
     });
     expect(draft.actor.system.proficiencies.armour).toEqual({
       light: true,
@@ -453,7 +453,7 @@ describe("toActorData", () => {
       "feature:Awakened",
       "magicStream:Aggregate",
       "weapon:Dagger",
-      "armour:Light",
+      "armour:Light armour",
     ]);
     expect(draft.items.find((item) => item.name === "Awakened")).toMatchObject({
       type: "feature",
@@ -470,9 +470,9 @@ describe("toActorData", () => {
         notes: "",
       },
     });
-    expect(draft.items.find((item) => item.name === "Light")).toEqual({
+    expect(draft.items.find((item) => item.name === "Light armour")).toEqual({
       type: "armour",
-      name: "Light",
+      name: "Light armour",
       system: {
         schemaVersion: CURRENT_SCHEMA_VERSION,
         effects: [],
@@ -571,7 +571,7 @@ describe("toActorData", () => {
       "feature:Acute Smell",
       "feature:Alert",
       "weapon:Hand axe",
-      "armour:Light",
+      "armour:Light armour",
       "equipment:Shield",
     ]);
     expect(draft.items.find((item) => item.name === "Chronically Ill")).toMatchObject({
@@ -821,7 +821,7 @@ describe("compareDrift", () => {
 });
 
 describe("pivot-character module", () => {
-  it("imports neither Foundry nor the rules calculators", () => {
+  it("imports the mana formula and neither Foundry nor the other calculators", () => {
     const source = readFileSync(
       new URL("../../src/import/pivot-character.ts", import.meta.url),
       "utf8",
@@ -830,8 +830,9 @@ describe("pivot-character module", () => {
       .split("\n")
       .filter((line) => /^\s*import\b/.test(line))
       .join("\n");
+    expect(imports).toMatch(/calculateManaMaximum/);
     expect(imports).not.toMatch(
-      /foundry|character-derived|modifiers|abilityModifier|proficiencyBonusForLevel|calculateCharacterDerived/i,
+      /foundry|modifiers|abilityModifier|proficiencyBonusForLevel|calculateCharacterDerived|calculateArmourClass|calculateSkillTotal/i,
     );
   });
 });

@@ -152,7 +152,7 @@ function dialogConstructor(): (new () => DialogState) | undefined {
       form: HTMLFormElement,
     ): Promise<void> {
       event.preventDefault();
-      if (this.creating) return;
+      if (this.creating || this.kept) return;
       this.creating = true;
       try {
         await importFile(this, form);

@@ -54,8 +54,19 @@ export async function createFromFile(
     };
   }
 
-  const draft = toActorData(parsed.value);
   const owner = game.users?.get?.(ownerUserId);
+  if (!owner) {
+    return {
+      ok: false,
+      error: {
+        code: "schema",
+        field: "ownerUserId",
+        message: IMPORT_MESSAGES.unknownPlayer,
+      },
+    };
+  }
+
+  const draft = toActorData(parsed.value);
   const player = typeof owner?.name === "string" ? owner.name : "";
   const levels = ownershipLevels();
   const ownership: Record<string, number> = { [ownerUserId]: levels.OWNER };
@@ -76,14 +87,19 @@ export async function createFromFile(
     ownership,
   });
 
-  try {
-    const items: Record<string, unknown>[] = [];
-    const packs = listPacks(game);
-    for (const item of draft.items) items.push(await resolveItem(item, packs));
-    await actor.createEmbeddedDocuments?.("Item", items);
-  } catch (error) {
-    await actor.delete?.();
-    throw error;
+  const items: Record<string, unknown>[] = [];
+  const packs = listPacks(game);
+  for (const item of draft.items) items.push(await resolveItem(item, packs));
+  const embedded = await embedItems(actor, items);
+  if (!embedded.ok) {
+    const removed = await removeActor(actor);
+    return {
+      ok: false,
+      error: {
+        code: "incomplete",
+        message: removed ? IMPORT_MESSAGES.incomplete : IMPORT_MESSAGES.cleanupFailed,
+      },
+    };
   }
 
   const actorId = actor.id ?? actor._id;
@@ -105,6 +121,28 @@ function ownershipLevels(): { OWNER: number; INHERIT: number } {
     OWNER: typeof levels?.OWNER === "number" ? levels.OWNER : 3,
     INHERIT: typeof levels?.INHERIT === "number" ? levels.INHERIT : -1,
   };
+}
+
+async function embedItems(
+  actor: CreatedActor,
+  items: Record<string, unknown>[],
+): Promise<{ ok: boolean }> {
+  try {
+    const created = await actor.createEmbeddedDocuments?.("Item", items);
+    return { ok: Array.isArray(created) && created.length === items.length };
+  } catch {
+    return { ok: false };
+  }
+}
+
+async function removeActor(actor: CreatedActor): Promise<boolean> {
+  if (!actor.delete) return false;
+  try {
+    await actor.delete();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function createActor(data: Record<string, unknown>): Promise<CreatedActor> {

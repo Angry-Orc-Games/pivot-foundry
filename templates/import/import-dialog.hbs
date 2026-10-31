@@ -26,5 +26,9 @@
       {{/each}}
     </ul>
   {{/if}}
-  <button type="submit">{{localize "PIVOT.Import.Confirm"}}</button>
+  {{#if kept}}
+    <button type="submit" disabled>{{localize "PIVOT.Import.Confirm"}}</button>
+  {{else}}
+    <button type="submit">{{localize "PIVOT.Import.Confirm"}}</button>
+  {{/if}}
 </div>

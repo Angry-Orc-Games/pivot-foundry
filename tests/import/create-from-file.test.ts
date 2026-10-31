@@ -57,9 +57,9 @@ function install(options: {
       delete: vi.fn(async () => {
         if (options.deleteFails) throw new Error("delete failed");
       }),
-      createEmbeddedDocuments: vi.fn(async () => {
+      createEmbeddedDocuments: vi.fn(async (_type: string, data: unknown[]) => {
         if (options.embed) return options.embed();
-        return [];
+        return data;
       }),
     };
     actors.push(actor);
@@ -203,7 +203,7 @@ describe("createFromFile", () => {
   });
 
   it("leaves the player name blank when the user record has no name", async () => {
-    const world = install({ isGM: true, users: [] });
+    const world = install({ isGM: true, users: [{ id: "player-1", name: "" }] });
     await createFromFile(veteran, "player-1");
     const payload = world.create.mock.calls[0]?.[0] as {
       system: { identity: { player: string } };
@@ -303,7 +303,11 @@ describe("createFromFile", () => {
         throw new Error("embed failed");
       },
     });
-    await expect(createFromFile(veteran, "player-1")).rejects.toThrow("embed failed");
+    const result = await createFromFile(veteran, "player-1");
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "incomplete", message: "Import did not finish, so no character was kept." },
+    });
     expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
   });
 
@@ -403,8 +407,8 @@ describe("readPrepared", () => {
 
     expect(readPrepared("veteran")).toEqual({ ac: 16, poolMax: 1, mpMax: 0, speed: 10 });
     const elfSnap = readPrepared("elf");
-    expect(elfSnap).toEqual({ ac: 14, poolMax: 1, mpMax: 11, speed: 10 });
-    expect(compareDrift(elfResult.value, elfSnap)).toEqual([{ field: "mp", file: 15, sheet: 11 }]);
+    expect(elfSnap).toEqual({ ac: 14, poolMax: 1, mpMax: 15, speed: 10 });
+    expect(compareDrift(elfResult.value, elfSnap)).toEqual([]);
     expect(compareDrift(veteranResult.value, readPrepared("veteran"))).toEqual([]);
   });
 });

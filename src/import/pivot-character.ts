@@ -1,4 +1,5 @@
 import { canonicalSkills } from "../config";
+import { calculateManaMaximum } from "../rules/character-derived";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 
 const pivotCharacterBrand = Symbol("pivot-character");
@@ -14,7 +15,8 @@ export type PivotImportCode =
   | "schema"
   | "tampered"
   | "unverifiable"
-  | "forbidden";
+  | "forbidden"
+  | "incomplete";
 
 export interface PivotImportError {
   readonly code: PivotImportCode;
@@ -35,6 +37,8 @@ export const IMPORT_MESSAGES = {
   forbidden: "Only a GM can import a character.",
   choosePlayer: "Choose a player.",
   incomplete: "Import did not finish, so no character was kept.",
+  cleanupFailed: "Import did not finish, and the character could not be removed.",
+  unknownPlayer: "Choose a player in this world.",
   tampered: "This file does not match its choices.",
   unverifiable: "This file could not be checked against the character generator.",
 } as const;
@@ -129,7 +133,7 @@ export interface CharacterSystemDraft {
   readonly magic: {
     readonly awakened: boolean;
     readonly ability: AbilityKey | null;
-    readonly mp: { readonly value: number; readonly maxBonus: 0 };
+    readonly mp: { readonly value: number; readonly maxBonus: number };
   };
   readonly notes: { readonly runesThaumaturgy: ""; readonly special: string };
 }
@@ -367,7 +371,7 @@ export function toActorData(character: PivotCharacter): CharacterImportDraft {
         magic: {
           awakened: choices.aw,
           ability: choices.magicAb === "" ? null : choices.magicAb,
-          mp: { value: computed.mp ?? 0, maxBonus: 0 },
+          mp: manaDraft(choices, computed),
         },
         notes: { runesThaumaturgy: "", special: specialNotes(choices) },
       },
@@ -448,7 +452,14 @@ interface ComputedFile {
   readonly mp: number | null;
   readonly buildPoints: { readonly remaining: number };
   readonly skills: Readonly<Record<string, SkillFile>>;
-  readonly attacks: readonly { readonly category: AttackCategory; readonly proficient: boolean }[];
+  readonly acArmour: string;
+  readonly attacks: readonly {
+    readonly category: AttackCategory;
+    readonly proficient: boolean;
+    readonly attack: number;
+    readonly ability: "str" | "dex";
+    readonly die: string;
+  }[];
   readonly armourProf: "None" | "Light" | "Medium" | "Heavy";
   readonly shieldProf: boolean;
   readonly languages: readonly string[];
@@ -906,12 +917,64 @@ function specialNotes(choices: ChoiceFile): string {
   return lines.join("\n");
 }
 
-function projectItems(file: StoredCharacter): ImportItem[] {
-  if (file.computed.items) return file.computed.items.map(overlayItem);
-  return choiceItems(file.choices);
+function manaDraft(
+  choices: ChoiceFile,
+  computed: ComputedFile,
+): { value: number; maxBonus: number } {
+  if (computed.mp === null) return { value: 0, maxBonus: 0 };
+  const ability = choices.magicAb === "" ? null : choices.magicAb;
+  const score = ability ? computed.abilities[ability].score : 0;
+  const base = calculateManaMaximum({
+    awakened: choices.aw,
+    level: 1,
+    abilityScore: score,
+  });
+  return { value: computed.mp, maxBonus: computed.mp - base };
 }
 
-function choiceItems(choices: ChoiceFile): ImportItem[] {
+function projectItems(file: StoredCharacter): ImportItem[] {
+  if (file.computed.items) return file.computed.items.map(overlayItem);
+  return choiceItems(file);
+}
+
+function fileItemName(shell: string, acArmour: string): string {
+  if ((shell === "Light" || shell === "Heavy") && acArmour.startsWith(`${shell} `)) return acArmour;
+  return shell;
+}
+
+function roadCategoryNames(roadType: string): AttackCategory[] {
+  if (roadType.includes("Light or Medium")) return ["Light Melee", "Medium Melee"];
+  if (roadType.includes("Two-Handed")) return ["Two-Handed Heavy Melee"];
+  const names: AttackCategory[] = [];
+  if (roadType.includes("Heavy Melee")) names.push("Heavy Melee");
+  if (roadType.includes("Light Melee")) names.push("Light Melee");
+  if (roadType.includes("Medium Melee")) names.push("Medium Melee");
+  return names.length > 0 ? names : ["Light Melee", "Medium Melee"];
+}
+
+function roadAttack(file: StoredCharacter): ComputedFile["attacks"][number] | undefined {
+  const wanted = roadCategoryNames(file.choices.roadType);
+  const pool = file.computed.attacks.filter((attack) => wanted.includes(attack.category));
+  const proficient = pool.filter((attack) => attack.proficient);
+  const candidates = proficient.length > 0 ? proficient : pool;
+  return candidates.slice().sort((left, right) => right.attack - left.attack)[0];
+}
+
+function roadWeaponSystem(file: StoredCharacter): Record<string, unknown> {
+  const row = roadAttack(file);
+  if (!row) return {};
+  const trained = row.proficient ? LEVEL_ONE_PROFICIENCY : 0;
+  const bonus = row.attack - file.computed.abilities[row.ability].mod - trained;
+  return {
+    category: ATTACK_CATEGORY_TO_KEY[row.category],
+    attack: { ability: row.ability, bonus },
+    damage: { formula: row.die, ability: row.ability },
+  };
+}
+
+function choiceItems(file: StoredCharacter): ImportItem[] {
+  const choices = file.choices;
+  const acArmour = file.computed.acArmour;
   const items: ImportItem[] = [];
   const species = SPECIES_LABEL[choices.species];
   if (species) items.push(featureItem(species, "species"));
@@ -936,12 +999,22 @@ function choiceItems(choices: ChoiceFile): ImportItem[] {
   for (const name of choices.streams) {
     if (name) items.push(streamItem(name, streamAbility));
   }
-  if (choices.roadWeapon) items.push(weaponItem(choices.roadWeapon, choices.roadType));
-  if (choices.armourBlock) items.push(armourItem(choices.armourBlock));
-  for (const name of choices.blocks) {
-    if (name) items.push(equipmentItem(name));
+  if (choices.roadWeapon) {
+    items.push(weaponItem(choices.roadWeapon, choices.roadType, roadWeaponSystem(file)));
   }
-  if (choices.issue) items.push(equipmentItem(choices.issue));
+  if (choices.armourBlock) {
+    const armour = armourItem(choices.armourBlock);
+    items.push({ ...armour, name: fileItemName(armour.name, acArmour) });
+  }
+  for (const name of choices.blocks) {
+    if (!name) continue;
+    const item = equipmentItem(name);
+    items.push({ ...item, name: fileItemName(item.name, acArmour) });
+  }
+  if (choices.issue) {
+    const item = equipmentItem(choices.issue);
+    items.push({ ...item, name: fileItemName(item.name, acArmour) });
+  }
   return items;
 }
 

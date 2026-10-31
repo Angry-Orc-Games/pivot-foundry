@@ -105,7 +105,7 @@ describe("imported sheet preview", () => {
     const veteran = preview(load("human-veteran.pivot.json"));
     const elf = preview(load("elf-street-mage.pivot.json"));
     const dwarf = preview(load("dwarf-recluse.pivot.json"));
-    const names = (items: { type: string; name: string }[]) =>
+    const names = (items: readonly { type: string; name: string }[]) =>
       items.map((item) => `${item.type}:${item.name}`);
 
     expect(names(veteran.draft.items)).toContain("equipment:Heavy armour");
