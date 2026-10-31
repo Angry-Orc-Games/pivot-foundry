@@ -47,6 +47,37 @@ export function schemaMessage(field: string): string {
   return `This file has a problem at ${field}.`;
 }
 
+function schemaProblem(file: unknown, field: string): PivotImportError {
+  const value = valueAt(file, field);
+  if (
+    NON_NEGATIVE_FIELDS.has(field) &&
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value < 0
+  ) {
+    return { code: "schema", field, message: minimumMessage(field, value) };
+  }
+  return { code: "schema", field, message: schemaMessage(field) };
+}
+
+function minimumMessage(field: string, value: number): string {
+  const name = fieldLabel(field.split(".").at(-1) ?? field);
+  return formatMessage(MINIMUM_KEY, "{field} must be 0 or more (file: {file})", {
+    field: name,
+    file: String(value),
+  });
+}
+
+function valueAt(file: unknown, path: string): unknown {
+  let cursor = file;
+  for (const key of path.split(".")) {
+    if (Array.isArray(cursor)) cursor = cursor[Number(key)];
+    else if (isPlainObject(cursor)) cursor = cursor[key];
+    else return undefined;
+  }
+  return cursor;
+}
+
 export interface SkillDraft {
   readonly ability: AbilityKey;
   readonly proficient: boolean;
@@ -280,12 +311,7 @@ export function validate(file: unknown, options?: ValidateOptions): Result<Pivot
   if (early) return { ok: false, error: early };
 
   const problem = fileShape(file, "");
-  if (problem) {
-    return {
-      ok: false,
-      error: { code: "schema", field: problem, message: schemaMessage(problem) },
-    };
-  }
+  if (problem) return { ok: false, error: schemaProblem(file, problem) };
 
   const copy = structuredClone(file) as Record<string, unknown>;
   const warnings = witnessWarnings(copy.computed, options?.rederive, copy.choices);
@@ -294,7 +320,14 @@ export function validate(file: unknown, options?: ValidateOptions): Result<Pivot
   return { ok: true, value: copy as PivotCharacter, warnings };
 }
 
+const MINIMUM_KEY = "PIVOT.Import.Minimum";
 const MISMATCH_KEY = "PIVOT.Import.Mismatch";
+const NON_NEGATIVE_FIELDS = new Set([
+  "computed.ac",
+  "computed.speed",
+  "computed.pool",
+  "computed.mp",
+]);
 const NOT_CHECKED_KEY = "PIVOT.Import.NotChecked";
 const FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
   ac: { key: "PIVOT.Import.Field.AC", fallback: "AC" },
@@ -852,8 +885,8 @@ function abilityOrNull(): Check {
   };
 }
 
-function integerOrNull(): Check {
-  const whole = integer();
+function integerOrNull(min?: number, max?: number): Check {
+  const whole = integer(min, max);
   return (value, path) => (value === null ? null : whole(value, path));
 }
 
@@ -1014,11 +1047,11 @@ const fileShape = objectShape(
         }),
         hp: integer(0),
         hitDie: oneOf(["d4", "d6", "d8", "d10", "d12"]),
-        ac: integer(),
+        ac: integer(0),
         acArmour: text(),
-        speed: integer(),
-        pool: integer(),
-        mp: integerOrNull(),
+        speed: integer(0),
+        pool: integer(0),
+        mp: integerOrNull(0),
         buildPoints: objectShape({
           income: integer(),
           spent: integer(),

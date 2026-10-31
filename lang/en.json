@@ -295,6 +295,7 @@
   "PIVOT.Import.Unverifiable": "This file could not be checked against the character generator.",
   "PIVOT.Import.NotChecked": "Not checked against the character generator.",
   "PIVOT.Import.Mismatch": "{field}: file {file}, rules {rules}",
+  "PIVOT.Import.Minimum": "{field} must be 0 or more (file: {file})",
   "PIVOT.Import.Field.AC": "AC",
   "PIVOT.Import.Field.HP": "HP",
   "PIVOT.Import.Field.Pool": "Pool",

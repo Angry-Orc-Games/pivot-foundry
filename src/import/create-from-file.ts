@@ -86,7 +86,8 @@ export async function createFromFile(
     const packs = listPacks(game);
     items = [];
     for (const item of draft.items) items.push(await resolveItem(item, packs));
-  } catch {
+  } catch (error) {
+    console.warn("Pivot import could not resolve items.", error);
     return {
       ok: false,
       error: { code: "incomplete", message: IMPORT_MESSAGES.incomplete },
@@ -173,7 +174,8 @@ async function removeActor(actor: CreatedActor): Promise<boolean> {
   try {
     await actor.delete();
     return true;
-  } catch {
+  } catch (error) {
+    console.warn("Pivot import could not remove the character.", error);
     return false;
   }
 }
