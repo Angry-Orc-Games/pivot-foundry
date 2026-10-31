@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { registerImportButton } from "../../src/import/import-dialog";
@@ -16,6 +17,7 @@ interface RenderedDialog {
   kept?: boolean;
   note?: string;
   warnings?: string[];
+  element?: HTMLElement;
   renders: Array<{ force?: boolean } | undefined>;
   render: (options?: { force?: boolean }) => void;
   constructor: {
@@ -88,10 +90,59 @@ function directory(): {
   return { html: html as unknown as HTMLElement, button: created };
 }
 
+function openDialog(): RenderedDialog {
+  let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+  registerImportButton({
+    on(_event, next) {
+      handler = next;
+    },
+  });
+  const view = directory();
+  handler?.({}, view.html);
+  view.button?.listeners.click?.({ preventDefault() {} });
+  const dialog = dialogs.at(-1);
+  if (!dialog) throw new Error("missing dialog");
+  return dialog;
+}
+
+function mountedWindow(options: {
+  fileText: string;
+  owner: string;
+  staleError?: string;
+}): HTMLFormElement {
+  const stale = options.staleError ? `<p class="pf-import-error">${options.staleError}</p>` : "";
+  const dom = new JSDOM(
+    `<form class="window-app">
+      <div class="window-content">
+        <div class="pf-import-body">
+          <input type="file" name="pivotFile" />
+          <select name="ownerUserId"><option value="player-1">Ada</option></select>
+          ${stale}
+          <button type="submit">Confirm</button>
+        </div>
+      </div>
+    </form>`,
+  );
+  (globalThis as { HTMLElement?: typeof HTMLElement }).HTMLElement = dom.window.HTMLElement;
+  const form = dom.window.document.querySelector("form");
+  if (!(form instanceof dom.window.HTMLFormElement)) throw new Error("missing form");
+  const input = form.querySelector('input[name="pivotFile"]');
+  if (!(input instanceof dom.window.HTMLInputElement)) throw new Error("missing file input");
+  Object.defineProperty(input, "files", {
+    configurable: true,
+    value: [{ text: async () => options.fileText }],
+  });
+  const owner = form.querySelector('select[name="ownerUserId"]');
+  if (!(owner instanceof dom.window.HTMLSelectElement)) throw new Error("missing owner");
+  owner.value = options.owner;
+  return form;
+}
+
 afterEach(() => {
   dialogs.length = 0;
   delete (globalThis as { foundry?: unknown }).foundry;
   delete (globalThis as { game?: unknown }).game;
+  delete (globalThis as { HTMLElement?: unknown }).HTMLElement;
 });
 
 describe("Import Pivot character button", () => {
@@ -308,6 +359,42 @@ describe("Import Pivot character button", () => {
       expect.objectContaining({ computed: expect.objectContaining({ ac: 16, mp: 20 }) }),
       "player-1",
     );
+  });
+
+  it("paints the mismatch list inside the sheet body of a mounted window", async () => {
+    installFoundry();
+    const edited = structuredClone(elf) as { computed: { ac: number; mp: number } };
+    const rules = structuredClone(edited.computed);
+    edited.computed.ac = 16;
+    edited.computed.mp = 20;
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      modules: {
+        get: (id: string) =>
+          id === "pivot-chargen" ? { active: true, api: { derive: () => rules } } : undefined,
+      },
+      pivot: { validate },
+    };
+    const dialog = openDialog();
+    const form = mountedWindow({
+      fileText: JSON.stringify(edited),
+      owner: "player-1",
+      staleError: "Could not read that file.",
+    });
+    dialog.element = form;
+
+    await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+
+    const body = form.querySelector(".pf-import-body");
+    const box = form.querySelector("[data-pivot-preview]");
+    const submit = form.querySelector('button[type="submit"]');
+    expect(box?.parentElement).toBe(body);
+    expect(submit?.previousElementSibling).toBe(box);
+    expect(Array.from(box?.querySelectorAll("li") ?? [], (item) => item.textContent)).toEqual([
+      "AC: file 16, rules 14",
+      "MP max: file 20, rules 15",
+    ]);
+    expect(form.textContent).not.toContain("Could not read that file.");
   });
 
   it("shows the generator note before Confirm when pivot-chargen is inactive", async () => {
