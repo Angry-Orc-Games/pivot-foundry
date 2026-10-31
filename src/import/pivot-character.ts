@@ -330,23 +330,6 @@ const ABILITY_LABELS: Record<string, { key: string; fallback: string }> = {
   cha: { key: "PIVOT.Import.Ability.Charisma", fallback: "Charisma" },
 };
 const FIELD_ORDER = ["ac", "hp", "pool", "mp", "speed"];
-const COMPUTED_WITNESS_KEYS = [
-  "abilities",
-  "hp",
-  "hitDie",
-  "ac",
-  "acArmour",
-  "speed",
-  "pool",
-  "mp",
-  "buildPoints",
-  "skills",
-  "attacks",
-  "armourProf",
-  "shieldProf",
-  "languages",
-] as const;
-const HIT_DICE = new Set(["d4", "d6", "d8", "d10", "d12"]);
 const SKILL_PROPS = ["ability", "proficient", "expertise", "total"] as const;
 const ABILITY_PROPS = ["score", "mod", "primary"] as const;
 const ATTACK_PROPS = ["proficient", "attack", "ability", "die", "melee"] as const;
@@ -388,46 +371,13 @@ function witnessWarnings(
   } catch {
     return [notCheckedWarning()];
   }
-  // pivot-chargen #47 api.derive returns raw session state. Only a computed-shaped
-  // witness is diffed. The computed-shaped export arrives with chargen #9.
-  if (!isComputedWitness(derived)) return [notCheckedWarning()];
   return computedDiff(computed, derived);
 }
 
-function isComputedWitness(value: unknown): value is Record<string, unknown> {
-  if (!isPlainObject(value)) return false;
-  const allowed = new Set<string>([...COMPUTED_WITNESS_KEYS, "items", "exportedAt"]);
-  if (!Object.keys(value).every((key) => allowed.has(key))) return false;
-  if (!COMPUTED_WITNESS_KEYS.every((key) => Object.hasOwn(value, key))) return false;
-  if (!isAbilityBlock(value.abilities) || !isPlainObject(value.skills)) return false;
-  if (!isPlainObject(value.buildPoints) || !Array.isArray(value.attacks)) return false;
-  if (!isInteger(value.hp) || !isInteger(value.ac) || !isInteger(value.speed)) return false;
-  if (!isInteger(value.pool) || !(value.mp === null || isInteger(value.mp))) return false;
-  if (typeof value.hitDie !== "string" || !HIT_DICE.has(value.hitDie)) return false;
-  if (typeof value.acArmour !== "string" || typeof value.armourProf !== "string") return false;
-  if (typeof value.shieldProf !== "boolean" || !Array.isArray(value.languages)) return false;
-  return value.languages.every((language) => typeof language === "string");
-}
-
-function isAbilityBlock(value: unknown): boolean {
-  if (!isPlainObject(value)) return false;
-  return Object.keys(ABILITY_LABELS).every((ability) => {
-    const row = value[ability];
-    return (
-      isPlainObject(row) &&
-      isInteger(row.score) &&
-      isInteger(row.mod) &&
-      typeof row.primary === "boolean"
-    );
-  });
-}
-
-function isInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value);
-}
-
-function computedDiff(file: unknown, derived: Record<string, unknown>): ImportWarning[] {
-  if (!isPlainObject(file)) return [mismatchWarning("computed", file, derived)];
+function computedDiff(file: unknown, derived: unknown): ImportWarning[] {
+  if (!isPlainObject(file) || !isPlainObject(derived)) {
+    return [mismatchWarning("computed", file, derived)];
+  }
   const keys = new Set([...Object.keys(file), ...Object.keys(derived)]);
   return [...keys]
     .filter((key) => key !== "exportedAt")

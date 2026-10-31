@@ -33,15 +33,15 @@ interface DialogState {
 
 interface ImportGame {
   user?: { isGM?: boolean };
-  users?: { contents?: Array<{ id?: string; name?: string }> };
+  users?: { contents?: Array<{ id?: string; name?: string; role?: number }> };
   i18n?: { localize?: (key: string) => string };
   modules?: {
     get?: (id: string) =>
       | {
           active?: boolean;
           api?: {
-            derive?: ValidateOptions["rederive"];
             deriveComputed?: ValidateOptions["rederive"];
+            deriveComputedVersion?: number;
           };
         }
       | undefined;
@@ -386,12 +386,14 @@ function show(dialog: DialogState, error: string, kept: boolean): void {
   void dialog.render({ force: true });
 }
 
+const DERIVE_COMPUTED_VERSION = 1;
+
 function chargenDerive(game: ImportGame | undefined): ValidateOptions["rederive"] {
   const module = game?.modules?.get?.("pivot-chargen");
-  if (!module?.active) return undefined;
-  if (typeof module.api?.deriveComputed === "function") return module.api.deriveComputed;
-  if (typeof module.api?.derive === "function") return module.api.derive;
-  return undefined;
+  const deriveComputed = module?.api?.deriveComputed;
+  if (!module?.active || typeof deriveComputed !== "function") return undefined;
+  if (module.api?.deriveComputedVersion !== DERIVE_COMPUTED_VERSION) return undefined;
+  return deriveComputed;
 }
 
 function listUsers(): Array<{ id: string; name: string }> {
@@ -400,10 +402,17 @@ function listUsers(): Array<{ id: string; name: string }> {
   const users: Array<{ id: string; name: string }> = [];
   for (const user of contents) {
     if (!user || typeof user.id !== "string" || user.id.length === 0) continue;
+    if (typeof user.role === "number" && user.role === noneRole()) continue;
     const name = typeof user.name === "string" && user.name.length > 0 ? user.name : user.id;
     users.push({ id: user.id, name });
   }
   return users;
+}
+
+function noneRole(): number {
+  const role = (globalThis as { CONST?: { USER_ROLES?: { NONE?: number } } }).CONST?.USER_ROLES
+    ?.NONE;
+  return typeof role === "number" ? role : 0;
 }
 
 function buttonLabel(): string {

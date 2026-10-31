@@ -278,7 +278,9 @@ describe("Import Pivot character button", () => {
       user: { isGM: true },
       modules: {
         get: (id: string) =>
-          id === "pivot-chargen" ? { active: true, api: { derive: () => rules } } : undefined,
+          id === "pivot-chargen"
+            ? { active: true, api: { deriveComputed: () => rules, deriveComputedVersion: 1 } }
+            : undefined,
       },
       pivot: { validate, createFromFile },
     };
@@ -329,7 +331,9 @@ describe("Import Pivot character button", () => {
       user: { isGM: true },
       modules: {
         get: (id: string) =>
-          id === "pivot-chargen" ? { active: true, api: { derive: () => rules } } : undefined,
+          id === "pivot-chargen"
+            ? { active: true, api: { deriveComputed: () => rules, deriveComputedVersion: 1 } }
+            : undefined,
       },
       pivot: { validate, createFromFile },
     };
@@ -377,7 +381,9 @@ describe("Import Pivot character button", () => {
       user: { isGM: true },
       modules: {
         get: (id: string) =>
-          id === "pivot-chargen" ? { active: true, api: { derive: () => rules } } : undefined,
+          id === "pivot-chargen"
+            ? { active: true, api: { deriveComputed: () => rules, deriveComputedVersion: 1 } }
+            : undefined,
       },
       pivot: { validate },
     };

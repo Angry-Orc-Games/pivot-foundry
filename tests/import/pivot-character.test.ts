@@ -290,24 +290,6 @@ describe("import warnings", () => {
     expect(warningMessages(result)).toEqual(["Not checked against the character generator."]);
   });
 
-  it("does not diff a generator witness that is not the computed block", () => {
-    const result = validate(veteran, {
-      rederive: () => ({
-        g: {},
-        sb: {},
-        pre: {},
-        final: { str: 16 },
-        ledger: { inc: [], exp: [] },
-        ac: 16,
-        hp: 12,
-        pool: 1,
-        speed: 10,
-      }),
-    });
-    expect(result.ok).toBe(true);
-    expect(warningMessages(result)).toEqual(["Not checked against the character generator."]);
-  });
-
   it("names a changed skill and attack instead of dumping JSON", () => {
     const edited = edit(
       edit(veteran, ["computed", "skills", "Stealth", "total"], 9),

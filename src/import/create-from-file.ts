@@ -15,7 +15,7 @@ interface CreatedActor {
 
 interface GameHost {
   user?: { id?: string; isGM?: boolean };
-  users?: { get?: (id: string) => { name?: unknown } | undefined };
+  users?: { get?: (id: string) => { name?: unknown; role?: unknown } | undefined };
   packs?: unknown;
 }
 
@@ -55,7 +55,7 @@ export async function createFromFile(
   }
 
   const owner = game.users?.get?.(ownerUserId);
-  if (!owner) {
+  if (!owner || !choosableOwner(owner)) {
     return {
       ok: false,
       error: {
@@ -114,6 +114,16 @@ export async function createFromFile(
   const actorId = actor.id ?? actor._id;
   if (!actorId) throw new Error(IMPORT_MESSAGES.incomplete);
   return { ok: true, value: { actorId } };
+}
+
+function choosableOwner(user: { role?: unknown }): boolean {
+  return typeof user.role !== "number" || user.role !== noneRole();
+}
+
+function noneRole(): number {
+  const role = (globalThis as { CONST?: { USER_ROLES?: { NONE?: number } } }).CONST?.USER_ROLES
+    ?.NONE;
+  return typeof role === "number" ? role : 0;
 }
 
 function readGame(): GameHost | undefined {
