@@ -36,9 +36,15 @@ interface ImportGame {
   users?: { contents?: Array<{ id?: string; name?: string }> };
   i18n?: { localize?: (key: string) => string };
   modules?: {
-    get?: (
-      id: string,
-    ) => { active?: boolean; api?: { derive?: ValidateOptions["rederive"] } } | undefined;
+    get?: (id: string) =>
+      | {
+          active?: boolean;
+          api?: {
+            derive?: ValidateOptions["rederive"];
+            deriveComputed?: ValidateOptions["rederive"];
+          };
+        }
+      | undefined;
   };
   actors?: { get?: (id: string) => ActorLike | undefined };
   pivot?: {
@@ -382,7 +388,9 @@ function show(dialog: DialogState, error: string, kept: boolean): void {
 
 function chargenDerive(game: ImportGame | undefined): ValidateOptions["rederive"] {
   const module = game?.modules?.get?.("pivot-chargen");
-  if (module?.active && typeof module.api?.derive === "function") return module.api.derive;
+  if (!module?.active) return undefined;
+  if (typeof module.api?.deriveComputed === "function") return module.api.deriveComputed;
+  if (typeof module.api?.derive === "function") return module.api.derive;
   return undefined;
 }
 

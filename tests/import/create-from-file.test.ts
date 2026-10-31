@@ -333,7 +333,10 @@ describe("createFromFile", () => {
     const result = await createFromFile(veteran, "player-1");
     expect(result).toEqual({
       ok: false,
-      error: { code: "incomplete", message: "Import did not finish, so no character was kept." },
+      error: {
+        code: "incomplete",
+        message: "Import did not finish, so no character was kept. embed failed",
+      },
     });
     expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
   });

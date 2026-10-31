@@ -223,8 +223,7 @@ describe("validate", () => {
     reversed.attacks = [...(reversed.attacks as unknown[])].reverse();
     const reordered = validate(veteran, { rederive: () => reversed });
     expect(reordered.ok).toBe(true);
-    if (reordered.ok)
-      expect(reordered.warnings?.some((warning) => warning.field === "attacks")).toBe(true);
+    if (reordered.ok) expect(reordered.warnings ?? []).toEqual([]);
   });
 
   it("reports a rederive function that throws", () => {
@@ -575,7 +574,7 @@ describe("toActorData", () => {
     expect(draft.actor.system.attributes.hp).toEqual({ temp: 0, value: 7, max: 7 });
     expect(draft.actor.system.attributes.speed).toEqual({ value: 8, bonus: 0 });
     expect(draft.actor.system.attributes.ac).toEqual({ bonus: 3 });
-    expect(draft.actor.system.resources.pool).toEqual({ value: 1, maxBonus: -1 });
+    expect(draft.actor.system.resources.pool).toEqual({ value: 1, maxBonus: 0 });
     expect(draft.actor.system.magic.mp).toEqual({ value: 0, maxBonus: 0 });
     expect(draft.actor.system.proficiencies).toMatchObject({
       armour: { light: true, medium: false, heavy: false },

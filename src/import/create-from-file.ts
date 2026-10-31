@@ -106,7 +106,7 @@ export async function createFromFile(
       ok: false,
       error: {
         code: "incomplete",
-        message: removed ? IMPORT_MESSAGES.incomplete : IMPORT_MESSAGES.cleanupFailed,
+        message: embedMessage(removed, embedded.error),
       },
     };
   }
@@ -135,13 +135,22 @@ function ownershipLevels(): { OWNER: number; INHERIT: number } {
 async function embedItems(
   actor: CreatedActor,
   items: Record<string, unknown>[],
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: true } | { ok: false; error: unknown }> {
   try {
     const created = await actor.createEmbeddedDocuments?.("Item", items);
-    return { ok: Array.isArray(created) && created.length === items.length };
-  } catch {
-    return { ok: false };
+    if (Array.isArray(created) && created.length === items.length) return { ok: true };
+    return { ok: false, error: undefined };
+  } catch (error) {
+    console.warn("Pivot import could not embed items.", error);
+    return { ok: false, error };
   }
+}
+
+function embedMessage(removed: boolean, error: unknown): string {
+  const base = removed ? IMPORT_MESSAGES.incomplete : IMPORT_MESSAGES.cleanupFailed;
+  if (!(error instanceof Error) || error.message.length === 0 || error.message === base)
+    return base;
+  return `${base} ${error.message}`;
 }
 
 async function removeActor(actor: CreatedActor): Promise<boolean> {

@@ -302,15 +302,67 @@ const FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
   pool: { key: "PIVOT.Import.Field.Pool", fallback: "Pool" },
   mp: { key: "PIVOT.Import.Field.MP", fallback: "MP max" },
   speed: { key: "PIVOT.Import.Field.Speed", fallback: "Speed" },
+  hitDie: { key: "PIVOT.Import.Field.HitDie", fallback: "Hit die" },
+  acArmour: { key: "PIVOT.Import.Field.Armour", fallback: "Armour" },
+  armourProf: { key: "PIVOT.Import.Field.ArmourProficiency", fallback: "Armour proficiency" },
+  shieldProf: { key: "PIVOT.Import.Field.ShieldProficiency", fallback: "Shield proficiency" },
+  languages: { key: "PIVOT.Import.Field.Languages", fallback: "Languages" },
+  attack: { key: "PIVOT.Import.Field.Attack", fallback: "attack" },
+  total: { key: "PIVOT.Import.Field.Total", fallback: "total" },
+  proficient: { key: "PIVOT.Import.Field.Proficient", fallback: "proficient" },
+  expertise: { key: "PIVOT.Import.Field.Expertise", fallback: "expertise" },
+  ability: { key: "PIVOT.Import.Field.Ability", fallback: "ability" },
+  die: { key: "PIVOT.Import.Field.Die", fallback: "die" },
+  melee: { key: "PIVOT.Import.Field.Melee", fallback: "melee" },
+  score: { key: "PIVOT.Import.Field.Score", fallback: "score" },
+  mod: { key: "PIVOT.Import.Field.Modifier", fallback: "modifier" },
+  primary: { key: "PIVOT.Import.Field.Primary", fallback: "primary" },
+  income: { key: "PIVOT.Import.Field.Income", fallback: "income" },
+  spent: { key: "PIVOT.Import.Field.Spent", fallback: "spent" },
+  remaining: { key: "PIVOT.Import.Field.Remaining", fallback: "remaining" },
+};
+const ABILITY_LABELS: Record<string, { key: string; fallback: string }> = {
+  str: { key: "PIVOT.Import.Ability.Strength", fallback: "Strength" },
+  dex: { key: "PIVOT.Import.Ability.Dexterity", fallback: "Dexterity" },
+  con: { key: "PIVOT.Import.Ability.Constitution", fallback: "Constitution" },
+  int: { key: "PIVOT.Import.Ability.Intelligence", fallback: "Intelligence" },
+  wis: { key: "PIVOT.Import.Ability.Wisdom", fallback: "Wisdom" },
+  cha: { key: "PIVOT.Import.Ability.Charisma", fallback: "Charisma" },
 };
 const FIELD_ORDER = ["ac", "hp", "pool", "mp", "speed"];
+const COMPUTED_WITNESS_KEYS = [
+  "abilities",
+  "hp",
+  "hitDie",
+  "ac",
+  "acArmour",
+  "speed",
+  "pool",
+  "mp",
+  "buildPoints",
+  "skills",
+  "attacks",
+  "armourProf",
+  "shieldProf",
+  "languages",
+] as const;
+const HIT_DICE = new Set(["d4", "d6", "d8", "d10", "d12"]);
+const SKILL_PROPS = ["ability", "proficient", "expertise", "total"] as const;
+const ABILITY_PROPS = ["score", "mod", "primary"] as const;
+const ATTACK_PROPS = ["proficient", "attack", "ability", "die", "melee"] as const;
+const BUILD_POINT_PROPS = ["income", "spent", "remaining"] as const;
 
-export function mismatchWarning(field: string, file: unknown, rules: unknown): ImportWarning {
+export function mismatchWarning(
+  field: string,
+  file: unknown,
+  rules: unknown,
+  label = fieldLabel(field),
+): ImportWarning {
   return {
     code: "tampered",
     field,
     message: formatMessage(MISMATCH_KEY, "{field}: file {file}, rules {rules}", {
-      field: fieldLabel(field),
+      field: label,
       file: formatWitnessValue(file),
       rules: formatWitnessValue(rules),
     }),
@@ -336,20 +388,169 @@ function witnessWarnings(
   } catch {
     return [notCheckedWarning()];
   }
+  // pivot-chargen #47 api.derive returns raw session state. Only a computed-shaped
+  // witness is diffed. The computed-shaped export arrives with chargen #9.
+  if (!isComputedWitness(derived)) return [notCheckedWarning()];
   return computedDiff(computed, derived);
 }
 
-function computedDiff(file: unknown, derived: unknown): ImportWarning[] {
-  if (!isPlainObject(file) || !isPlainObject(derived)) {
-    return [mismatchWarning("computed", file, derived)];
-  }
+function isComputedWitness(value: unknown): value is Record<string, unknown> {
+  if (!isPlainObject(value)) return false;
+  const allowed = new Set<string>([...COMPUTED_WITNESS_KEYS, "items", "exportedAt"]);
+  if (!Object.keys(value).every((key) => allowed.has(key))) return false;
+  if (!COMPUTED_WITNESS_KEYS.every((key) => Object.hasOwn(value, key))) return false;
+  if (!isAbilityBlock(value.abilities) || !isPlainObject(value.skills)) return false;
+  if (!isPlainObject(value.buildPoints) || !Array.isArray(value.attacks)) return false;
+  if (!isInteger(value.hp) || !isInteger(value.ac) || !isInteger(value.speed)) return false;
+  if (!isInteger(value.pool) || !(value.mp === null || isInteger(value.mp))) return false;
+  if (typeof value.hitDie !== "string" || !HIT_DICE.has(value.hitDie)) return false;
+  if (typeof value.acArmour !== "string" || typeof value.armourProf !== "string") return false;
+  if (typeof value.shieldProf !== "boolean" || !Array.isArray(value.languages)) return false;
+  return value.languages.every((language) => typeof language === "string");
+}
+
+function isAbilityBlock(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  return Object.keys(ABILITY_LABELS).every((ability) => {
+    const row = value[ability];
+    return (
+      isPlainObject(row) &&
+      isInteger(row.score) &&
+      isInteger(row.mod) &&
+      typeof row.primary === "boolean"
+    );
+  });
+}
+
+function isInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value);
+}
+
+function computedDiff(file: unknown, derived: Record<string, unknown>): ImportWarning[] {
+  if (!isPlainObject(file)) return [mismatchWarning("computed", file, derived)];
   const keys = new Set([...Object.keys(file), ...Object.keys(derived)]);
   return [...keys]
     .filter((key) => key !== "exportedAt")
     .sort((left, right) => fieldRank(left) - fieldRank(right) || left.localeCompare(right))
-    .flatMap((key) =>
-      sameCanonical(file[key], derived[key]) ? [] : [mismatchWarning(key, file[key], derived[key])],
-    );
+    .flatMap((key) => diffField(key, file[key], derived[key]));
+}
+
+function diffField(field: string, file: unknown, rules: unknown): ImportWarning[] {
+  if (sameCanonical(file, rules)) return [];
+  if (field === "skills") return diffRows(field, file, rules, SKILL_PROPS, skillLabel);
+  if (field === "abilities") return diffRows(field, file, rules, ABILITY_PROPS, abilityLabel);
+  if (field === "attacks") return diffAttacks(file, rules);
+  if (field === "buildPoints") return diffProps(field, file, rules, BUILD_POINT_PROPS);
+  if (field === "languages") return [mismatchWarning(field, textList(file), textList(rules))];
+  return [mismatchWarning(field, file, rules)];
+}
+
+function diffRows(
+  field: string,
+  file: unknown,
+  rules: unknown,
+  props: readonly string[],
+  labelFor: (name: string, prop: string) => string,
+): ImportWarning[] {
+  if (!isPlainObject(file) || !isPlainObject(rules)) return [mismatchWarning(field, file, rules)];
+  const names = [...new Set([...Object.keys(file), ...Object.keys(rules)])].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  const warnings: ImportWarning[] = [];
+  for (const name of names) {
+    const left = file[name];
+    const right = rules[name];
+    if (!isPlainObject(left) || !isPlainObject(right)) {
+      warnings.push(
+        mismatchWarning(`${field}.${name}`, left ?? "missing", right ?? "missing", name),
+      );
+      continue;
+    }
+    for (const prop of props) {
+      if (sameCanonical(left[prop], right[prop])) continue;
+      warnings.push(
+        mismatchWarning(`${field}.${name}.${prop}`, left[prop], right[prop], labelFor(name, prop)),
+      );
+    }
+  }
+  return warnings;
+}
+
+function diffProps(
+  field: string,
+  file: unknown,
+  rules: unknown,
+  props: readonly string[],
+): ImportWarning[] {
+  if (!isPlainObject(file) || !isPlainObject(rules)) return [mismatchWarning(field, file, rules)];
+  return props.flatMap((prop) =>
+    sameCanonical(file[prop], rules[prop])
+      ? []
+      : [mismatchWarning(`${field}.${prop}`, file[prop], rules[prop], fieldLabel(prop))],
+  );
+}
+
+function diffAttacks(file: unknown, rules: unknown): ImportWarning[] {
+  const left = attackRows(file);
+  const right = attackRows(rules);
+  if (!left || !right) return [mismatchWarning("attacks", file, rules)];
+  const names = [
+    ...new Set([...left.map((row) => row.category), ...right.map((row) => row.category)]),
+  ].sort((one, other) => one.localeCompare(other));
+  const warnings: ImportWarning[] = [];
+  for (const name of names) {
+    const fileRow = left.find((row) => row.category === name);
+    const rulesRow = right.find((row) => row.category === name);
+    if (!fileRow || !rulesRow) {
+      warnings.push(
+        mismatchWarning(`attacks.${name}`, fileRow ?? "missing", rulesRow ?? "missing", name),
+      );
+      continue;
+    }
+    for (const prop of ATTACK_PROPS) {
+      if (sameCanonical(fileRow[prop], rulesRow[prop])) continue;
+      warnings.push(
+        mismatchWarning(
+          `attacks.${name}.${prop}`,
+          fileRow[prop],
+          rulesRow[prop],
+          `${name} ${fieldLabel(prop)}`,
+        ),
+      );
+    }
+  }
+  return warnings;
+}
+
+function attackRows(
+  value: unknown,
+): Array<Record<string, unknown> & { category: string }> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const rows: Array<Record<string, unknown> & { category: string }> = [];
+  for (const item of value) {
+    if (!isPlainObject(item) || typeof item.category !== "string") return undefined;
+    rows.push({ ...item, category: item.category });
+  }
+  return rows;
+}
+
+function skillLabel(name: string, prop: string): string {
+  return `${name} ${fieldLabel(prop)}`;
+}
+
+function abilityLabel(name: string, prop: string): string {
+  return `${abilityName(name)} ${fieldLabel(prop)}`;
+}
+
+function abilityName(name: string): string {
+  const known = ABILITY_LABELS[name];
+  if (!known) return name;
+  return formatMessage(known.key, known.fallback);
+}
+
+function textList(value: unknown): string {
+  if (!Array.isArray(value)) return formatWitnessValue(value);
+  return value.map((item) => formatWitnessValue(item)).join(", ");
 }
 
 function fieldRank(field: string): number {
@@ -367,7 +568,13 @@ function formatWitnessValue(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (typeof value === "string") return value;
   if (value === null) return "null";
-  return JSON.stringify(value) ?? "";
+  if (value === undefined) return "missing";
+  if (Array.isArray(value)) {
+    if (value.every((item) => typeof item === "string")) return value.join(", ");
+    return `${value.length} values`;
+  }
+  if (isPlainObject(value)) return Object.keys(value).sort().join(", ");
+  return "";
 }
 
 function formatMessage(key: string, fallback: string, data?: Record<string, string>): string {
@@ -438,7 +645,9 @@ export function toActorData(character: PivotCharacter): CharacterImportDraft {
         resources: {
           pool: {
             value: computed.pool,
-            maxBonus: choices.flaws.some((flaw) => flaw.n === "Chronically Ill") ? -1 : 0,
+            // Sheet pool max is level + this bonus. Level 1 starts at 1, and the file
+            // pool already includes flaws such as Chronically Ill.
+            maxBonus: computed.pool - 1,
           },
         },
         skills: skillDraft(computed),
