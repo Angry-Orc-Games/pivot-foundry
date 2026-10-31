@@ -241,6 +241,53 @@ describe("validate", () => {
   });
 });
 
+function warningMessages(result: ReturnType<typeof validate>): string[] | undefined {
+  if (!result.ok || !Object.hasOwn(result, "warnings")) return undefined;
+  const warnings = (result as { warnings?: unknown }).warnings;
+  if (!Array.isArray(warnings)) return undefined;
+  return warnings.map((warning) => {
+    if (typeof warning === "string") return warning;
+    if (warning && typeof warning === "object" && "message" in warning) {
+      const message = (warning as { message?: unknown }).message;
+      return typeof message === "string" ? message : "";
+    }
+    return "";
+  });
+}
+
+describe("import warnings", () => {
+  it("names exactly AC and MP when those computed values were edited", () => {
+    const edited = edit(edit(elf, ["computed", "ac"], 16), ["computed", "mp"], 20);
+    const result = validate(edited, { rederive: () => recordAt(elf, "computed") });
+    expect(warningMessages(result)).toEqual(["AC: file 16, rules 14", "MP max: file 20, rules 15"]);
+  });
+
+  it.each(Object.values(FIXTURES))("%s imports with zero warnings", (name) => {
+    const file = load(name);
+    const result = validate(file, { rederive: () => recordAt(file, "computed") });
+    expect(result.ok).toBe(true);
+    expect(warningMessages(result)).toEqual([]);
+  });
+
+  it("warns when a rederive witness disagrees and still validates", () => {
+    const derived = structuredClone(recordAt(veteran, "computed"));
+    derived.hp = 1;
+    const result = validate(veteran, { rederive: () => derived });
+    expect(result.ok).toBe(true);
+    expect(warningMessages(result)).toEqual(["HP: file 12, rules 1"]);
+  });
+
+  it("notes that a throwing rederive was not checked and still validates", () => {
+    const result = validate(veteran, {
+      rederive: () => {
+        throw new Error("generator missing");
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(warningMessages(result)).toEqual(["Not checked against the character generator."]);
+  });
+});
+
 function failureOf(result: ReturnType<typeof validate>) {
   if (result.ok) throw new Error("expected a validation error");
   return result.error;

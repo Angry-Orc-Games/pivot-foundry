@@ -8,14 +8,20 @@ import { validate } from "../../src/import/pivot-character";
 const veteran = JSON.parse(
   readFileSync(new URL("./fixtures/human-veteran.pivot.json", import.meta.url), "utf8"),
 );
+const elf = JSON.parse(
+  readFileSync(new URL("./fixtures/elf-street-mage.pivot.json", import.meta.url), "utf8"),
+);
 
 interface RenderedDialog {
   kept?: boolean;
+  note?: string;
+  warnings?: string[];
   renders: Array<{ force?: boolean } | undefined>;
   constructor: {
     onConfirm?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
+    onPreview?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
   };
-  _prepareContext?: () => Promise<{ kept: boolean }>;
+  _prepareContext?: () => Promise<{ kept: boolean; note?: string; warnings?: string[] }>;
 }
 
 const dialogs: RenderedDialog[] = [];
@@ -200,6 +206,87 @@ describe("Import Pivot character button", () => {
     expect(dialog?.kept).toBe(true);
     expect((await dialog?._prepareContext?.())?.kept).toBe(true);
     await confirm();
+    expect(createFromFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists the edited AC and MP before Confirm and then imports the file", async () => {
+    installFoundry();
+    const edited = structuredClone(elf) as { computed: { ac: number; mp: number } };
+    const rules = structuredClone(edited.computed);
+    edited.computed.ac = 16;
+    edited.computed.mp = 20;
+    const createFromFile = vi.fn(async () => ({ ok: true, value: { actorId: "actor-1" } }));
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      modules: {
+        get: (id: string) =>
+          id === "pivot-chargen" ? { active: true, api: { derive: () => rules } } : undefined,
+      },
+      pivot: { validate, createFromFile },
+    };
+    let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+    registerImportButton({
+      on(_event, next) {
+        handler = next;
+      },
+    });
+    const view = directory();
+    handler?.({}, view.html);
+    view.button?.listeners.click?.({ preventDefault() {} });
+    const dialog = dialogs.at(-1);
+    const form = {
+      querySelector(selector: string) {
+        if (selector.includes("file")) {
+          return { files: [{ text: async () => JSON.stringify(edited) }] };
+        }
+        return { value: "player-1" };
+      },
+    } as unknown as HTMLFormElement;
+
+    await dialog?.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(createFromFile).not.toHaveBeenCalled();
+    expect(dialog?.warnings).toEqual(["AC: file 16, rules 14", "MP max: file 20, rules 15"]);
+    expect(dialog?.note ?? "").toBe("");
+
+    await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
+    expect(createFromFile).toHaveBeenCalledTimes(1);
+    expect(createFromFile).toHaveBeenCalledWith(
+      expect.objectContaining({ computed: expect.objectContaining({ ac: 16, mp: 20 }) }),
+      "player-1",
+    );
+  });
+
+  it("shows the generator note before Confirm when pivot-chargen is inactive", async () => {
+    installFoundry();
+    const createFromFile = vi.fn(async () => ({ ok: true, value: { actorId: "actor-1" } }));
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      pivot: { validate, createFromFile },
+    };
+    let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+    registerImportButton({
+      on(_event, next) {
+        handler = next;
+      },
+    });
+    const view = directory();
+    handler?.({}, view.html);
+    view.button?.listeners.click?.({ preventDefault() {} });
+    const dialog = dialogs.at(-1);
+    const form = {
+      querySelector(selector: string) {
+        if (selector.includes("file")) {
+          return { files: [{ text: async () => JSON.stringify(veteran) }] };
+        }
+        return { value: "player-1" };
+      },
+    } as unknown as HTMLFormElement;
+
+    await dialog?.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(createFromFile).not.toHaveBeenCalled();
+    expect(dialog?.warnings ?? []).toEqual([]);
+    expect(dialog?.note).toBe("Not checked against the character generator.");
+    await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
     expect(createFromFile).toHaveBeenCalledTimes(1);
   });
 });

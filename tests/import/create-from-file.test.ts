@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFromFile } from "../../src/import/create-from-file";
 import { readPrepared, registerImportButton } from "../../src/import/import-dialog";
 import { compareDrift, toActorData, validate } from "../../src/import/pivot-character";
+import { prepareCharacterSheetContext } from "../../src/sheets/character-sheet";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -381,6 +382,29 @@ describe("createFromFile", () => {
       expect(result.error.message).toContain("could not be removed");
     }
     expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates the edited AC and MP and does not block on the warning", async () => {
+    const edited = structuredClone(elf);
+    const computed = edited.computed as { ac: number; mp: number };
+    computed.ac = 16;
+    computed.mp = 20;
+    const world = install({ isGM: true });
+    const created = await createFromFile(edited, "player-1");
+    expect(created.ok).toBe(true);
+    const payload = world.create.mock.calls[0]?.[0] as {
+      name: string;
+      type: string;
+      system: { attributes: { ac: { bonus: number } } };
+    };
+    const context = prepareCharacterSheetContext({
+      name: payload.name,
+      type: payload.type,
+      system: payload.system,
+      items: [],
+    });
+    expect(context.derived.armourClass.value).toBe(16);
+    expect(context.derived.magic.mp.max).toBe(20);
   });
 
   it("creates a second actor on a second success", async () => {
