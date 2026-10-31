@@ -12,7 +12,7 @@ import { abilityModifier } from "../rules/modifiers";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
 import {
   applyHealth,
-  reconcileSurvival,
+  effectiveSurvival,
   validateSurvival,
   type SurvivalState,
 } from "../rules/survival";
@@ -90,7 +90,7 @@ function warnRest(key: string): void {
  * A stale HP / status pair is reconciled first, as damage and death saves do.
  */
 function restableSurvival(actor: ActorLike): SurvivalState | null {
-  const survival = reconcileSurvival(readSurvival(actor));
+  const survival = effectiveSurvival(readSurvival(actor));
   if (survival.status === "dead" || survival.status === "unconfirmed") return null;
   try {
     validateSurvival(survival);
