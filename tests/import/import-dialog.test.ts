@@ -25,7 +25,12 @@ interface RenderedDialog {
     onConfirm?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
     onPreview?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
   };
-  _prepareContext?: () => Promise<{ kept: boolean; note?: string; warnings?: string[] }>;
+  _prepareContext?: () => Promise<{
+    kept: boolean;
+    note?: string;
+    warnings?: string[];
+    users?: Array<{ id: string; name: string }>;
+  }>;
 }
 
 const dialogs: RenderedDialog[] = [];
@@ -434,31 +439,34 @@ describe("Import Pivot character button", () => {
 
   it("shows the generator note and no field warnings with the real pivot-chargen module", async () => {
     installFoundry();
+    const deriveSpy = vi.fn(derive);
     (globalThis as { game?: unknown }).game = {
       user: { isGM: true },
       modules: {
         get: (id: string) =>
-          id === "pivot-chargen" ? { active: true, api: { derive } } : undefined,
+          id === "pivot-chargen" ? { active: true, api: { derive: deriveSpy } } : undefined,
       },
       pivot: { validate },
     };
     const dialog = openDialog();
     const form = fileForm(JSON.stringify(veteran));
     await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(deriveSpy).not.toHaveBeenCalled();
     expect(dialog.warnings ?? []).toEqual([]);
     expect(dialog.note).toBe("Not checked against the character generator.");
   });
 
-  it("warns from deriveComputed when that witness has the computed shape", async () => {
+  it("warns from deriveComputed version 1 when that witness has the computed shape", async () => {
     installFoundry();
     const rules = structuredClone(veteran.computed) as { hp: number };
     rules.hp = 1;
+    const deriveComputed = vi.fn(() => rules);
     (globalThis as { game?: unknown }).game = {
       user: { isGM: true },
       modules: {
         get: (id: string) =>
           id === "pivot-chargen"
-            ? { active: true, api: { derive, deriveComputed: () => rules } }
+            ? { active: true, api: { derive, deriveComputed, deriveComputedVersion: 1 } }
             : undefined,
       },
       pivot: { validate },
@@ -466,8 +474,53 @@ describe("Import Pivot character button", () => {
     const dialog = openDialog();
     const form = fileForm(JSON.stringify(veteran));
     await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(deriveComputed).toHaveBeenCalledTimes(1);
     expect(dialog.warnings).toEqual(["HP: file 12, rules 1"]);
     expect(dialog.note ?? "").toBe("");
+  });
+
+  it("does not call deriveComputed when its version is not supported", async () => {
+    installFoundry();
+    const rules = structuredClone(veteran.computed) as { hp: number };
+    rules.hp = 1;
+    const deriveComputed = vi.fn(() => rules);
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      modules: {
+        get: (id: string) =>
+          id === "pivot-chargen"
+            ? { active: true, api: { deriveComputed, deriveComputedVersion: 2 } }
+            : undefined,
+      },
+      pivot: { validate },
+    };
+    const dialog = openDialog();
+    const form = fileForm(JSON.stringify(veteran));
+    await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(deriveComputed).not.toHaveBeenCalled();
+    expect(dialog.warnings ?? []).toEqual([]);
+    expect(dialog.note).toBe("Not checked against the character generator.");
+  });
+
+  it("leaves a role of None out of the player list", async () => {
+    installFoundry();
+    (globalThis as { CONST?: { USER_ROLES?: { NONE?: number } } }).CONST = {
+      USER_ROLES: { NONE: 0 },
+    };
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      users: {
+        contents: [
+          { id: "ada", name: "Ada", role: 1 },
+          { id: "blank", name: "Nobody", role: 0 },
+          { id: "ken", name: "Ken", role: 4 },
+        ],
+      },
+    };
+    const dialog = openDialog();
+    const context = await dialog._prepareContext?.();
+    expect(context?.users?.map((user) => user.id)).toEqual(["ada", "ken"]);
+    delete (globalThis as { CONST?: unknown }).CONST;
   });
 });
 

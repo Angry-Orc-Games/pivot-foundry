@@ -49,7 +49,7 @@ function withoutHp(): JsonRecord {
 function install(options: {
   isGM?: boolean;
   userId?: string;
-  users?: { id: string; name: string }[];
+  users?: { id: string; name: string; role?: number }[];
   packs?: unknown[];
   embed?: () => unknown;
   deleteFails?: boolean;
@@ -366,6 +366,33 @@ describe("createFromFile", () => {
     const gm = await createFromFile(veteran, "gm-1");
     expect(player.ok).toBe(true);
     expect(gm.ok).toBe(true);
+  });
+
+  it("creates when the chosen owner is a GM", async () => {
+    host.CONST = { USER_ROLES: { NONE: 0, GAMEMASTER: 4 } };
+    const world = install({
+      isGM: true,
+      userId: "gm-1",
+      users: [{ id: "gm-1", name: "Ken", role: 4 }],
+    });
+    const created = await createFromFile(veteran, "gm-1");
+    expect(created.ok).toBe(true);
+    expect(world.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not create when the owner role is None", async () => {
+    host.CONST = { USER_ROLES: { NONE: 0, GAMEMASTER: 4 } };
+    const world = install({
+      isGM: true,
+      users: [
+        { id: "player-1", name: "Ada", role: 1 },
+        { id: "blank", name: "Nobody", role: 0 },
+      ],
+    });
+    const created = await createFromFile(veteran, "blank");
+    expect(created.ok).toBe(false);
+    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
+    expect(world.create).not.toHaveBeenCalled();
   });
 
   it("deletes the actor when embedding creates no items", async () => {
