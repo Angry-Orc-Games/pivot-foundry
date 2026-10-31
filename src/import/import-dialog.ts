@@ -329,6 +329,7 @@ function paintPreview(dialog: DialogState): void {
     void dialog.render({ force: true });
     return;
   }
+  clearRenderedMessages(form);
   const box = previewBox(form);
   box.replaceChildren();
   const doc = form.ownerDocument;
@@ -348,13 +349,22 @@ function paintPreview(dialog: DialogState): void {
 
 function previewBox(form: HTMLElement): HTMLElement {
   const existing = form.querySelector("[data-pivot-preview]");
-  if (existing instanceof HTMLElement) return existing;
+  if (existing) return existing as HTMLElement;
   const box = form.ownerDocument.createElement("div");
   box.setAttribute("data-pivot-preview", "");
   const submit = form.querySelector('button[type="submit"]');
-  if (submit) form.insertBefore(box, submit);
+  // The window root is the form. The button lives in the sheet body, so insert beside it.
+  const parent = submit?.parentElement;
+  if (submit && parent) parent.insertBefore(box, submit);
   else form.append(box);
   return box;
+}
+
+function clearRenderedMessages(form: HTMLElement): void {
+  for (const node of form.querySelectorAll(".pf-import-error, .pf-import-note, .pf-import-drift")) {
+    if (node.closest("[data-pivot-preview]")) continue;
+    node.remove();
+  }
 }
 
 function messageParagraph(doc: Document, className: string, text: string): HTMLParagraphElement {
