@@ -1,0 +1,30 @@
+<div class="pf-import-body">
+  <p class="pf-import-help">{{localize "PIVOT.Import.Help"}}</p>
+  <label class="pf-import-field">
+    <span>{{localize "PIVOT.Import.File"}}</span>
+    <input type="file" name="pivotFile" accept=".pivot.json,application/json" />
+  </label>
+  <label class="pf-import-field">
+    <span>{{localize "PIVOT.Import.Player"}}</span>
+    <select name="ownerUserId">
+      <option value="">{{localize "PIVOT.Import.ChoosePlayer"}}</option>
+      {{#each users}}
+        <option value="{{id}}">{{name}}</option>
+      {{/each}}
+    </select>
+  </label>
+  {{#if error}}
+    <p class="pf-import-error">{{error}}</p>
+  {{/if}}
+  {{#if kept}}
+    <p class="pf-import-kept">{{localize "PIVOT.Import.Kept"}}</p>
+  {{/if}}
+  {{#if showDrift}}
+    <ul class="pf-import-drift">
+      {{#each drift}}
+        <li>{{field}}: file {{file}} vs sheet {{sheet}}</li>
+      {{/each}}
+    </ul>
+  {{/if}}
+  <button type="submit">{{localize "PIVOT.Import.Confirm"}}</button>
+</div>

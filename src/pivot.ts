@@ -15,6 +15,19 @@ import { SYSTEM_ID } from "./config";
 import { createPivotCharacterSheetClass } from "./sheets/character-sheet";
 import { createPivotNpcSheetClass } from "./sheets/npc-sheet";
 import { createPivotItemSheetClass } from "./sheets/item-sheet";
+import { createFromFile } from "./import/create-from-file";
+import { registerImportButton } from "./import/import-dialog";
+import { toActorData, validate } from "./import/pivot-character";
+
+declare global {
+  interface Game {
+    pivot: {
+      validate: typeof validate;
+      toActorData: typeof toActorData;
+      createFromFile: typeof createFromFile;
+    };
+  }
+}
 
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
@@ -154,6 +167,19 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
         types: ["weapon", "armour", "equipment", "feature", "magicStream", "magicAbility"],
         makeDefault: true,
         label: "PIVOT.Sheets.Item.Label",
+      },
+    );
+
+    const host = globalThis as typeof globalThis & { game?: Game };
+    if (host.game) {
+      host.game.pivot = { validate, toActorData, createFromFile };
+    }
+    registerImportButton(
+      runtime.Hooks as {
+        on?: (
+          event: "renderActorDirectory",
+          handler: (app: unknown, html: HTMLElement) => void,
+        ) => void;
       },
     );
 
