@@ -1,4 +1,4 @@
-import { readSurvival } from "../runtime/health";
+import { readSurvival } from "../runtime/survival-transaction";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
@@ -15,7 +15,7 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { selectInitiativeCombatant } from "../rules/combat";
-import { survivalForDisplay } from "../rules/survival";
+import { effectiveSurvival } from "../rules/survival";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -354,7 +354,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = survivalForDisplay(readSurvival(actor));
+  const survival = effectiveSurvival(readSurvival(actor));
 
   return {
     actor,
