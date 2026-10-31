@@ -556,25 +556,7 @@ describe("createFromFile", () => {
     expect(world.create).toHaveBeenCalledTimes(1);
   });
 
-  it("does not create when the owner is not in the active user list", async () => {
-    const world = install({
-      isGM: true,
-      users: [
-        { id: "player-1", name: "Ada", role: 1, active: true },
-        { id: "away", name: "Bea", role: 1, active: true },
-      ],
-      activeIds: ["player-1"],
-    });
-    const created = await createFromFile(veteran, "away");
-    expect(created.ok).toBe(false);
-    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
-    expect(world.create).not.toHaveBeenCalled();
-
-    const present = await createFromFile(veteran, "player-1");
-    expect(present.ok).toBe(true);
-  });
-
-  it("reads the active user list from the users collection", async () => {
+  it("creates for a player who is not in the connected list", async () => {
     const records = [
       { id: "player-1", name: "Ada", role: 1, active: true },
       { id: "away", name: "Bea", role: 1, active: true },
@@ -583,30 +565,19 @@ describe("createFromFile", () => {
     const users = (
       host.game as {
         users: {
-          contents: typeof records;
-          filter?: (
-            this: { contents: typeof records },
-            predicate: (user: (typeof records)[number]) => boolean,
-          ) => typeof records;
+          filter?: () => never;
         };
       }
     ).users;
-    users.filter = function (
-      this: { contents: typeof records },
-      predicate: (user: (typeof records)[number]) => boolean,
-    ) {
-      return this.contents.filter((user) => user.id !== "away" && predicate(user));
+    users.filter = () => {
+      throw new Error("connected list was consulted");
     };
     const created = await createFromFile(veteran, "away");
-    expect(created.ok).toBe(false);
-    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
-    expect(world.create).not.toHaveBeenCalled();
-
-    const present = await createFromFile(veteran, "player-1");
-    expect(present.ok).toBe(true);
+    expect(created.ok).toBe(true);
+    expect(world.create).toHaveBeenCalledTimes(1);
   });
 
-  it("does not create when Foundry marks the owner inactive", async () => {
+  it("creates for an offline player", async () => {
     const world = install({
       isGM: true,
       users: [
@@ -615,12 +586,8 @@ describe("createFromFile", () => {
       ],
     });
     const created = await createFromFile(veteran, "away");
-    expect(created.ok).toBe(false);
-    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
-    expect(world.create).not.toHaveBeenCalled();
-
-    const present = await createFromFile(veteran, "player-1");
-    expect(present.ok).toBe(true);
+    expect(created.ok).toBe(true);
+    expect(world.create).toHaveBeenCalledTimes(1);
   });
 
   it("does not create when the owner role is None", async () => {
