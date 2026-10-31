@@ -468,22 +468,26 @@ describe("createFromFile", () => {
   });
 
   it("does not keep an actor when an item pack lookup throws", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const cause = new Error("pack unavailable");
     const packs = [
       {
         documentName: "Item",
         index: [{ _id: "human", name: "Human", type: "feature" }],
         async getDocument() {
-          throw new Error("pack unavailable");
+          throw cause;
         },
       },
     ];
     const world = install({ isGM: true, packs });
     const result = await createFromFile(veteran, "player-1");
+    expect(warn).toHaveBeenCalledWith("Pivot import could not resolve items.", cause);
     expect(result).toEqual({
       ok: false,
       error: { code: "incomplete", message: "Import did not finish, so no character was kept." },
     });
     for (const actor of world.actors) expect(actor.delete).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it("deletes the actor when embedding items throws", async () => {
@@ -615,6 +619,7 @@ describe("createFromFile", () => {
   });
 
   it("reports the import error when removing the actor also fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const world = install({
       isGM: true,
       deleteFails: true,
@@ -628,7 +633,46 @@ describe("createFromFile", () => {
       expect(result.error.code).toBe("incomplete");
       expect(result.error.message).toContain("could not be removed");
     }
+    const removal = warn.mock.calls.find(
+      (call) => call[0] === "Pivot import could not remove the character.",
+    );
+    expect(removal?.[1]).toBeInstanceOf(Error);
+    expect((removal?.[1] as Error).message).toBe("delete failed");
     expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it.each([
+    ["pool", "Pool"],
+    ["ac", "AC"],
+    ["speed", "Speed"],
+    ["mp", "MP max"],
+  ])("rejects computed %s below 0 and creates nothing", async (field, label) => {
+    const world = install({ isGM: true });
+    const file = structuredClone(veteran);
+    (file.computed as JsonRecord)[field] = -1;
+    const result = await createFromFile(file, "player-1");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toEqual({
+      code: "schema",
+      field: `computed.${field}`,
+      message: `${label} must be 0 or more (file: -1)`,
+    });
+    expect(world.create).not.toHaveBeenCalled();
+  });
+
+  it("imports a pool of 0", async () => {
+    const world = install({ isGM: true });
+    const file = structuredClone(veteran);
+    (file.computed as JsonRecord).pool = 0;
+    const result = await createFromFile(file, "player-1");
+    expect(result.ok).toBe(true);
+    expect(world.create).toHaveBeenCalledTimes(1);
+    const payload = world.create.mock.calls[0]?.[0] as {
+      system: { resources: { pool: { value: number } } };
+    };
+    expect(payload.system.resources.pool.value).toBe(0);
   });
 
   it("creates the edited AC and MP and does not block on the warning", async () => {
