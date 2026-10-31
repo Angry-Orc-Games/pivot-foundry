@@ -136,11 +136,12 @@ it("lets the GM stabilize a Dying Character and clears the counters", async () =
 it("warns and writes nothing for an inconsistent correction", async () => {
   vi.stubGlobal("game", { user: { isGM: true } });
   const seen = captureWarnings();
-  const actor = inMemoryCharacter({ hp: 0, status: "dying" });
-  dialogReturns({ hp: 5, temp: 0, successes: 0, failures: 0, status: "dying" });
+  const actor = inMemoryCharacter({ hp: 5, status: "alive" });
+  dialogReturns({ hp: 5, temp: 2, successes: 0, failures: 0, status: "dead" });
   await correctSurvivalDialog(actor);
   expect(seen).toEqual(["ApplyFailed"]);
   expect(actor.writes).toEqual([]);
+  expect(readSurvival(actor)).toMatchObject({ hp: 5, status: "alive" });
 });
 
 it("refuses Dying or Stable above 0 HP and tells the GM why, whatever the temporary HP", async () => {

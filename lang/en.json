@@ -220,6 +220,7 @@
   "PIVOT.Survival.NoTargets": "No Character targets available. Select tokens or use the source Character.",
   "PIVOT.Survival.MissingTarget": "A target is no longer available; it was skipped.",
   "PIVOT.Survival.ApplyFailed": "Application failed. Check current state and permissions before starting a new action.",
+  "PIVOT.Survival.DyingAboveZero": "Dying and Stable need 0 HP. Set HP to 0 first, or choose Conscious.",
   "PIVOT.Survival.ApplicationResult": "HP Application Results",
   "PIVOT.Survival.ReportFailed": "HP application was attempted but chat reporting failed. Check each target before any new application.",
   "PIVOT.Survival.ManualConsequences": "Exhaustion consequences, conditions, Medicine, timed recovery and full rests remain manual.",

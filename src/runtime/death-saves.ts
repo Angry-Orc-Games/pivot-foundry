@@ -1,6 +1,7 @@
 import { dicePoolForRollMode, d20PoolFormula, selectKeptD20 } from "../rules/d20-roll";
 import {
   correctSurvival,
+  DyingAboveZeroError,
   resolveDeathSave,
   SURVIVAL_STATUSES,
   type SurvivalStatus,
@@ -48,6 +49,7 @@ export async function deathSaveDialog(actor: SurvivalActor): Promise<void> {
 
 export async function correctSurvivalDialog(actor: SurvivalActor): Promise<void> {
   if (runtime().game?.user?.isGM !== true) return;
+  let dyingAboveZero = false;
   const { outcome } = await runSurvivalTransaction(
     actor,
     async (s) => {
@@ -74,11 +76,19 @@ export async function correctSurvivalDialog(actor: SurvivalActor): Promise<void>
           status: field(form, "status") as SurvivalStatus,
         }),
       );
-      return requested ? { next: correctSurvival({ current: s, requested }) } : null;
+      if (!requested) return null;
+      try {
+        return { next: correctSurvival({ current: s, requested }) };
+      } catch (error) {
+        dyingAboveZero = error instanceof DyingAboveZeroError;
+        throw error;
+      }
     },
     { gmOnly: true },
   );
-  if (outcome !== "updated" && outcome !== "cancelled" && outcome !== "busy") warn("ApplyFailed");
+  if (dyingAboveZero) warn("DyingAboveZero");
+  else if (outcome !== "updated" && outcome !== "cancelled" && outcome !== "busy")
+    warn("ApplyFailed");
 }
 
 export async function clearTempHpDialog(actor: SurvivalActor): Promise<void> {
