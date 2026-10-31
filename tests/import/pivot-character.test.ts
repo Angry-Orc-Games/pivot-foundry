@@ -53,13 +53,14 @@ function edit(file: JsonRecord, path: string[], value: unknown): JsonRecord {
   return copy;
 }
 
-function remove(file: JsonRecord, path: string[]): JsonRecord {
+function withoutHitPoints(file: JsonRecord): JsonRecord {
   const copy = structuredClone(file);
-  let cursor: unknown = copy;
-  for (const key of path.slice(0, -1)) cursor = step(cursor, key);
-  const last = path[path.length - 1];
-  if (!last || !isRecord(cursor)) throw new Error("cannot remove");
-  delete cursor[last];
+  const computed = recordAt(copy, "computed");
+  const rest: JsonRecord = {};
+  for (const [key, value] of Object.entries(computed)) {
+    if (key !== "hp") rest[key] = value;
+  }
+  copy.computed = rest;
   return copy;
 }
 
@@ -144,7 +145,7 @@ describe("validate", () => {
   });
 
   it("names the first missing required field", () => {
-    expect(failure(remove(veteran, ["computed", "hp"]))).toMatchObject({
+    expect(failure(withoutHitPoints(veteran))).toMatchObject({
       code: "schema",
       field: "computed.hp",
       message: "This file has a problem at computed.hp.",

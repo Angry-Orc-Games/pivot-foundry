@@ -21,7 +21,7 @@ interface DialogState {
   kept: boolean;
   drift: DriftLine[];
   showDrift: boolean;
-  render(force?: boolean): unknown;
+  render(options?: { force?: boolean }): unknown;
 }
 
 interface ImportGame {
@@ -80,7 +80,7 @@ function openImportDialog(): void {
   const Dialog = dialogConstructor();
   if (!Dialog) return;
   const dialog = new Dialog();
-  void dialog.render(true);
+  void dialog.render({ force: true });
 }
 
 function dialogConstructor(): (new () => DialogState) | undefined {
@@ -123,11 +123,11 @@ function dialogConstructor(): (new () => DialogState) | undefined {
       form: { template: TEMPLATE },
     };
 
-    render(force?: boolean): unknown {
+    render(options?: { force?: boolean }): unknown {
       const parent = Object.getPrototypeOf(ImportPivotDialog.prototype) as {
-        render?: (this: unknown, force?: boolean) => unknown;
+        render?: (this: unknown, options?: { force?: boolean }) => unknown;
       };
-      return parent.render?.call(this, force);
+      return parent.render?.call(this, options);
     }
 
     async _prepareContext(): Promise<{
@@ -222,7 +222,7 @@ function show(dialog: DialogState, error: string, kept: boolean, drift: DriftLin
   dialog.kept = kept;
   dialog.drift = drift;
   dialog.showDrift = drift.length > 0;
-  void dialog.render();
+  void dialog.render({ force: true });
 }
 
 function chargenDerive(game: ImportGame | undefined): ValidateOptions["rederive"] {
