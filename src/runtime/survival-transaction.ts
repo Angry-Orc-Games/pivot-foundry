@@ -1,4 +1,4 @@
-import { SYSTEM_ID } from "../config";
+import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import {
   effectiveSurvival,
   SURVIVAL_STATUSES,
@@ -38,15 +38,6 @@ export function readSurvival(actor: SurvivalActor): SurvivalState {
       ? (status as SurvivalStatus)
       : "unconfirmed",
   };
-}
-
-/** Update option that marks a write as a Survival transaction (or a trusted migration). */
-export const SURVIVAL_WRITE_OPTIONS = { [SYSTEM_ID]: { survivalWrite: true } } as const;
-
-export function isSurvivalWrite(options: unknown): boolean {
-  const scoped = (options as Record<string, unknown> | undefined)?.[SYSTEM_ID] as
-    { survivalWrite?: unknown } | undefined;
-  return scoped?.survivalWrite === true;
 }
 
 function survivalUpdate(s: SurvivalState): Record<string, unknown> {

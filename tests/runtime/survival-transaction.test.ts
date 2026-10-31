@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  isSurvivalWrite,
-  readSurvival,
-  runSurvivalTransaction,
-} from "../../src/runtime/survival-transaction";
+import { isSurvivalWrite } from "../../src/runtime/actor-guards";
+import { readSurvival, runSurvivalTransaction } from "../../src/runtime/survival-transaction";
 import { inMemoryCharacter } from "../helpers/in-memory-actor";
 
 afterEach(() => {
@@ -108,5 +105,13 @@ describe("Survival transaction", () => {
     expect(result).toMatchObject({ outcome: "failed", after: { hp: 3 } });
     expect(update).toHaveBeenCalledTimes(1);
     expect((await runSurvivalTransaction(actor, (s) => ({ next: s }))).outcome).toBe("updated");
+  });
+
+  it("is the only way to change a Character's survival fields", async () => {
+    const actor = inMemoryCharacter({ hp: 10 });
+    await actor.update({ "system.attributes.hp.value": 2 });
+    expect(readSurvival(actor).hp).toBe(10);
+    await runSurvivalTransaction(actor, (state) => ({ next: { ...state, hp: 2 } }));
+    expect(readSurvival(actor).hp).toBe(2);
   });
 });

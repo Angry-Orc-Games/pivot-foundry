@@ -117,24 +117,43 @@ it("keeps a max that is at least the HP in the same update", () => {
   expect(raised).toEqual({ system: { attributes: { hp: { max: 11 } } } });
   expect(warnings).toEqual([]);
 });
-it("rejects bare Character HP writes that would leave survival status stale", () => {
+it("rejects Character survival writes that are not Survival transactions", () => {
   const actor = {
     type: "character",
-    system: { attributes: { hp: { value: 0, max: 20 } } },
+    system: {
+      attributes: {
+        hp: { value: 0, max: 20, temp: 0 },
+        deathSaves: { status: "dying", successes: 0, failures: 0 },
+      },
+    },
   };
   expect(guardCharacterHpWrite(actor, { "system.attributes.hp.value": 5 })).toBe(false);
   expect(guardCharacterHpWrite(actor, { system: { attributes: { hp: { value: 5 } } } })).toBe(
     false,
   );
   expect(guardCharacterHpWrite(actor, { "system.attributes.hp": { value: 5 } })).toBe(false);
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.temp": 3 })).toBe(false);
+  expect(
+    guardCharacterHpWrite(actor, { "system.attributes.deathSaves": { status: "stable" } }),
+  ).toBe(false);
   expect(
     guardCharacterHpWrite(actor, {
       "system.attributes.hp.value": 5,
       "system.attributes.deathSaves.status": "alive",
     }),
-  ).toBeUndefined();
+  ).toBe(false);
+});
+
+it("allows marked writes, unchanged values, max edits, and NPCs", () => {
+  const actor = {
+    type: "character",
+    system: { attributes: { hp: { value: 0, max: 20 }, deathSaves: { status: "dying" } } },
+  };
+  const marked = { "pivot-fantasy": { survivalWrite: true } };
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.value": 5 }, marked)).toBeUndefined();
   expect(guardCharacterHpWrite(actor, { "system.attributes.hp.value": 0 })).toBeUndefined();
   expect(guardCharacterHpWrite(actor, { "system.attributes.hp.max": 30 })).toBeUndefined();
+  expect(guardCharacterHpWrite(actor, { name: "Hera" })).toBeUndefined();
   expect(
     guardCharacterHpWrite({ ...actor, type: "npc" }, { "system.attributes.hp.value": 5 }),
   ).toBeUndefined();
