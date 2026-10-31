@@ -76,6 +76,18 @@ export async function createFromFile(
     ownership[userId] = levels.INHERIT;
   }
 
+  let items: Record<string, unknown>[];
+  try {
+    const packs = listPacks(game);
+    items = [];
+    for (const item of draft.items) items.push(await resolveItem(item, packs));
+  } catch {
+    return {
+      ok: false,
+      error: { code: "incomplete", message: IMPORT_MESSAGES.incomplete },
+    };
+  }
+
   const actor = await createActor({
     name: draft.actor.name,
     type: draft.actor.type,
@@ -87,9 +99,6 @@ export async function createFromFile(
     ownership,
   });
 
-  const items: Record<string, unknown>[] = [];
-  const packs = listPacks(game);
-  for (const item of draft.items) items.push(await resolveItem(item, packs));
   const embedded = await embedItems(actor, items);
   if (!embedded.ok) {
     const removed = await removeActor(actor);

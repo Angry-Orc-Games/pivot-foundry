@@ -938,7 +938,12 @@ function projectItems(file: StoredCharacter): ImportItem[] {
 }
 
 function fileItemName(shell: string, acArmour: string): string {
-  if ((shell === "Light" || shell === "Heavy") && acArmour.startsWith(`${shell} `)) return acArmour;
+  if (
+    (shell === "Light" || shell === "Medium" || shell === "Heavy") &&
+    acArmour.startsWith(`${shell} `)
+  ) {
+    return acArmour;
+  }
   return shell;
 }
 
@@ -960,15 +965,24 @@ function roadAttack(file: StoredCharacter): ComputedFile["attacks"][number] | un
   return candidates.slice().sort((left, right) => right.attack - left.attack)[0];
 }
 
+function roadDamage(die: string): { formula: string; versatile: string } {
+  const match = /^(\d*d\d+)(?:\s*\(([^)]*)\))?\s*$/.exec(die.trim());
+  if (!match?.[1]) return { formula: die.trim(), versatile: "" };
+  return { formula: match[1], versatile: match[2]?.trim() ?? "" };
+}
+
 function roadWeaponSystem(file: StoredCharacter): Record<string, unknown> {
   const row = roadAttack(file);
   if (!row) return {};
   const trained = row.proficient ? LEVEL_ONE_PROFICIENCY : 0;
   const bonus = row.attack - file.computed.abilities[row.ability].mod - trained;
+  const damage = roadDamage(row.die);
+  const notes = damage.versatile ? `${file.choices.roadType} (${damage.versatile})` : undefined;
   return {
     category: ATTACK_CATEGORY_TO_KEY[row.category],
     attack: { ability: row.ability, bonus },
-    damage: { formula: row.die, ability: row.ability },
+    damage: { formula: damage.formula, ability: row.ability },
+    ...(notes ? { notes } : {}),
   };
 }
 
