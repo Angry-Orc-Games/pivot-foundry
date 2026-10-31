@@ -296,6 +296,25 @@ describe("createFromFile", () => {
     });
   });
 
+  it("does not keep an actor when an item pack lookup throws", async () => {
+    const packs = [
+      {
+        documentName: "Item",
+        index: [{ _id: "human", name: "Human", type: "feature" }],
+        async getDocument() {
+          throw new Error("pack unavailable");
+        },
+      },
+    ];
+    const world = install({ isGM: true, packs });
+    const result = await createFromFile(veteran, "player-1");
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "incomplete", message: "Import did not finish, so no character was kept." },
+    });
+    for (const actor of world.actors) expect(actor.delete).toHaveBeenCalledTimes(1);
+  });
+
   it("deletes the actor when embedding items throws", async () => {
     const world = install({
       isGM: true,

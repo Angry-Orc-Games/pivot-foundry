@@ -10,6 +10,7 @@ import {
   type PivotCharacter,
 } from "../../src/import/pivot-character";
 import { SURVIVAL_VERSION } from "../../src/migrations/m002";
+import { parseExplodingFormula } from "../../src/rules/exploding-roll";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
 
 type JsonRecord = Record<string, unknown>;
@@ -107,6 +108,11 @@ function reorder(value: unknown): unknown {
 const veteran = load(FIXTURES.veteran);
 const elf = load(FIXTURES.elf);
 const dwarf = load(FIXTURES.dwarf);
+const heavyMaul = edit(
+  edit(veteran, ["choices", "roadType"], "Heavy Melee weapon"),
+  ["choices", "roadWeapon"],
+  "Maul",
+);
 const custom = load(FIXTURES.custom);
 
 describe("validate", () => {
@@ -801,6 +807,37 @@ describe("toActorData", () => {
     choices.blocks = [""];
     choices.issue = "";
     expect(itemNames(file)).toEqual(["feature:Lucky"]);
+  });
+
+  it("names Medium armour and issue shells from the file", () => {
+    const armour = edit(
+      edit(elf, ["choices", "armourBlock"], "Medium"),
+      ["computed", "acArmour"],
+      "Medium armour",
+    );
+    const issue = edit(
+      edit(veteran, ["choices", "issue"], "Medium"),
+      ["computed", "acArmour"],
+      "Medium armour",
+    );
+    expect(itemNames(armour)).toContain("armour:Medium armour");
+    expect(itemNames(issue)).toContain("equipment:Medium armour");
+  });
+});
+
+describe("road weapon damage", () => {
+  it("stores a rollable formula for every sample and a Heavy weapon", () => {
+    const files = [veteran, elf, dwarf, custom, heavyMaul];
+    for (const file of files) {
+      const weapon = mapped(file).items.find((item) => item.type === "weapon");
+      if (!weapon || weapon.type !== "weapon") throw new Error("missing road weapon");
+      expect(parseExplodingFormula(weapon.system.damage.formula)).not.toBeNull();
+    }
+
+    const weapon = mapped(heavyMaul).items.find((item) => item.type === "weapon");
+    if (!weapon || weapon.type !== "weapon") throw new Error("missing road weapon");
+    expect(weapon.system.damage.formula).toBe("1d8");
+    expect(weapon.system.notes).toContain("1d10 two hands");
   });
 });
 

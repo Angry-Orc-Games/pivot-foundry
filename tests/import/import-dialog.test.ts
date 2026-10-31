@@ -10,10 +10,12 @@ const veteran = JSON.parse(
 );
 
 interface RenderedDialog {
+  kept?: boolean;
   renders: Array<{ force?: boolean } | undefined>;
   constructor: {
     onConfirm?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
   };
+  _prepareContext?: () => Promise<{ kept: boolean }>;
 }
 
 const dialogs: RenderedDialog[] = [];
@@ -124,7 +126,50 @@ describe("Import Pivot character button", () => {
     expect(dialog?.renders).toEqual([{ force: true }, { force: true }]);
   });
 
-  it("does not create a second actor when Confirm is clicked again", async () => {
+  it("ignores a second Confirm while the first import is still pending", async () => {
+    installFoundry();
+    let release: (value: { ok: true; value: { actorId: string } }) => void = () => {};
+    const pending = new Promise<{ ok: true; value: { actorId: string } }>((resolve) => {
+      release = resolve;
+    });
+    const createFromFile = vi.fn(() => pending);
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      pivot: { validate, createFromFile },
+    };
+    let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+    registerImportButton({
+      on(_event, next) {
+        handler = next;
+      },
+    });
+    const view = directory();
+    handler?.({}, view.html);
+    view.button?.listeners.click?.({ preventDefault() {} });
+    const dialog = dialogs.at(-1);
+    const form = {
+      querySelector(selector: string) {
+        if (selector.includes("file")) {
+          return { files: [{ text: async () => JSON.stringify(veteran) }] };
+        }
+        return { value: "player-1" };
+      },
+    } as unknown as HTMLFormElement;
+    const confirm = () => dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
+
+    const first = confirm();
+    await vi.waitFor(() => expect(createFromFile).toHaveBeenCalledTimes(1));
+    const second = confirm();
+    await Promise.resolve();
+    expect(createFromFile).toHaveBeenCalledTimes(1);
+
+    release({ ok: true, value: { actorId: "actor-1" } });
+    await first;
+    await second;
+    expect(createFromFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks Confirm after a successful import", async () => {
     installFoundry();
     const createFromFile = vi.fn(async () => ({ ok: true, value: { actorId: "actor-1" } }));
     (globalThis as { game?: unknown }).game = {
@@ -149,9 +194,12 @@ describe("Import Pivot character button", () => {
         return { value: "player-1" };
       },
     } as unknown as HTMLFormElement;
+    const confirm = () => dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
 
-    await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
-    await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
+    await confirm();
+    expect(dialog?.kept).toBe(true);
+    expect((await dialog?._prepareContext?.())?.kept).toBe(true);
+    await confirm();
     expect(createFromFile).toHaveBeenCalledTimes(1);
   });
 });
