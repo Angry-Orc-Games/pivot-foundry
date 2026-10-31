@@ -40,6 +40,13 @@ function preview(file: Record<string, unknown>) {
   };
 }
 
+const ROAD_WEAPON = {
+  "human-veteran.pivot.json": "Medium Melee",
+  "dwarf-recluse.pivot.json": "Medium Melee",
+  "elf-street-mage.pivot.json": "Light Melee",
+  "custom-humanoid.pivot.json": "Light Melee",
+} as const;
+
 describe("imported sheet preview", () => {
   it.each(FILES)("%s shows the file armour class, pool, and speed", (name) => {
     const file = load(name);
@@ -74,6 +81,36 @@ describe("imported sheet preview", () => {
     } else {
       expect(drift).toEqual([]);
     }
+  });
+
+  it.each(FILES)("%s sheet mana and road weapon match the file", (name) => {
+    const file = load(name);
+    const { context, computed } = preview(file);
+    const attacks = computed.attacks as Array<{
+      category: string;
+      attack: number;
+      die: string;
+    }>;
+    const row = attacks.find((attack) => attack.category === ROAD_WEAPON[name]);
+    const weapon = context.items.weapons[0];
+    const mp = typeof computed.mp === "number" ? computed.mp : 0;
+
+    expect(row).toBeDefined();
+    expect(context.derived.magic.mp.max).toBe(mp);
+    expect(weapon?.summary.bth).toBe(row?.attack);
+    expect(weapon?.summary.damageFormula).toBe(row?.die);
+  });
+
+  it("names Light and Heavy shells from the file", () => {
+    const veteran = preview(load("human-veteran.pivot.json"));
+    const elf = preview(load("elf-street-mage.pivot.json"));
+    const dwarf = preview(load("dwarf-recluse.pivot.json"));
+    const names = (items: { type: string; name: string }[]) =>
+      items.map((item) => `${item.type}:${item.name}`);
+
+    expect(names(veteran.draft.items)).toContain("equipment:Heavy armour");
+    expect(names(elf.draft.items)).toContain("armour:Light armour");
+    expect(names(dwarf.draft.items)).toContain("armour:Light armour");
   });
 
   it("names slings on the dwarf and keeps the custom humanoid ability with traits", () => {

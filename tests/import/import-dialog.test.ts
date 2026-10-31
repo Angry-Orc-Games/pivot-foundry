@@ -1,6 +1,13 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { registerImportButton } from "../../src/import/import-dialog";
+import { validate } from "../../src/import/pivot-character";
+
+const veteran = JSON.parse(
+  readFileSync(new URL("./fixtures/human-veteran.pivot.json", import.meta.url), "utf8"),
+);
 
 interface RenderedDialog {
   renders: Array<{ force?: boolean } | undefined>;
@@ -115,5 +122,36 @@ describe("Import Pivot character button", () => {
     } as unknown as HTMLFormElement;
     await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
     expect(dialog?.renders).toEqual([{ force: true }, { force: true }]);
+  });
+
+  it("does not create a second actor when Confirm is clicked again", async () => {
+    installFoundry();
+    const createFromFile = vi.fn(async () => ({ ok: true, value: { actorId: "actor-1" } }));
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      pivot: { validate, createFromFile },
+    };
+    let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+    registerImportButton({
+      on(_event, next) {
+        handler = next;
+      },
+    });
+    const view = directory();
+    handler?.({}, view.html);
+    view.button?.listeners.click?.({ preventDefault() {} });
+    const dialog = dialogs.at(-1);
+    const form = {
+      querySelector(selector: string) {
+        if (selector.includes("file")) {
+          return { files: [{ text: async () => JSON.stringify(veteran) }] };
+        }
+        return { value: "player-1" };
+      },
+    } as unknown as HTMLFormElement;
+
+    await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
+    await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
+    expect(createFromFile).toHaveBeenCalledTimes(1);
   });
 });

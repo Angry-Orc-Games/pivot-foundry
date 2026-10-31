@@ -47,13 +47,16 @@ function install(options: {
   users?: { id: string; name: string }[];
   packs?: unknown[];
   embed?: () => unknown;
+  deleteFails?: boolean;
 }): World {
   const users = options.users ?? [{ id: "player-1", name: "Ada" }];
   const actors: CreatedActor[] = [];
   const create = vi.fn(async () => {
     const actor: CreatedActor = {
       id: `actor-${actors.length + 1}`,
-      delete: vi.fn(async () => undefined),
+      delete: vi.fn(async () => {
+        if (options.deleteFails) throw new Error("delete failed");
+      }),
       createEmbeddedDocuments: vi.fn(async () => {
         if (options.embed) return options.embed();
         return [];
@@ -310,6 +313,51 @@ describe("createFromFile", () => {
     world.create.mockRejectedValue(new Error("create failed"));
     await expect(createFromFile(veteran, "player-1")).rejects.toThrow("create failed");
     expect(world.actors).toHaveLength(0);
+  });
+
+  it("does not create when the owner is not a user in the world", async () => {
+    const world = install({
+      isGM: true,
+      users: [
+        { id: "player-1", name: "Ada" },
+        { id: "gm-1", name: "Ken" },
+      ],
+    });
+    const missing = await createFromFile(veteran, "missing-user");
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.error.field).toBe("ownerUserId");
+    expect(world.create).not.toHaveBeenCalled();
+
+    const player = await createFromFile(veteran, "player-1");
+    const gm = await createFromFile(veteran, "gm-1");
+    expect(player.ok).toBe(true);
+    expect(gm.ok).toBe(true);
+  });
+
+  it("deletes the actor when embedding creates no items", async () => {
+    const world = install({ isGM: true, embed: () => [] });
+    const result = await createFromFile(veteran, "player-1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("incomplete");
+    expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
+    expect(world.actors).toHaveLength(1);
+  });
+
+  it("reports the import error when removing the actor also fails", async () => {
+    const world = install({
+      isGM: true,
+      deleteFails: true,
+      embed: () => {
+        throw new Error("embed failed");
+      },
+    });
+    const result = await createFromFile(veteran, "player-1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("incomplete");
+      expect(result.error.message).toContain("could not be removed");
+    }
+    expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
   });
 
   it("creates a second actor on a second success", async () => {
