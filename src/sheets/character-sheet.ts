@@ -15,6 +15,7 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { selectInitiativeCombatant } from "../rules/combat";
+import { survivalForDisplay } from "../rules/survival";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -113,6 +114,8 @@ export interface CharacterSheetContext {
   poolPercent: number;
   deathSaveSuccessPips: boolean[];
   deathSaveFailurePips: boolean[];
+  deathSaveSuccesses: number;
+  deathSaveFailures: number;
   isGM: boolean;
   system: RecordValue;
   form: {
@@ -351,7 +354,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = readSurvival(actor);
+  const survival = survivalForDisplay(readSurvival(actor));
 
   return {
     actor,
@@ -361,6 +364,8 @@ export function prepareCharacterSheetContext(
     poolPercent: fillPercent(numberAt(system, ["resources", "pool", "value"], 0), derived.pool.max),
     deathSaveSuccessPips: deathSavePips(survival.successes),
     deathSaveFailurePips: deathSavePips(survival.failures),
+    deathSaveSuccesses: survival.successes,
+    deathSaveFailures: survival.failures,
     isGM:
       (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
         ?.isGM === true,

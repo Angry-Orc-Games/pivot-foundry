@@ -1,4 +1,4 @@
-import { correctCreatedHp, guardHpMaximum } from "./runtime/actor-guards";
+import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
@@ -41,6 +41,7 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
   runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
+  runtime.Hooks.on?.("preUpdateActor", guardCharacterHpWrite);
 
   // Sync token status effects after HP or death state changes
   // Foundry passes nested changes object: {system: {attributes: {hp: {value}}}}

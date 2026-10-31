@@ -46,6 +46,27 @@ it("rejects edited or deleted source messages after preview", () => {
   expect(messagePayloadUnchanged("m", payload)).toBe(false);
 });
 
+it("does not label a full-HP character as Dying in the damage target list", () => {
+  const row = targetPreviewRow(
+    {
+      name: "Hera",
+      type: "character",
+      isOwner: true,
+      system: {
+        attributes: {
+          hp: { value: 10, max: 10, temp: 0 },
+          deathSaves: { status: "dying", successes: 2, failures: 1 },
+        },
+      },
+    },
+    0,
+    true,
+  );
+  expect(row).toContain("HP 10/10");
+  expect(row).toContain("(alive)");
+  expect(row).not.toContain("dying");
+});
+
 it("never reads or displays unowned target stats", () => {
   const row = targetPreviewRow(
     {
