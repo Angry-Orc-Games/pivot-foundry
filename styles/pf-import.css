@@ -98,6 +98,13 @@
   padding: 8px;
 }
 
+.pivot-fantasy.pf-import .pf-import-note {
+  color: var(--pf-warn);
+  background: var(--pf-warn-soft);
+  margin: 0;
+  padding: 8px;
+}
+
 .pivot-fantasy.pf-import .pf-import-drift {
   color: var(--pf-warn);
   background: var(--pf-warn-soft);

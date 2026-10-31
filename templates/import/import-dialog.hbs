@@ -19,10 +19,13 @@
   {{#if kept}}
     <p class="pf-import-kept">{{localize "PIVOT.Import.Kept"}}</p>
   {{/if}}
-  {{#if showDrift}}
+  {{#if note}}
+    <p class="pf-import-note">{{note}}</p>
+  {{/if}}
+  {{#if showWarnings}}
     <ul class="pf-import-drift">
-      {{#each drift}}
-        <li>{{field}}: file {{file}} vs sheet {{sheet}}</li>
+      {{#each warnings}}
+        <li>{{this}}</li>
       {{/each}}
     </ul>
   {{/if}}

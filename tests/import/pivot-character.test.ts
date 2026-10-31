@@ -214,30 +214,34 @@ describe("validate", () => {
   it("reports a computed block that does not match rederive", () => {
     const computed = structuredClone(recordAt(veteran, "computed"));
     computed.hp = 1;
-    expect(failureOf(validate(veteran, { rederive: () => computed }))).toEqual({
-      code: "tampered",
-      field: "computed",
-      message: "This file does not match its choices.",
-    });
+    const edited = validate(veteran, { rederive: () => computed });
+    expect(edited.ok).toBe(true);
+    if (edited.ok)
+      expect(edited.warnings?.map((warning) => warning.message)).toEqual(["HP: file 12, rules 1"]);
 
     const reversed = structuredClone(recordAt(veteran, "computed"));
     reversed.attacks = [...(reversed.attacks as unknown[])].reverse();
-    expect(validate(veteran, { rederive: () => reversed }).ok).toBe(false);
+    const reordered = validate(veteran, { rederive: () => reversed });
+    expect(reordered.ok).toBe(true);
+    if (reordered.ok)
+      expect(reordered.warnings?.some((warning) => warning.field === "attacks")).toBe(true);
   });
 
   it("reports a rederive function that throws", () => {
-    expect(
-      failureOf(
-        validate(veteran, {
-          rederive: () => {
-            throw new Error("generator missing");
-          },
-        }),
-      ),
-    ).toEqual({
-      code: "unverifiable",
-      message: "This file could not be checked against the character generator.",
+    const result = validate(veteran, {
+      rederive: () => {
+        throw new Error("generator missing");
+      },
     });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toEqual([
+        {
+          code: "unverifiable",
+          message: "Not checked against the character generator.",
+        },
+      ]);
+    }
   });
 });
 
@@ -287,11 +291,6 @@ describe("import warnings", () => {
     expect(warningMessages(result)).toEqual(["Not checked against the character generator."]);
   });
 });
-
-function failureOf(result: ReturnType<typeof validate>) {
-  if (result.ok) throw new Error("expected a validation error");
-  return result.error;
-}
 
 describe("toActorData", () => {
   it("keeps a later edit to the file from changing the draft", () => {

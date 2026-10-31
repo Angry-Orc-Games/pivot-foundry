@@ -9,14 +9,9 @@ export type PivotCharacter = { readonly [pivotCharacterBrand]: true };
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
 export type PivotImportCode =
-  | "malformed"
-  | "wrong-system"
-  | "unknown-format"
-  | "schema"
-  | "tampered"
-  | "unverifiable"
-  | "forbidden"
-  | "incomplete";
+  "malformed" | "wrong-system" | "unknown-format" | "schema" | "forbidden" | "incomplete";
+
+export type ImportWarningCode = "tampered" | "unverifiable";
 
 export interface PivotImportError {
   readonly code: PivotImportCode;
@@ -24,8 +19,14 @@ export interface PivotImportError {
   readonly field?: string;
 }
 
+export interface ImportWarning {
+  readonly code: ImportWarningCode;
+  readonly message: string;
+  readonly field?: string;
+}
+
 export type Result<T> =
-  | { readonly ok: true; readonly value: T }
+  | { readonly ok: true; readonly value: T; readonly warnings?: readonly ImportWarning[] }
   | { readonly ok: false; readonly error: PivotImportError };
 
 export const IMPORT_MESSAGES = {
@@ -39,8 +40,7 @@ export const IMPORT_MESSAGES = {
   incomplete: "Import did not finish, so no character was kept.",
   cleanupFailed: "Import did not finish, and the character could not be removed.",
   unknownPlayer: "Choose a player in this world.",
-  tampered: "This file does not match its choices.",
-  unverifiable: "This file could not be checked against the character generator.",
+  notChecked: "Not checked against the character generator.",
 } as const;
 
 export function schemaMessage(field: string): string {
@@ -288,27 +288,109 @@ export function validate(file: unknown, options?: ValidateOptions): Result<Pivot
   }
 
   const copy = structuredClone(file) as Record<string, unknown>;
-  const rederive = options?.rederive;
-  if (rederive) {
-    let derived: unknown;
-    try {
-      derived = rederive(structuredClone(copy.choices));
-    } catch {
-      return {
-        ok: false,
-        error: { code: "unverifiable", message: IMPORT_MESSAGES.unverifiable },
-      };
-    }
-    if (!sameCanonical(copy.computed, derived)) {
-      return {
-        ok: false,
-        error: { code: "tampered", field: "computed", message: IMPORT_MESSAGES.tampered },
-      };
-    }
-  }
+  const warnings = witnessWarnings(copy.computed, options?.rederive, copy.choices);
 
   Object.defineProperty(copy, pivotCharacterBrand, { value: true });
-  return { ok: true, value: copy as PivotCharacter };
+  return { ok: true, value: copy as PivotCharacter, warnings };
+}
+
+const MISMATCH_KEY = "PIVOT.Import.Mismatch";
+const NOT_CHECKED_KEY = "PIVOT.Import.NotChecked";
+const FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
+  ac: { key: "PIVOT.Import.Field.AC", fallback: "AC" },
+  hp: { key: "PIVOT.Import.Field.HP", fallback: "HP" },
+  pool: { key: "PIVOT.Import.Field.Pool", fallback: "Pool" },
+  mp: { key: "PIVOT.Import.Field.MP", fallback: "MP max" },
+  speed: { key: "PIVOT.Import.Field.Speed", fallback: "Speed" },
+};
+const FIELD_ORDER = ["ac", "hp", "pool", "mp", "speed"];
+
+export function mismatchWarning(field: string, file: unknown, rules: unknown): ImportWarning {
+  return {
+    code: "tampered",
+    field,
+    message: formatMessage(MISMATCH_KEY, "{field}: file {file}, rules {rules}", {
+      field: fieldLabel(field),
+      file: formatWitnessValue(file),
+      rules: formatWitnessValue(rules),
+    }),
+  };
+}
+
+export function notCheckedWarning(): ImportWarning {
+  return {
+    code: "unverifiable",
+    message: formatMessage(NOT_CHECKED_KEY, IMPORT_MESSAGES.notChecked),
+  };
+}
+
+function witnessWarnings(
+  computed: unknown,
+  rederive: ValidateOptions["rederive"],
+  choices: unknown,
+): ImportWarning[] {
+  if (!rederive) return [];
+  let derived: unknown;
+  try {
+    derived = rederive(structuredClone(choices));
+  } catch {
+    return [notCheckedWarning()];
+  }
+  return computedDiff(computed, derived);
+}
+
+function computedDiff(file: unknown, derived: unknown): ImportWarning[] {
+  if (!isPlainObject(file) || !isPlainObject(derived)) {
+    return [mismatchWarning("computed", file, derived)];
+  }
+  const keys = new Set([...Object.keys(file), ...Object.keys(derived)]);
+  return [...keys]
+    .filter((key) => key !== "exportedAt")
+    .sort((left, right) => fieldRank(left) - fieldRank(right) || left.localeCompare(right))
+    .flatMap((key) =>
+      sameCanonical(file[key], derived[key]) ? [] : [mismatchWarning(key, file[key], derived[key])],
+    );
+}
+
+function fieldRank(field: string): number {
+  const index = FIELD_ORDER.indexOf(field);
+  return index === -1 ? FIELD_ORDER.length : index;
+}
+
+function fieldLabel(field: string): string {
+  const known = FIELD_LABELS[field];
+  if (!known) return field;
+  return formatMessage(known.key, known.fallback);
+}
+
+function formatWitnessValue(value: unknown): string {
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "string") return value;
+  if (value === null) return "null";
+  return JSON.stringify(value) ?? "";
+}
+
+function formatMessage(key: string, fallback: string, data?: Record<string, string>): string {
+  const i18n = (
+    globalThis as {
+      game?: {
+        i18n?: {
+          format?: (key: string, data?: Record<string, string>) => string;
+          localize?: (key: string) => string;
+        };
+      };
+    }
+  ).game?.i18n;
+  if (data && typeof i18n?.format === "function") {
+    const formatted = i18n.format(key, data);
+    if (formatted && formatted !== key) return formatted;
+  }
+  if (!data && typeof i18n?.localize === "function") {
+    const localized = i18n.localize(key);
+    if (localized && localized !== key) return localized;
+  }
+  if (!data) return fallback;
+  return fallback.replace(/\{(\w+)\}/g, (_match, token: string) => data[token] ?? "");
 }
 
 export function toActorData(character: PivotCharacter): CharacterImportDraft {

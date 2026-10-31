@@ -3,8 +3,12 @@ import { createFromFile } from "./create-from-file";
 import {
   compareDrift,
   IMPORT_MESSAGES,
+  mismatchWarning,
+  notCheckedWarning,
+  toActorData,
   validate,
-  type DriftLine,
+  type ImportWarning,
+  type PivotCharacter,
   type PreparedSnapshot,
   type ValidateOptions,
 } from "./pivot-character";
@@ -19,8 +23,9 @@ interface DialogState {
   creating: boolean;
   error: string;
   kept: boolean;
-  drift: DriftLine[];
-  showDrift: boolean;
+  warnings: string[];
+  note: string;
+  showWarnings: boolean;
   render(options?: { force?: boolean }): unknown;
 }
 
@@ -105,8 +110,9 @@ function dialogConstructor(): (new () => DialogState) | undefined {
     creating = false;
     error = "";
     kept = false;
-    drift: DriftLine[] = [];
-    showDrift = false;
+    warnings: string[] = [];
+    note = "";
+    showWarnings = false;
 
     static DEFAULT_OPTIONS = {
       classes: ["pivot-fantasy", "pf-import"],
@@ -134,16 +140,43 @@ function dialogConstructor(): (new () => DialogState) | undefined {
       users: Array<{ id: string; name: string }>;
       error: string;
       kept: boolean;
-      drift: DriftLine[];
-      showDrift: boolean;
+      warnings: string[];
+      note: string;
+      showWarnings: boolean;
     }> {
       return {
         users: listUsers(),
         error: this.error,
         kept: this.kept,
-        drift: this.drift,
-        showDrift: this.showDrift,
+        warnings: this.warnings,
+        note: this.note,
+        showWarnings: this.showWarnings,
       };
+    }
+
+    async _onRender(...args: unknown[]): Promise<void> {
+      const parent = Object.getPrototypeOf(ImportPivotDialog.prototype) as {
+        _onRender?: (this: unknown, ...args: unknown[]) => unknown;
+      };
+      await parent._onRender?.apply(this, args);
+      const form = (this as { element?: HTMLElement }).element;
+      const input = form?.querySelector?.('input[name="pivotFile"]');
+      if (!(input instanceof HTMLInputElement) || input.dataset.pivotBound === "1") return;
+      input.dataset.pivotBound = "1";
+      input.addEventListener("change", (event) => {
+        const current = input.closest("form");
+        if (current) void ImportPivotDialog.onPreview.call(this, event, current);
+      });
+    }
+
+    static async onPreview(
+      this: ImportPivotDialog,
+      event: Event,
+      form: HTMLFormElement,
+    ): Promise<void> {
+      event.preventDefault();
+      if (this.creating || this.kept) return;
+      await previewFile(this, form);
     }
 
     static async onConfirm(
@@ -166,28 +199,56 @@ function dialogConstructor(): (new () => DialogState) | undefined {
   return dialogClass;
 }
 
-async function importFile(dialog: DialogState, form: HTMLFormElement): Promise<void> {
-  const input = form.querySelector<HTMLInputElement>('input[type="file"]');
-  const selected = input?.files?.[0];
-  if (!selected) {
-    show(dialog, IMPORT_MESSAGES.malformed, false, []);
-    return;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(await selected.text());
-  } catch {
-    show(dialog, IMPORT_MESSAGES.malformed, false, []);
+async function previewFile(dialog: DialogState, form: HTMLFormElement): Promise<void> {
+  const read = await readSelected(form);
+  if (!read.ok) {
+    dialog.error = read.error;
+    dialog.warnings = [];
+    dialog.note = "";
+    dialog.showWarnings = false;
+    void dialog.render({ force: true });
     return;
   }
 
   const game = readGame();
   const validateFile = game?.pivot?.validate ?? validate;
   const rederive = chargenDerive(game);
-  const result = validateFile(parsed, rederive ? { rederive } : undefined);
+  const result = validateFile(read.value, rederive ? { rederive } : undefined);
   if (!result.ok) {
-    show(dialog, result.error.message, false, []);
+    dialog.error = result.error.message;
+    dialog.warnings = [];
+    dialog.note = "";
+    dialog.showWarnings = false;
+    void dialog.render({ force: true });
+    return;
+  }
+
+  const witness = result.warnings ?? [];
+  const unchecked = witness.find((warning) => warning.code === "unverifiable");
+  const mismatches = mergeWarnings(
+    witness.filter((warning) => warning.code === "tampered"),
+    sheetWarnings(result.value),
+  );
+  dialog.warnings = mismatches.map((warning) => warning.message);
+  dialog.showWarnings = dialog.warnings.length > 0;
+  dialog.note = unchecked?.message ?? (rederive ? "" : notCheckedWarning().message);
+  dialog.error = "";
+  void dialog.render({ force: true });
+}
+
+async function importFile(dialog: DialogState, form: HTMLFormElement): Promise<void> {
+  const read = await readSelected(form);
+  if (!read.ok) {
+    show(dialog, read.error, false);
+    return;
+  }
+
+  const game = readGame();
+  const validateFile = game?.pivot?.validate ?? validate;
+  const rederive = chargenDerive(game);
+  const result = validateFile(read.value, rederive ? { rederive } : undefined);
+  if (!result.ok) {
+    show(dialog, result.error.message, false);
     return;
   }
 
@@ -195,33 +256,63 @@ async function importFile(dialog: DialogState, form: HTMLFormElement): Promise<v
   const create = game?.pivot?.createFromFile ?? createFromFile;
   let created: Awaited<ReturnType<typeof createFromFile>>;
   try {
-    created = await create(parsed, owner);
+    created = await create(read.value, owner);
   } catch {
-    show(dialog, IMPORT_MESSAGES.incomplete, false, []);
+    show(dialog, IMPORT_MESSAGES.incomplete, false);
     return;
   }
   if (!created.ok) {
-    show(dialog, created.error.message, false, []);
+    show(dialog, created.error.message, false);
     return;
   }
 
-  const lines = driftLines(result.value, created.value.actorId);
-  show(dialog, "", true, lines);
+  show(dialog, "", true);
 }
 
-function driftLines(character: Parameters<typeof compareDrift>[0], actorId: string): DriftLine[] {
+async function readSelected(
+  form: HTMLFormElement,
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  const input = form.querySelector<HTMLInputElement>('input[type="file"]');
+  const selected = input?.files?.[0];
+  if (!selected) return { ok: false, error: IMPORT_MESSAGES.malformed };
   try {
-    return compareDrift(character, readPrepared(actorId));
+    return { ok: true, value: JSON.parse(await selected.text()) };
   } catch {
-    return [];
+    return { ok: false, error: IMPORT_MESSAGES.malformed };
   }
 }
 
-function show(dialog: DialogState, error: string, kept: boolean, drift: DriftLine[]): void {
+function sheetWarnings(character: PivotCharacter): ImportWarning[] {
+  const draft = toActorData(character);
+  const context = prepareCharacterSheetContext({
+    name: draft.actor.name,
+    type: draft.actor.type,
+    system: draft.actor.system as unknown as ActorLike["system"],
+    items: draft.items.map((item) => ({
+      name: item.name,
+      type: item.type,
+      system: item.system as unknown as ActorLike["system"],
+    })),
+  });
+  return compareDrift(character, {
+    ac: context.derived.armourClass.value,
+    poolMax: context.derived.pool.max,
+    mpMax: context.derived.magic.mp.max,
+    speed: context.derived.speed,
+  }).map((line) => mismatchWarning(line.field, line.file, line.sheet));
+}
+
+function mergeWarnings(primary: ImportWarning[], extra: ImportWarning[]): ImportWarning[] {
+  const seen = new Set(primary.flatMap((warning) => (warning.field ? [warning.field] : [])));
+  return [
+    ...primary,
+    ...extra.filter((warning) => warning.field === undefined || !seen.has(warning.field)),
+  ];
+}
+
+function show(dialog: DialogState, error: string, kept: boolean): void {
   dialog.error = error;
   dialog.kept = kept;
-  dialog.drift = drift;
-  dialog.showDrift = drift.length > 0;
   void dialog.render({ force: true });
 }
 
