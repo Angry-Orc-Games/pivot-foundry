@@ -48,8 +48,10 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   runtime.Hooks.on?.("updateActor", (actor: unknown, changes: Record<string, unknown>) => {
     const hpChanged = hasNestedProperty(changes, "system.attributes.hp.value");
     const statusChanged = hasNestedProperty(changes, "system.attributes.deathSaves.status");
+    // A max change can make Conscious at 0 HP effectively Dying.
+    const maxChanged = hasNestedProperty(changes, "system.attributes.hp.max");
 
-    if (hpChanged || statusChanged) {
+    if (hpChanged || statusChanged || maxChanged) {
       const globals = globalThis as { game?: unknown };
       void updateTokenStatusEffects(
         actor as Parameters<typeof updateTokenStatusEffects>[0],
