@@ -220,6 +220,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
             crossbows: booleanField(fields, { required: true, initial: false }),
             thrown: booleanField(fields, { required: true, initial: false }),
             improvised: booleanField(fields, { required: true, initial: false }),
+            slings: booleanField(fields, { required: true, initial: false }),
           }),
         }),
         currency: schemaField(fields, {

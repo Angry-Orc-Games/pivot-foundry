@@ -450,6 +450,7 @@ export function prepareCharacterSheetContext(
   if (weaponProfs.bows) weaponProfList.push("Bows");
   if (weaponProfs.crossbows) weaponProfList.push("Crossbows");
   if (weaponProfs.thrown) weaponProfList.push("Thrown");
+  if (weaponProfs.slings) weaponProfList.push("Slings");
   if (weaponProfs.meleeLight) weaponProfList.push("Melee Light");
   if (weaponProfs.meleeMedium) weaponProfList.push("Melee Medium");
   if (weaponProfs.meleeHeavy) weaponProfList.push("Melee Heavy");
@@ -471,7 +472,9 @@ export function prepareCharacterSheetContext(
     (item) => stringAt(item.system, ["category"], "") === "bodyModification",
   );
   const traits = features.filter((item) =>
-    ["species", "background", "other"].includes(stringAt(item.system, ["category"], "")),
+    ["species", "background", "other", "humanoidAbility"].includes(
+      stringAt(item.system, ["category"], ""),
+    ),
   );
 
   // Magic streams text

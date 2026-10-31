@@ -198,6 +198,38 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.items.traits.map((item) => item.name)).toEqual(["Darkvision"]);
   });
 
+  it("lists slings after thrown and keeps humanoid abilities with traits", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        proficiencies: { weapons: { bows: true, thrown: true, slings: true } },
+      },
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "habil-1",
+          name: "Chitinous Carapace",
+          type: "feature",
+          system: { category: "humanoidAbility" },
+        },
+        {
+          id: "trait-1",
+          name: "Darkvision",
+          type: "feature",
+          system: { category: "species" },
+        },
+      ],
+    });
+
+    expect(context.proficiencyText.weapons).toBe("Bows, Thrown, Slings");
+    expect(context.items.traits.map((item) => item.name)).toEqual([
+      "Chitinous Carapace",
+      "Darkvision",
+    ]);
+  });
+
   it("keeps non-enumerable Foundry document ids available for item row actions", () => {
     const weapon = {
       name: "Hidden Id Axe",
