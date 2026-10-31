@@ -1,4 +1,4 @@
-import { guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
+import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
@@ -39,6 +39,7 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
   runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
+  runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
   runtime.Hooks.on?.("preUpdateActor", guardCharacterHpWrite);
 
@@ -211,13 +212,20 @@ function linkCharacterPrototypeToken(
 }
 
 function creationSpecifiesActorLink(data: unknown): boolean {
-  const hasProperty = (
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const utils = (
     globalThis as {
-      foundry?: { utils?: { hasNestedProperty?: (object: unknown, path: string) => boolean } };
+      foundry?: {
+        utils?: {
+          expandObject?: (object: object) => object;
+          hasProperty?: (object: object, key: string) => boolean;
+        };
+      };
     }
-  ).foundry?.utils?.hasNestedProperty;
-  if (hasProperty) return hasProperty(data, "prototypeToken.actorLink");
-  return hasNestedProperty(data, "prototypeToken.actorLink");
+  ).foundry?.utils;
+  const expanded = utils?.expandObject?.(data) ?? data;
+  if (utils?.hasProperty) return utils.hasProperty(expanded, "prototypeToken.actorLink");
+  return hasNestedProperty(expanded, "prototypeToken.actorLink");
 }
 
 const pivotGlobals = globalThis as PivotGlobals & {

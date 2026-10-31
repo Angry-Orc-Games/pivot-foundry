@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import manifestJson from "../system.json";
 import { createPivotCharacterDataModel } from "../src/data/character-data";
@@ -251,4 +251,217 @@ describe("registerPivotFantasySystem", () => {
     }
     expect(updateSource).not.toHaveBeenCalled();
   });
+
+  it("corrects a blank or non-numeric HP max when an export is created", () => {
+    const { listeners } = capturePreCreate();
+    const blank = importedActor({ value: 30, max: null });
+    runPreCreate(listeners, blank.actor, { prototypeToken: { actorLink: false } });
+    expect(blank.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 30 }]]);
+
+    const text = importedActor({ value: 12, max: "nope" });
+    runPreCreate(listeners, text.actor, { prototypeToken: { actorLink: false } });
+    expect(text.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 12 }]]);
+
+    const negative = importedActor({ value: 15, max: -3 });
+    runPreCreate(listeners, negative.actor, { prototypeToken: { actorLink: false } });
+    expect(negative.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 15 }]]);
+
+    const npc = importedActor({ value: 40, max: 0 }, "npc");
+    runPreCreate(listeners, npc.actor, { prototypeToken: { actorLink: false } });
+    expect(npc.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.max": 40 }]]);
+  });
+
+  it("leaves a zero HP pair unchanged when an export is created", () => {
+    const { listeners } = capturePreCreate();
+    const zero = importedActor({ value: 0, max: 0 });
+    runPreCreate(listeners, zero.actor, { prototypeToken: { actorLink: false } });
+    expect(zero.updateSource).not.toHaveBeenCalled();
+  });
+
+  it("clamps current HP to a positive numeric max when an export is created above that max", () => {
+    const { listeners } = capturePreCreate();
+    const character = importedActor({ value: 50, max: 20 });
+    runPreCreate(listeners, character.actor, { prototypeToken: { actorLink: false } });
+    expect(character.updateSource.mock.calls).toEqual([[{ "system.attributes.hp.value": 20 }]]);
+  });
+
+  it("leaves a valid imported HP pair unchanged", () => {
+    const { listeners } = capturePreCreate();
+    const character = importedActor({ value: 18, max: 28 });
+    runPreCreate(listeners, character.actor, { prototypeToken: { actorLink: false } });
+    expect(character.updateSource).not.toHaveBeenCalled();
+  });
 });
+
+describe("preCreateActor actorLink", () => {
+  let restoreFoundry: () => void;
+
+  beforeEach(() => {
+    restoreFoundry = installFoundryV14PropertyUtils();
+  });
+
+  afterEach(() => {
+    restoreFoundry();
+  });
+
+  it("keeps a flat prototypeToken.actorLink of false", () => {
+    const updateSource = runPreCreateActor({ "prototypeToken.actorLink": false });
+    expect(updateSource).not.toHaveBeenCalled();
+  });
+
+  it("keeps a nested prototypeToken.actorLink of false", () => {
+    const updateSource = runPreCreateActor({ prototypeToken: { actorLink: false } });
+    expect(updateSource).not.toHaveBeenCalled();
+  });
+
+  it("keeps a flat prototypeToken.actorLink of true", () => {
+    const updateSource = runPreCreateActor({ "prototypeToken.actorLink": true });
+    expect(updateSource).not.toHaveBeenCalled();
+  });
+
+  it("links a character when creation data omits actorLink", () => {
+    const updateSource = runPreCreateActor(undefined);
+    expect(updateSource).toHaveBeenCalledWith({ "prototypeToken.actorLink": true });
+  });
+});
+
+function runPreCreateActor(data: unknown): ReturnType<typeof vi.fn> {
+  const { foundry } = createMockFoundry();
+  const listeners: Array<
+    (actor: { type?: string; updateSource?: (data: unknown) => unknown }, data?: unknown) => void
+  > = [];
+  registerPivotFantasySystem({
+    Hooks: {
+      on(event, callback) {
+        if (event === "preCreateActor") listeners.push(callback as (typeof listeners)[number]);
+      },
+      once() {},
+    },
+    CONFIG: {
+      Actor: { dataModels: {}, trackableAttributes: {} },
+      Item: { dataModels: {} },
+    },
+    foundry,
+  });
+  const updateSource = vi.fn();
+  const character = {
+    type: "character",
+    system: { survivalVersion: 1 },
+    token: null,
+    updateSource,
+  };
+  for (const listener of listeners) listener(character, data);
+  return updateSource;
+}
+
+function installFoundryV14PropertyUtils(): () => void {
+  const host = globalThis as { foundry?: { utils?: object } };
+  const previous = host.foundry;
+  host.foundry = {
+    utils: {
+      hasProperty: foundryV14HasProperty,
+      expandObject: foundryV14ExpandObject,
+    },
+  };
+  return () => {
+    if (previous === undefined) delete host.foundry;
+    else host.foundry = previous;
+  };
+}
+
+function foundryV14HasProperty(object: object, key: string): boolean {
+  let current: unknown = object;
+  for (const part of key.split(".")) {
+    if (typeof current !== "object" || current === null || !(part in current)) return false;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return true;
+}
+
+function foundryV14ExpandObject(obj: object): object {
+  const expanded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const nested = isPlainRecord(value) ? foundryV14ExpandObject(value) : value;
+    assignDottedKey(expanded, key, nested);
+  }
+  return expanded;
+}
+
+function assignDottedKey(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".");
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (!isPlainRecord(next)) current[part] = {};
+    current = current[part] as Record<string, unknown>;
+  }
+  const leaf = parts.at(-1);
+  if (leaf) current[leaf] = value;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function capturePreCreate(): {
+  listeners: Array<
+    (
+      actor: {
+        type?: string;
+        system?: unknown;
+        updateSource?: (data: Record<string, unknown>) => unknown;
+      },
+      data?: unknown,
+    ) => void
+  >;
+} {
+  const { foundry } = createMockFoundry();
+  const listeners: Array<
+    (
+      actor: {
+        type?: string;
+        system?: unknown;
+        updateSource?: (data: Record<string, unknown>) => unknown;
+      },
+      data?: unknown,
+    ) => void
+  > = [];
+  registerPivotFantasySystem({
+    Hooks: {
+      on(event, callback) {
+        if (event === "preCreateActor") listeners.push(callback as (typeof listeners)[number]);
+      },
+      once() {},
+    },
+    CONFIG: {
+      Actor: { dataModels: {}, trackableAttributes: {} },
+      Item: { dataModels: {} },
+    },
+    foundry,
+  });
+  return { listeners };
+}
+
+function importedActor(hp: { value: unknown; max: unknown }, type = "character") {
+  const updateSource = vi.fn();
+  return {
+    updateSource,
+    actor: {
+      type,
+      system: { survivalVersion: 1, attributes: { hp } },
+      updateSource,
+    },
+  };
+}
+
+function runPreCreate(
+  listeners: Array<
+    (actor: { updateSource?: (data: Record<string, unknown>) => unknown }, data?: unknown) => void
+  >,
+  actor: { updateSource?: (data: Record<string, unknown>) => unknown },
+  data?: unknown,
+): void {
+  for (const listener of listeners) listener(actor, data);
+}
