@@ -508,6 +508,43 @@ describe("Import Pivot character button", () => {
     expect(dialog.note).toBe("Not checked against the character generator.");
   });
 
+  it("leaves a user who is not in the active list out of the player list", async () => {
+    installFoundry();
+    const contents = [
+      { id: "ada", name: "Ada", role: 1, active: true },
+      { id: "bea", name: "Bea", role: 1, active: true },
+      { id: "ken", name: "Ken", role: 4, active: true },
+    ];
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      users: {
+        contents,
+        filter: (predicate: (user: { id?: string; active?: boolean }) => boolean) =>
+          contents.filter((user) => user.id !== "bea" && predicate(user)),
+      },
+    };
+    const dialog = openDialog();
+    const context = await dialog._prepareContext?.();
+    expect(context?.users?.map((user) => user.id)).toEqual(["ada", "ken"]);
+  });
+
+  it("leaves a user Foundry marks inactive out of the player list", async () => {
+    installFoundry();
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      users: {
+        contents: [
+          { id: "ada", name: "Ada", role: 1, active: true },
+          { id: "bea", name: "Bea", role: 1, active: false },
+          { id: "ken", name: "Ken", role: 4 },
+        ],
+      },
+    };
+    const dialog = openDialog();
+    const context = await dialog._prepareContext?.();
+    expect(context?.users?.map((user) => user.id)).toEqual(["ada", "ken"]);
+  });
+
   it("leaves a role of None out of the player list", async () => {
     installFoundry();
     (globalThis as { CONST?: { USER_ROLES?: { NONE?: number } } }).CONST = {

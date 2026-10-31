@@ -49,7 +49,8 @@ function withoutHp(): JsonRecord {
 function install(options: {
   isGM?: boolean;
   userId?: string;
-  users?: { id: string; name: string; role?: number }[];
+  users?: { id: string; name: string; role?: number; active?: boolean }[];
+  activeIds?: string[];
   packs?: unknown[];
   embed?: () => unknown;
   deleteFails?: boolean;
@@ -81,6 +82,15 @@ function install(options: {
       get(id: string) {
         return users.find((user) => user.id === id);
       },
+      ...(options.activeIds
+        ? {
+            filter(predicate: (user: (typeof users)[number]) => boolean) {
+              return users.filter(
+                (user) => options.activeIds?.includes(user.id) && predicate(user),
+              );
+            },
+          }
+        : {}),
     },
     packs: options.packs ?? [],
     actors: { get: () => undefined },
@@ -105,7 +115,160 @@ afterEach(() => {
   host.game = prior.game;
   host.Actor = prior.Actor;
   host.CONST = prior.CONST;
+  delete (globalThis as { foundry?: unknown }).foundry;
+  importDialogs.length = 0;
 });
+
+const WITNESS_CASES: Array<{
+  field: string;
+  warning: string;
+  change: (computed: JsonRecord) => void;
+  stored: (actor: CreatedActor) => void;
+}> = [
+  {
+    field: "AC",
+    warning: "AC: file 16, rules 10",
+    change: (computed) => {
+      computed.ac = 10;
+    },
+    stored: (actor) => {
+      const bonus = (actor.system.attributes as { ac: { bonus: number } } | undefined)?.ac.bonus;
+      expect(bonus).toBe(4);
+      const context = prepareCharacterSheetContext({
+        name: actor.name,
+        type: actor.type,
+        system: actor.system,
+        items: [],
+      });
+      expect(context.derived.armourClass.value).toBe(16);
+    },
+  },
+  {
+    field: "HP",
+    warning: "HP: file 12, rules 1",
+    change: (computed) => {
+      computed.hp = 1;
+    },
+    stored: (actor) => {
+      const hp = (actor.system.attributes as { hp: { value: number; max: number } } | undefined)
+        ?.hp;
+      expect(hp).toEqual({ temp: 0, value: 12, max: 12 });
+    },
+  },
+  {
+    field: "Pool",
+    warning: "Pool: file 1, rules 4",
+    change: (computed) => {
+      computed.pool = 4;
+    },
+    stored: (actor) => {
+      const pool = (
+        actor.system.resources as { pool: { value: number; maxBonus: number } } | undefined
+      )?.pool;
+      expect(pool).toEqual({ value: 1, maxBonus: 0 });
+      const context = prepareCharacterSheetContext({
+        name: actor.name,
+        type: actor.type,
+        system: actor.system,
+        items: [],
+      });
+      expect(context.derived.pool.max).toBe(1);
+    },
+  },
+  {
+    field: "MP max",
+    warning: "MP max: file null, rules 9",
+    change: (computed) => {
+      computed.mp = 9;
+    },
+    stored: (actor) => {
+      const mp = (actor.system.magic as { mp: { value: number; maxBonus: number } } | undefined)
+        ?.mp;
+      expect(mp).toEqual({ value: 0, maxBonus: 0 });
+      const context = prepareCharacterSheetContext({
+        name: actor.name,
+        type: actor.type,
+        system: actor.system,
+        items: [],
+      });
+      expect(context.derived.magic.mp.max).toBe(0);
+    },
+  },
+  {
+    field: "Speed",
+    warning: "Speed: file 10, rules 6",
+    change: (computed) => {
+      computed.speed = 6;
+    },
+    stored: (actor) => {
+      const speed = (
+        actor.system.attributes as { speed: { value: number; bonus: number } } | undefined
+      )?.speed;
+      expect(speed).toEqual({ value: 10, bonus: 0 });
+      const context = prepareCharacterSheetContext({
+        name: actor.name,
+        type: actor.type,
+        system: actor.system,
+        items: [],
+      });
+      expect(context.derived.speed).toBe(10);
+    },
+  },
+];
+
+const importDialogs: Array<{
+  warnings?: string[];
+  constructor: {
+    onPreview?: (this: unknown, event: Event, form: HTMLFormElement) => Promise<void>;
+  };
+}> = [];
+
+class ImportApplicationV2 {
+  constructor() {
+    importDialogs.push(this as unknown as (typeof importDialogs)[number]);
+  }
+
+  render(): void {}
+}
+
+function installImportFoundry(): void {
+  (globalThis as { foundry?: unknown }).foundry = {
+    applications: {
+      api: {
+        ApplicationV2: ImportApplicationV2,
+        HandlebarsApplicationMixin: (base: new (...args: never[]) => object) =>
+          class extends base {},
+      },
+    },
+  };
+}
+
+function openImportDialog(): (typeof importDialogs)[number] {
+  let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+  registerImportButton({
+    on(_event, next) {
+      handler = next;
+    },
+  });
+  const html = directory();
+  handler?.(null, html);
+  const button = html.querySelector("[data-pivot-import]");
+  const ViewEvent = html.ownerDocument.defaultView?.Event;
+  if (!button || !ViewEvent) throw new Error("missing import button");
+  button.dispatchEvent(new ViewEvent("click", { bubbles: true, cancelable: true }));
+  const dialog = importDialogs.at(-1);
+  if (!dialog) throw new Error("missing import dialog");
+  return dialog;
+}
+
+function importFileForm(fileText: string): HTMLFormElement {
+  return {
+    querySelector(selector: string) {
+      if (selector.includes("file")) return { files: [{ text: async () => fileText }] };
+      return { value: "player-1" };
+    },
+  } as unknown as HTMLFormElement;
+}
 
 describe("createFromFile", () => {
   it.each([
@@ -380,6 +543,54 @@ describe("createFromFile", () => {
     expect(world.create).toHaveBeenCalledTimes(1);
   });
 
+  it("creates when the active owner is a GM", async () => {
+    host.CONST = { USER_ROLES: { NONE: 0, GAMEMASTER: 4 } };
+    const world = install({
+      isGM: true,
+      userId: "gm-1",
+      users: [{ id: "gm-1", name: "Ken", role: 4, active: true }],
+      activeIds: ["gm-1"],
+    });
+    const created = await createFromFile(veteran, "gm-1");
+    expect(created.ok).toBe(true);
+    expect(world.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not create when the owner is not in the active user list", async () => {
+    const world = install({
+      isGM: true,
+      users: [
+        { id: "player-1", name: "Ada", role: 1, active: true },
+        { id: "away", name: "Bea", role: 1, active: true },
+      ],
+      activeIds: ["player-1"],
+    });
+    const created = await createFromFile(veteran, "away");
+    expect(created.ok).toBe(false);
+    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
+    expect(world.create).not.toHaveBeenCalled();
+
+    const present = await createFromFile(veteran, "player-1");
+    expect(present.ok).toBe(true);
+  });
+
+  it("does not create when Foundry marks the owner inactive", async () => {
+    const world = install({
+      isGM: true,
+      users: [
+        { id: "player-1", name: "Ada", role: 1, active: true },
+        { id: "away", name: "Bea", role: 1, active: false },
+      ],
+    });
+    const created = await createFromFile(veteran, "away");
+    expect(created.ok).toBe(false);
+    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
+    expect(world.create).not.toHaveBeenCalled();
+
+    const present = await createFromFile(veteran, "player-1");
+    expect(present.ok).toBe(true);
+  });
+
   it("does not create when the owner role is None", async () => {
     host.CONST = { USER_ROLES: { NONE: 0, GAMEMASTER: 4 } };
     const world = install({
@@ -546,6 +757,39 @@ describe("createFromFile", () => {
     expect(second).toEqual({ ok: true, value: { actorId: "actor-2" } });
     expect(world.create).toHaveBeenCalledTimes(2);
   });
+});
+
+describe("deriveComputed version 1 disagreements", () => {
+  it.each(WITNESS_CASES)(
+    "$field warning names the file value and the derived value, and the actor keeps the file value",
+    async ({ warning, change, stored }) => {
+      const world = install({ isGM: true });
+      const rules = structuredClone((veteran as { computed: JsonRecord }).computed);
+      change(rules);
+      const deriveComputed = vi.fn(() => structuredClone(rules));
+      const game = host.game as { modules?: unknown; pivot?: unknown };
+      game.modules = {
+        get: (id: string) =>
+          id === "pivot-chargen"
+            ? { active: true, api: { deriveComputed, deriveComputedVersion: 1 } }
+            : undefined,
+      };
+      game.pivot = { validate };
+      installImportFoundry();
+      const dialog = openImportDialog();
+      const form = importFileForm(JSON.stringify(veteran));
+
+      await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+      expect(deriveComputed).toHaveBeenCalledTimes(1);
+      expect(dialog.warnings).toEqual([warning]);
+
+      const created = await createFromFile(veteran, "player-1");
+      expect(created.ok).toBe(true);
+      const actor = world.actors[0];
+      if (!actor) throw new Error("missing actor");
+      stored(actor);
+    },
+  );
 });
 
 describe("readPrepared", () => {
