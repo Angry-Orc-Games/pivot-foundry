@@ -43,7 +43,7 @@ The current character sheet stores player-editable source data under `Actor.syst
 - Weapons, armour, equipment, features/flaws/background/species notes, magic streams, and magic abilities are embedded Items. Each Item type stores `schemaVersion` and a whitelisted `effects` array.
 - Ability modifiers, proficiency bonus, saves, skill totals, passive perception, Pool maximum, MP maximum, AC, initiative, speed, carried weight, derived proficiencies, and weapon BTH/BTD are calculated in `src/rules/character-derived.ts`. Embedded Item effects are aggregated in `src/rules/effects.ts` and passed into that derived calculation. Source ability scores and manual bonuses are not rewritten.
 
-Named migration M001 treats missing/`0` `schemaVersion` as legacy and persists the current version `1`. It does not persist derived totals. Malformed documents fail individually and are logged; they are not repaired silently. Reading stored `schemaVersion` uses public `document.toObject()` with `_source.system` as a fallback so TypeDataModel `initial: 1` defaults cannot hide legacy documents.
+Named migration M001 treats missing/`0` `schemaVersion` as legacy and persists the current version `1`. It does not persist derived totals. Malformed documents fail individually and are logged; they are not repaired silently. Foundry copies a TypeDataModel `initial` into `_source` and `toObject()`, so `schemaVersion` initial is the legacy sentinel `0`, not the current version. Fresh Actor and Item creation stamps the current version in `preCreate`.
 
 ## Review Hotspots
 

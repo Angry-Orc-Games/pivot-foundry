@@ -1,5 +1,5 @@
 import { abilities, canonicalSkills } from "../config";
-import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
+import { LEGACY_SCHEMA_VERSION } from "../rules/schema-version";
 import { abilityModifier } from "../rules/modifiers";
 import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
 import {
@@ -73,7 +73,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
           required: true,
           integer: true,
           min: 0,
-          initial: CURRENT_SCHEMA_VERSION,
+          initial: LEGACY_SCHEMA_VERSION,
         }),
         identity: schemaField(fields, {
           player: stringField(fields, { required: true, initial: "" }),

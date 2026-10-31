@@ -54,6 +54,13 @@ export interface FoundryHooks {
       updateSource?: (data: Record<string, unknown>) => unknown;
     }) => void,
   ): void;
+  on?(
+    event: "preCreateItem",
+    callback: (item: {
+      system?: unknown;
+      updateSource?: (data: Record<string, unknown>) => unknown;
+    }) => void,
+  ): void;
   on?(event: "createActor", callback: (actor: unknown) => void): void;
   on?(
     event: "preUpdateActor",
