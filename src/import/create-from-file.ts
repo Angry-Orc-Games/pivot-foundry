@@ -13,9 +13,19 @@ interface CreatedActor {
   createEmbeddedDocuments?: (type: string, data: unknown[]) => Promise<unknown>;
 }
 
+interface WorldUser {
+  id?: unknown;
+  name?: unknown;
+  role?: unknown;
+  active?: unknown;
+}
+
 interface GameHost {
   user?: { id?: string; isGM?: boolean };
-  users?: { get?: (id: string) => { name?: unknown; role?: unknown } | undefined };
+  users?: {
+    get?: (id: string) => WorldUser | undefined;
+    filter?: (predicate: (user: WorldUser) => boolean) => WorldUser[];
+  };
   packs?: unknown;
 }
 
@@ -40,7 +50,7 @@ export async function createFromFile(
   if (!parsed.ok) return parsed;
 
   const game = readGame();
-  if (game?.user?.isGM !== true) {
+  if (!game || game.user?.isGM !== true) {
     return { ok: false, error: { code: "forbidden", message: IMPORT_MESSAGES.forbidden } };
   }
   if (ownerUserId.length === 0) {
@@ -55,7 +65,7 @@ export async function createFromFile(
   }
 
   const owner = game.users?.get?.(ownerUserId);
-  if (!owner || !choosableOwner(owner)) {
+  if (!owner || !choosableOwner(owner, game)) {
     return {
       ok: false,
       error: {
@@ -116,8 +126,19 @@ export async function createFromFile(
   return { ok: true, value: { actorId } };
 }
 
-function choosableOwner(user: { role?: unknown }): boolean {
-  return typeof user.role !== "number" || user.role !== noneRole();
+function choosableOwner(user: WorldUser, game: GameHost): boolean {
+  if (typeof user.role === "number" && user.role === noneRole()) return false;
+  if (user.active === false) return false;
+  const active = activeUsers(game);
+  if (!active) return true;
+  return typeof user.id === "string" && active.some((candidate) => candidate.id === user.id);
+}
+
+function activeUsers(game: GameHost): WorldUser[] | undefined {
+  const filter = game.users?.filter;
+  if (typeof filter !== "function") return undefined;
+  const active = filter((user) => user.active === true);
+  return Array.isArray(active) ? active : [];
 }
 
 function noneRole(): number {
