@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { deathSaveDialog } from "../../src/runtime/death-saves";
-import { readSurvival, type HealthActor } from "../../src/runtime/health";
+import { readSurvival, type SurvivalActor } from "../../src/runtime/survival-transaction";
 import { applyHealth } from "../../src/rules/survival";
 afterEach(() => vi.unstubAllGlobals());
 function setup(uuid = "Actor.death", hp = 0, status = "dying") {
-  const actor: HealthActor = {
+  const actor: SurvivalActor = {
     uuid,
     name: "Hero",
     type: "character",

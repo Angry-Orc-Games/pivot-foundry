@@ -6,11 +6,11 @@ import {
   validAmount,
   type SurvivalStatus,
 } from "../rules/survival";
-import { busyHealthActors, readSurvival, survivalUpdate, type HealthActor } from "./health";
+import { readSurvival, survivalLocks, survivalUpdate, type SurvivalActor } from "./survival-transaction";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 import { promptRollMode } from "../sheets/character-sheet";
-const busy = busyHealthActors;
-export async function deathSaveDialog(actor: HealthActor): Promise<void> {
+const busy = survivalLocks;
+export async function deathSaveDialog(actor: SurvivalActor): Promise<void> {
   if (!actor.uuid || busy.has(actor.uuid) || actor.isOwner !== true) return;
   busy.add(actor.uuid);
   try {
@@ -53,7 +53,7 @@ export async function deathSaveDialog(actor: HealthActor): Promise<void> {
     busy.delete(actor.uuid);
   }
 }
-export async function correctSurvivalDialog(actor: HealthActor): Promise<void> {
+export async function correctSurvivalDialog(actor: SurvivalActor): Promise<void> {
   if (runtime().game?.user?.isGM !== true) return;
   const s = readSurvival(actor);
   const next = await prompt(
@@ -102,7 +102,7 @@ export async function correctSurvivalDialog(actor: HealthActor): Promise<void> {
     busy.delete(actor.uuid);
   }
 }
-export async function clearTempHpDialog(actor: HealthActor): Promise<void> {
+export async function clearTempHpDialog(actor: SurvivalActor): Promise<void> {
   if (actor.isOwner !== true) return;
   const approved = await prompt("ClearTemp", `<p>${localize("ClearTempHelp")}</p>`, () => true);
   if (!approved || !actor.uuid || busy.has(actor.uuid)) return;

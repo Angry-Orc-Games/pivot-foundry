@@ -1,13 +1,12 @@
 import { SYSTEM_ID } from "../config";
 import type { DamagePayload } from "./damage-roll";
+import { applyHealth, effectiveSurvival, validAmount, type HealthKind } from "../rules/survival";
 import {
-  healthTargetLabel,
-  healthTransactions,
   readSurvival,
-  uniqueHealthTargets,
-  type HealthActor,
-} from "./health";
-import { effectiveSurvival, validAmount } from "../rules/survival";
+  runSurvivalTransaction,
+  type SurvivalActor,
+  type SurvivalOutcome,
+} from "./survival-transaction";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 interface MessageLike {
   id?: string;
@@ -35,19 +34,19 @@ export function readDamagePayload(message: MessageLike): DamagePayload | null {
     actorUuid: p.actorUuid,
   };
 }
-function targets(): HealthActor[] {
+function targets(): SurvivalActor[] {
   const globals = globalThis as unknown as {
-    canvas?: { tokens?: { controlled?: Array<{ actor?: HealthActor }> } };
-    game?: { user?: { targets?: Iterable<{ actor?: HealthActor }> } };
+    canvas?: { tokens?: { controlled?: Array<{ actor?: SurvivalActor }> } };
+    game?: { user?: { targets?: Iterable<{ actor?: SurvivalActor }> } };
   };
   return [
     ...(globals.canvas?.tokens?.controlled ?? []),
     ...Array.from(globals.game?.user?.targets ?? []),
   ].flatMap((token) => (token.actor ? [token.actor] : []));
 }
-async function resolveActor(uuid: string): Promise<HealthActor | null> {
+async function resolveActor(uuid: string): Promise<SurvivalActor | null> {
   const globals = globalThis as unknown as {
-    fromUuid?: (uuid: string) => Promise<HealthActor | null>;
+    fromUuid?: (uuid: string) => Promise<SurvivalActor | null>;
   };
   return uuid ? ((await globals.fromUuid?.(uuid)) ?? null) : null;
 }
@@ -86,7 +85,7 @@ export async function previewHealth(
   kind: "damage" | "healing" | "temp",
   amount: number,
   critical: boolean,
-  self: HealthActor | null,
+  self: SurvivalActor | null,
   revalidate: () => boolean = () => true,
 ): Promise<void> {
   const actors = uniqueHealthTargets([...(self ? [self] : []), ...targets()]);
@@ -120,13 +119,13 @@ export async function previewHealth(
   }
   const selected = actors.filter((_actor, index) => preview.selected.includes(index));
   // Resolve identities again after the dialog: never use DOM-supplied actor IDs.
-  const refreshed: HealthActor[] = [];
+  const refreshed: SurvivalActor[] = [];
   for (const actor of selected) {
     const current = await resolveActor(actor.uuid ?? "");
     if (current) refreshed.push(current);
     else warn("MissingTarget");
   }
-  const results = await healthTransactions.apply(
+  const results = await healthApplications.apply(
     operation,
     refreshed,
     kind,
@@ -151,7 +150,7 @@ export async function previewHealth(
     warn("ReportFailed");
   }
 }
-export async function tempHpDialog(actor: HealthActor): Promise<void> {
+export async function tempHpDialog(actor: SurvivalActor): Promise<void> {
   const amount = await prompt(
     "Temp",
     `<label>${localize("Amount")} <input type="number" name="amount" min="0" step="1" value="0"></label>`,
@@ -182,10 +181,70 @@ export function messagePayloadUnchanged(id: string, expected: DamagePayload): bo
   );
 }
 
-export function targetPreviewRow(actor: HealthActor, index: number, checked: boolean): string {
+export function targetPreviewRow(actor: SurvivalActor, index: number, checked: boolean): string {
   const name = escapeHtml(healthTargetLabel(actor));
   if (actor.isOwner !== true)
     return `<label><input type="checkbox" disabled>${name} — ${escapeHtml(localize("denied"))}</label>`;
   const state = effectiveSurvival(readSurvival(actor));
   return `<label><input type="checkbox" name="target" value="${index}" ${checked ? "checked" : ""}>${name} — HP ${state.hp}/${state.max}, ${localize("Temp")} ${state.temp} (${escapeHtml(localize(state.status))})</label>`;
 }
+
+export function uniqueHealthTargets(actors: SurvivalActor[]): SurvivalActor[] {
+  const seen = new Set<string>();
+  return actors.filter((actor) => {
+    if (actor.type !== "character" || !actor.uuid || seen.has(actor.uuid)) return false;
+    seen.add(actor.uuid);
+    return true;
+  });
+}
+
+export function healthTargetLabel(actor: SurvivalActor): string {
+  const tokenName = actor.token?.name;
+  return tokenName && tokenName !== actor.name ? `${tokenName} (${actor.name})` : actor.name;
+}
+
+type ApplicationOutcome = "updated" | "denied" | "duplicate" | "failed";
+const APPLICATION_OUTCOMES: Record<SurvivalOutcome, ApplicationOutcome> = {
+  updated: "updated",
+  busy: "duplicate",
+  denied: "denied",
+  // The source chat card changed under the preview: the application no longer stands.
+  changed: "denied",
+  invalid: "failed",
+  cancelled: "failed",
+  failed: "failed",
+};
+
+/** One chat application across its chosen Characters, one Survival transaction each. */
+export class HealthApplications {
+  private attempted = new Set<string>();
+  async apply(
+    operation: string,
+    actors: SurvivalActor[],
+    kind: HealthKind,
+    amount: number,
+    critical = false,
+    tempChoice?: "keep" | "replace",
+    revalidate: () => boolean = () => true,
+  ): Promise<Array<{ actor: SurvivalActor; outcome: ApplicationOutcome }>> {
+    if (!operation || !validAmount(amount)) throw new RangeError("Invalid application");
+    const results: Array<{ actor: SurvivalActor; outcome: ApplicationOutcome }> = [];
+    for (const actor of uniqueHealthTargets(actors)) {
+      const key = JSON.stringify([operation, actor.uuid]);
+      if (this.attempted.has(key)) {
+        results.push({ actor, outcome: "duplicate" });
+        continue;
+      }
+      const { outcome, after } = await runSurvivalTransaction(
+        actor,
+        (state) => ({ next: applyHealth(state, kind, amount, critical, tempChoice) }),
+        { stillValid: revalidate },
+      );
+      // A write was sent (even if rejected): repeat clicks must not apply it again.
+      if (after) this.attempted.add(key);
+      results.push({ actor, outcome: APPLICATION_OUTCOMES[outcome] });
+    }
+    return results;
+  }
+}
+export const healthApplications = new HealthApplications();

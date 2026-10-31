@@ -1,4 +1,4 @@
-import { readSurvival } from "../runtime/health";
+import { readSurvival } from "../runtime/survival-transaction";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";

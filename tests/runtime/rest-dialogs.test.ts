@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { busyHealthActors } from "../../src/runtime/health";
+import { survivalLocks } from "../../src/runtime/survival-transaction";
 import { longRestDialog, shortRestDialog } from "../../src/runtime/rest-dialogs";
 import type { ActorLike } from "../../src/sheets/character-sheet";
 
@@ -14,7 +14,7 @@ vi.mock("../../src/runtime/roll-progress", () => ({
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  busyHealthActors.clear();
+  survivalLocks.clear();
   progressClose.mockClear();
 });
 
@@ -112,17 +112,17 @@ it("does not overwrite damage that lands while the rest dialog is open", async (
 
 it("does not start while another HP action holds the actor", async () => {
   const { actor, warn } = setup(10, "alive", [{ poolSpendsRaw: "1", inDanger: false }]);
-  busyHealthActors.add("Actor.rest");
+  survivalLocks.add("Actor.rest");
   await shortRestDialog(actor);
   expect(actor.update).not.toHaveBeenCalled();
   expect(warn).toHaveBeenCalledWith("PIVOT.Rest.Unavailable");
-  expect(busyHealthActors.has("Actor.rest")).toBe(true);
+  expect(survivalLocks.has("Actor.rest")).toBe(true);
 });
 
 it("releases the actor lock after the rest", async () => {
   const { actor } = setup(10, "alive", [{ poolSpendsRaw: "1", inDanger: false }]);
   await shortRestDialog(actor);
-  expect(busyHealthActors.has("Actor.rest")).toBe(false);
+  expect(survivalLocks.has("Actor.rest")).toBe(false);
 });
 
 it("closes the progress dialog when the hit die cannot be rolled", async () => {

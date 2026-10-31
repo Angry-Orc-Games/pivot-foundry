@@ -16,7 +16,7 @@ import {
   validateSurvival,
   type SurvivalState,
 } from "../rules/survival";
-import { busyHealthActors, readSurvival, survivalUpdate } from "./health";
+import { readSurvival, survivalLocks, survivalUpdate } from "./survival-transaction";
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
@@ -107,11 +107,11 @@ function restSnapshot(actor: ActorLike): string {
 }
 
 function lockRest(actor: ActorLike): string | null {
-  if (!actor.uuid || busyHealthActors.has(actor.uuid) || !restableSurvival(actor)) {
+  if (!actor.uuid || survivalLocks.has(actor.uuid) || !restableSurvival(actor)) {
     warnRest("Unavailable");
     return null;
   }
-  busyHealthActors.add(actor.uuid);
+  survivalLocks.add(actor.uuid);
   return actor.uuid;
 }
 
@@ -132,7 +132,7 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   try {
     await runShortRest(actor, ctx);
   } finally {
-    busyHealthActors.delete(lock);
+    survivalLocks.delete(lock);
   }
 }
 
@@ -303,7 +303,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
   try {
     await runLongRest(actor, ctx);
   } finally {
-    busyHealthActors.delete(lock);
+    survivalLocks.delete(lock);
   }
 }
 
