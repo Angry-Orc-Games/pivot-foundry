@@ -1,4 +1,5 @@
 import { abilityModifier } from "./modifiers";
+import { validateSurvival, type SurvivalState } from "./survival";
 
 function assertNonNegativeInteger(value: number, name: string): void {
   if (!Number.isInteger(value) || value < 0) {
@@ -199,4 +200,18 @@ export function parsePoolSpends(raw: string, max: number): number | null {
   if (parsed < 1) return null;
 
   return Math.min(parsed, max);
+}
+
+/**
+ * A rest heals through the survival rules, so it needs an effective survival state those
+ * rules can heal: not Dead, not Unconfirmed, and internally consistent.
+ */
+export function canRest(state: SurvivalState): boolean {
+  if (state.status === "dead" || state.status === "unconfirmed") return false;
+  try {
+    validateSurvival(state);
+    return true;
+  } catch {
+    return false;
+  }
 }

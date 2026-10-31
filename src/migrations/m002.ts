@@ -1,5 +1,5 @@
 import {
-  reconcileSurvival,
+  effectiveSurvival,
   SURVIVAL_STATUSES,
   validAmount,
   type SurvivalState,
@@ -43,7 +43,7 @@ export function planSurvivalMigration(source: unknown): MigrationPlan {
         typeof hp?.value === "number" && hp.value > 0 ? "alive" : "unconfirmed";
   }
   const stored = readStoredSurvival(system);
-  const reconciled = reconcileSurvival(stored);
+  const reconciled = effectiveSurvival(stored);
   if (
     reconciled.status !== stored.status ||
     reconciled.successes !== stored.successes ||

@@ -1,74 +1,61 @@
 import { dicePoolForRollMode, d20PoolFormula, selectKeptD20 } from "../rules/d20-roll";
 import {
-  reconcileSurvival,
+  correctSurvival,
+  DyingAboveZeroError,
   resolveDeathSave,
   SURVIVAL_STATUSES,
-  validateSurvival,
-  validAmount,
   type SurvivalStatus,
 } from "../rules/survival";
-import { busyHealthActors, readSurvival, survivalUpdate, type HealthActor } from "./health";
+import { runSurvivalTransaction, type SurvivalActor } from "./survival-transaction";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 import { promptRollMode } from "../sheets/character-sheet";
 import { waitForDiceSoNiceAnimation } from "./dice-so-nice";
 
-const busy = busyHealthActors;
-export async function deathSaveDialog(actor: HealthActor): Promise<void> {
-  if (!actor.uuid || busy.has(actor.uuid) || actor.isOwner !== true) return;
-  busy.add(actor.uuid);
-  try {
-    const source = readSurvival(actor);
-    resolveDeathSave(source, 10); // Validate availability before consuming dice.
-    const mode = await promptRollMode();
-    if (!mode) return;
+export async function deathSaveDialog(actor: SurvivalActor): Promise<void> {
+  let faces: number[] = [];
+  let natural = 0;
+  let mode = "";
+  let rolled: unknown = null;
+  const { outcome, after } = await runSurvivalTransaction(actor, async (state) => {
+    resolveDeathSave(state, 10); // Validate availability before consuming dice.
+    const chosen = await promptRollMode();
     const Roll = runtime().Roll;
-    if (!Roll) return;
-    const pool = dicePoolForRollMode(mode);
+    if (!chosen || !Roll) return null;
+    mode = chosen;
+    const pool = dicePoolForRollMode(chosen);
     const roll = new Roll(d20PoolFormula(pool.dieCount));
     await roll.evaluate();
-    const faces = (roll.dice ?? [])
+    rolled = roll;
+    faces = (roll.dice ?? [])
       .filter((d) => d.faces === 20)
       .flatMap((d) => (d.results ?? []).map((r) => r.result ?? 0));
-    const natural = selectKeptD20(faces, pool);
-    // A dialog/roll may outlive another client mutation. Do not overwrite a changed state.
-    const current = readSurvival(actor);
-    if (
-      actor.isOwner !== true ||
-      JSON.stringify(current) !== JSON.stringify(source) ||
-      !actor.update
-    ) {
-      warn("StateChanged");
-      return;
-    }
-    const next = resolveDeathSave(current, natural);
-    let message: unknown = null;
-    try {
-      message = await createChat({
-        speaker: { alias: actor.name },
-        content: `<h3>${escapeHtml(actor.name)} — ${localize("DeathSave")}</h3><p>${faces.join(", ")} → ${natural} (${escapeHtml(mode)})</p><p>${escapeHtml(localize(next.status))}: ${next.successes} / ${next.failures}</p><p>${localize("ManualConsequences")}</p>`,
-        rolls: [roll],
-      });
-      await waitForDiceSoNiceAnimation(message);
-    } catch {
-      warn("ReportFailed");
-    }
-    try {
-      await actor.update(survivalUpdate(next));
-    } catch {
-      warn("UpdateFailed");
-    }
+    natural = selectKeptD20(faces, pool);
+    return { next: resolveDeathSave(state, natural) };
+  });
+  if (outcome === "changed") warn("StateChanged");
+  if (outcome === "invalid" || outcome === "failed") warn("DeathFailed");
+  if (outcome !== "updated" || !after) return;
+  try {
+    const message = await createChat({
+      speaker: { alias: actor.name },
+      content: `<h3>${escapeHtml(actor.name)} — ${localize("DeathSave")}</h3><p>${faces.join(", ")} → ${natural} (${escapeHtml(mode)})</p><p>${escapeHtml(localize(after.status))}: ${after.successes} / ${after.failures}</p><p>${localize("ManualConsequences")}</p>`,
+      rolls: [rolled],
+    });
+    await waitForDiceSoNiceAnimation(message);
   } catch {
-    warn("DeathFailed");
-  } finally {
-    busy.delete(actor.uuid);
+    warn("ReportFailed");
   }
 }
-export async function correctSurvivalDialog(actor: HealthActor): Promise<void> {
+
+export async function correctSurvivalDialog(actor: SurvivalActor): Promise<void> {
   if (runtime().game?.user?.isGM !== true) return;
-  const s = readSurvival(actor);
-  const next = await prompt(
-    "Correction",
-    `<p>${localize("CorrectionHelp")}</p>
+  let dyingAboveZero = false;
+  const { outcome } = await runSurvivalTransaction(
+    actor,
+    async (s) => {
+      const requested = await prompt(
+        "Correction",
+        `<p>${localize("CorrectionHelp")}</p>
  <label>HP <input type="number" min="0" step="1" name="hp" value="${s.hp}"></label>
  <label>${localize("Temp")} <input type="number" min="0" step="1" name="temp" value="${s.temp}"></label>
  <label>${localize("Successes")} <input type="number" min="0" max="3" step="1" name="successes" value="${s.successes}"></label>
@@ -81,50 +68,34 @@ export async function correctSurvivalDialog(actor: HealthActor): Promise<void> {
        `<option value="${status}" ${status === s.status ? "selected" : ""}>${escapeHtml(localize(status))}</option>`,
    )
    .join("")}</select></label>`,
-    (form) => ({
-      ...s,
-      hp: Number(field(form, "hp")),
-      temp: Number(field(form, "temp")),
-      successes: Number(field(form, "successes")),
-      failures: Number(field(form, "failures")),
-      status: field(form, "status") as SurvivalStatus,
-    }),
+        (form) => ({
+          hp: Number(field(form, "hp")),
+          temp: Number(field(form, "temp")),
+          successes: Number(field(form, "successes")),
+          failures: Number(field(form, "failures")),
+          status: field(form, "status") as SurvivalStatus,
+        }),
+      );
+      if (!requested) return null;
+      try {
+        return { next: correctSurvival({ current: s, requested }) };
+      } catch (error) {
+        dyingAboveZero = error instanceof DyingAboveZeroError;
+        throw error;
+      }
+    },
+    { gmOnly: true },
   );
-  if (!next || !actor.uuid || busy.has(actor.uuid)) return;
-  busy.add(actor.uuid);
-  try {
-    if (
-      runtime().game?.user?.isGM !== true ||
-      actor.isOwner !== true ||
-      !actor.update ||
-      JSON.stringify(readSurvival(actor)) !== JSON.stringify(s)
-    )
-      throw Error("changed");
-    const legal = reconcileSurvival(next);
-    validateSurvival(legal);
-    if (legal.status === "stable" || legal.hp > 0) {
-      legal.successes = 0;
-      legal.failures = 0;
-    }
-    await actor.update(survivalUpdate(legal));
-  } catch {
+  if (dyingAboveZero) warn("DyingAboveZero");
+  else if (outcome !== "updated" && outcome !== "cancelled" && outcome !== "busy")
     warn("ApplyFailed");
-  } finally {
-    busy.delete(actor.uuid);
-  }
 }
-export async function clearTempHpDialog(actor: HealthActor): Promise<void> {
+
+export async function clearTempHpDialog(actor: SurvivalActor): Promise<void> {
   if (actor.isOwner !== true) return;
-  const approved = await prompt("ClearTemp", `<p>${localize("ClearTempHelp")}</p>`, () => true);
-  if (!approved || !actor.uuid || busy.has(actor.uuid)) return;
-  busy.add(actor.uuid);
-  try {
-    if (actor.isOwner !== true || !actor.update || !validAmount(readSurvival(actor).temp))
-      throw Error("denied");
-    await actor.update({ "system.attributes.hp.temp": 0 });
-  } catch {
-    warn("ApplyFailed");
-  } finally {
-    busy.delete(actor.uuid);
-  }
+  const { outcome } = await runSurvivalTransaction(actor, async (s) => {
+    const approved = await prompt("ClearTemp", `<p>${localize("ClearTempHelp")}</p>`, () => true);
+    return approved ? { next: { ...s, temp: 0 } } : null;
+  });
+  if (outcome !== "updated" && outcome !== "cancelled" && outcome !== "busy") warn("ApplyFailed");
 }

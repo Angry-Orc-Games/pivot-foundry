@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import { correctSurvivalDialog } from "../../src/runtime/death-saves";
-import { targetPreviewRow } from "../../src/runtime/health-dialog";
-import { HealthTransactions, type HealthActor } from "../../src/runtime/health";
+import { HealthApplications, targetPreviewRow } from "../../src/runtime/health-dialog";
+import type { SurvivalActor as HealthActor } from "../../src/runtime/survival-transaction";
 import { prepareCharacterSheetContext, type ActorLike } from "../../src/sheets/character-sheet";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -88,18 +88,18 @@ it("applies 3 damage, capped healing, and an exact correction, then keeps them o
   expect(lethalPreview).toContain("HP 0/10");
   expect(lethalPreview).toContain("(Dying)");
 
-  expect((await new HealthTransactions().apply("dmg", [actor], "damage", 3))[0]?.outcome).toBe(
+  expect((await new HealthApplications().apply("dmg", [actor], "damage", 3))[0]?.outcome).toBe(
     "updated",
   );
   expect(shownHp(actor)).toBe("7 / 10");
   expect(shownHp(reloaded(actor))).toBe("7 / 10");
 
-  expect((await new HealthTransactions().apply("heal", [actor], "healing", 5))[0]?.outcome).toBe(
+  expect((await new HealthApplications().apply("heal", [actor], "healing", 5))[0]?.outcome).toBe(
     "updated",
   );
   expect(shownHp(actor)).toBe("10 / 10");
   expect(
-    (await new HealthTransactions().apply("overheal", [actor], "healing", 5))[0]?.outcome,
+    (await new HealthApplications().apply("overheal", [actor], "healing", 5))[0]?.outcome,
   ).toBe("updated");
   expect(shownHp(reloaded(actor))).toBe("10 / 10");
 
@@ -109,7 +109,7 @@ it("applies 3 damage, capped healing, and an exact correction, then keeps them o
       <input name="temp" value="0" />
       <input name="successes" value="0" />
       <input name="failures" value="0" />
-      <input name="status" value="dying" />
+      <input name="status" value="alive" />
     </form>`,
   );
   const form = dom.window.document.querySelector("form");
@@ -139,7 +139,7 @@ it("does not revive a dead character when HP is already positive", async () => {
   };
   attributes.hp.value = 4;
   attributes.deathSaves.status = "dead";
-  expect((await new HealthTransactions().apply("dead", [actor], "healing", 3))[0]?.outcome).toBe(
+  expect((await new HealthApplications().apply("dead", [actor], "healing", 3))[0]?.outcome).toBe(
     "failed",
   );
   expect(shownHp(actor)).toBe("4 / 10");

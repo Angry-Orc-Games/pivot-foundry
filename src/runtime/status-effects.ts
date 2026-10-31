@@ -1,4 +1,4 @@
-import { type SurvivalStatus } from "../rules/survival";
+import { effectiveSurvival, type SurvivalState, type SurvivalStatus } from "../rules/survival";
 
 /**
  * Foundry VTT core status effect IDs for Unconscious and Dead.
@@ -13,17 +13,16 @@ export const FOUNDRY_STATUS_DEAD = "dead";
 export const SYSTEM_MANAGED_FLAG = "pivot-fantasy.systemManaged";
 
 /**
- * Derives which status effects should be active based on Character survival state.
+ * Derives which status effects should be active from the effective survival state.
  *
  * - **Unconscious**: Applied when at 0 HP and Dying or Stable
  * - **Dead**: Applied when Dead (replaces Unconscious)
  * - Neither: Applied when Conscious (HP > 0) or Unconfirmed
  *
- * @param hp - Current HP value
- * @param status - Current survival status
  * @returns Array of Foundry status effect IDs that should be active
  */
-export function deriveStatusEffects(hp: number, status: SurvivalStatus): string[] {
+export function deriveStatusEffects(stored: SurvivalState): string[] {
+  const { hp, status } = effectiveSurvival(stored);
   if (status === "dead") {
     return [FOUNDRY_STATUS_DEAD];
   }
@@ -51,7 +50,7 @@ export async function updateTokenStatusEffects(
     type: string;
     system?: {
       attributes?: {
-        hp?: { value?: number };
+        hp?: { value?: number; max?: number };
         deathSaves?: { status?: string };
       };
     };
@@ -69,10 +68,19 @@ export async function updateTokenStatusEffects(
   // Only the active GM should sync effects to avoid multi-client races
   if (game?.users?.activeGM?.isSelf !== true) return;
 
-  const hp = actor.system?.attributes?.hp?.value ?? 0;
+  const hp = actor.system?.attributes?.hp;
   const status = (actor.system?.attributes?.deathSaves?.status ?? "unconfirmed") as SurvivalStatus;
 
-  const desiredStatuses = new Set(deriveStatusEffects(hp, status));
+  const desiredStatuses = new Set(
+    deriveStatusEffects({
+      hp: hp?.value ?? 0,
+      max: hp?.max ?? 0,
+      temp: 0,
+      successes: 0,
+      failures: 0,
+      status,
+    }),
+  );
 
   // Find existing system-managed status effects ONLY
   // Never delete GM- or module-created effects that happen to use unconscious/dead status ids
