@@ -574,6 +574,28 @@ describe("createFromFile", () => {
     expect(present.ok).toBe(true);
   });
 
+  it("reads the active user list from the users collection", async () => {
+    const records = [
+      { id: "player-1", name: "Ada", role: 1, active: true },
+      { id: "away", name: "Bea", role: 1, active: true },
+    ];
+    const world = install({ isGM: true, users: records });
+    const users = (host.game as { users: { contents: typeof records } }).users;
+    users.filter = function (
+      this: { contents: typeof records },
+      predicate: (user: (typeof records)[number]) => boolean,
+    ) {
+      return this.contents.filter((user) => user.id !== "away" && predicate(user));
+    };
+    const created = await createFromFile(veteran, "away");
+    expect(created.ok).toBe(false);
+    if (!created.ok) expect(created.error.field).toBe("ownerUserId");
+    expect(world.create).not.toHaveBeenCalled();
+
+    const present = await createFromFile(veteran, "player-1");
+    expect(present.ok).toBe(true);
+  });
+
   it("does not create when Foundry marks the owner inactive", async () => {
     const world = install({
       isGM: true,

@@ -508,6 +508,28 @@ describe("Import Pivot character button", () => {
     expect(dialog.note).toBe("Not checked against the character generator.");
   });
 
+  it("reads the player list from the users collection", async () => {
+    installFoundry();
+    const contents = [
+      { id: "ada", name: "Ada", role: 1, active: true },
+      { id: "bea", name: "Bea", role: 1, active: true },
+      { id: "ken", name: "Ken", role: 4, active: true },
+    ];
+    const users = {
+      contents,
+      filter(
+        this: { contents: typeof contents },
+        predicate: (user: (typeof contents)[number]) => boolean,
+      ) {
+        return this.contents.filter((user) => user.id !== "bea" && predicate(user));
+      },
+    };
+    (globalThis as { game?: unknown }).game = { user: { isGM: true }, users };
+    const dialog = openDialog();
+    const context = await dialog._prepareContext?.();
+    expect(context?.users?.map((user) => user.id)).toEqual(["ada", "ken"]);
+  });
+
   it("leaves a user who is not in the active list out of the player list", async () => {
     installFoundry();
     const contents = [
