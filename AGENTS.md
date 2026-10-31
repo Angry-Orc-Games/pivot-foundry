@@ -46,3 +46,17 @@ Do not claim Cloud execution, GitHub CI, staging, production, or release publica
 `.cursor/environment.json` installs Node, Docker/Compose, and Playwright browsers. `install` and `start` do not boot Foundry. After a snapshot, use this checkout’s package (`npm ci`, `npm run build`) before `npm run foundry:up`.
 
 Runtime Secrets: `FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`, and optionally `FOUNDRY_RELEASE_CACHE_URL` + `FOUNDRY_RELEASE_SHA256`. Do not persist a timed `FOUNDRY_RELEASE_URL`. Do not load production deploy credentials onto Cloud Agents. Preview port **30000** through Cursor forwarding and confirm WebSocket connectivity, not just the first HTML page.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for Angry-Orc-Games/pivot-foundry via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
