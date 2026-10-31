@@ -634,9 +634,7 @@
         <div
           class="pf-pips"
           role="img"
-          aria-label="{{localize
-            'PIVOT.Fields.Successes'
-          }}: {{system.attributes.deathSaves.successes}}"
+          aria-label="{{localize 'PIVOT.Fields.Successes'}}: {{deathSaveSuccesses}}"
         >
           {{#each deathSaveSuccessPips}}
             {{#if this}}
@@ -652,9 +650,7 @@
         <div
           class="pf-pips"
           role="img"
-          aria-label="{{localize
-            'PIVOT.Fields.Failures'
-          }}: {{system.attributes.deathSaves.failures}}"
+          aria-label="{{localize 'PIVOT.Fields.Failures'}}: {{deathSaveFailures}}"
         >
           {{#each deathSaveFailurePips}}
             {{#if this}}
