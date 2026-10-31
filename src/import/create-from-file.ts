@@ -135,9 +135,9 @@ function choosableOwner(user: WorldUser, game: GameHost): boolean {
 }
 
 function activeUsers(game: GameHost): WorldUser[] | undefined {
-  const filter = game.users?.filter;
-  if (typeof filter !== "function") return undefined;
-  const active = filter((user) => user.active === true);
+  const users = game.users;
+  if (typeof users?.filter !== "function") return undefined;
+  const active = users.filter((user) => user.active === true);
   return Array.isArray(active) ? active : [];
 }
 

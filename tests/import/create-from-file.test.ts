@@ -580,7 +580,17 @@ describe("createFromFile", () => {
       { id: "away", name: "Bea", role: 1, active: true },
     ];
     const world = install({ isGM: true, users: records });
-    const users = (host.game as { users: { contents: typeof records } }).users;
+    const users = (
+      host.game as {
+        users: {
+          contents: typeof records;
+          filter?: (
+            this: { contents: typeof records },
+            predicate: (user: (typeof records)[number]) => boolean,
+          ) => typeof records;
+        };
+      }
+    ).users;
     users.filter = function (
       this: { contents: typeof records },
       predicate: (user: (typeof records)[number]) => boolean,
