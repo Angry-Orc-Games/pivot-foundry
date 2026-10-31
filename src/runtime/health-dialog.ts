@@ -7,7 +7,7 @@ import {
   uniqueHealthTargets,
   type HealthActor,
 } from "./health";
-import { validAmount } from "../rules/survival";
+import { survivalForDisplay, validAmount } from "../rules/survival";
 import { createChat, escapeHtml, field, localize, prompt, runtime, warn } from "./ui";
 interface MessageLike {
   id?: string;
@@ -186,6 +186,6 @@ export function targetPreviewRow(actor: HealthActor, index: number, checked: boo
   const name = escapeHtml(healthTargetLabel(actor));
   if (actor.isOwner !== true)
     return `<label><input type="checkbox" disabled>${name} — ${escapeHtml(localize("denied"))}</label>`;
-  const state = readSurvival(actor);
+  const state = survivalForDisplay(readSurvival(actor));
   return `<label><input type="checkbox" name="target" value="${index}" ${checked ? "checked" : ""}>${name} — HP ${state.hp}/${state.max}, ${localize("Temp")} ${state.temp} (${escapeHtml(localize(state.status))})</label>`;
 }

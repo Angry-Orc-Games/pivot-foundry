@@ -251,33 +251,30 @@ describe("calculateMagicAbilityModifier", () => {
 });
 
 describe("buildLongRestUpdate", () => {
+  const healed = {
+    hp: 20,
+    max: 20,
+    temp: 4,
+    successes: 0,
+    failures: 0,
+    status: "alive" as const,
+  };
+
   it("always clears temp HP to 0", () => {
-    const update = buildLongRestUpdate(10, 3, 5);
+    const update = buildLongRestUpdate(healed, 3, 5);
     expect(update["system.attributes.hp.temp"]).toBe(0);
   });
 
-  it("passes through HP from result", () => {
-    const update = buildLongRestUpdate(25, 4, 8);
-    expect(update["system.attributes.hp.value"]).toBe(25);
-  });
-
-  it("passes through Pool from result", () => {
-    const update = buildLongRestUpdate(10, 7, 5);
-    expect(update["system.resources.pool.value"]).toBe(7);
-  });
-
-  it("passes through MP from result unchanged", () => {
-    const update = buildLongRestUpdate(10, 3, 12);
-    expect(update["system.magic.mp.value"]).toBe(12);
-  });
-
-  it("builds correct update for typical long rest", () => {
-    const update = buildLongRestUpdate(20, 5, 10);
+  it("writes survival status with HP so the record stays consistent", () => {
+    const update = buildLongRestUpdate(healed, 5, 10);
     expect(update).toEqual({
       "system.attributes.hp.value": 20,
+      "system.attributes.hp.temp": 0,
+      "system.attributes.deathSaves.successes": 0,
+      "system.attributes.deathSaves.failures": 0,
+      "system.attributes.deathSaves.status": "alive",
       "system.resources.pool.value": 5,
       "system.magic.mp.value": 10,
-      "system.attributes.hp.temp": 0,
     });
   });
 });
