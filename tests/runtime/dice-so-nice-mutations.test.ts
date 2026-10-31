@@ -279,7 +279,7 @@ describe("Dice So Nice wait timeout", () => {
 });
 
 describe("Death save ordering", () => {
-  it("creates chat then waits then updates actor", async () => {
+  it("updates actor, then creates chat, then waits for dice", async () => {
     const callOrder: string[] = [];
 
     vi.stubGlobal("ChatMessage", {
@@ -333,7 +333,7 @@ describe("Death save ordering", () => {
 
     await deathSaveDialog(actor);
 
-    expect(callOrder).toEqual(["chat", "dice3d", "update"]);
+    expect(callOrder).toEqual(["update", "chat", "dice3d"]);
   });
 
   it("attaches roll with dice to death save chat message", async () => {
@@ -500,6 +500,7 @@ describe("Short rest ordering", () => {
 
     const actor = {
       uuid: "Actor.short-rest-order",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
@@ -569,6 +570,7 @@ describe("Short rest ordering", () => {
 
     const actor = {
       uuid: "Actor.short-rest-rolls",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
@@ -629,6 +631,7 @@ describe("Short Rest cancel is a clean no-op", () => {
 
     const actor = {
       uuid: "Actor.short-rest-cancel-fields",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
@@ -673,6 +676,7 @@ describe("Short Rest cancel is a clean no-op", () => {
 
     const actor = {
       uuid: "Actor.short-rest-cancel-string",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {

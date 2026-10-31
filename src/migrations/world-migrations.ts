@@ -1,3 +1,4 @@
+import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
@@ -20,7 +21,7 @@ export interface MigratableDocument {
   _source?: { system?: unknown; prototypeToken?: { actorLink?: unknown } };
   toObject?: () => { system?: unknown; prototypeToken?: { actorLink?: unknown } };
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
-  update?: (data: Record<string, unknown>) => Promise<unknown>;
+  update?: (data: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>;
 }
 
 export interface WorldMigrationGame {
@@ -166,7 +167,8 @@ async function persistMigration(
 
   try {
     if (!document.update) throw new Error("Document cannot be updated");
-    await document.update(plan.update);
+    // Migrations may repair survival fields; they write as a trusted survival writer.
+    await document.update(plan.update, { ...SURVIVAL_WRITE_OPTIONS });
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

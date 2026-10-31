@@ -1,6 +1,7 @@
 import type { ActorLike } from "../sheets/character-sheet";
 import {
   applyLongRestHpRecovery,
+  canRest,
   applyLongRestMpRecovery,
   applyLongRestPoolRecovery,
   applyShortRestMpRecovery,
@@ -10,13 +11,12 @@ import {
 } from "../rules/rest";
 import { abilityModifier } from "../rules/modifiers";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
+import { applyHealth, type SurvivalState } from "../rules/survival";
 import {
-  applyHealth,
-  reconcileSurvival,
-  validateSurvival,
-  type SurvivalState,
-} from "../rules/survival";
-import { busyHealthActors, readSurvival, survivalUpdate } from "./health";
+  runSurvivalTransaction,
+  type SurvivalChange,
+  type SurvivalTransactionResult,
+} from "./survival-transaction";
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
@@ -86,34 +86,33 @@ function warnRest(key: string): void {
 }
 
 /**
- * Rests change HP, so they share the health lock and refuse states the survival
- * rules cannot heal: Dead, unconfirmed legacy state, or an inconsistent record.
- * A stale HP / status pair is reconciled first, as damage and death saves do.
+ * Rests change HP, so each runs as one Survival transaction that also watches Pool and MP.
+ * The survival rules cannot heal a Dead, Unconfirmed, or inconsistent record.
  */
-function restableSurvival(actor: ActorLike): SurvivalState | null {
-  const survival = reconcileSurvival(readSurvival(actor));
-  if (survival.status === "dead" || survival.status === "unconfirmed") return null;
-  try {
-    validateSurvival(survival);
-  } catch {
-    return null;
-  }
-  return survival;
-}
-
-/** Everything a rest reads before its dialogs; any change means another write landed. */
-function restSnapshot(actor: ActorLike): string {
-  const ctx = extractRestContext(actor);
-  return JSON.stringify([readSurvival(actor), ctx?.poolCurrent, ctx?.mpCurrent]);
-}
-
-function lockRest(actor: ActorLike): string | null {
-  if (!actor.uuid || busyHealthActors.has(actor.uuid) || !restableSurvival(actor)) {
-    warnRest("Unavailable");
-    return null;
-  }
-  busyHealthActors.add(actor.uuid);
-  return actor.uuid;
+async function runRest(
+  actor: ActorLike,
+  rest: (state: SurvivalState) => Promise<SurvivalChange | null>,
+): Promise<SurvivalTransactionResult> {
+  const result = await runSurvivalTransaction(
+    actor,
+    async (state) => {
+      if (!canRest(state)) {
+        warnRest("Unavailable");
+        return null;
+      }
+      return rest(state);
+    },
+    {
+      watch: () => [
+        numberAt(actor.system, ["resources", "pool", "value"], 0),
+        numberAt(actor.system, ["magic", "mp", "value"], 0),
+      ],
+    },
+  );
+  if (result.outcome === "busy" || result.outcome === "denied") warnRest("Unavailable");
+  if (result.outcome === "changed") warnRest("StateChanged");
+  if (result.outcome === "invalid" || result.outcome === "failed") warnRest("RestFailed");
+  return result;
 }
 
 export async function shortRestDialog(actor: ActorLike): Promise<void> {
@@ -128,25 +127,22 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     return;
   }
 
-  const lock = lockRest(actor);
-  if (!lock) return;
-  try {
-    await runShortRest(actor, ctx);
-  } finally {
-    busyHealthActors.delete(lock);
-  }
+  await runShortRest(actor, ctx);
 }
 
 async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
-  const snapshot = restSnapshot(actor);
-
   const magicAbilityMod = calculateMagicAbilityModifier(ctx.awakened, ctx.magicAbilityScore);
 
   const maxSpends = ctx.poolCurrent;
+  let poolSpends = 0;
+  const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
+  const diceRolls: unknown[] = [];
+  let mpRecovered = 0;
 
-  const inputs = await prompt(
-    localizeRest("ShortRest"),
-    `<div>
+  const { outcome, before, after } = await runRest(actor, async (state) => {
+    const inputs = await prompt(
+      localizeRest("ShortRest"),
+      `<div>
       <p>${escapeHtml(localizeRest("ShortRestPrompt"))}</p>
       <label>${escapeHtml(localizeRest("PoolDiceToSpend"))} (${escapeHtml(localizeRest("Max"))}: ${maxSpends})<br>
         <input type="number" name="poolSpends" min="0" max="${maxSpends}" step="1" value="1">
@@ -159,118 +155,109 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
           : `<p><em>${escapeHtml(localizeRest("ShortRestNotAwakened"))}</em></p>`
       }
     </div>`,
-    (form) => {
-      const poolSpendsRaw = field(form, "poolSpends");
-      const inDanger = field(form, "inDanger") === "yes";
-      return { poolSpendsRaw, inDanger };
-    },
-    localizeRest("Confirm"),
-    { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
-  );
+      (form) => {
+        const poolSpendsRaw = field(form, "poolSpends");
+        const inDanger = field(form, "inDanger") === "yes";
+        return { poolSpendsRaw, inDanger };
+      },
+      localizeRest("Confirm"),
+      { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
+    );
 
-  // Cancel / dismiss must be a clean no-op (DialogV2 may return a string or partial object).
-  if (!inputs || typeof inputs !== "object") return;
-  if (typeof inputs.poolSpendsRaw !== "string") return;
+    // Cancel / dismiss must be a clean no-op (DialogV2 may return a string or partial object).
+    if (!inputs || typeof inputs !== "object") return null;
+    if (typeof inputs.poolSpendsRaw !== "string") return null;
 
-  const poolSpends = parsePoolSpends(inputs.poolSpendsRaw, maxSpends);
+    const spends = parsePoolSpends(inputs.poolSpendsRaw, maxSpends);
 
-  if (poolSpends === null) {
-    warnRest("RestFailed");
-    return;
-  }
-
-  const Roll = runtime().Roll;
-  if (!Roll) {
-    warnRest("RestFailed");
-    return;
-  }
-
-  let poolRemaining = ctx.poolCurrent;
-  let totalHealed = 0;
-  const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
-  const diceRolls: InstanceType<typeof Roll>[] = [];
-
-  const progress = rollProgress();
-  try {
-    for (let i = 0; i < poolSpends; i++) {
-      if (poolRemaining < 1) break;
-
-      const spendResult = applyShortRestPoolSpend({
-        die: ctx.hitDie,
-        poolCurrent: poolRemaining,
-        conMod: ctx.conMod,
-      });
-
-      poolRemaining = spendResult.poolRemaining;
-
-      const dieFormula = ctx.hitDie;
-      if (!parseExplodingFormula(dieFormula)) {
-        warnRest("RestFailed");
-        return;
-      }
-
-      const rollResult = await rollExploding(
-        dieFormula,
-        { critical: false, enhanced: false },
-        async (faces) => {
-          const die = new Roll(`1d${faces}`);
-          await progress.wait(die.evaluate());
-          diceRolls.push(die);
-          if (die.total === undefined) throw new Error("Incomplete");
-          return die.total;
-        },
-      );
-
-      if (!rollResult.complete || rollResult.total === null) {
-        warnRest("RollIncomplete");
-        return;
-      }
-
-      const dieTotal = rollResult.total;
-      const healedForThisDie = Math.max(0, dieTotal + ctx.conMod);
-      totalHealed += healedForThisDie;
-
-      diceResults.push({
-        faces: Number(ctx.hitDie.replace(/^d/, "")),
-        results: rollResult.chains[0]?.results ?? [],
-        total: healedForThisDie,
-      });
+    if (spends === null) {
+      warnRest("RestFailed");
+      return null;
     }
-  } catch {
-    warnRest("RestFailed");
-    return;
-  } finally {
-    progress.close();
-  }
+    poolSpends = spends;
 
-  const mpResult = applyShortRestMpRecovery({
-    awakened: ctx.awakened,
-    magicAbilityMod,
-    mpCurrent: ctx.mpCurrent,
-    mpMax: ctx.mpMax,
-    inDanger: inputs.inDanger,
-  });
+    const Roll = runtime().Roll;
+    if (!Roll) {
+      warnRest("RestFailed");
+      return null;
+    }
 
-  // Dialogs and dice can outlive another client's write. Never overwrite a changed state.
-  if (restSnapshot(actor) !== snapshot) {
-    warnRest("StateChanged");
-    return;
-  }
+    let poolRemaining = ctx.poolCurrent;
+    let totalHealed = 0;
+    diceRolls.length = 0;
 
-  try {
-    const survival = restableSurvival(actor);
-    if (!survival) throw new Error("Rest unavailable");
-    const healed = applyHealth(survival, "healing", totalHealed);
-    totalHealed = healed.hp - survival.hp;
-    await actor.update?.({
-      ...survivalUpdate(healed),
-      "system.resources.pool.value": poolRemaining,
-      "system.magic.mp.value": mpResult.mpFinal,
+    const progress = rollProgress();
+    try {
+      for (let i = 0; i < poolSpends; i++) {
+        if (poolRemaining < 1) break;
+
+        const spendResult = applyShortRestPoolSpend({
+          die: ctx.hitDie,
+          poolCurrent: poolRemaining,
+          conMod: ctx.conMod,
+        });
+
+        poolRemaining = spendResult.poolRemaining;
+
+        const dieFormula = ctx.hitDie;
+        if (!parseExplodingFormula(dieFormula)) {
+          warnRest("RestFailed");
+          return null;
+        }
+
+        const rollResult = await rollExploding(
+          dieFormula,
+          { critical: false, enhanced: false },
+          async (faces) => {
+            const die = new Roll(`1d${faces}`);
+            await progress.wait(die.evaluate());
+            diceRolls.push(die);
+            if (die.total === undefined) throw new Error("Incomplete");
+            return die.total;
+          },
+        );
+
+        if (!rollResult.complete || rollResult.total === null) {
+          warnRest("RollIncomplete");
+          return null;
+        }
+
+        const dieTotal = rollResult.total;
+        const healedForThisDie = Math.max(0, dieTotal + ctx.conMod);
+        totalHealed += healedForThisDie;
+
+        diceResults.push({
+          faces: Number(ctx.hitDie.replace(/^d/, "")),
+          results: rollResult.chains[0]?.results ?? [],
+          total: healedForThisDie,
+        });
+      }
+    } catch {
+      warnRest("RestFailed");
+      return null;
+    } finally {
+      progress.close();
+    }
+
+    const mpResult = applyShortRestMpRecovery({
+      awakened: ctx.awakened,
+      magicAbilityMod,
+      mpCurrent: ctx.mpCurrent,
+      mpMax: ctx.mpMax,
+      inDanger: inputs.inDanger,
     });
-  } catch {
-    warnRest("RestFailed");
-    return;
-  }
+    mpRecovered = mpResult.mpRecovered;
+
+    return {
+      next: applyHealth(state, "healing", totalHealed),
+      extra: {
+        "system.resources.pool.value": poolRemaining,
+        "system.magic.mp.value": mpResult.mpFinal,
+      },
+    };
+  });
+  if (outcome !== "updated" || !before || !after) return;
+  const totalHealed = after.hp - before.hp;
 
   const diceChains = diceResults
     .map((d) => `d${d.faces}: [${d.results.join(" → ")}] ${formatSigned(ctx.conMod)} = ${d.total}`)
@@ -280,9 +267,7 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
     `${escapeHtml(localizeRest("ShortRestComplete"))}`,
     `${escapeHtml(localizeRest("PoolSpent"))}: ${poolSpends}`,
     `${escapeHtml(localizeRest("HpHealed"))}: ${totalHealed}`,
-    mpResult.mpRecovered > 0
-      ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
-      : "",
+    mpRecovered > 0 ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpRecovered}` : "",
   ]
     .filter(Boolean)
     .join(" • ");
@@ -305,21 +290,17 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     return;
   }
 
-  const lock = lockRest(actor);
-  if (!lock) return;
-  try {
-    await runLongRest(actor, ctx);
-  } finally {
-    busyHealthActors.delete(lock);
-  }
+  await runLongRest(actor, ctx);
 }
 
 async function runLongRest(actor: ActorLike, ctx: RestContext): Promise<void> {
-  const snapshot = restSnapshot(actor);
+  let poolRecovered = 0;
+  let mpRecovered = 0;
 
-  const safeInput = await prompt(
-    localizeRest("LongRest"),
-    `<div>
+  const { outcome, before, after } = await runRest(actor, async (state) => {
+    const safeInput = await prompt(
+      localizeRest("LongRest"),
+      `<div>
       <p>${escapeHtml(localizeRest("LongRestPrompt"))}</p>
       <label>
         <input type="checkbox" name="safeAndComfortable" value="yes">
@@ -327,88 +308,81 @@ async function runLongRest(actor: ActorLike, ctx: RestContext): Promise<void> {
       </label>
       <p><em>${escapeHtml(localizeRest("LongRestMpInfo"))}</em></p>
     </div>`,
-    (form) => ({
-      safeAndComfortable: field(form, "safeAndComfortable") === "yes",
-    }),
-    localizeRest("Confirm"),
-    { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
-  );
+      (form) => ({
+        safeAndComfortable: field(form, "safeAndComfortable") === "yes",
+      }),
+      localizeRest("Confirm"),
+      { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
+    );
 
-  if (!safeInput) return;
+    if (!safeInput) return null;
 
-  const hpResult = applyLongRestHpRecovery({
-    hpCurrent: ctx.hpCurrent,
-    hpMax: ctx.hpMax,
-  });
+    const hpResult = applyLongRestHpRecovery({
+      hpCurrent: state.hp,
+      hpMax: state.max,
+    });
 
-  const poolResult = applyLongRestPoolRecovery({
-    poolCurrent: ctx.poolCurrent,
-    poolMax: ctx.poolMax,
-  });
+    const poolResult = applyLongRestPoolRecovery({
+      poolCurrent: ctx.poolCurrent,
+      poolMax: ctx.poolMax,
+    });
 
-  let controlMagicRoll: number | null = null;
+    let controlMagicRoll: number | null = null;
 
-  if (ctx.awakened && !safeInput.safeAndComfortable) {
-    const rollInput = await prompt(
-      localizeRest("ControlMagic"),
-      `<div>
+    if (ctx.awakened && !safeInput.safeAndComfortable) {
+      const rollInput = await prompt(
+        localizeRest("ControlMagic"),
+        `<div>
         <p>${escapeHtml(localizeRest("ControlMagicPrompt"))}</p>
         <label>${escapeHtml(localizeRest("ControlMagicRollResult"))}<br>
           <input type="number" name="roll" min="1" step="1" value="">
         </label>
         <p><em>${escapeHtml(localizeRest("ControlMagicDC15"))}</em></p>
       </div>`,
-      (form) => ({
-        roll: Number(field(form, "roll")),
-      }),
-      localizeRest("Confirm"),
-      { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
-    );
+        (form) => ({
+          roll: Number(field(form, "roll")),
+        }),
+        localizeRest("Confirm"),
+        { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
+      );
 
-    if (!rollInput) return;
+      if (!rollInput) return null;
 
-    if (!Number.isFinite(rollInput.roll)) {
-      controlMagicRoll = null;
-    } else {
-      controlMagicRoll = rollInput.roll;
+      if (!Number.isFinite(rollInput.roll)) {
+        controlMagicRoll = null;
+      } else {
+        controlMagicRoll = rollInput.roll;
+      }
     }
-  }
 
-  const mpResult = applyLongRestMpRecovery({
-    awakened: ctx.awakened,
-    mpCurrent: ctx.mpCurrent,
-    mpMax: ctx.mpMax,
-    safeAndComfortable: safeInput.safeAndComfortable,
-    controlMagicRoll,
+    const mpResult = applyLongRestMpRecovery({
+      awakened: ctx.awakened,
+      mpCurrent: ctx.mpCurrent,
+      mpMax: ctx.mpMax,
+      safeAndComfortable: safeInput.safeAndComfortable,
+      controlMagicRoll,
+    });
+    poolRecovered = poolResult.poolRecovered;
+    mpRecovered = mpResult.mpRecovered;
+
+    // Long Rest clears Temporary HP; status and counters follow the healed state.
+    return {
+      next: { ...applyHealth(state, "healing", hpResult.hpRecovered), temp: 0 },
+      extra: {
+        "system.resources.pool.value": poolResult.poolFinal,
+        "system.magic.mp.value": mpResult.mpFinal,
+      },
+    };
   });
-
-  if (restSnapshot(actor) !== snapshot) {
-    warnRest("StateChanged");
-    return;
-  }
-
-  let hpRecovered: number;
-  try {
-    const survival = restableSurvival(actor);
-    if (!survival) throw new Error("Rest unavailable");
-    const healed = applyHealth(survival, "healing", hpResult.hpRecovered);
-    hpRecovered = healed.hp - survival.hp;
-    await actor.update?.(buildLongRestUpdate(healed, poolResult.poolFinal, mpResult.mpFinal));
-  } catch {
-    warnRest("RestFailed");
-    return;
-  }
+  if (outcome !== "updated" || !before || !after) return;
+  const hpRecovered = after.hp - before.hp;
 
   const summary = [
     `${escapeHtml(localizeRest("LongRestComplete"))}`,
     hpRecovered > 0 ? `${escapeHtml(localizeRest("HpRecovered"))}: ${hpRecovered}` : "",
-    poolResult.poolRecovered > 0
-      ? `${escapeHtml(localizeRest("PoolRecovered"))}: ${poolResult.poolRecovered}`
-      : "",
-    mpResult.mpRecovered > 0
-      ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpResult.mpRecovered}`
-      : "",
-    ctx.temp > 0 ? `${escapeHtml(localizeRest("TempHpCleared"))}: ${ctx.temp}` : "",
+    poolRecovered > 0 ? `${escapeHtml(localizeRest("PoolRecovered"))}: ${poolRecovered}` : "",
+    mpRecovered > 0 ? `${escapeHtml(localizeRest("MpRecovered"))}: ${mpRecovered}` : "",
+    before.temp > 0 ? `${escapeHtml(localizeRest("TempHpCleared"))}: ${before.temp}` : "",
   ]
     .filter(Boolean)
     .join(" • ");
@@ -418,19 +392,6 @@ async function runLongRest(actor: ActorLike, ctx: RestContext): Promise<void> {
   } catch {
     warnRest("ChatFailed");
   }
-}
-
-/** Long Rest clears temporary HP; survival status and counters follow the healed state. */
-export function buildLongRestUpdate(
-  healed: SurvivalState,
-  poolFinal: number,
-  mpFinal: number,
-): Record<string, unknown> {
-  return {
-    ...survivalUpdate({ ...healed, temp: 0 }),
-    "system.resources.pool.value": poolFinal,
-    "system.magic.mp.value": mpFinal,
-  };
 }
 
 function numberAt(source: Record<string, unknown>, path: string[], fallback: number): number {

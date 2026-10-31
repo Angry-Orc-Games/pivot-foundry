@@ -55,7 +55,9 @@ Named migration M001 treats missing/`0` `schemaVersion` as legacy and persists t
 
 ## Survival Loop
 
-Deterministic exploding dice and HP/death-save transitions live in `src/rules/`. The `src/runtime/` adapters own localized dialogs, visible dice chains, chat flags, permission checks, and guarded Actor updates. The existing sheet delegates to these adapters. Current HP/counters are not independently submitted by the sheet.
+Deterministic exploding dice and HP/death-save transitions live in `src/rules/`, including `effectiveSurvival`, the one place a stale HP / status pair is aligned for display, status icons, and changes. The `src/runtime/` adapters own localized dialogs, visible dice chains, chat flags, and reports. The existing sheet delegates to these adapters. Current HP/counters are not independently submitted by the sheet.
+
+Every change to a Character's HP, Temporary HP, or death saves is a Survival transaction (`runSurvivalTransaction` in `src/runtime/survival-transaction.ts`): chat damage/healing/Temporary HP, death saves, GM Survival corrections, clearing Temporary HP, and Short/Long Rests. One call checks ownership, holds a per-client lock across the caller's dialogs and dice, starts from the effective survival state, refuses to write if the Character (or fields the caller watches, such as Pool and MP) changed meanwhile, then makes one update marked with `SURVIVAL_WRITE_OPTIONS`. The `preUpdateActor` guard rejects any other Character survival write; world migrations pass the same marker, and a lowered maximum HP may clamp current HP.
 
 M002 adds Character-only `survivalVersion`, temporary HP, and survival status alongside the existing shared schemaVersion/M001. Legacy-safe defaults must not masquerade as persisted migration completion. Fresh Actor creation explicitly initializes survival source data. Actor and unlinked-token migration plans are captured before writes to prevent inherited base-Actor defaults from hiding token-specific legacy state.
 

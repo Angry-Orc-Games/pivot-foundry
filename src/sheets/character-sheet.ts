@@ -1,5 +1,4 @@
-import { readSurvival } from "../runtime/health";
-import { survivalForDisplay } from "../rules/survival";
+import { readSurvival } from "../runtime/survival-transaction";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
@@ -17,6 +16,7 @@ import {
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
 import { applyChatMessageMode } from "../runtime/ui";
+import { effectiveSurvival } from "../rules/survival";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -423,7 +423,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = survivalForDisplay(readSurvival(actor));
+  const survival = effectiveSurvival(readSurvival(actor));
 
   // Helper to format signed numbers
   const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));

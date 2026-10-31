@@ -1,3 +1,4 @@
+import { SYSTEM_ID } from "../config";
 import { validAmount } from "../rules/survival";
 import { warn } from "./ui";
 
@@ -162,28 +163,53 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
+export function isSurvivalWrite(options: unknown): boolean {
+  const scoped = asRecord(asRecord(options)?.[SYSTEM_ID]);
+  return scoped?.survivalWrite === true;
+}
+
+const SURVIVAL_FIELDS = [
+  ["hp", "value"],
+  ["hp", "temp"],
+  ["deathSaves", "successes"],
+  ["deathSaves", "failures"],
+  ["deathSaves", "status"],
+] as const;
+
+function submittedField(
+  changes: Record<string, unknown>,
+  group: string,
+  key: string,
+): { present: boolean; value: unknown } {
+  const flat = `system.attributes.${group}.${key}`;
+  if (Object.hasOwn(changes, flat)) return { present: true, value: changes[flat] };
+  const grouped = asRecord(changes[`system.attributes.${group}`]);
+  if (grouped && Object.hasOwn(grouped, key)) return { present: true, value: grouped[key] };
+  const nested = asRecord(asRecord(asRecord(changes.system)?.attributes)?.[group]);
+  if (nested && Object.hasOwn(nested, key)) return { present: true, value: nested[key] };
+  return { present: false, value: undefined };
+}
+
 /**
- * Character HP only changes through survival transactions, which always write the status
- * alongside HP. A bare HP write (such as the token HUD bar) would leave the status stale.
+ * Only a Survival transaction (or a world migration) may change a Character's HP, Temporary HP,
+ * or death saves. Any other write, such as the token HUD bar, would bypass the survival rules.
  */
 export function guardCharacterHpWrite(
   actor: { type?: string; system?: unknown },
   changes: Record<string, unknown>,
+  options?: unknown,
 ): false | undefined {
-  if (actor.type !== "character") return;
-  const nested = changes.system as
-    { attributes?: { hp?: { value?: unknown }; deathSaves?: { status?: unknown } } } | undefined;
-  const grouped = changes["system.attributes.hp"] as { value?: unknown } | undefined;
-  const hp =
-    changes["system.attributes.hp.value"] ?? grouped?.value ?? nested?.attributes?.hp?.value;
-  if (hp === undefined) return;
-  const status =
-    changes["system.attributes.deathSaves.status"] ?? nested?.attributes?.deathSaves?.status;
-  if (status !== undefined) return;
-  const system = actor.system as { attributes?: { hp?: { value?: unknown } } } | undefined;
-  if (hp === system?.attributes?.hp?.value) return;
+  if (actor.type !== "character" || isSurvivalWrite(options)) return;
+  const attributes = asRecord(asRecord(actor.system)?.attributes);
+  const touched = SURVIVAL_FIELDS.filter(([group, key]) => {
+    const submitted = submittedField(changes, group, key);
+    return submitted.present && submitted.value !== asRecord(attributes?.[group])?.[key];
+  });
+  if (touched.length === 0) return;
   // guardHpMaximum lowers HP to a lowered max; that clamp keeps the status consistent.
-  if (validAmount(hp) && hp === numericMax(changes) && hp < storedHp(actor)) return;
+  const hp = submittedField(changes, "hp", "value").value;
+  const onlyHp = touched.length === 1 && touched[0]?.[0] === "hp" && touched[0][1] === "value";
+  if (onlyHp && validAmount(hp) && hp === numericMax(changes) && hp < storedHp(actor)) return;
   warn("UseHealthTools");
   return false;
 }
