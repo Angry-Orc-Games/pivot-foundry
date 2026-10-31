@@ -17,6 +17,7 @@ interface RenderedDialog {
   note?: string;
   warnings?: string[];
   renders: Array<{ force?: boolean } | undefined>;
+  render: (options?: { force?: boolean }) => void;
   constructor: {
     onConfirm?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
     onPreview?: (this: RenderedDialog, event: Event, form: HTMLFormElement) => Promise<void>;
@@ -250,6 +251,59 @@ describe("Import Pivot character button", () => {
 
     await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
     expect(createFromFile).toHaveBeenCalledTimes(1);
+    expect(createFromFile).toHaveBeenCalledWith(
+      expect.objectContaining({ computed: expect.objectContaining({ ac: 16, mp: 20 }) }),
+      "player-1",
+    );
+  });
+
+  it("imports the previewed file after a repaint clears the form", async () => {
+    installFoundry();
+    const edited = structuredClone(elf) as { computed: { ac: number; mp: number } };
+    const rules = structuredClone(edited.computed);
+    edited.computed.ac = 16;
+    edited.computed.mp = 20;
+    const holder = {
+      files: [{ text: async () => JSON.stringify(edited) }],
+      owner: "player-1",
+    };
+    const createFromFile = vi.fn(async () => ({ ok: true, value: { actorId: "actor-1" } }));
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      modules: {
+        get: (id: string) =>
+          id === "pivot-chargen" ? { active: true, api: { derive: () => rules } } : undefined,
+      },
+      pivot: { validate, createFromFile },
+    };
+    let handler: ((app: unknown, html: HTMLElement) => void) | undefined;
+    registerImportButton({
+      on(_event, next) {
+        handler = next;
+      },
+    });
+    const view = directory();
+    handler?.({}, view.html);
+    view.button?.listeners.click?.({ preventDefault() {} });
+    const dialog = dialogs.at(-1);
+    if (!dialog) throw new Error("missing dialog");
+    dialog.render = () => {
+      holder.files = [];
+      holder.owner = "";
+      dialog.renders.push({ force: true });
+    };
+    const form = {
+      querySelector(selector: string) {
+        if (selector.includes("file")) return { files: holder.files };
+        return { value: holder.owner };
+      },
+    } as unknown as HTMLFormElement;
+
+    await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(holder.files).toEqual([]);
+    expect(holder.owner).toBe("");
+    expect(dialog.warnings).toEqual(["AC: file 16, rules 14", "MP max: file 20, rules 15"]);
+    await dialog.constructor.onConfirm?.call(dialog, new Event("submit"), form);
     expect(createFromFile).toHaveBeenCalledWith(
       expect.objectContaining({ computed: expect.objectContaining({ ac: 16, mp: 20 }) }),
       "player-1",

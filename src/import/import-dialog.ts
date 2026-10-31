@@ -26,6 +26,8 @@ interface DialogState {
   warnings: string[];
   note: string;
   showWarnings: boolean;
+  pending: { file: unknown; owner: string } | null;
+  element?: HTMLElement;
   render(options?: { force?: boolean }): unknown;
 }
 
@@ -113,6 +115,7 @@ function dialogConstructor(): (new () => DialogState) | undefined {
     warnings: string[] = [];
     note = "";
     showWarnings = false;
+    pending: { file: unknown; owner: string } | null = null;
 
     static DEFAULT_OPTIONS = {
       classes: ["pivot-fantasy", "pf-import"],
@@ -202,11 +205,12 @@ function dialogConstructor(): (new () => DialogState) | undefined {
 async function previewFile(dialog: DialogState, form: HTMLFormElement): Promise<void> {
   const read = await readSelected(form);
   if (!read.ok) {
+    dialog.pending = null;
     dialog.error = read.error;
     dialog.warnings = [];
     dialog.note = "";
     dialog.showWarnings = false;
-    void dialog.render({ force: true });
+    paintPreview(dialog);
     return;
   }
 
@@ -215,11 +219,12 @@ async function previewFile(dialog: DialogState, form: HTMLFormElement): Promise<
   const rederive = chargenDerive(game);
   const result = validateFile(read.value, rederive ? { rederive } : undefined);
   if (!result.ok) {
+    dialog.pending = null;
     dialog.error = result.error.message;
     dialog.warnings = [];
     dialog.note = "";
     dialog.showWarnings = false;
-    void dialog.render({ force: true });
+    paintPreview(dialog);
     return;
   }
 
@@ -229,34 +234,37 @@ async function previewFile(dialog: DialogState, form: HTMLFormElement): Promise<
     witness.filter((warning) => warning.code === "tampered"),
     sheetWarnings(result.value),
   );
+  dialog.pending = { file: read.value, owner: selectedOwner(form) };
   dialog.warnings = mismatches.map((warning) => warning.message);
   dialog.showWarnings = dialog.warnings.length > 0;
   dialog.note = unchecked?.message ?? (rederive ? "" : notCheckedWarning().message);
   dialog.error = "";
-  void dialog.render({ force: true });
+  // A mounted form is updated in place. Replacing the template would drop the file input.
+  paintPreview(dialog);
 }
 
 async function importFile(dialog: DialogState, form: HTMLFormElement): Promise<void> {
   const read = await readSelected(form);
-  if (!read.ok) {
-    show(dialog, read.error, false);
+  const file = read.ok ? read.value : dialog.pending?.file;
+  if (file === undefined) {
+    show(dialog, read.ok ? IMPORT_MESSAGES.malformed : read.error, false);
     return;
   }
 
   const game = readGame();
   const validateFile = game?.pivot?.validate ?? validate;
   const rederive = chargenDerive(game);
-  const result = validateFile(read.value, rederive ? { rederive } : undefined);
+  const result = validateFile(file, rederive ? { rederive } : undefined);
   if (!result.ok) {
     show(dialog, result.error.message, false);
     return;
   }
 
-  const owner = form.querySelector<HTMLSelectElement>('select[name="ownerUserId"]')?.value ?? "";
+  const owner = selectedOwner(form) || dialog.pending?.owner || "";
   const create = game?.pivot?.createFromFile ?? createFromFile;
   let created: Awaited<ReturnType<typeof createFromFile>>;
   try {
-    created = await create(read.value, owner);
+    created = await create(file, owner);
   } catch {
     show(dialog, IMPORT_MESSAGES.incomplete, false);
     return;
@@ -308,6 +316,52 @@ function mergeWarnings(primary: ImportWarning[], extra: ImportWarning[]): Import
     ...primary,
     ...extra.filter((warning) => warning.field === undefined || !seen.has(warning.field)),
   ];
+}
+
+function selectedOwner(form: HTMLFormElement): string {
+  return form.querySelector<HTMLSelectElement>('select[name="ownerUserId"]')?.value ?? "";
+}
+
+function paintPreview(dialog: DialogState): void {
+  const form = dialog.element;
+  const input = form?.querySelector?.('input[name="pivotFile"]');
+  if (!form?.ownerDocument || !input) {
+    void dialog.render({ force: true });
+    return;
+  }
+  const box = previewBox(form);
+  box.replaceChildren();
+  const doc = form.ownerDocument;
+  if (dialog.error) box.append(messageParagraph(doc, "pf-import-error", dialog.error));
+  if (dialog.note) box.append(messageParagraph(doc, "pf-import-note", dialog.note));
+  if (dialog.showWarnings) {
+    const list = doc.createElement("ul");
+    list.className = "pf-import-drift";
+    for (const line of dialog.warnings) {
+      const item = doc.createElement("li");
+      item.textContent = line;
+      list.append(item);
+    }
+    box.append(list);
+  }
+}
+
+function previewBox(form: HTMLElement): HTMLElement {
+  const existing = form.querySelector("[data-pivot-preview]");
+  if (existing instanceof HTMLElement) return existing;
+  const box = form.ownerDocument.createElement("div");
+  box.setAttribute("data-pivot-preview", "");
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) form.insertBefore(box, submit);
+  else form.append(box);
+  return box;
+}
+
+function messageParagraph(doc: Document, className: string, text: string): HTMLParagraphElement {
+  const paragraph = doc.createElement("p");
+  paragraph.className = className;
+  paragraph.textContent = text;
+  return paragraph;
 }
 
 function show(dialog: DialogState, error: string, kept: boolean): void {
