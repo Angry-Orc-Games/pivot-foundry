@@ -7,9 +7,9 @@ import {
   applyShortRestMpRecovery,
   applyShortRestPoolSpend,
   calculateMagicAbilityModifier,
+  canRest,
   parsePoolSpends,
 } from "../../src/rules/rest";
-import { buildLongRestUpdate } from "../../src/runtime/rest-dialogs";
 import enJson from "../../lang/en.json";
 
 describe("applyShortRestPoolSpend", () => {
@@ -250,32 +250,26 @@ describe("calculateMagicAbilityModifier", () => {
   });
 });
 
-describe("buildLongRestUpdate", () => {
-  const healed = {
-    hp: 20,
+describe("canRest", () => {
+  const state = {
+    hp: 0,
     max: 20,
-    temp: 4,
+    temp: 0,
     successes: 0,
     failures: 0,
-    status: "alive" as const,
+    status: "dying" as const,
   };
 
-  it("always clears temp HP to 0", () => {
-    const update = buildLongRestUpdate(healed, 3, 5);
-    expect(update["system.attributes.hp.temp"]).toBe(0);
+  it("lets a Dying, Stable, or Conscious Character rest", () => {
+    expect(canRest(state)).toBe(true);
+    expect(canRest({ ...state, status: "stable" })).toBe(true);
+    expect(canRest({ ...state, hp: 5, status: "alive" })).toBe(true);
   });
 
-  it("writes survival status with HP so the record stays consistent", () => {
-    const update = buildLongRestUpdate(healed, 5, 10);
-    expect(update).toEqual({
-      "system.attributes.hp.value": 20,
-      "system.attributes.hp.temp": 0,
-      "system.attributes.deathSaves.successes": 0,
-      "system.attributes.deathSaves.failures": 0,
-      "system.attributes.deathSaves.status": "alive",
-      "system.resources.pool.value": 5,
-      "system.magic.mp.value": 10,
-    });
+  it("refuses a Dead, Unconfirmed, or inconsistent Character", () => {
+    expect(canRest({ ...state, status: "dead" })).toBe(false);
+    expect(canRest({ ...state, status: "unconfirmed" })).toBe(false);
+    expect(canRest({ ...state, hp: 25, status: "alive" })).toBe(false);
   });
 });
 

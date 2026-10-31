@@ -45,12 +45,11 @@ export const SURVIVAL_WRITE_OPTIONS = { [SYSTEM_ID]: { survivalWrite: true } } a
 
 export function isSurvivalWrite(options: unknown): boolean {
   const scoped = (options as Record<string, unknown> | undefined)?.[SYSTEM_ID] as
-    | { survivalWrite?: unknown }
-    | undefined;
+    { survivalWrite?: unknown } | undefined;
   return scoped?.survivalWrite === true;
 }
 
-export function survivalUpdate(s: SurvivalState): Record<string, unknown> {
+function survivalUpdate(s: SurvivalState): Record<string, unknown> {
   return {
     "system.attributes.hp.value": s.hp,
     "system.attributes.hp.temp": s.temp,
@@ -76,13 +75,7 @@ export interface SurvivalTransactionOptions {
 }
 
 export type SurvivalOutcome =
-  | "updated"
-  | "busy"
-  | "denied"
-  | "changed"
-  | "invalid"
-  | "cancelled"
-  | "failed";
+  "updated" | "busy" | "denied" | "changed" | "invalid" | "cancelled" | "failed";
 
 export interface SurvivalTransactionResult {
   outcome: SurvivalOutcome;
@@ -97,8 +90,6 @@ export interface SurvivalTransactionResult {
  * write between our snapshot and our update. The snapshot check narrows that window.
  */
 const busy = new Set<string>();
-/** @deprecated Transitional: death saves and rests share the lock until they run as transactions. */
-export const survivalLocks = busy;
 
 /**
  * Run one Survival transaction on a Character: take the lock, hand the effective survival

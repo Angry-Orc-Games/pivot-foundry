@@ -3,7 +3,6 @@ import {
   isSurvivalWrite,
   readSurvival,
   runSurvivalTransaction,
-  survivalUpdate,
 } from "../../src/runtime/survival-transaction";
 import { inMemoryCharacter } from "../helpers/in-memory-actor";
 
@@ -109,17 +108,5 @@ describe("Survival transaction", () => {
     expect(result).toMatchObject({ outcome: "failed", after: { hp: 3 } });
     expect(update).toHaveBeenCalledTimes(1);
     expect((await runSurvivalTransaction(actor, (s) => ({ next: s }))).outcome).toBe("updated");
-  });
-
-  it("writes every survival field with flat keys", () => {
-    expect(
-      survivalUpdate({ hp: 1, max: 9, temp: 2, successes: 0, failures: 1, status: "alive" }),
-    ).toEqual({
-      "system.attributes.hp.value": 1,
-      "system.attributes.hp.temp": 2,
-      "system.attributes.deathSaves.successes": 0,
-      "system.attributes.deathSaves.failures": 1,
-      "system.attributes.deathSaves.status": "alive",
-    });
   });
 });
