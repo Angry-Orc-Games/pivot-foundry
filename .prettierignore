@@ -10,3 +10,4 @@ foundry-dist
 .foundry
 playwright-report
 test-results
+tests/import/fixtures/pivot-chargen-c39605e/book.js

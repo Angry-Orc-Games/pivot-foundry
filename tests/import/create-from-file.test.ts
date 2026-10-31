@@ -467,6 +467,47 @@ describe("createFromFile", () => {
     expect(context.derived.magic.mp.max).not.toBe(rules.mp);
   });
 
+  it("drift: actor keeps file computed values when the pool was edited", async () => {
+    const edited = structuredClone(veteran) as { computed: { pool: number } };
+    const rulesPool = edited.computed.pool;
+    edited.computed.pool = 4;
+    const world = install({ isGM: true });
+    const created = await createFromFile(edited, "player-1");
+    expect(created.ok).toBe(true);
+    const actor = world.actors[0];
+    if (!actor) throw new Error("missing actor");
+    const pool = (actor.system as { resources: { pool: { value: number; maxBonus: number } } })
+      .resources.pool;
+    expect(pool.value).toBe(4);
+    expect(pool.maxBonus).toBe(3);
+    expect(pool.maxBonus).not.toBe(rulesPool - 1);
+    const context = prepareCharacterSheetContext({
+      name: actor.name,
+      type: actor.type,
+      system: actor.system as { resources: { pool: { value: number; maxBonus: number } } },
+      items: [],
+    });
+    expect(context.derived.pool.max).toBe(4);
+    expect(context.derived.pool.max).not.toBe(rulesPool);
+  });
+
+  it("logs an embed failure and tells the GM what failed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const cause = new Error("embed failed");
+    const world = install({
+      isGM: true,
+      embed: () => {
+        throw cause;
+      },
+    });
+    const result = await createFromFile(veteran, "player-1");
+    expect(warn).toHaveBeenCalledWith("Pivot import could not embed items.", cause);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain("embed failed");
+    expect(world.actors[0]?.delete).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it("creates a second actor on a second success", async () => {
     const world = install({ isGM: true });
     const first = await createFromFile(veteran, "player-1");

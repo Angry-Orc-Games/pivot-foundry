@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { registerImportButton } from "../../src/import/import-dialog";
 import { validate } from "../../src/import/pivot-character";
+import { derive } from "./fixtures/pivot-chargen-c39605e/index";
 
 const veteran = JSON.parse(
   readFileSync(new URL("./fixtures/human-veteran.pivot.json", import.meta.url), "utf8"),
@@ -430,4 +431,51 @@ describe("Import Pivot character button", () => {
     await dialog?.constructor.onConfirm?.call(dialog, new Event("submit"), form);
     expect(createFromFile).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the generator note and no field warnings with the real pivot-chargen module", async () => {
+    installFoundry();
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      modules: {
+        get: (id: string) =>
+          id === "pivot-chargen" ? { active: true, api: { derive } } : undefined,
+      },
+      pivot: { validate },
+    };
+    const dialog = openDialog();
+    const form = fileForm(JSON.stringify(veteran));
+    await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(dialog.warnings ?? []).toEqual([]);
+    expect(dialog.note).toBe("Not checked against the character generator.");
+  });
+
+  it("warns from deriveComputed when that witness has the computed shape", async () => {
+    installFoundry();
+    const rules = structuredClone(veteran.computed) as { hp: number };
+    rules.hp = 1;
+    (globalThis as { game?: unknown }).game = {
+      user: { isGM: true },
+      modules: {
+        get: (id: string) =>
+          id === "pivot-chargen"
+            ? { active: true, api: { derive, deriveComputed: () => rules } }
+            : undefined,
+      },
+      pivot: { validate },
+    };
+    const dialog = openDialog();
+    const form = fileForm(JSON.stringify(veteran));
+    await dialog.constructor.onPreview?.call(dialog, new Event("change"), form);
+    expect(dialog.warnings).toEqual(["HP: file 12, rules 1"]);
+    expect(dialog.note ?? "").toBe("");
+  });
 });
+
+function fileForm(fileText: string): HTMLFormElement {
+  return {
+    querySelector(selector: string) {
+      if (selector.includes("file")) return { files: [{ text: async () => fileText }] };
+      return { value: "player-1" };
+    },
+  } as unknown as HTMLFormElement;
+}
