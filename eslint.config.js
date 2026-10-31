@@ -12,6 +12,7 @@ export default tseslint.config(
       "test-results/**",
       ".foundry/**",
       "foundry-dist/**",
+      "tests/import/fixtures/pivot-chargen-c39605e/book.js",
     ],
   },
   js.configs.recommended,
