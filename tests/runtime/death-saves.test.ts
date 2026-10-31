@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import en from "../../lang/en.json";
 import {
   clearTempHpDialog,
   correctSurvivalDialog,
@@ -140,6 +141,23 @@ it("warns and writes nothing for an inconsistent correction", async () => {
   await correctSurvivalDialog(actor);
   expect(seen).toEqual(["ApplyFailed"]);
   expect(actor.writes).toEqual([]);
+});
+
+it("refuses Dying or Stable above 0 HP and tells the GM why, whatever the temporary HP", async () => {
+  const notice = "Dying and Stable need 0 HP. Set HP to 0 first, or choose Conscious.";
+  for (const status of ["dying", "stable"] as const) {
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      i18n: { localize: (key: string) => (en as Record<string, string>)[key] ?? key },
+    });
+    const seen = captureWarnings();
+    const actor = inMemoryCharacter({ hp: 5, temp: 4, status: "alive" });
+    dialogReturns({ hp: 5, temp: 9, successes: 1, failures: 1, status });
+    await correctSurvivalDialog(actor);
+    expect(seen, status).toEqual([notice]);
+    expect(actor.writes, status).toEqual([]);
+    expect(readSurvival(actor), status).toMatchObject({ hp: 5, temp: 4, status: "alive" });
+  }
 });
 
 it("does not open a correction for a player", async () => {

@@ -177,4 +177,24 @@ describe("Survival correction", () => {
       correctSurvival({ current: state(), requested: { ...requested, failures: 4 } }),
     ).toThrow(RangeError);
   });
+
+  it("allows Dying at 0 HP while temporary HP remains", () => {
+    expect(
+      correctSurvival({
+        current: state(),
+        requested: { hp: 0, temp: 7, successes: 1, failures: 2, status: "dying" },
+      }),
+    ).toMatchObject({ status: "dying", hp: 0, temp: 7 });
+  });
+
+  it("refuses Dying above 0 HP with or without temporary HP", () => {
+    for (const temp of [0, 10]) {
+      expect(() =>
+        correctSurvival({
+          current: state(),
+          requested: { hp: 3, temp, successes: 0, failures: 0, status: "dying" },
+        }),
+      ).toThrow(RangeError);
+    }
+  });
 });
