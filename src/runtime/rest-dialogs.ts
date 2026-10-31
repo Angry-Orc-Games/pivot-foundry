@@ -10,6 +10,13 @@ import {
 } from "../rules/rest";
 import { abilityModifier } from "../rules/modifiers";
 import { parseExplodingFormula, rollExploding } from "../rules/exploding-roll";
+import {
+  applyHealth,
+  reconcileSurvival,
+  validateSurvival,
+  type SurvivalState,
+} from "../rules/survival";
+import { busyHealthActors, readSurvival, survivalUpdate } from "./health";
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
@@ -78,6 +85,37 @@ function warnRest(key: string): void {
   runtime().ui?.notifications?.warn(localizeRest(key));
 }
 
+/**
+ * Rests change HP, so they share the health lock and refuse states the survival
+ * rules cannot heal: Dead, unconfirmed legacy state, or an inconsistent record.
+ * A stale HP / status pair is reconciled first, as damage and death saves do.
+ */
+function restableSurvival(actor: ActorLike): SurvivalState | null {
+  const survival = reconcileSurvival(readSurvival(actor));
+  if (survival.status === "dead" || survival.status === "unconfirmed") return null;
+  try {
+    validateSurvival(survival);
+  } catch {
+    return null;
+  }
+  return survival;
+}
+
+/** Everything a rest reads before its dialogs; any change means another write landed. */
+function restSnapshot(actor: ActorLike): string {
+  const ctx = extractRestContext(actor);
+  return JSON.stringify([readSurvival(actor), ctx?.poolCurrent, ctx?.mpCurrent]);
+}
+
+function lockRest(actor: ActorLike): string | null {
+  if (!actor.uuid || busyHealthActors.has(actor.uuid) || !restableSurvival(actor)) {
+    warnRest("Unavailable");
+    return null;
+  }
+  busyHealthActors.add(actor.uuid);
+  return actor.uuid;
+}
+
 export async function shortRestDialog(actor: ActorLike): Promise<void> {
   const ctx = extractRestContext(actor);
   if (!ctx) {
@@ -89,6 +127,18 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     warnRest("InsufficientPool");
     return;
   }
+
+  const lock = lockRest(actor);
+  if (!lock) return;
+  try {
+    await runShortRest(actor, ctx);
+  } finally {
+    busyHealthActors.delete(lock);
+  }
+}
+
+async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
+  const snapshot = restSnapshot(actor);
 
   const magicAbilityMod = calculateMagicAbilityModifier(ctx.awakened, ctx.magicAbilityScore);
 
@@ -140,9 +190,8 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
   const diceRolls: InstanceType<typeof Roll>[] = [];
 
+  const progress = rollProgress();
   try {
-    const progress = rollProgress();
-
     for (let i = 0; i < poolSpends; i++) {
       if (poolRemaining < 1) break;
 
@@ -156,7 +205,6 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
 
       const dieFormula = ctx.hitDie;
       if (!parseExplodingFormula(dieFormula)) {
-        progress.close();
         warnRest("RestFailed");
         return;
       }
@@ -174,7 +222,6 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
       );
 
       if (!rollResult.complete || rollResult.total === null) {
-        progress.close();
         warnRest("RollIncomplete");
         return;
       }
@@ -189,11 +236,11 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
         total: healedForThisDie,
       });
     }
-
-    progress.close();
   } catch {
     warnRest("RestFailed");
     return;
+  } finally {
+    progress.close();
   }
 
   const mpResult = applyShortRestMpRecovery({
@@ -204,7 +251,26 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
     inDanger: inputs.inDanger,
   });
 
-  const newHp = Math.min(ctx.hpMax, ctx.hpCurrent + totalHealed);
+  // Dialogs and dice can outlive another client's write. Never overwrite a changed state.
+  if (restSnapshot(actor) !== snapshot) {
+    warnRest("StateChanged");
+    return;
+  }
+
+  try {
+    const survival = restableSurvival(actor);
+    if (!survival) throw new Error("Rest unavailable");
+    const healed = applyHealth(survival, "healing", totalHealed);
+    totalHealed = healed.hp - survival.hp;
+    await actor.update?.({
+      ...survivalUpdate(healed),
+      "system.resources.pool.value": poolRemaining,
+      "system.magic.mp.value": mpResult.mpFinal,
+    });
+  } catch {
+    warnRest("RestFailed");
+    return;
+  }
 
   const diceChains = diceResults
     .map((d) => `d${d.faces}: [${d.results.join(" → ")}] ${formatSigned(ctx.conMod)} = ${d.total}`)
@@ -230,19 +296,6 @@ export async function shortRestDialog(actor: ActorLike): Promise<void> {
   } catch {
     warnRest("ChatFailed");
   }
-
-  const update: Record<string, unknown> = {
-    "system.attributes.hp.value": newHp,
-    "system.resources.pool.value": poolRemaining,
-    "system.magic.mp.value": mpResult.mpFinal,
-  };
-
-  try {
-    await actor.update?.(update);
-  } catch {
-    warnRest("RestFailed");
-    return;
-  }
 }
 
 export async function longRestDialog(actor: ActorLike): Promise<void> {
@@ -251,6 +304,18 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     warnRest("RestFailed");
     return;
   }
+
+  const lock = lockRest(actor);
+  if (!lock) return;
+  try {
+    await runLongRest(actor, ctx);
+  } finally {
+    busyHealthActors.delete(lock);
+  }
+}
+
+async function runLongRest(actor: ActorLike, ctx: RestContext): Promise<void> {
+  const snapshot = restSnapshot(actor);
 
   const safeInput = await prompt(
     localizeRest("LongRest"),
@@ -317,10 +382,18 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
     controlMagicRoll,
   });
 
-  const update = buildLongRestUpdate(hpResult.hpFinal, poolResult.poolFinal, mpResult.mpFinal);
+  if (restSnapshot(actor) !== snapshot) {
+    warnRest("StateChanged");
+    return;
+  }
 
+  let hpRecovered: number;
   try {
-    await actor.update?.(update);
+    const survival = restableSurvival(actor);
+    if (!survival) throw new Error("Rest unavailable");
+    const healed = applyHealth(survival, "healing", hpResult.hpRecovered);
+    hpRecovered = healed.hp - survival.hp;
+    await actor.update?.(buildLongRestUpdate(healed, poolResult.poolFinal, mpResult.mpFinal));
   } catch {
     warnRest("RestFailed");
     return;
@@ -328,9 +401,7 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
 
   const summary = [
     `${escapeHtml(localizeRest("LongRestComplete"))}`,
-    hpResult.hpRecovered > 0
-      ? `${escapeHtml(localizeRest("HpRecovered"))}: ${hpResult.hpRecovered}`
-      : "",
+    hpRecovered > 0 ? `${escapeHtml(localizeRest("HpRecovered"))}: ${hpRecovered}` : "",
     poolResult.poolRecovered > 0
       ? `${escapeHtml(localizeRest("PoolRecovered"))}: ${poolResult.poolRecovered}`
       : "",
@@ -349,16 +420,16 @@ export async function longRestDialog(actor: ActorLike): Promise<void> {
   }
 }
 
+/** Long Rest clears temporary HP; survival status and counters follow the healed state. */
 export function buildLongRestUpdate(
-  hpFinal: number,
+  healed: SurvivalState,
   poolFinal: number,
   mpFinal: number,
 ): Record<string, unknown> {
   return {
-    "system.attributes.hp.value": hpFinal,
+    ...survivalUpdate({ ...healed, temp: 0 }),
     "system.resources.pool.value": poolFinal,
     "system.magic.mp.value": mpFinal,
-    "system.attributes.hp.temp": 0,
   };
 }
 

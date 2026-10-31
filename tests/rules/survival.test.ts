@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyHealth, resolveDeathSave, type SurvivalState } from "../../src/rules/survival";
+import {
+  applyHealth,
+  resolveDeathSave,
+  survivalForDisplay,
+  type SurvivalState,
+} from "../../src/rules/survival";
 const state = (patch: Partial<SurvivalState> = {}): SurvivalState => ({
   hp: 10,
   max: 20,
@@ -91,4 +96,30 @@ it("preserves accumulated successes on damage while dying", () => {
 });
 it("grants first temporary HP even with keep selected", () => {
   expect(applyHealth(state({ temp: 0 }), "temp", 5, false, "keep").temp).toBe(5);
+});
+
+it("shows Conscious at full HP when Dying is stale, and does not add Exhaustion", () => {
+  const stored = state({ hp: 20, max: 20, status: "dying", successes: 2, failures: 1 });
+  const shown = survivalForDisplay(stored);
+  expect(shown).toEqual({
+    hp: 20,
+    max: 20,
+    temp: 5,
+    successes: 0,
+    failures: 0,
+    status: "alive",
+  });
+  expect(shown).not.toHaveProperty("exhaustion");
+  expect(stored).toMatchObject({ status: "dying", successes: 2, failures: 1 });
+});
+
+it("keeps a real Dying character at 0 HP, and Dead at full HP", () => {
+  expect(survivalForDisplay(state({ hp: 0, max: 20, status: "dying", failures: 1 }))).toMatchObject(
+    {
+      status: "dying",
+      failures: 1,
+    },
+  );
+  expect(survivalForDisplay(state({ hp: 20, max: 20, status: "dead" })).status).toBe("dead");
+  expect(survivalForDisplay(state({ hp: 8, max: 16, status: "stable" })).status).toBe("alive");
 });
