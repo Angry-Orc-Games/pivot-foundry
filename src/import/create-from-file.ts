@@ -14,18 +14,13 @@ interface CreatedActor {
 }
 
 interface WorldUser {
-  id?: unknown;
   name?: unknown;
   role?: unknown;
-  active?: unknown;
 }
 
 interface GameHost {
   user?: { id?: string; isGM?: boolean };
-  users?: {
-    get?: (id: string) => WorldUser | undefined;
-    filter?: (predicate: (user: WorldUser) => boolean) => WorldUser[];
-  };
+  users?: { get?: (id: string) => WorldUser | undefined };
   packs?: unknown;
 }
 
@@ -65,7 +60,7 @@ export async function createFromFile(
   }
 
   const owner = game.users?.get?.(ownerUserId);
-  if (!owner || !choosableOwner(owner, game)) {
+  if (!owner || !choosableOwner(owner)) {
     return {
       ok: false,
       error: {
@@ -126,19 +121,8 @@ export async function createFromFile(
   return { ok: true, value: { actorId } };
 }
 
-function choosableOwner(user: WorldUser, game: GameHost): boolean {
-  if (typeof user.role === "number" && user.role === noneRole()) return false;
-  if (user.active === false) return false;
-  const active = activeUsers(game);
-  if (!active) return true;
-  return typeof user.id === "string" && active.some((candidate) => candidate.id === user.id);
-}
-
-function activeUsers(game: GameHost): WorldUser[] | undefined {
-  const users = game.users;
-  if (typeof users?.filter !== "function") return undefined;
-  const active = users.filter((user) => user.active === true);
-  return Array.isArray(active) ? active : [];
+function choosableOwner(user: WorldUser): boolean {
+  return typeof user.role !== "number" || user.role !== noneRole();
 }
 
 function noneRole(): number {

@@ -35,15 +35,11 @@ interface WorldUser {
   id?: string;
   name?: string;
   role?: number;
-  active?: boolean;
 }
 
 interface ImportGame {
   user?: { isGM?: boolean };
-  users?: {
-    contents?: WorldUser[];
-    filter?: (predicate: (user: WorldUser) => boolean) => WorldUser[];
-  };
+  users?: { contents?: WorldUser[] };
   i18n?: { localize?: (key: string) => string };
   modules?: {
     get?: (id: string) =>
@@ -407,25 +403,16 @@ function chargenDerive(game: ImportGame | undefined): ValidateOptions["rederive"
 }
 
 function listUsers(): Array<{ id: string; name: string }> {
+  const contents = readGame()?.users?.contents;
+  if (!Array.isArray(contents)) return [];
   const users: Array<{ id: string; name: string }> = [];
-  for (const user of selectableUsers(readGame())) {
+  for (const user of contents) {
     if (!user || typeof user.id !== "string" || user.id.length === 0) continue;
-    if (user.active === false) continue;
     if (typeof user.role === "number" && user.role === noneRole()) continue;
     const name = typeof user.name === "string" && user.name.length > 0 ? user.name : user.id;
     users.push({ id: user.id, name });
   }
   return users;
-}
-
-function selectableUsers(game: ImportGame | undefined): WorldUser[] {
-  const users = game?.users;
-  if (typeof users?.filter === "function") {
-    const active = users.filter((user) => user.active === true);
-    return Array.isArray(active) ? active : [];
-  }
-  const contents = game?.users?.contents;
-  return Array.isArray(contents) ? contents : [];
 }
 
 function noneRole(): number {
