@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { guardHpMaximum } from "../../src/runtime/actor-guards";
+import { guardCharacterHpWrite, guardHpMaximum } from "../../src/runtime/actor-guards";
 
 const warnings: string[] = [];
 
@@ -116,6 +116,64 @@ it("keeps a max that is at least the HP in the same update", () => {
   expect(guardHpMaximum(actor, raised)).toBeUndefined();
   expect(raised).toEqual({ system: { attributes: { hp: { max: 11 } } } });
   expect(warnings).toEqual([]);
+});
+it("rejects Character survival writes that are not Survival transactions", () => {
+  const actor = {
+    type: "character",
+    system: {
+      attributes: {
+        hp: { value: 0, max: 20, temp: 0 },
+        deathSaves: { status: "dying", successes: 0, failures: 0 },
+      },
+    },
+  };
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.value": 5 })).toBe(false);
+  expect(guardCharacterHpWrite(actor, { system: { attributes: { hp: { value: 5 } } } })).toBe(
+    false,
+  );
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp": { value: 5 } })).toBe(false);
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.temp": 3 })).toBe(false);
+  expect(
+    guardCharacterHpWrite(actor, { "system.attributes.deathSaves": { status: "stable" } }),
+  ).toBe(false);
+  expect(
+    guardCharacterHpWrite(actor, {
+      "system.attributes.hp.value": 5,
+      "system.attributes.deathSaves.status": "alive",
+    }),
+  ).toBe(false);
+});
+
+it("allows marked writes, unchanged values, max edits, and NPCs", () => {
+  const actor = {
+    type: "character",
+    system: { attributes: { hp: { value: 0, max: 20 }, deathSaves: { status: "dying" } } },
+  };
+  const marked = { "pivot-fantasy": { survivalWrite: true } };
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.value": 5 }, marked)).toBeUndefined();
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.value": 0 })).toBeUndefined();
+  expect(guardCharacterHpWrite(actor, { "system.attributes.hp.max": 30 })).toBeUndefined();
+  expect(guardCharacterHpWrite(actor, { name: "Hera" })).toBeUndefined();
+  expect(
+    guardCharacterHpWrite({ ...actor, type: "npc" }, { "system.attributes.hp.value": 5 }),
+  ).toBeUndefined();
+});
+
+it("lets a lowered Character max clamp HP through both guards", () => {
+  const actor = {
+    type: "character",
+    system: {
+      attributes: { hp: { value: 12, max: 20 }, deathSaves: { status: "alive" } },
+    },
+  };
+  const lowered = { "system.attributes.hp.max": 8 };
+  expect(guardHpMaximum(actor, lowered)).toBeUndefined();
+  expect(guardCharacterHpWrite(actor, lowered)).toBeUndefined();
+  expect(lowered).toEqual({ "system.attributes.hp.max": 8, "system.attributes.hp.value": 8 });
+
+  const raised = { "system.attributes.hp.max": 8, "system.attributes.hp.value": 4 };
+  expect(guardHpMaximum(actor, raised)).toBeUndefined();
+  expect(guardCharacterHpWrite(actor, raised)).toBe(false);
 });
 
 it("stores the max when a flat, nested, or grouped value is set above it", () => {
