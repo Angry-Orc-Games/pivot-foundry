@@ -1,0 +1,201 @@
+{
+  "system": "pivot",
+  "format": 2,
+  "schemaVersion": 2,
+  "generatorVersion": "0.0.0",
+  "exportedAt": "2026-10-23T00:00:00.000Z",
+  "choices": {
+    "name": "Elf Street Mage",
+    "concept": "An elf street mage who learned magic between jobs.",
+    "focus": "Caster",
+    "species": "elf",
+    "cust": {
+      "mode": "p21",
+      "plus2": "str",
+      "plus1": "dex",
+      "size": "Medium",
+      "nativeLang": ""
+    },
+    "sp": {
+      "skType": "skill",
+      "skVal": "Stealth",
+      "vOrigin": "",
+      "vGeneral": "",
+      "lang": "",
+      "craft": "",
+      "grade": "",
+      "elfGrade": "Light Melee"
+    },
+    "bg": "Street Mage",
+    "bgp": {
+      "0": { "o": 1 },
+      "1": { "o": 1 },
+      "2": { "o": 0, "v": "Light" }
+    },
+    "issue": "",
+    "survFeat": "",
+    "scores": { "str": "8", "dex": "14", "con": "13", "int": "15", "wis": "12", "cha": "10" },
+    "adj": { "str": 0, "dex": 0, "con": 0, "int": 0, "wis": 0, "cha": 0 },
+    "prim": ["int", "dex"],
+    "magicAb": "int",
+    "flaws": [],
+    "hd": 2,
+    "hpRoll": "5",
+    "aw": true,
+    "streams": ["Aggregate"],
+    "wprof": [],
+    "aprof": "None",
+    "shield": false,
+    "feats": ["Alert", "Great Memory", "Vigilant", "Finesse", "Steady Mind", "Lucky"],
+    "asiPicks": {},
+    "freeO": "Acute Vision",
+    "freeG": "",
+    "skills": [
+      "Thievery",
+      "Sleight of Hand",
+      "Investigation",
+      "Persuasion",
+      "Alchemy",
+      "Nature",
+      "Performance"
+    ],
+    "mods": [],
+    "modPicks": {},
+    "habil": [],
+    "gearBP": false,
+    "roadWeapon": "Dagger",
+    "roadType": "Light or Medium Melee weapon",
+    "blocks": [],
+    "blockPicks": {},
+    "armourBlock": "Light",
+    "money": "",
+    "moneyRolls": [],
+    "look": "",
+    "home": "",
+    "loyalty": "The corner of the ward that still hides him.",
+    "notes": ""
+  },
+  "computed": {
+    "abilities": {
+      "str": { "score": 8, "mod": -1, "primary": false },
+      "dex": { "score": 16, "mod": 3, "primary": true },
+      "con": { "score": 13, "mod": 1, "primary": false },
+      "int": { "score": 17, "mod": 3, "primary": true },
+      "wis": { "score": 12, "mod": 1, "primary": false },
+      "cha": { "score": 10, "mod": 0, "primary": false }
+    },
+    "hp": 6,
+    "hitDie": "d8",
+    "ac": 14,
+    "acArmour": "Light armour",
+    "speed": 10,
+    "pool": 1,
+    "mp": 15,
+    "buildPoints": { "income": 8, "spent": 8, "remaining": 0 },
+    "skills": {
+      "Acrobatics": { "ability": "dex", "proficient": false, "expertise": false, "total": 3 },
+      "Alchemy": { "ability": "int", "proficient": true, "expertise": false, "total": 5 },
+      "Animal Handling": { "ability": "wis", "proficient": false, "expertise": false, "total": 1 },
+      "Athletics": { "ability": "str", "proficient": false, "expertise": false, "total": -1 },
+      "Control Magic": { "ability": "int", "proficient": true, "expertise": false, "total": 5 },
+      "Deception": { "ability": "cha", "proficient": true, "expertise": false, "total": 2 },
+      "Insight": { "ability": "wis", "proficient": true, "expertise": false, "total": 3 },
+      "Intimidation": { "ability": "cha", "proficient": false, "expertise": false, "total": 0 },
+      "Investigation": { "ability": "int", "proficient": true, "expertise": false, "total": 5 },
+      "Medicine": { "ability": "int", "proficient": false, "expertise": false, "total": 3 },
+      "Medicine: Holistic": {
+        "ability": "wis",
+        "proficient": false,
+        "expertise": false,
+        "total": 1
+      },
+      "Nature": { "ability": "int", "proficient": true, "expertise": false, "total": 5 },
+      "Navigation": { "ability": "int", "proficient": false, "expertise": false, "total": 3 },
+      "Perception": { "ability": "wis", "proficient": true, "expertise": false, "total": 3 },
+      "Performance": { "ability": "cha", "proficient": true, "expertise": false, "total": 2 },
+      "Persuasion": { "ability": "cha", "proficient": true, "expertise": false, "total": 2 },
+      "Religion": { "ability": "wis", "proficient": false, "expertise": false, "total": 1 },
+      "Sleight of Hand": { "ability": "dex", "proficient": true, "expertise": false, "total": 5 },
+      "Stealth": { "ability": "dex", "proficient": true, "expertise": false, "total": 5 },
+      "Survival": { "ability": "wis", "proficient": false, "expertise": false, "total": 1 },
+      "Thievery": { "ability": "dex", "proficient": true, "expertise": false, "total": 5 }
+    },
+    "attacks": [
+      {
+        "category": "Light Melee",
+        "proficient": true,
+        "attack": 5,
+        "ability": "dex",
+        "die": "1d4",
+        "melee": true
+      },
+      {
+        "category": "Medium Melee",
+        "proficient": false,
+        "attack": -1,
+        "ability": "str",
+        "die": "1d6",
+        "melee": true
+      },
+      {
+        "category": "Heavy Melee",
+        "proficient": false,
+        "attack": -1,
+        "ability": "str",
+        "die": "1d8 (1d10 two hands)",
+        "melee": true
+      },
+      {
+        "category": "Two-Handed Heavy Melee",
+        "proficient": false,
+        "attack": -1,
+        "ability": "str",
+        "die": "1d12",
+        "melee": true
+      },
+      {
+        "category": "Improvised",
+        "proficient": false,
+        "attack": -1,
+        "ability": "str",
+        "die": "",
+        "melee": true
+      },
+      {
+        "category": "Bows",
+        "proficient": true,
+        "attack": 5,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Crossbows",
+        "proficient": false,
+        "attack": 3,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Slings",
+        "proficient": false,
+        "attack": 3,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      },
+      {
+        "category": "Thrown",
+        "proficient": false,
+        "attack": 3,
+        "ability": "dex",
+        "die": "",
+        "melee": false
+      }
+    ],
+    "armourProf": "Light",
+    "shieldProf": false,
+    "languages": ["Common", "Elvish"]
+  }
+}

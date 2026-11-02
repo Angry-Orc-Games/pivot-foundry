@@ -1,4 +1,4 @@
-import { correctCreatedHp, guardHpMaximum } from "./runtime/actor-guards";
+import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
@@ -15,6 +15,19 @@ import { SYSTEM_ID } from "./config";
 import { createPivotCharacterSheetClass } from "./sheets/character-sheet";
 import { createPivotNpcSheetClass } from "./sheets/npc-sheet";
 import { createPivotItemSheetClass } from "./sheets/item-sheet";
+import { createFromFile } from "./import/create-from-file";
+import { registerImportButton } from "./import/import-dialog";
+import { toActorData, validate } from "./import/pivot-character";
+
+declare global {
+  interface Game {
+    pivot: {
+      validate: typeof validate;
+      toActorData: typeof toActorData;
+      createFromFile: typeof createFromFile;
+    };
+  }
+}
 
 type PivotGlobals = typeof globalThis & Partial<PivotRegistrationRuntime>;
 
@@ -41,14 +54,17 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
   runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
+  runtime.Hooks.on?.("preUpdateActor", guardCharacterHpWrite);
 
   // Sync token status effects after HP or death state changes
   // Foundry passes nested changes object: {system: {attributes: {hp: {value}}}}
   runtime.Hooks.on?.("updateActor", (actor: unknown, changes: Record<string, unknown>) => {
     const hpChanged = hasNestedProperty(changes, "system.attributes.hp.value");
     const statusChanged = hasNestedProperty(changes, "system.attributes.deathSaves.status");
+    // A max change can make Conscious at 0 HP effectively Dying.
+    const maxChanged = hasNestedProperty(changes, "system.attributes.hp.max");
 
-    if (hpChanged || statusChanged) {
+    if (hpChanged || statusChanged || maxChanged) {
       const globals = globalThis as { game?: unknown };
       void updateTokenStatusEffects(
         actor as Parameters<typeof updateTokenStatusEffects>[0],
@@ -154,6 +170,19 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
         types: ["weapon", "armour", "equipment", "feature", "magicStream", "magicAbility"],
         makeDefault: true,
         label: "PIVOT.Sheets.Item.Label",
+      },
+    );
+
+    const host = globalThis as typeof globalThis & { game?: Game };
+    if (host.game) {
+      host.game.pivot = { validate, toActorData, createFromFile };
+    }
+    registerImportButton(
+      runtime.Hooks as {
+        on?: (
+          event: "renderActorDirectory",
+          handler: (app: unknown, html: HTMLElement) => void,
+        ) => void;
       },
     );
 

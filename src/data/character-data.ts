@@ -2,7 +2,7 @@ import { abilities, canonicalSkills } from "../config";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 import { abilityModifier } from "../rules/modifiers";
 import {
-  reconcileSurvival,
+  effectiveSurvival,
   SURVIVAL_STATUSES,
   type SurvivalState,
   type SurvivalStatus,
@@ -84,7 +84,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
             ? (saves.status as SurvivalStatus)
             : "unconfirmed",
         };
-        const reconciled = reconcileSurvival(stored);
+        const reconciled = effectiveSurvival(stored);
         if (
           reconciled.status !== stored.status ||
           reconciled.successes !== stored.successes ||
@@ -220,6 +220,7 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
             crossbows: booleanField(fields, { required: true, initial: false }),
             thrown: booleanField(fields, { required: true, initial: false }),
             improvised: booleanField(fields, { required: true, initial: false }),
+            slings: booleanField(fields, { required: true, initial: false }),
           }),
         }),
         currency: schemaField(fields, {

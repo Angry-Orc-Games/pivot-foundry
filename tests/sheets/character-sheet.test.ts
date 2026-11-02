@@ -198,6 +198,38 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.items.traits.map((item) => item.name)).toEqual(["Darkvision"]);
   });
 
+  it("lists slings after thrown and keeps humanoid abilities with traits", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        proficiencies: { weapons: { bows: true, thrown: true, slings: true } },
+      },
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "habil-1",
+          name: "Chitinous Carapace",
+          type: "feature",
+          system: { category: "humanoidAbility" },
+        },
+        {
+          id: "trait-1",
+          name: "Darkvision",
+          type: "feature",
+          system: { category: "species" },
+        },
+      ],
+    });
+
+    expect(context.proficiencyText.weapons).toBe("Bows, Thrown, Slings");
+    expect(context.items.traits.map((item) => item.name)).toEqual([
+      "Chitinous Carapace",
+      "Darkvision",
+    ]);
+  });
+
   it("keeps non-enumerable Foundry document ids available for item row actions", () => {
     const weapon = {
       name: "Hidden Id Axe",
@@ -245,6 +277,8 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.poolPercent).toBe(20);
     expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
     expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+    expect(context.deathSaveSuccesses).toBe(0);
+    expect(context.deathSaveFailures).toBe(0);
   });
 
   it("shows alive after prepare when stored HP is positive and status is dying", () => {
@@ -263,6 +297,31 @@ describe("prepareCharacterSheetContext", () => {
 
     expect(context.survivalStatus).toBe("alive");
     expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
+    expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
+    expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+    expect(context.deathSaveSuccesses).toBe(0);
+    expect(context.deathSaveFailures).toBe(0);
+  });
+
+  it("shows Conscious on the sheet when HP is full and Dying is stale", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 16, max: 16, temp: 2 },
+          deathSaves: { status: "dying", successes: 1, failures: 1 },
+        },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("alive");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
+    expect(context.hpPercent).toBe(100);
+    expect(context.deathSaveSuccesses).toBe(0);
+    expect(context.deathSaveFailures).toBe(0);
     expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
     expect(context.deathSaveFailurePips).toEqual([false, false, false]);
   });
@@ -286,6 +345,28 @@ describe("prepareCharacterSheetContext", () => {
     expect(statusFor(0, "stable")).toBe("stable");
     expect(statusFor(10, "dead")).toBe("dead");
     expect(statusFor(0, "dead")).toBe("dead");
+  });
+
+  it("still shows Dying and its counters at 0 HP", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 0, max: 16, temp: 0 },
+          deathSaves: { status: "dying", successes: 2, failures: 1 },
+        },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("dying");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.dying");
+    expect(context.deathSaveSuccessPips).toEqual([true, true, false]);
+    expect(context.deathSaveFailurePips).toEqual([true, false, false]);
+    expect(context.deathSaveSuccesses).toBe(2);
+    expect(context.deathSaveFailures).toBe(1);
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
+import { guardCharacterHpWrite } from "../../src/runtime/actor-guards";
 
 function createDocument(
   name: string,
@@ -219,4 +220,24 @@ it("plans synthetic state before writes and persists it after base changes", asy
     },
   });
   expect(order).toEqual(["base", "token"]);
+});
+
+it("writes migrations as trusted survival writes so the Character guard admits them", async () => {
+  const writes: unknown[] = [];
+  const actor = createDocument(
+    "Hera",
+    { attributes: { hp: { value: 5, max: 20 } } },
+    {
+      type: "character",
+      update: async (data, options) => {
+        writes.push(guardCharacterHpWrite({ type: "character", system: {} }, data, options));
+      },
+    },
+  );
+  const report = await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [actor], items: [] },
+  });
+  expect(report.failed).toBe(0);
+  expect(writes.length).toBeGreaterThan(0);
+  expect(writes.every((result) => result === undefined)).toBe(true);
 });
