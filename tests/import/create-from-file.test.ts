@@ -642,6 +642,21 @@ describe("createFromFile", () => {
     warn.mockRestore();
   });
 
+  it("rejects computed hp of -3 with the field minimum and creates nothing", async () => {
+    const world = install({ isGM: true });
+    const file = structuredClone(veteran);
+    (file.computed as JsonRecord).hp = -3;
+    const result = await createFromFile(file, "player-1");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toEqual({
+      code: "schema",
+      field: "computed.hp",
+      message: "HP must be 0 or more (file: -3)",
+    });
+    expect(world.create).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["pool", "Pool"],
     ["ac", "AC"],
