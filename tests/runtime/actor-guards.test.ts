@@ -161,6 +161,11 @@ it("rejects Character survival writes submitted under a shallower or mixed-depth
     { system: { "attributes.hp": { temp: 3 } } },
     { system: { attributes: { "hp.value": 5 } } },
     { system: { attributes: { "deathSaves.status": "stable" } } },
+    { "system.attributes.deathSaves.-=status": null },
+    { system: { attributes: { deathSaves: { "-=status": null } } } },
+    { "system.attributes.hp.-=temp": null },
+    { "system.attributes.-=hp": null },
+    { system: { attributes: { hp: null } } },
   ];
   for (const changes of bypasses) {
     expect(guardCharacterHpWrite(actor, changes), JSON.stringify(changes)).toBe(false);

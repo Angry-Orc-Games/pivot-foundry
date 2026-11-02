@@ -190,20 +190,38 @@ function flattenChanges(
   return out;
 }
 
+/**
+ * Whether the flattened changes touch `system.attributes.<group>.<key>`: by its own path, by a
+ * Foundry deletion key (`-=key`) on it or any parent, or by replacing a parent with a non-object.
+ * A deletion or replacement leaves the field without a value, so it reports `undefined`.
+ */
 function submittedField(
   flat: Record<string, unknown>,
   group: string,
   key: string,
 ): { present: boolean; value: unknown } {
-  const path = `system.attributes.${group}.${key}`;
-  return Object.hasOwn(flat, path)
-    ? { present: true, value: flat[path] }
-    : { present: false, value: undefined };
+  const segments = ["system", "attributes", group, key];
+  for (let i = 0; i < segments.length; i++) {
+    const parent = segments.slice(0, i).join(".");
+    const path = segments.slice(0, i + 1).join(".");
+    const isField = i === segments.length - 1;
+    const deletion = `${parent ? `${parent}.` : ""}-=${segments[i]}`;
+    if (Object.hasOwn(flat, deletion)) return { present: true, value: undefined };
+    if (Object.hasOwn(flat, path)) {
+      if (isField) return { present: true, value: flat[path] };
+      if (!asRecord(flat[path])) return { present: true, value: undefined };
+    }
+  }
+  return { present: false, value: undefined };
 }
 
 /**
  * Only a Survival transaction (or a world migration) may change a Character's HP, Temporary HP,
  * or death saves. Any other write, such as the token HUD bar, would bypass the survival rules.
+ *
+ * This runs in the submitting client's preUpdateActor hook, and the `survivalWrite` option is
+ * supplied by the caller. It stops accidental bypasses (sheets, token bars, macros); it is not
+ * a server-side security boundary.
  */
 export function guardCharacterHpWrite(
   actor: { type?: string; system?: unknown },
