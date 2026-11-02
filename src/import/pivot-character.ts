@@ -324,6 +324,7 @@ const MINIMUM_KEY = "PIVOT.Import.Minimum";
 const MISMATCH_KEY = "PIVOT.Import.Mismatch";
 const NON_NEGATIVE_FIELDS = new Set([
   "computed.ac",
+  "computed.hp",
   "computed.speed",
   "computed.pool",
   "computed.mp",
