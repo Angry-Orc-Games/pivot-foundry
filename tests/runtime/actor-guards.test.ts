@@ -204,6 +204,15 @@ it("lets a lowered Character max clamp HP through both guards", () => {
   expect(guardCharacterHpWrite(actor, raised)).toBe(false);
 });
 
+it("lets a lowered max clamp HP through when submitted under a mixed-depth key", () => {
+  const actor = {
+    type: "character",
+    system: { attributes: { hp: { value: 12, max: 20 }, deathSaves: { status: "alive" } } },
+  };
+  const lowered = { system: { attributes: { "hp.max": 8, "hp.value": 8 } } };
+  expect(guardCharacterHpWrite(actor, lowered)).toBeUndefined();
+});
+
 it("stores the max when a flat, nested, or grouped value is set above it", () => {
   const actor = { system: { attributes: { hp: { value: 10, max: 20 } } } };
   const flat = { "system.attributes.hp.value": 50 };

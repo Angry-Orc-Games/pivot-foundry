@@ -239,7 +239,8 @@ export function guardCharacterHpWrite(
   // guardHpMaximum lowers HP to a lowered max; that clamp keeps the status consistent.
   const hp = submittedField(flat, "hp", "value").value;
   const onlyHp = touched.length === 1 && touched[0]?.[0] === "hp" && touched[0][1] === "value";
-  if (onlyHp && validAmount(hp) && hp === numericMax(changes) && hp < storedHp(actor)) return;
+  const max = submittedField(flat, "hp", "max").value;
+  if (onlyHp && validAmount(hp) && hp === max && hp < storedHp(actor)) return;
   warn("UseHealthTools");
   return false;
 }
