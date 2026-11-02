@@ -176,18 +176,29 @@ const SURVIVAL_FIELDS = [
   ["deathSaves", "status"],
 ] as const;
 
-function submittedField(
+function flattenChanges(
   changes: Record<string, unknown>,
+  prefix = "",
+  out: Record<string, unknown> = {},
+): Record<string, unknown> {
+  for (const [key, value] of Object.entries(changes)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const record = asRecord(value);
+    if (record && Object.keys(record).length > 0) flattenChanges(record, path, out);
+    else out[path] = value;
+  }
+  return out;
+}
+
+function submittedField(
+  flat: Record<string, unknown>,
   group: string,
   key: string,
 ): { present: boolean; value: unknown } {
-  const flat = `system.attributes.${group}.${key}`;
-  if (Object.hasOwn(changes, flat)) return { present: true, value: changes[flat] };
-  const grouped = asRecord(changes[`system.attributes.${group}`]);
-  if (grouped && Object.hasOwn(grouped, key)) return { present: true, value: grouped[key] };
-  const nested = asRecord(asRecord(asRecord(changes.system)?.attributes)?.[group]);
-  if (nested && Object.hasOwn(nested, key)) return { present: true, value: nested[key] };
-  return { present: false, value: undefined };
+  const path = `system.attributes.${group}.${key}`;
+  return Object.hasOwn(flat, path)
+    ? { present: true, value: flat[path] }
+    : { present: false, value: undefined };
 }
 
 /**
@@ -201,13 +212,14 @@ export function guardCharacterHpWrite(
 ): false | undefined {
   if (actor.type !== "character" || isSurvivalWrite(options)) return;
   const attributes = asRecord(asRecord(actor.system)?.attributes);
+  const flat = flattenChanges(changes);
   const touched = SURVIVAL_FIELDS.filter(([group, key]) => {
-    const submitted = submittedField(changes, group, key);
+    const submitted = submittedField(flat, group, key);
     return submitted.present && submitted.value !== asRecord(attributes?.[group])?.[key];
   });
   if (touched.length === 0) return;
   // guardHpMaximum lowers HP to a lowered max; that clamp keeps the status consistent.
-  const hp = submittedField(changes, "hp", "value").value;
+  const hp = submittedField(flat, "hp", "value").value;
   const onlyHp = touched.length === 1 && touched[0]?.[0] === "hp" && touched[0][1] === "value";
   if (onlyHp && validAmount(hp) && hp === numericMax(changes) && hp < storedHp(actor)) return;
   warn("UseHealthTools");

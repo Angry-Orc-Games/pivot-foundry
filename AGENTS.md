@@ -20,6 +20,8 @@ Run these from the repository root:
 
 ## Architecture Boundaries
 
+Read [CODING_STANDARDS.md](CODING_STANDARDS.md) before writing or reviewing code.
+
 - Put deterministic game rules in `src/rules/`.
 - Put tests for deterministic rules under `tests/rules/`.
 - Keep Foundry lifecycle registration, document model wiring, hooks, sheets, and settings thin and close to `src/pivot.ts` until there is enough surface area to split modules.

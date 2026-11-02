@@ -144,6 +144,29 @@ it("rejects Character survival writes that are not Survival transactions", () =>
   ).toBe(false);
 });
 
+it("rejects Character survival writes submitted under a shallower or mixed-depth key", () => {
+  const actor = {
+    type: "character",
+    system: {
+      attributes: {
+        hp: { value: 0, max: 20, temp: 0 },
+        deathSaves: { status: "dying", successes: 0, failures: 0 },
+      },
+    },
+  };
+  const bypasses: Array<Record<string, unknown>> = [
+    { "system.attributes": { hp: { value: 5 } } },
+    { "system.attributes": { deathSaves: { status: "stable" } } },
+    { system: { "attributes.hp.value": 5 } },
+    { system: { "attributes.hp": { temp: 3 } } },
+    { system: { attributes: { "hp.value": 5 } } },
+    { system: { attributes: { "deathSaves.status": "stable" } } },
+  ];
+  for (const changes of bypasses) {
+    expect(guardCharacterHpWrite(actor, changes), JSON.stringify(changes)).toBe(false);
+  }
+});
+
 it("allows marked writes, unchanged values, max edits, and NPCs", () => {
   const actor = {
     type: "character",
