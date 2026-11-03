@@ -522,8 +522,9 @@ describe("workflows that start Foundry", () => {
     expect(staging).toContain("accept-artifact.sh");
     expect(staging).toContain("path: package-artifact");
     expect(staging).toContain("working-directory: trusted-gate");
-    expect(staging).toContain("group: foundry-staging-deploy");
-    expect(staging).not.toContain("group: foundry-e2e");
+    // The deploy restarts the build server, so it waits for the nightly E2E instead of overlapping it.
+    expect(staging).toContain("group: foundry-e2e");
+    expect(staging).toContain("cancel-in-progress: false");
 
     const nightlyGate = nightly.slice(
       nightly.indexOf("  gate:\n"),

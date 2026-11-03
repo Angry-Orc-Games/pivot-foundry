@@ -33,7 +33,7 @@ Publication of a GitHub Release is separate from deploying to Angry Orc Games ho
 | [`promote-production.yml`](../.github/workflows/promote-production.yml) | Manual, environment approval                      | `production`                         | Promote the exact staging-accepted zip. Does not start a Foundry process.                                                                                                                                                                                |
 | [`release.yml`](../.github/workflows/release.yml)                       | `v*` tags                                         | None. Publish uses `contents: write` | Looks up a green `Foundry E2E (nightly)` check on the tagged commit, then publishes. Does not start Foundry. A missing, red, neutral, or unverifiable check fails closed at any hour.                                                                    |
 
-Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Nightly E2E runs use `concurrency: foundry-e2e` with `cancel-in-progress: false`, so a second run waits instead of starting another Foundry. Release does not take that lock and does not start Foundry.
+Actions are pinned by commit SHA. Jobs have timeouts and concurrency groups. Nightly E2E and the build-server deploy share `concurrency: foundry-e2e` with `cancel-in-progress: false`, so a deploy never restarts the build server during a nightly run and a second run waits instead of starting another Foundry. Release does not take that lock and does not start Foundry.
 
 Untrusted fork PRs run `CI` only. They do **not** receive Foundry secrets. There is no `pull_request_target` workflow. The nightly queue skips fork heads. `workflow_dispatch` `ref` accepts a 40-character SHA only when that commit is reachable from a branch in this repository. A commit that exists only as a fork pull-request head is refused. The runner scripts still come from `main`. `secrets_check_only` verifies the repository E2E secrets at any hour and does not start Foundry.
 
@@ -81,15 +81,14 @@ The public hostnames are **not** assumed to be SSH destinations. Do not invent u
 
 Suggested branch-protection checks on `main`:
 
-- `Verify / Node 20`
-- `Verify / Node 22`
-- `Package Foundry System`
+- `Verify`
+- `Node 20 compatibility`
 
 `Foundry E2E (nightly)` is posted on each tested SHA. It is not a required pull-request check unless you add it. The workflow runs at 07:23 UTC and on `workflow_dispatch`.
 
 ## Staging
 
-After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` downloads that `system.zip`, deploys it to https://build.angryorcgames.com, waits for the server to come back, then runs `npm run test:e2e:staging`. It starts no Foundry process, so it never takes the shared license and can run at any hour. A pull-request CI run does not start it. Real-Foundry E2E is the nightly `e2e.yml` run (see ADR 0001); production promotion requires a green nightly check on the packaged commit. The GM and player smoke checks skip until the `PIVOT_STAGING_*` secrets exist; the status and package-version checks always run.
+After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` downloads that `system.zip`, deploys it to https://build.angryorcgames.com, waits for the server to come back, then runs `npm run test:e2e:staging`. It starts no Foundry process, so it needs no license window and can run at any hour. It shares the `foundry-e2e` concurrency group with the nightly E2E, so a deploy waits rather than restarting the build server during a nightly run. A pull-request CI run does not start it. Real-Foundry E2E is the nightly `e2e.yml` run (see ADR 0001); production promotion requires a green nightly check on the packaged commit. The GM and player smoke checks skip until the `PIVOT_STAGING_*` secrets exist; the status and package-version checks always run.
 
 Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` only when `artifact-identity.json` `commit` equals the CI commit (`github.event.workflow_run.head_sha`, or `github.sha` on a manual dispatch). The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 

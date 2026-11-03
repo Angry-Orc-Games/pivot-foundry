@@ -13,7 +13,7 @@ permissions:
   statuses: write
 
 concurrency:
-  group: foundry-staging-deploy
+  group: foundry-e2e
   cancel-in-progress: false
 
 jobs:
