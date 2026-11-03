@@ -28,7 +28,7 @@ jobs:
         github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: staging
+    environment: build
     env:
       PIVOT_FOUNDRY_TARGET: staging
       PIVOT_FOUNDRY_BASE_URL: https://build.angryorcgames.com
@@ -50,14 +50,14 @@ jobs:
 
       - name: Check required staging secrets
         env:
-          HAVE_FOUNDRY_DEPLOY_SSH_HOST: ${{ secrets.FOUNDRY_DEPLOY_SSH_HOST != '' }}
-          HAVE_FOUNDRY_DEPLOY_SSH_USER: ${{ secrets.FOUNDRY_DEPLOY_SSH_USER != '' }}
+          HAVE_FOUNDRY_DEPLOY_SSH_HOST: ${{ vars.FOUNDRY_DEPLOY_SSH_HOST != '' }}
+          HAVE_FOUNDRY_DEPLOY_SSH_USER: ${{ vars.FOUNDRY_DEPLOY_SSH_USER != '' }}
           HAVE_FOUNDRY_DEPLOY_SSH_KEY: ${{ secrets.FOUNDRY_DEPLOY_SSH_KEY != '' }}
-          HAVE_FOUNDRY_DEPLOY_TARGET_DIR: ${{ secrets.FOUNDRY_DEPLOY_TARGET_DIR != '' }}
-          HAVE_FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR != '' }}
-          HAVE_FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE != '' }}
+          HAVE_FOUNDRY_DEPLOY_TARGET_DIR: ${{ vars.FOUNDRY_DEPLOY_TARGET_DIR != '' }}
+          HAVE_FOUNDRY_DEPLOY_BACKUP_DIR: ${{ vars.FOUNDRY_DEPLOY_BACKUP_DIR != '' }}
+          HAVE_FOUNDRY_DEPLOY_SERVICE: ${{ vars.FOUNDRY_DEPLOY_SERVICE != '' }}
         run: |
-          # Fail fast with the names (never values) of missing staging environment secrets.
+          # Fail fast with the names (never values) of missing build environment secrets and variables.
           missing=""
           for name in FOUNDRY_DEPLOY_SSH_HOST FOUNDRY_DEPLOY_SSH_USER FOUNDRY_DEPLOY_SSH_KEY \
                       FOUNDRY_DEPLOY_TARGET_DIR FOUNDRY_DEPLOY_BACKUP_DIR FOUNDRY_DEPLOY_SERVICE; do
@@ -65,7 +65,7 @@ jobs:
             if [ "${!var}" != "true" ]; then missing="${missing} ${name}"; fi
           done
           if [ -n "$missing" ]; then
-            echo "::error::Missing secrets on GitHub Environment 'staging':${missing}. See docs/deployment.md."
+            echo "::error::Missing secrets/variables on GitHub Environment 'build':${missing}. See docs/deployment.md."
             exit 3
           fi
           echo "All required staging secrets are configured."
@@ -121,12 +121,12 @@ jobs:
 
       - name: Deploy exact artifact to the build server
         env:
-          FOUNDRY_DEPLOY_SSH_HOST: ${{ secrets.FOUNDRY_DEPLOY_SSH_HOST }}
-          FOUNDRY_DEPLOY_SSH_USER: ${{ secrets.FOUNDRY_DEPLOY_SSH_USER }}
+          FOUNDRY_DEPLOY_SSH_HOST: ${{ vars.FOUNDRY_DEPLOY_SSH_HOST }}
+          FOUNDRY_DEPLOY_SSH_USER: ${{ vars.FOUNDRY_DEPLOY_SSH_USER }}
           FOUNDRY_DEPLOY_SSH_KEY: ${{ secrets.FOUNDRY_DEPLOY_SSH_KEY }}
-          FOUNDRY_DEPLOY_TARGET_DIR: ${{ secrets.FOUNDRY_DEPLOY_TARGET_DIR }}
-          FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR }}
-          FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE }}
+          FOUNDRY_DEPLOY_TARGET_DIR: ${{ vars.FOUNDRY_DEPLOY_TARGET_DIR }}
+          FOUNDRY_DEPLOY_BACKUP_DIR: ${{ vars.FOUNDRY_DEPLOY_BACKUP_DIR }}
+          FOUNDRY_DEPLOY_SERVICE: ${{ vars.FOUNDRY_DEPLOY_SERVICE }}
           PIVOT_DEPLOY_PUBLIC_URL: https://build.angryorcgames.com
         working-directory: trusted-gate
         run: node scripts/deploy-package.mjs staging
@@ -151,10 +151,6 @@ jobs:
 
       - name: External staging smoke
         env:
-          PIVOT_STAGING_GM_USER: ${{ secrets.PIVOT_STAGING_GM_USER }}
-          PIVOT_STAGING_GM_PASSWORD: ${{ secrets.PIVOT_STAGING_GM_PASSWORD }}
-          PIVOT_STAGING_PLAYER_USER: ${{ secrets.PIVOT_STAGING_PLAYER_USER }}
-          PIVOT_STAGING_PLAYER_PASSWORD: ${{ secrets.PIVOT_STAGING_PLAYER_PASSWORD }}
           PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
         working-directory: trusted-gate
         run: npm run test:e2e:staging

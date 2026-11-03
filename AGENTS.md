@@ -47,7 +47,7 @@ Do not claim Cloud execution, GitHub CI, staging, production, or release publica
 
 `.cursor/environment.json` installs Node, Docker/Compose, and Playwright browsers. `install` and `start` do not boot Foundry. After a snapshot, use this checkout’s package (`npm ci`, `npm run build`) before `npm run foundry:up`.
 
-Runtime Secrets: `FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`, and optionally `FOUNDRY_RELEASE_CACHE_URL` + `FOUNDRY_RELEASE_SHA256`. Do not persist a timed `FOUNDRY_RELEASE_URL`. Do not load production deploy credentials onto Cloud Agents. Preview port **30000** through Cursor forwarding and confirm WebSocket connectivity, not just the first HTML page.
+Runtime Secrets: `FOUNDRY_ADMIN_KEY` (local-only password), `FOUNDRY_LICENSE_KEY`, and optionally `FOUNDRY_RELEASE_CACHE_URL` + `FOUNDRY_RELEASE_SHA256` (the `FOUNDRY_DIST_URL` + `FOUNDRY_DIST_SHA256` Actions secrets map to these). Do not persist a timed `FOUNDRY_RELEASE_URL`. Do not load production deploy credentials onto Cloud Agents. Preview port **30000** through Cursor forwarding and confirm WebSocket connectivity, not just the first HTML page.
 
 ## Agent skills
 

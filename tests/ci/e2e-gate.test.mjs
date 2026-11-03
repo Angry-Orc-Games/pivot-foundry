@@ -572,9 +572,9 @@ describe("workflows that start Foundry", () => {
       packageJob.indexOf("\n      - name:", packageScan),
     );
     expect(packageBeforeScan).not.toContain("secrets.");
-    expect(packageBeforeScan.replace("environment: foundry-e2e", "")).not.toContain("environment:");
-    expect(packageJob).toContain("environment: foundry-e2e");
-    expect(packageScanStep).toContain("FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}");
+    expect(nightly).not.toContain("environment:");
+    expect(nightly).not.toContain("secrets.FOUNDRY_ADMIN_KEY");
+    expect(packageScanStep).not.toContain("FOUNDRY_ADMIN_KEY");
     expect(packageScanStep).toContain("FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}");
     expect(packageJob.slice(packageScan + packageScanStep.length)).not.toContain("secrets.");
     expect(packageJob).toContain("npm run package:system");
@@ -710,7 +710,7 @@ describe("e2e secret presence", () => {
     expect(result.status).toBe(1);
     expect(result.available).toBe("");
     expect(result.stderr.trim()).toBe(
-      "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': FOUNDRY_ADMIN_KEY FOUNDRY_RELEASE_SHA256",
+      "::error::Foundry E2E cannot run. Missing required secrets in the repository secrets: FOUNDRY_DIST_SHA256",
     );
     expect(result.stderr).not.toContain("super-secret-admin");
     expect(result.curls).toEqual([]);
