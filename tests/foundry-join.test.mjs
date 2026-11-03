@@ -72,6 +72,9 @@ function v14JoinPage() {
         first() {
           return this;
         },
+        async count() {
+          return 0;
+        },
         async isVisible() {
           return false;
         },
@@ -110,6 +113,9 @@ function v14JoinPage() {
       return {
         first() {
           return this;
+        },
+        async count() {
+          return 0;
         },
         async isVisible() {
           return false;
@@ -173,6 +179,9 @@ function v14JoinPage() {
       return {
         first() {
           return this;
+        },
+        async count() {
+          return 0;
         },
         async isVisible() {
           return false;

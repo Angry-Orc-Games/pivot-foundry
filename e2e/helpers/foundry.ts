@@ -771,18 +771,31 @@ export async function joinAs(
             has: page.getByRole("heading", { name: "Join Game Session", exact: true }),
           })
           .first();
+        // Foundry 14.367 replaced the user <select> on the Join screen with a text field
+        // ("Select User"). Older builds still have the combobox, so use whichever the page has.
+        const userText = form.getByRole("textbox", { name: "Select User" }).first();
+        const hasTextUser = (await userText.count()) > 0;
         const user = form.getByRole("combobox").first();
-        const choose = () =>
-          user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        const choose = async () => {
+          if (hasTextUser) {
+            if ((await userText.inputValue()) !== name) {
+              await userText.fill(name, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+            }
+            return;
+          }
+          await user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        };
         await choose();
         if (password) {
           const field = form.locator('input[type="password"]');
           if ((await field.count()) > 0) await fillSecret(field.first(), password);
           await choose();
         }
-        const selected = await user.evaluate(
-          (element: HTMLSelectElement) => element.selectedOptions[0]?.label ?? "",
-        );
+        const selected = hasTextUser
+          ? await userText.inputValue()
+          : await user.evaluate(
+              (element: HTMLSelectElement) => element.selectedOptions[0]?.label ?? "",
+            );
         await expect(selected).toBe(name);
         await form
           .getByRole("button", { name: "Join Game Session", exact: true })
