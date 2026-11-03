@@ -774,8 +774,13 @@ export async function joinAs(
         // Foundry 14.367 replaced the user <select> on the Join screen with a text field
         // ("Select User"). Older builds still have the combobox, so use whichever the page has.
         const userText = form.getByRole("textbox", { name: "Select User" }).first();
-        const hasTextUser = (await userText.count()) > 0;
         const user = form.getByRole("combobox").first();
+        // count() does not wait, so first wait for whichever control the form renders.
+        await userText
+          .or(user)
+          .first()
+          .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        const hasTextUser = (await userText.count()) > 0;
         const choose = async () => {
           if (hasTextUser) {
             // The field is a plain text input and the harness never types into inputs it records

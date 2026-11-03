@@ -13,6 +13,10 @@ function textboxJoinPage({ initial }) {
     async count() {
       return 1;
     },
+    or() {
+      return userText;
+    },
+    async waitFor() {},
     async inputValue() {
       return value;
     },
@@ -33,6 +37,10 @@ function textboxJoinPage({ initial }) {
     async count() {
       return 0;
     },
+    or() {
+      return none;
+    },
+    async waitFor() {},
     async isVisible() {
       return false;
     },
