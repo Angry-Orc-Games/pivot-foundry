@@ -78,12 +78,11 @@ describe("joinAs on a Foundry 14.367 text-field join screen", () => {
     expect(page.events.some((event) => event.startsWith("fill:"))).toBe(false);
   });
 
-  it("types the user name when the field shows someone else", async () => {
+  it("refuses with a clear message when the field shows someone else", async () => {
     const page = textboxJoinPage({ initial: "Somebody Else" });
-    await joinAs(page, { name: "Gamemaster" }).catch(() => {});
-    expect(page.events).toContain("fill:Gamemaster");
-    expect(page.events.indexOf("fill:Gamemaster")).toBeLessThan(
-      page.events.indexOf("click-join-session"),
+    await expect(joinAs(page, { name: "Gamemaster" })).rejects.toThrow(
+      /shows "Somebody Else" but the test expected "Gamemaster"/,
     );
+    expect(page.events).not.toContain("click-join-session");
   });
 });

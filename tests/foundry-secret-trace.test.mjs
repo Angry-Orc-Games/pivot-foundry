@@ -108,6 +108,9 @@ function tracedJoinPage(trace) {
         first() {
           return this;
         },
+        async count() {
+          return 0;
+        },
         async isVisible() {
           return true;
         },

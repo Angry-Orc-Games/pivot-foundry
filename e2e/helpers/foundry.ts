@@ -778,8 +778,13 @@ export async function joinAs(
         const user = form.getByRole("combobox").first();
         const choose = async () => {
           if (hasTextUser) {
-            if ((await userText.inputValue()) !== name) {
-              await userText.fill(name, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+            // The field is a plain text input and the harness never types into inputs it records
+            // (see tests/foundry-secret-actions.test.mjs), so it only accepts the pre-filled user.
+            const shown = await userText.inputValue();
+            if (shown !== name) {
+              throw new Error(
+                `The Join screen shows "${shown}" but the test expected "${name}". Foundry 14.367 pre-fills the user.`,
+              );
             }
             return;
           }
