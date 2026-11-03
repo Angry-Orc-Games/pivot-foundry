@@ -122,13 +122,12 @@ license_gate() {
 
 check_secrets() {
   local -a missing=()
-  [[ ${HAVE_ADMIN:-} == true ]] || missing+=("FOUNDRY_ADMIN_KEY")
   [[ ${HAVE_LICENSE:-} == true ]] || missing+=("FOUNDRY_LICENSE_KEY")
-  [[ ${HAVE_CACHE:-} == true ]] || missing+=("FOUNDRY_RELEASE_CACHE_URL")
-  [[ ${HAVE_SHA:-} == true ]] || missing+=("FOUNDRY_RELEASE_SHA256")
+  [[ ${HAVE_CACHE:-} == true ]] || missing+=("FOUNDRY_DIST_URL")
+  [[ ${HAVE_SHA:-} == true ]] || missing+=("FOUNDRY_DIST_SHA256")
 
   if ((${#missing[@]} > 0)); then
-    printf "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': %s\n" "${missing[*]}" >&2
+    printf "::error::Foundry E2E cannot run. Missing required secrets in the repository secrets: %s\n" "${missing[*]}" >&2
     exit 1
   fi
 
