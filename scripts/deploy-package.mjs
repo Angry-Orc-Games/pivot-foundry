@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { EXIT, assertSafeTarget, repoRoot } from "./foundry-env.mjs";
 import { fileSha256 } from "./artifact-identity.mjs";
+import { preflightScript } from "./deploy-preflight.mjs";
 
 const target = process.argv[2] || process.env.PIVOT_DEPLOY_TARGET;
 const identityPath = process.argv[3] || join(repoRoot, "artifact-identity.json");
@@ -93,6 +94,10 @@ const backup = `${backupDir}/pivot-fantasy-${stamp}`;
 const remoteZip = `/tmp/pivot-fantasy-system-${stamp}.zip`;
 
 try {
+  execFileSync(ssh[0], [...ssh.slice(1), remote, "sh", "-s"], {
+    input: preflightScript({ targetDir, backupDir }),
+    stdio: ["pipe", "inherit", "inherit"],
+  });
   execFileSync(
     "scp",
     [...sshOptions, ...(key ? ["-i", keyFile] : []), zipPath, `${remote}:${remoteZip}`],

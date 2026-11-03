@@ -97,3 +97,21 @@ describe("joinAs on a Foundry 14.367 text-field join screen", () => {
     );
   });
 });
+
+describe("joinAs failure report", () => {
+  it("adds the form controls to the error and omits password values", async () => {
+    const page = textboxJoinPage({ initial: "" });
+    page.evaluate = async () => [
+      '<input type="text" name="username" id="join-username" value="">',
+      '<input type="password" name="password">',
+    ];
+    const section = page.locator();
+    const userText = section.getByRole("textbox", { name: "Select User" });
+    userText.waitFor = async () => {
+      throw new Error("timed out");
+    };
+    const error = await joinAs(page, { name: "Gamemaster" }).catch((e) => e);
+    expect(error.message).toContain('Join screen controls: <input type="text" name="username"');
+    expect(error.message).not.toContain("secret");
+  });
+});

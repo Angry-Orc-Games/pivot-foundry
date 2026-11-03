@@ -94,6 +94,8 @@ Reset only a designated local/E2E world. The staging job does not wipe other ser
 
 Keep the build Foundry **runtime** on the same version as production (14.367). Upgrading Foundry on the server is a separate operation from deploying this game system.
 
+Before uploading, `scripts/deploy-preflight.mjs` runs over SSH and checks that the deploy user can write the target dir, its parent, the backup dir and `/tmp`, and that `unzip` exists. It reports every problem at once and stops before the upload. It cannot test the `systemctl restart` permission without restarting the service.
+
 ## Production
 
 Run **Promote production** and pass the staging workflow run id. The `production` environment must require a human approval. The job:
