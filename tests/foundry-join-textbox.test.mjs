@@ -20,9 +20,11 @@ function textboxJoinPage({ initial }) {
     async inputValue() {
       return value;
     },
-    async fill(next) {
-      events.push(`fill:${next}`);
-      value = next;
+    async evaluate(write, next) {
+      const input = { value, dispatchEvent() {} };
+      write(input, next);
+      events.push(`set:${input.value}`);
+      value = input.value;
     },
   };
   const joinButton = {
@@ -54,12 +56,7 @@ function textboxJoinPage({ initial }) {
       return section;
     },
     locator() {
-      return {
-        ...none,
-        async evaluateAll() {
-          return ["<input>"];
-        },
-      };
+      return none;
     },
     getByRole(role, options = {}) {
       if (role === "textbox" && options.name === "Select User") return userText;
@@ -88,14 +85,15 @@ describe("joinAs on a Foundry 14.367 text-field join screen", () => {
     const page = textboxJoinPage({ initial: "Gamemaster" });
     await joinAs(page, { name: "Gamemaster" }).catch(() => {});
     expect(page.events).toContain("click-join-session");
-    expect(page.events.some((event) => event.startsWith("fill:"))).toBe(false);
+    expect(page.events.some((event) => event.startsWith("set:"))).toBe(false);
   });
 
-  it("refuses with a clear message when the field shows someone else", async () => {
-    const page = textboxJoinPage({ initial: "Somebody Else" });
-    await expect(joinAs(page, { name: "Gamemaster" })).rejects.toThrow(
-      /shows "Somebody Else" but the test expected "Gamemaster"/,
+  it("types the user name when the field is empty (a fresh browser with several users)", async () => {
+    const page = textboxJoinPage({ initial: "" });
+    await joinAs(page, { name: "Gamemaster" }).catch(() => {});
+    expect(page.events).toContain("set:Gamemaster");
+    expect(page.events.indexOf("set:Gamemaster")).toBeLessThan(
+      page.events.indexOf("click-join-session"),
     );
-    expect(page.events).not.toContain("click-join-session");
   });
 });

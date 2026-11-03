@@ -783,20 +783,10 @@ export async function joinAs(
         const hasTextUser = (await userText.count()) > 0;
         const choose = async () => {
           if (hasTextUser) {
-            // The field is a plain text input and the harness never types into inputs it records
-            // (see tests/foundry-secret-actions.test.mjs), so it only accepts the pre-filled user.
-            const shown = await userText.inputValue();
-            if (shown !== name) {
-              // Diagnostic only: the user field's markup, never the password field's value.
-              const markup = await form
-                .locator(
-                  '[name="userid"], [name="user"], select, input[type="text"], input:not([type])',
-                )
-                .evaluateAll((els) => els.map((el) => el.outerHTML.slice(0, 600)));
-              throw new Error(
-                `The Join screen shows "${shown}" but the test expected "${name}". Foundry 14.367 pre-fills the user. User field markup: ${JSON.stringify(markup)}`,
-              );
-            }
+            // Foundry 14.367: the user is typed into <input name="username">, and is only
+            // pre-filled in a browser that has joined before. fillSecret is the harness's
+            // way to enter a variable without recording it (see foundry-secret-actions.test).
+            if ((await userText.inputValue()) !== name) await fillSecret(userText, name);
             return;
           }
           await user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
