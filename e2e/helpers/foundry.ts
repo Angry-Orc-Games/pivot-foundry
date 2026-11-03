@@ -787,8 +787,14 @@ export async function joinAs(
             // (see tests/foundry-secret-actions.test.mjs), so it only accepts the pre-filled user.
             const shown = await userText.inputValue();
             if (shown !== name) {
+              // Diagnostic only: the user field's markup, never the password field's value.
+              const markup = await form
+                .locator(
+                  '[name="userid"], [name="user"], select, input[type="text"], input:not([type])',
+                )
+                .evaluateAll((els) => els.map((el) => el.outerHTML.slice(0, 600)));
               throw new Error(
-                `The Join screen shows "${shown}" but the test expected "${name}". Foundry 14.367 pre-fills the user.`,
+                `The Join screen shows "${shown}" but the test expected "${name}". Foundry 14.367 pre-fills the user. User field markup: ${JSON.stringify(markup)}`,
               );
             }
             return;

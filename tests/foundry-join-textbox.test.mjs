@@ -54,7 +54,12 @@ function textboxJoinPage({ initial }) {
       return section;
     },
     locator() {
-      return none;
+      return {
+        ...none,
+        async evaluateAll() {
+          return ["<input>"];
+        },
+      };
     },
     getByRole(role, options = {}) {
       if (role === "textbox" && options.name === "Select User") return userText;
