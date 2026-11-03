@@ -472,7 +472,7 @@ describe("required license gate", () => {
 });
 
 describe("workflows that start Foundry", () => {
-  it("keeps release off Foundry, fails staging closed before Foundry, and leaves production promotion alone", async () => {
+  it("keeps release off Foundry, keeps staging off Foundry, requires the nightly check before production, and leaves production promotion alone", async () => {
     const release = await readFile(
       fileURLToPath(new URL("../../.github/workflows/release.yml", import.meta.url)),
       "utf8",
@@ -516,14 +516,15 @@ describe("workflows that start Foundry", () => {
     expect(staging).toContain(
       "PIVOT_CI_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}",
     );
-    expect(staging.indexOf("bash trusted-gate/scripts/ci/e2e-gate.sh require")).toBeLessThan(
-      staging.indexOf("foundry:e2e"),
-    );
-    expect(staging.indexOf("accept-artifact.sh")).toBeLessThan(staging.indexOf("foundry:e2e"));
-    expect(staging).toContain("export PIVOT_E2E_SUBJECT");
+    expect(staging).not.toContain("e2e-gate.sh");
+    expect(staging).not.toContain("foundry:e2e");
+    expect(staging).not.toContain("FOUNDRY_LICENSE_KEY");
+    expect(staging).toContain("accept-artifact.sh");
     expect(staging).toContain("path: package-artifact");
     expect(staging).toContain("working-directory: trusted-gate");
+    // The deploy restarts the build server, so it waits for the nightly E2E instead of overlapping it.
     expect(staging).toContain("group: foundry-e2e");
+    expect(staging).toContain("cancel-in-progress: false");
 
     const nightlyGate = nightly.slice(
       nightly.indexOf("  gate:\n"),
@@ -543,6 +544,10 @@ describe("workflows that start Foundry", () => {
     expect(promote).toContain("accept-artifact.sh");
     expect(promote).toContain("persist-credentials: false");
     expect(promote.indexOf("accept-artifact.sh")).toBeLessThan(
+      promote.indexOf("deploy-package.mjs"),
+    );
+    expect(promote).toContain("scripts/ci/require-nightly.sh");
+    expect(promote.indexOf("require-nightly.sh")).toBeLessThan(
       promote.indexOf("deploy-package.mjs"),
     );
     expect(promote).not.toContain("foundry:e2e");
@@ -568,9 +573,9 @@ describe("workflows that start Foundry", () => {
       packageJob.indexOf("\n      - name:", packageScan),
     );
     expect(packageBeforeScan).not.toContain("secrets.");
-    expect(packageBeforeScan.replace("environment: foundry-e2e", "")).not.toContain("environment:");
-    expect(packageJob).toContain("environment: foundry-e2e");
-    expect(packageScanStep).toContain("FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}");
+    expect(nightly).not.toContain("environment:");
+    expect(nightly).not.toContain("secrets.FOUNDRY_ADMIN_KEY");
+    expect(packageScanStep).not.toContain("FOUNDRY_ADMIN_KEY");
     expect(packageScanStep).toContain("FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}");
     expect(packageJob.slice(packageScan + packageScanStep.length)).not.toContain("secrets.");
     expect(packageJob).toContain("npm run package:system");
@@ -706,7 +711,7 @@ describe("e2e secret presence", () => {
     expect(result.status).toBe(1);
     expect(result.available).toBe("");
     expect(result.stderr.trim()).toBe(
-      "::error::Foundry E2E cannot run. Missing required secrets in GitHub Environment 'foundry-e2e': FOUNDRY_ADMIN_KEY FOUNDRY_RELEASE_SHA256",
+      "::error::Foundry E2E cannot run. Missing required secrets in the repository secrets: FOUNDRY_DIST_SHA256",
     );
     expect(result.stderr).not.toContain("super-secret-admin");
     expect(result.curls).toEqual([]);

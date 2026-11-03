@@ -14,6 +14,7 @@ permissions:
   contents: read
   actions: read
   statuses: read
+  checks: read
 
 concurrency:
   group: foundry-production
@@ -76,6 +77,14 @@ jobs:
       - name: Accept the packaged files
         run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip artifact-identity.json
 
+      - name: Require a green nightly Foundry E2E on the packaged commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # require-nightly.sh reads GITHUB_SHA; point it at the commit that built the zip.
+          GITHUB_SHA=$(jq -er '.commit' package-artifact/artifact-identity.json) \
+            bash trusted-gate/scripts/ci/require-nightly.sh
+
       - name: Read package version
         id: package-version
         run: |
@@ -123,12 +132,12 @@ jobs:
 
       - name: Deploy exact artifact to production
         env:
-          FOUNDRY_DEPLOY_SSH_HOST: ${{ secrets.FOUNDRY_DEPLOY_SSH_HOST }}
-          FOUNDRY_DEPLOY_SSH_USER: ${{ secrets.FOUNDRY_DEPLOY_SSH_USER }}
+          FOUNDRY_DEPLOY_SSH_HOST: ${{ vars.FOUNDRY_DEPLOY_SSH_HOST }}
+          FOUNDRY_DEPLOY_SSH_USER: ${{ vars.FOUNDRY_DEPLOY_SSH_USER }}
           FOUNDRY_DEPLOY_SSH_KEY: ${{ secrets.FOUNDRY_DEPLOY_SSH_KEY }}
-          FOUNDRY_DEPLOY_TARGET_DIR: ${{ secrets.FOUNDRY_DEPLOY_TARGET_DIR }}
-          FOUNDRY_DEPLOY_BACKUP_DIR: ${{ secrets.FOUNDRY_DEPLOY_BACKUP_DIR }}
-          FOUNDRY_DEPLOY_SERVICE: ${{ secrets.FOUNDRY_DEPLOY_SERVICE }}
+          FOUNDRY_DEPLOY_TARGET_DIR: ${{ vars.FOUNDRY_DEPLOY_TARGET_DIR }}
+          FOUNDRY_DEPLOY_BACKUP_DIR: ${{ vars.FOUNDRY_DEPLOY_BACKUP_DIR }}
+          FOUNDRY_DEPLOY_SERVICE: ${{ vars.FOUNDRY_DEPLOY_SERVICE }}
           PIVOT_DEPLOY_PUBLIC_URL: https://foundry.angryorcgames.com
           PIVOT_STAGING_ARTIFACT_SHA256: ${{ steps.staging-bytes.outputs.sha256 }}
         working-directory: trusted-gate
