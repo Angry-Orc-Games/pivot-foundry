@@ -89,16 +89,13 @@ if (key) ssh.push("-i", keyFile);
 const remote = `${user}@${host}`;
 const stamp = new Date().toISOString().replaceAll(/[:.]/g, "");
 const backup = `${backupDir}/pivot-fantasy-${stamp}`;
+// A unique name per run: a fixed /tmp path can be left behind by another user and then cannot be overwritten.
+const remoteZip = `/tmp/pivot-fantasy-system-${stamp}.zip`;
 
 try {
   execFileSync(
     "scp",
-    [
-      ...sshOptions,
-      ...(key ? ["-i", keyFile] : []),
-      zipPath,
-      `${remote}:/tmp/pivot-fantasy-system.zip`,
-    ],
+    [...sshOptions, ...(key ? ["-i", keyFile] : []), zipPath, `${remote}:${remoteZip}`],
     {
       stdio: "inherit",
     },
@@ -113,7 +110,8 @@ try {
         `mkdir -p ${shellQuote(backupDir)}`,
         `if [ -d ${shellQuote(targetDir)} ]; then mv ${shellQuote(targetDir)} ${shellQuote(backup)}; fi`,
         `mkdir -p ${shellQuote(targetDir)}`,
-        `unzip -q -o /tmp/pivot-fantasy-system.zip -d ${shellQuote(targetDir)}`,
+        `unzip -q -o ${shellQuote(remoteZip)} -d ${shellQuote(targetDir)}`,
+        `rm -f ${shellQuote(remoteZip)}`,
         `test -f ${shellQuote(`${targetDir}/system.json`)}`,
         `systemctl restart ${shellQuote(service)}`,
       ].join(" && "),
