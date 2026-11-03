@@ -17,7 +17,7 @@ Check `system.json`:
 - `title`: `Pivot Fantasy`
 - `compatibility.minimum`: `14`
 - `compatibility.verified`: `14.368` (published manifest; leave this value)
-- Installed runtime pin in `foundry/versions.json`: `14.361` (at or below `compatibility.verified`)
+- Installed runtime pin in `foundry/versions.json`: `14.367` (at or below `compatibility.verified`)
 - `esmodules`: `dist/pivot.mjs`
 - `manifest` / `download`: GitHub release URLs
 

@@ -117,7 +117,7 @@ After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` 
 
 Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` only when `artifact-identity.json` `commit` equals the CI commit (`github.event.workflow_run.head_sha`, or `github.sha` on a manual dispatch). The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 
-Keep the staging Foundry **runtime** on 14.361 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
+Keep the build Foundry **runtime** on the same version as production (14.367). Upgrading Foundry on the server is a separate operation from deploying this game system.
 
 ## Production
 

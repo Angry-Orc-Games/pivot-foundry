@@ -1,17 +1,17 @@
 {
-  "foundryVersion": "14.361",
+  "foundryVersion": "14.367",
   "foundryNodeMajor": 24,
   "systemId": "pivot-fantasy",
   "systemTitle": "Pivot Fantasy",
   "e2eWorldId": "pivot-e2e",
   "e2eWorldTitle": "Pivot Fantasy E2E",
-  "archiveFileName": "FoundryVTT-Node-14.361.zip",
-  "cacheFileName": "foundryvtt-14.361.zip",
+  "archiveFileName": "FoundryVTT-Node-14.367.zip",
+  "cacheFileName": "foundryvtt-14.367.zip",
   "releaseSha256": "",
   "container": {
     "image": "ghcr.io/felddy/foundryvtt",
-    "digest": "sha256:88399d7707a5ee548283a66947e54f69eaad68f27433c0f57c8940b44794fdfc",
-    "notes": "Image tag is foundryVersion. Digest is the ghcr.io/felddy/foundryvtt:14.361 multi-arch index, checked 2026-10-19."
+    "digest": "sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac",
+    "notes": "Image tag is foundryVersion. Digest is the ghcr.io/felddy/foundryvtt:14.367 multi-arch index, checked 2026-11-03."
   },
   "node": {
     "verify": ["20", "22"],
