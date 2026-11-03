@@ -14,6 +14,7 @@ permissions:
   contents: read
   actions: read
   statuses: read
+  checks: read
 
 concurrency:
   group: foundry-production
@@ -75,6 +76,14 @@ jobs:
 
       - name: Accept the packaged files
         run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip artifact-identity.json
+
+      - name: Require a green nightly Foundry E2E on the packaged commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # require-nightly.sh reads GITHUB_SHA; point it at the commit that built the zip.
+          GITHUB_SHA=$(jq -er '.commit' package-artifact/artifact-identity.json) \
+            bash trusted-gate/scripts/ci/require-nightly.sh
 
       - name: Read package version
         id: package-version
