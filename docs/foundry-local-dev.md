@@ -10,12 +10,12 @@ Pins live in [`foundry/versions.json`](../foundry/versions.json):
 
 | Item              | Pin                                                                                                        |
 | ----------------- | ---------------------------------------------------------------------------------------------------------- |
-| Foundry           | **14.361**                                                                                                 |
+| Foundry           | **14.367**                                                                                                 |
 | Foundry host Node | **24** (inside the container)                                                                              |
-| Container image   | `ghcr.io/felddy/foundryvtt:14.361@sha256:88399d7707a5ee548283a66947e54f69eaad68f27433c0f57c8940b44794fdfc` |
+| Container image   | `ghcr.io/felddy/foundryvtt:14.367@sha256:5004a67fbbef8e3f5f82afb01c8dbe06626c57519cad541a59b1bdce3c2a97ac` |
 | Playwright        | `@playwright/test` **1.63.0** / Chromium                                                                   |
 
-The container tag is `foundryVersion`, so `FOUNDRY_VERSION` and `felddy/foundryvtt:14.361` stay the same pin. The digest above is the `14.361` multi-arch index. Felddy installs `CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip` and writes `CACHEDIR.TAG` in that directory, so the mounted cache is a writable copy owned by uid 1000. The checksummed archive in `foundry-dist/` is not mounted.
+The container tag is `foundryVersion`, so `FOUNDRY_VERSION` and `felddy/foundryvtt:14.367` stay the same pin. The digest above is the `14.367` multi-arch index. Felddy installs `CONTAINER_CACHE/foundryvtt-${FOUNDRY_VERSION}.zip` and writes `CACHEDIR.TAG` in that directory, so the mounted cache is a writable copy owned by uid 1000. The checksummed archive in `foundry-dist/` is not mounted.
 
 Do not upgrade an existing v13 campaign world as part of this workflow. Keep v13 user data out of `foundry-data-v14/`.
 
@@ -40,7 +40,7 @@ cp .env.foundry.local.example .env.foundry.local
 - `FOUNDRY_ADMIN_KEY` — local admin password, not `change-me-local-only`
 - `FOUNDRY_LICENSE_KEY` — required for unattended setup and E2E
 - One install source (in order of preference):
-  1. Place the official `FoundryVTT-Node-14.361.zip` in `foundry-dist/` as `foundryvtt-14.361.zip`
+  1. Place the official `FoundryVTT-Node-14.367.zip` in `foundry-dist/` as `foundryvtt-14.367.zip`
   2. `FOUNDRY_RELEASE_ARCHIVE` — absolute path to that zip
   3. `FOUNDRY_RELEASE_CACHE_URL` plus `FOUNDRY_RELEASE_SHA256` — private durable URL, not a Foundry timed URL
   4. `FOUNDRY_RELEASE_URL` — first bootstrap only; expires in about five minutes
@@ -84,7 +84,7 @@ npm run foundry:up
 | Path                       | Role                                                                                                       |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `foundry-data-v14/`        | Persistent local development data for this Compose workflow                                                |
-| `foundry-dist/`            | Private licensed archive cache (`foundryvtt-14.361.zip`)                                                   |
+| `foundry-dist/`            | Private licensed archive cache (`foundryvtt-14.367.zip`)                                                   |
 | `.foundry/instances/<id>/` | Per-worktree runtime files and disposable E2E data                                                         |
 | `foundry-app/`             | **Retired.** Left over from the host-Node launcher. Not used. Do not delete if you still need the install. |
 | `foundry-data/`            | **Retired.** Previous host-Node user data. Not mounted. Do not delete campaign backups stored there.       |
@@ -105,7 +105,7 @@ Each worktree, Cloud Agent, and CI run gets its own Compose project, container n
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Missing .env.foundry.local`  | Copy the example file or export the `FOUNDRY_*` secrets.                                                                                    |
 | `FOUNDRY_ADMIN_KEY` rejected  | Replace `change-me-local-only`.                                                                                                             |
-| Archive checksum mismatch     | Re-download the Node 14.361 zip and update `FOUNDRY_RELEASE_SHA256`.                                                                        |
+| Archive checksum mismatch     | Re-download the Node 14.367 zip and update `FOUNDRY_RELEASE_SHA256`.                                                                        |
 | Timed URL expired             | Generate a new Node.js timed URL, or use `foundry-dist/` from a previous successful download.                                               |
 | Docker not available          | Install Docker Compose v2 and start the daemon. Cloud Agents use `scripts/cloud-agent-start.sh`.                                            |
 | Port already in use           | The CLI picks the next free loopback port. Check `npm run foundry:status`.                                                                  |
