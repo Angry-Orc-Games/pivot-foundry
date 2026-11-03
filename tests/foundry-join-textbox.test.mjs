@@ -98,20 +98,79 @@ describe("joinAs on a Foundry 14.367 text-field join screen", () => {
   });
 });
 
+// Just enough DOM for describeFormControls' page.evaluate callback, which runs for real here, so the
+// redaction in e2e/helpers/foundry.ts is exercised (QA on PR #211: a canned evaluate result skipped it).
+class FakeElement {
+  constructor(tagName, attributes) {
+    this.tagName = tagName;
+    this.attributes = new Map(Object.entries(attributes));
+  }
+  getAttribute(name) {
+    return this.attributes.has(name) ? this.attributes.get(name) : null;
+  }
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+  cloneNode() {
+    return new FakeElement(this.tagName, Object.fromEntries(this.attributes));
+  }
+  get outerHTML() {
+    const attributes = [...this.attributes].map(([name, value]) => ` ${name}="${value}"`).join("");
+    return `<${this.tagName}${attributes}>`;
+  }
+}
+
+function fakeDocument(elements) {
+  return {
+    querySelectorAll(selector) {
+      const tags = selector.split(",").map((tag) => tag.trim());
+      return elements.filter((element) => tags.includes(element.tagName));
+    },
+  };
+}
+
+// Runs the callback the way Playwright would in the page, with `document` bound to the fake DOM.
+function evaluateIn(dom) {
+  return async (callback, argument) => {
+    const previous = globalThis.document;
+    globalThis.document = dom;
+    try {
+      return await callback(argument);
+    } finally {
+      if (previous === undefined) delete globalThis.document;
+      else globalThis.document = previous;
+    }
+  };
+}
+
 describe("joinAs failure report", () => {
   it("adds the form controls to the error and omits password values", async () => {
+    const secret = "hunter2-not-a-real-password";
     const page = textboxJoinPage({ initial: "" });
-    page.evaluate = async () => [
-      '<input type="text" name="username" id="join-username" value="">',
-      '<input type="password" name="password">',
-    ];
+    page.evaluate = evaluateIn(
+      fakeDocument([
+        new FakeElement("input", {
+          type: "text",
+          name: "username",
+          id: "join-username",
+          value: "Gamemaster",
+        }),
+        new FakeElement("input", { type: "password", name: "password", value: secret }),
+        new FakeElement("button", { type: "submit", name: "join" }),
+      ]),
+    );
     const section = page.locator();
     const userText = section.getByRole("textbox", { name: "Select User" });
     userText.waitFor = async () => {
       throw new Error("timed out");
     };
     const error = await joinAs(page, { name: "Gamemaster" }).catch((e) => e);
-    expect(error.message).toContain('Join screen controls: <input type="text" name="username"');
-    expect(error.message).not.toContain("secret");
+    expect(error.message).toContain(
+      'Join screen controls: <input type="text" name="username" id="join-username" value="Gamemaster">',
+    );
+    // The password input is still reported, without its value.
+    expect(error.message).toContain('<input type="password" name="password">');
+    expect(error.message).toContain('<button type="submit" name="join">');
+    expect(error.message).not.toContain(secret);
   });
 });
