@@ -81,7 +81,10 @@ if (key) {
   writeFileSync(keyFile, `${key.endsWith("\n") ? key : `${key}\n`}`, { mode: 0o600 });
 }
 
-const ssh = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"];
+// scp and ssh share the same options: a fresh CI runner has no known_hosts, so scp must also accept
+// a new host key instead of failing with "Host key verification failed".
+const sshOptions = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"];
+const ssh = ["ssh", ...sshOptions];
 if (key) ssh.push("-i", keyFile);
 const remote = `${user}@${host}`;
 const stamp = new Date().toISOString().replaceAll(/[:.]/g, "");
@@ -90,7 +93,12 @@ const backup = `${backupDir}/pivot-fantasy-${stamp}`;
 try {
   execFileSync(
     "scp",
-    [...(key ? ["-i", keyFile] : []), zipPath, `${remote}:/tmp/pivot-fantasy-system.zip`],
+    [
+      ...sshOptions,
+      ...(key ? ["-i", keyFile] : []),
+      zipPath,
+      `${remote}:/tmp/pivot-fantasy-system.zip`,
+    ],
     {
       stdio: "inherit",
     },
