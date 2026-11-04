@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTED  
 **Primary Actor:** Player  
-**Goal:** Roll an existing Character d20 check using Pivot Normal/Advantage/Disadvantage/Super-Advantage behavior and receive one traceable chat result.  
+**Goal:** Roll an existing Character d20 check using Pivot Normal, Advantage, and Disadvantage behavior and receive one traceable chat result.  
 **Linked Requirements:** FR-001, FR-002 (attack natural result only where applicable), NFR-001, NFR-002, NFR-003, NFR-004, C-003  
 **Relevant Entities:** Character, Roll Mode, Roll Outcome
 
@@ -17,7 +17,7 @@ Non-goals: combat-tracker initiative updates; automated advantage-source discove
 Player behavior:
 
 1. Player activates an existing d20 roll control for ability, save, skill, initiative, or weapon attack.
-2. System opens a localized roll-mode prompt with four choices: Normal, Advantage, Disadvantage, Super-Advantage. Normal is initially selected.
+2. System opens a localized roll-mode prompt with three choices: Normal, Advantage, and Disadvantage. Normal is initially selected.
 3. Player confirms or cancels.
 4. On cancel, no roll/chat message/state change occurs.
 5. On confirm, system resolves the selected mode to a dice pool, rolls the required d20s, keeps the correct die, adds the existing derived modifier, and posts one chat message.
@@ -40,7 +40,7 @@ Existing API remains authoritative:
 resolveDicePool(
   advantageSources: number,
   disadvantageSources: number,
-): { dieCount: number; pick: "highest" | "lowest" | "single" }
+): { dieCount: 1; pick: "single" } | { dieCount: 2; pick: "highest" | "lowest" }
 
 applyAttackCrit(naturalD20Result: number): "hit" | "miss" | null
 ```
@@ -48,7 +48,9 @@ applyAttackCrit(naturalD20Result: number): "hit" | "miss" | null
 Add pure helpers:
 
 ```ts
-export type RollMode = "normal" | "advantage" | "disadvantage" | "superAdvantage";
+export type RollMode = "normal" | "advantage" | "disadvantage";
+
+export function parseRollMode(value: unknown): RollMode | null;
 
 export function dicePoolForRollMode(mode: RollMode): DicePoolResolution;
 
@@ -63,7 +65,8 @@ Mapping is explicit and contains no user preference:
 - normal -> `resolveDicePool(0, 0)`
 - advantage -> `resolveDicePool(1, 0)`
 - disadvantage -> `resolveDicePool(0, 1)`
-- superAdvantage -> `resolveDicePool(2, 0)`
+
+Any number of advantage sources rolls two d20s and keeps the highest. `parseRollMode` reads the retired token `superAdvantage` as `advantage`.
 
 `selectKeptD20` validates result count and values 1..20. For `single`, exactly one result is required. For `highest`/`lowest`, result count must equal `dieCount`.
 
@@ -90,7 +93,6 @@ Add localization keys at minimum:
 - `PIVOT.RollMode.Normal`
 - `PIVOT.RollMode.Advantage`
 - `PIVOT.RollMode.Disadvantage`
-- `PIVOT.RollMode.SuperAdvantage`
 - `PIVOT.RollDialog.Roll`
 - `PIVOT.RollDialog.Cancel`
 - `PIVOT.Chat.KeptD20`
@@ -107,7 +109,7 @@ Vitest pure-rule cases:
 
 - each RollMode maps to the expected pool resolution;
 - highest/lowest/single selection;
-- super-advantage with two dice selects highest;
+- any advantage count keeps the highest of two dice;
 - invalid die values, wrong result counts, empty arrays throw;
 - attack crit uses kept natural 20/1, not total.
 
@@ -120,7 +122,7 @@ Manual Foundry v13 smoke:
 
 - each d20 button opens the prompt;
 - cancel posts nothing;
-- all four modes visibly roll/keep correctly;
+- Normal, Advantage, and Disadvantage each roll and keep the correct die;
 - chat includes kept die/modifier/total;
 - weapon natural 20/1 shows auto hit/miss;
 - no Actor source fields change.
@@ -150,7 +152,7 @@ Open rules questions: none blocking this slice. Automated counting/cancellation 
 
 ### Unresolved Decisions
 
-None significant. The four-choice prompt is the approved specification behavior for this slice; later automated source discovery may replace or augment it through a new spec.
+None significant. The three-choice prompt is the approved specification behavior for this slice. Later automated source discovery may replace or augment it through a new spec.
 
 ### Traceability
 

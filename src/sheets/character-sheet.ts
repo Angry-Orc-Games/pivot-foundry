@@ -34,7 +34,9 @@ import {
   applyAttackCrit,
   d20PoolFormula,
   dicePoolForRollMode,
-  isRollMode,
+  parseRollMode,
+  ROLL_MODES,
+  type DicePoolResolution,
   type RollMode,
   selectKeptD20,
 } from "../rules/d20-roll";
@@ -80,7 +82,6 @@ export const ROLL_MODE_LABEL_KEYS: Record<RollMode, string> = {
   normal: "PIVOT.RollMode.Normal",
   advantage: "PIVOT.RollMode.Advantage",
   disadvantage: "PIVOT.RollMode.Disadvantage",
-  superAdvantage: "PIVOT.RollMode.SuperAdvantage",
 };
 
 export type D20RollKind = "ability" | "save" | "skill" | "initiative" | "weaponAttack";
@@ -685,14 +686,12 @@ export function resolveSheetRoll(
 }
 
 export function buildRollModeDialogContent(localize: (key: string) => string): string {
-  const options = (["normal", "advantage", "disadvantage", "superAdvantage"] as const)
-    .map((mode, index) => {
-      const checked = index === 0 ? " checked" : "";
-      return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
-        localize(ROLL_MODE_LABEL_KEYS[mode]),
-      )}</label>`;
-    })
-    .join("");
+  const options = ROLL_MODES.map((mode) => {
+    const checked = mode === "normal" ? " checked" : "";
+    return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
+      localize(ROLL_MODE_LABEL_KEYS[mode]),
+    )}</label>`;
+  }).join("");
   return `<fieldset class="pf-roll-mode-dialog"><legend>${escapeHtml(
     localize("PIVOT.RollDialog.Title"),
   )}</legend>${options}</fieldset>`;
@@ -1156,10 +1155,7 @@ async function rollAction(
  * Initiative formula with real d20 terms so Dice So Nice animates every rolled die.
  * Keep modifiers mirror selectKeptD20: highest -> kh1, lowest -> kl1, single -> plain.
  */
-export function initiativeRollFormula(
-  resolution: { dieCount: number; pick: "single" | "highest" | "lowest" },
-  modifier: number,
-): string {
+export function initiativeRollFormula(resolution: DicePoolResolution, modifier: number): string {
   const keep = resolution.pick === "highest" ? "kh1" : resolution.pick === "lowest" ? "kl1" : "";
   return `${d20PoolFormula(resolution.dieCount)}${keep}${formatSigned(modifier)}`;
 }
@@ -1543,7 +1539,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
         callback: (_event: unknown, button: { form?: HTMLFormElement }) => {
           const selected = button.form?.querySelector("input[name='mode']:checked");
           const value = selected && "value" in selected ? String(selected.value) : "normal";
-          return isRollMode(value) ? value : "normal";
+          return parseRollMode(value) ?? "normal";
         },
       },
       buttons: [
@@ -1556,7 +1552,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
       rejectClose: false,
       render: presentRenderedDialog,
     });
-    return isRollMode(result) ? result : null;
+    return parseRollMode(result);
   } catch {
     return null;
   }
