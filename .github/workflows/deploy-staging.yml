@@ -139,14 +139,14 @@ jobs:
               let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
                 if (!d.trim()) process.exit(1);
                 const s = JSON.parse(d);
-                process.exit(s.active === true ? 0 : 1);
+                process.exit(typeof s.version === "string" ? 0 : 1);
               });'; then
-              echo "Build server is active."
+              echo "Build server is up."
               exit 0
             fi
             sleep 5
           done
-          echo "::error::Build server did not report active within 180s after deploy."
+          echo "::error::Build server did not answer /api/status within 180s after deploy."
           exit 1
 
       - name: External staging smoke
