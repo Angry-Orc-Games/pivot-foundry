@@ -186,11 +186,13 @@ type CountedEffect = EffectRule | { source: "gear"; effect: EffectRule };
 
 const gearItemTypes = new Set(["weapon", "armour", "equipment"]);
 
+type GearStat = { bestBonus: number; penalties: number[]; sample: EffectRule };
+
 export function aggregateCharacterEffects(
   effects: readonly CountedEffect[],
 ): CharacterEffectSummary {
   const summary = emptyCharacterEffectSummary();
-  const gearBest = new Map<string, EffectRule>();
+  const gearStats = new Map<string, GearStat>();
 
   for (const counted of effects) {
     const fromGear = isGearCounted(counted);
@@ -201,15 +203,38 @@ export function aggregateCharacterEffects(
       continue;
     }
     if (fromGear) {
-      const current = gearBest.get(key);
-      if (!current || numericAmount(effect) > numericAmount(current)) gearBest.set(key, effect);
+      const amount = numericAmount(effect);
+      const stat = gearStats.get(key) ?? { bestBonus: 0, penalties: [], sample: effect };
+      if (amount < 0) stat.penalties.push(amount);
+      else if (amount > stat.bestBonus) {
+        stat.bestBonus = amount;
+        stat.sample = effect;
+      }
+      gearStats.set(key, stat);
       continue;
     }
     addNumericEffect(summary, effect);
   }
 
-  for (const effect of gearBest.values()) addNumericEffect(summary, effect);
+  for (const stat of gearStats.values()) {
+    if (!hasAmount(stat.sample)) continue;
+    addNumericEffect(summary, {
+      ...stat.sample,
+      amount: gearStatTotal(stat.bestBonus, stat.penalties),
+    });
+  }
   return summary;
+}
+
+// Best bonus plus every penalty. https://github.com/Angry-Orc-Games/pivot-foundry/pull/109#issuecomment-6640416282
+// Change the next line to the worst penalty only if Ken rules that way.
+function gearStatTotal(bestBonus: number, penalties: readonly number[]): number {
+  const penaltyTotal = penalties.reduce((sum, amount) => sum + amount, 0);
+  return bestBonus + penaltyTotal;
+}
+
+function hasAmount(effect: EffectRule): effect is Extract<EffectRule, { amount: number }> {
+  return "amount" in effect;
 }
 
 export function collectEmbeddedItemEffects(
