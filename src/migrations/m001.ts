@@ -10,7 +10,13 @@ export { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION, SCHEMA_MIGRATION_ID };
 
 export type MigrationPlan =
   | { ok: true; changed: false; log?: string }
-  | { ok: true; changed: true; update: Record<string, unknown>; log?: string }
+  | {
+      ok: true;
+      changed: true;
+      update: Record<string, unknown>;
+      diff?: false;
+      log?: string;
+    }
   | { ok: false; error: string };
 
 export function planActorMigration(storedSystem: unknown): MigrationPlan {
