@@ -502,7 +502,7 @@ describe("workflows that start Foundry", () => {
     expect(releaseNightly).not.toContain("environment:");
     expect(releaseNightly).not.toContain("refs/tags/");
     expect(releaseNightly).not.toContain("FOUNDRY_");
-    expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
+    expect(release).not.toContain("refs/tags/");
     expect(release).not.toContain("foundry:e2e");
     expect(release).not.toContain("foundry-cli");
     expect(release).not.toContain("environment: foundry-e2e");

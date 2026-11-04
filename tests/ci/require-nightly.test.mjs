@@ -251,6 +251,7 @@ describe("release workflow", () => {
     expect(release).not.toContain("foundry-cli");
     expect(release).toContain("bash trusted-gate/scripts/ci/require-nightly.sh");
     expect(release).toContain("needs: [package, nightly]");
-    expect(release).toContain("ref: refs/tags/${{ github.ref_name }}");
+    expect(release).not.toContain("refs/tags/");
+    expect(release).toContain("bash scripts/ci/assert-tag-sha.sh");
   });
 });
