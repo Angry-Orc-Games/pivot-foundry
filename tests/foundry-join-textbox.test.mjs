@@ -1,6 +1,29 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 import { joinAs } from "../e2e/helpers/foundry.ts";
+
+const PASSWORD_VALUE = "hunter2-not-a-real-password";
+
+// Run the callback describeFormControls passes to page.evaluate against jsdom.
+// A canned return hides a deleted redaction, because the assertion then checks text the test wrote.
+function evaluateIn(html) {
+  return async (callback) => {
+    if (typeof callback !== "function") {
+      throw new Error("join diagnostics did not pass a callback");
+    }
+    const dom = new JSDOM(`<!doctype html>${html}`);
+    const previous = globalThis.document;
+    globalThis.document = dom.window.document;
+    try {
+      return await callback();
+    } finally {
+      if (previous === undefined) delete globalThis.document;
+      else globalThis.document = previous;
+      dom.window.close();
+    }
+  };
+}
 
 // Foundry 14.367 shows the user as a text field named "Select User" instead of a <select>.
 function textboxJoinPage({ initial }) {
@@ -95,5 +118,26 @@ describe("joinAs on a Foundry 14.367 text-field join screen", () => {
     expect(page.events.indexOf("set:Gamemaster")).toBeLessThan(
       page.events.indexOf("click-join-session"),
     );
+  });
+});
+
+describe("joinAs failure report", () => {
+  it("adds the form controls to the error and omits password values", async () => {
+    const page = textboxJoinPage({ initial: "" });
+    page.evaluate = evaluateIn(
+      `<input type="text" name="username" id="join-username" value="Gamemaster"><input type="password" name="password" value="${PASSWORD_VALUE}"><button type="submit" name="join"></button>`,
+    );
+    const section = page.locator();
+    const userText = section.getByRole("textbox", { name: "Select User" });
+    userText.waitFor = async () => {
+      throw new Error("timed out");
+    };
+    const error = await joinAs(page, { name: "Gamemaster" }).catch((e) => e);
+    expect(error.message).toContain(
+      'Join screen controls: <input type="text" name="username" id="join-username" value="Gamemaster">',
+    );
+    expect(error.message).toContain('<input type="password" name="password">');
+    expect(error.message).toContain('<button type="submit" name="join">');
+    expect(error.message).not.toContain(PASSWORD_VALUE);
   });
 });

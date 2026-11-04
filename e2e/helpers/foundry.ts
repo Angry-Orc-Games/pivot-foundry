@@ -813,7 +813,30 @@ export async function joinAs(
     releaseFailureShots(page);
   } catch (error) {
     await clearPasswordFields(page);
+    if (error instanceof Error) {
+      const controls = await describeFormControls(page);
+      if (controls) error.message += `\nJoin screen controls: ${controls}`;
+    }
     throw error;
+  }
+}
+
+// Foundry's markup changes between builds and is only visible in a live run, so a failed step reports it.
+// Opening tags only, and password values are dropped, so nothing secret reaches the log.
+async function describeFormControls(page: Page): Promise<string> {
+  try {
+    const tags = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("input, select, button"))
+        .slice(0, 20)
+        .map((element) => {
+          const copy = element.cloneNode(false) as HTMLElement;
+          if (copy.getAttribute("type") === "password") copy.removeAttribute("value");
+          return copy.outerHTML;
+        }),
+    );
+    return Array.isArray(tags) ? tags.join(" ") : "";
+  } catch {
+    return "";
   }
 }
 
