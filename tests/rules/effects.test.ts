@@ -235,6 +235,45 @@ describe("gear bonuses count only while equipped", () => {
     expect(strengthTotal([embedded("magicAbility", false, [strengthBonus])])).toBe(2);
   });
 
+  it("keeps the best equipped gear bonus and adds every penalty on that stat", () => {
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: 1 }]),
+        embedded("equipment", true, [{ type: "abilityScoreBonus", ability: "str", amount: -2 }]),
+      ]),
+    ).toBe(-1);
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: 3 }]),
+        embedded("armour", true, [{ type: "abilityScoreBonus", ability: "str", amount: 1 }]),
+        embedded("equipment", true, [{ type: "abilityScoreBonus", ability: "str", amount: -2 }]),
+      ]),
+    ).toBe(1);
+  });
+
+  it("sums equipped gear penalties on one stat", () => {
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: -1 }]),
+        embedded("equipment", true, [{ type: "abilityScoreBonus", ability: "str", amount: -2 }]),
+      ]),
+    ).toBe(-3);
+  });
+
+  it("ignores a penalty on unequipped gear", () => {
+    expect(
+      strengthTotal([
+        embedded("equipment", false, [{ type: "abilityScoreBonus", ability: "str", amount: -2 }]),
+      ]),
+    ).toBe(0);
+    expect(
+      strengthTotal([
+        embedded("weapon", true, [{ type: "abilityScoreBonus", ability: "str", amount: 1 }]),
+        embedded("equipment", false, [{ type: "abilityScoreBonus", ability: "str", amount: -2 }]),
+      ]),
+    ).toBe(1);
+  });
+
   it("uses the highest gear bonus for one effect key instead of adding them", () => {
     expect(
       strengthTotal([
