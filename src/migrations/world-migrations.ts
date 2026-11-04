@@ -1,6 +1,7 @@
 import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
 import { planMpClampMigration } from "./m005";
+import { planSpeciesSpeedMigration } from "./m007";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planSchemaV2ActorMigration,
@@ -163,7 +164,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID}`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID} / M007`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -203,6 +204,9 @@ async function persistMigration(
   if (!plan.ok) {
     reportFailure(document, plan.error, dependencies);
     return { updated: 0, failed: 1 };
+  }
+  if (plan.log) {
+    dependencies.log?.(`${document.name ?? document.id ?? "unknown"}: ${plan.log}`);
   }
   if (!plan.changed) return { updated: 0, failed: 0 };
 
@@ -287,8 +291,14 @@ export function planAllActorMigrations(
           actorLink: prototype?.actorLink,
         });
   if (!hp.ok) return hp;
-  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed) {
-    return { ok: true, changed: false };
+  const speed = character
+    ? planSpeciesSpeedMigration(source)
+    : ({ ok: true, changed: false } as const);
+  if (!speed.ok) return speed;
+  const plans: MigrationPlan[] = [first, survival, schemaV2, hp, speed];
+  const log = plans.flatMap((plan) => (plan.ok && plan.log ? [plan.log] : [])).join("\n");
+  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed && !speed.changed) {
+    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
   }
   return {
     ok: true,
@@ -298,7 +308,9 @@ export function planAllActorMigrations(
       ...(survival.changed ? survival.update : {}),
       ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
+      ...(speed.changed ? speed.update : {}),
     },
+    ...(log ? { log } : {}),
   };
 }
 
@@ -351,7 +363,10 @@ function planUnlinkedToken(
 function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): MigrationPlan {
   if (!left.ok) return left;
   if (!right.ok) return right;
-  if (!left.changed && !right.changed) return { ok: true, changed: false };
+  const log = [left.log, right.log].filter(Boolean).join("\n");
+  if (!left.changed && !right.changed) {
+    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
@@ -359,6 +374,7 @@ function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): Migrati
       ...(left.changed ? left.update : {}),
       ...(right.changed ? right.update : {}),
     },
+    ...(log ? { log } : {}),
   };
 }
 

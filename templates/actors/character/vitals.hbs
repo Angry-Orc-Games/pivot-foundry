@@ -1,5 +1,8 @@
 {{! Vitals section: 4 stat cards, 6 ability boxes, Initiative/Passive Perception line }}
 <section class="pf-vitals pf-print pf-print-wrap">
+  {{#each primaryWarnings}}
+    <p class="pf-primary-warning" role="status">{{this}}</p>
+  {{/each}}
   <div class="pf-stats">
     {{! AC stat card }}
     <div class="pf-stat" title="{{derived.armourClass.breakdown}}">
