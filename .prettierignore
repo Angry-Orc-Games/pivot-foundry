@@ -10,3 +10,7 @@ foundry-dist
 .foundry
 playwright-report
 test-results
+.agents
+.claude
+.cursor
+.grok

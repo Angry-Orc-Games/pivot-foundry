@@ -22,6 +22,21 @@ describe("Survival transaction", () => {
     expect(isSurvivalWrite(update.mock.calls[0]?.[1])).toBe(true);
   });
 
+  it("reports a write vetoed by a pre-update hook as denied, with no written state", async () => {
+    const actor = inMemoryCharacter({ hp: 10 }, { guards: [() => false] });
+    const result = await runSurvivalTransaction(actor, (state) => ({ next: { ...state, hp: 4 } }));
+    expect(result.outcome).toBe("denied");
+    expect(result.after).toBeUndefined();
+    expect(readSurvival(actor).hp).toBe(10);
+  });
+
+  it("treats an update that resolves empty because nothing changed as updated", async () => {
+    const actor = inMemoryCharacter({ hp: 10 });
+    vi.spyOn(actor, "update").mockResolvedValue(undefined);
+    const result = await runSurvivalTransaction(actor, (state) => ({ next: state }));
+    expect(result.outcome).toBe("updated");
+  });
+
   it("starts from the effective survival state", async () => {
     const actor = inMemoryCharacter({ hp: 0, status: "alive", failures: 1 });
     const result = await runSurvivalTransaction(actor, (state) => ({ next: state }));

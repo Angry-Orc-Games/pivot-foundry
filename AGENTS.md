@@ -20,6 +20,8 @@ Run these from the repository root:
 
 ## Architecture Boundaries
 
+Read [CODING_STANDARDS.md](CODING_STANDARDS.md) before writing or reviewing code.
+
 - Put deterministic game rules in `src/rules/`.
 - Put tests for deterministic rules under `tests/rules/`.
 - Keep Foundry lifecycle registration, document model wiring, hooks, sheets, and settings thin and close to `src/pivot.ts` until there is enough surface area to split modules.
@@ -37,7 +39,7 @@ Run these from the repository root:
 
 Before handoff, run `npm run verify` unless the change is documentation-only and the user explicitly accepts a narrower check. For changes that touch packaging, also run `npm run package:system`. For changes that touch Foundry runtime behavior, run `npm run foundry:e2e` when Docker and Foundry credentials exist; otherwise say that browser E2E was not run.
 
-The Foundry runtime is Docker Compose + Felddy, pinned in `foundry/versions.json` to Foundry **14.361**. Persistent data is `foundry-data-v14/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Do not delete retired `foundry-app/` or `foundry-data/` directories. Repository `npm run verify` stays on Node 20/22.
+The Foundry runtime is Docker Compose + Felddy, pinned in `foundry/versions.json` to Foundry **14.367**. Persistent data is `foundry-data-v14/`. Do not commit Foundry binaries, `.env.foundry.local`, or license keys. Do not delete retired `foundry-app/` or `foundry-data/` directories. Repository `npm run verify` stays on Node 20/22.
 
 Do not claim Cloud execution, GitHub CI, staging, production, or release publication unless that surface was actually observed.
 
@@ -45,4 +47,18 @@ Do not claim Cloud execution, GitHub CI, staging, production, or release publica
 
 `.cursor/environment.json` installs Node, Docker/Compose, and Playwright browsers. `install` and `start` do not boot Foundry. After a snapshot, use this checkout’s package (`npm ci`, `npm run build`) before `npm run foundry:up`.
 
-Runtime Secrets: `FOUNDRY_ADMIN_KEY`, `FOUNDRY_LICENSE_KEY`, and optionally `FOUNDRY_RELEASE_CACHE_URL` + `FOUNDRY_RELEASE_SHA256`. Do not persist a timed `FOUNDRY_RELEASE_URL`. Do not load production deploy credentials onto Cloud Agents. Preview port **30000** through Cursor forwarding and confirm WebSocket connectivity, not just the first HTML page.
+Runtime Secrets: `FOUNDRY_ADMIN_KEY` (local-only password), `FOUNDRY_LICENSE_KEY`, and optionally `FOUNDRY_RELEASE_CACHE_URL` + `FOUNDRY_RELEASE_SHA256` (the `FOUNDRY_DIST_URL` + `FOUNDRY_DIST_SHA256` Actions secrets map to these). Do not persist a timed `FOUNDRY_RELEASE_URL`. Do not load production deploy credentials onto Cloud Agents. Preview port **30000** through Cursor forwarding and confirm WebSocket connectivity, not just the first HTML page.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for Angry-Orc-Games/pivot-foundry via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

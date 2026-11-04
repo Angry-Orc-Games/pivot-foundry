@@ -76,6 +76,18 @@ export interface SurvivalTransactionResult {
   after?: SurvivalState;
 }
 
+function valueAt(root: unknown, path: string): unknown {
+  return path.split(".").reduce<unknown>((node, key) => {
+    return typeof node === "object" && node !== null
+      ? (node as Record<string, unknown>)[key]
+      : undefined;
+  }, root);
+}
+
+function alreadyHolds(actor: SurvivalActor, data: Record<string, unknown>): boolean {
+  return Object.entries(data).every(([path, value]) => valueAt(actor, path) === value);
+}
+
 /**
  * Local guard only: Foundry offers no cross-client transaction, so another client can still
  * write between our snapshot and our update. The snapshot check narrows that window.
@@ -120,14 +132,16 @@ export async function runSurvivalTransaction(
     } catch {
       return { outcome: "invalid", before };
     }
+    const data = { ...survivalUpdate(after), ...requested.extra };
+    let written: unknown;
     try {
-      await actor.update?.(
-        { ...survivalUpdate(after), ...requested.extra },
-        { ...SURVIVAL_WRITE_OPTIONS },
-      );
+      written = await actor.update?.(data, { ...SURVIVAL_WRITE_OPTIONS });
     } catch {
       return { outcome: "failed", before, after };
     }
+    // Foundry resolves to undefined both when a pre-update hook vetoes the write and when
+    // nothing changed. Only a document that already holds every written value is a success.
+    if (written === undefined && !alreadyHolds(actor, data)) return { outcome: "denied", before };
     return { outcome: "updated", before, after };
   } finally {
     busy.delete(uuid);

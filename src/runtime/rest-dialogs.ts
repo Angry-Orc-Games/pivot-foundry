@@ -103,10 +103,10 @@ async function runRest(
       return rest(state);
     },
     {
-      watch: () => [
-        numberAt(actor.system, ["resources", "pool", "value"], 0),
-        numberAt(actor.system, ["magic", "mp", "value"], 0),
-      ],
+      watch: () => {
+        const now = extractRestContext(actor);
+        return now && [now.poolCurrent, now.poolMax, now.mpCurrent, now.mpMax];
+      },
     },
   );
   if (result.outcome === "busy" || result.outcome === "denied") warnRest("Unavailable");
