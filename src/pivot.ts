@@ -1,6 +1,7 @@
 import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
 import { registerMpClampHooks } from "./runtime/mp-clamp";
 import { initializeSurvival } from "./migrations/m002";
+import { initializeEquippedMarker } from "./migrations/m008";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
   updateTokenStatusEffects,
@@ -39,6 +40,7 @@ function hasNestedProperty(obj: unknown, path: string): boolean {
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
+  runtime.Hooks.on?.("preCreateItem", initializeEquippedMarker);
   runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
   runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);

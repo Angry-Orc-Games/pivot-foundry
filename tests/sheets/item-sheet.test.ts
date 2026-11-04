@@ -13,6 +13,7 @@ import {
 } from "../../src/sheets/item-sheet";
 
 Handlebars.registerHelper("localize", (key: string) => key);
+Handlebars.registerHelper("checked", (value: unknown) => (value ? "checked" : ""));
 Handlebars.registerHelper("selectOptions", (choices: Record<string, string> | undefined) => {
   const html = Object.entries(choices ?? {})
     .map(([value, label]) => `<option value="${value}">${label}</option>`)
@@ -62,6 +63,57 @@ describe("prepareItemSheetContext", () => {
   });
 });
 
+describe("weapon item sheet", () => {
+  it("renders an Equipped checkbox in the weapon section", () => {
+    const template = Handlebars.compile(
+      readFileSync(join(__dirname, "../../templates/items/item-sheet.hbs"), "utf8"),
+    );
+    const html = template({
+      ...prepareItemSheetContext({
+        name: "Flame Tongue",
+        type: "weapon",
+        system: { equipped: true },
+      }),
+      rootId: "weapon-sheet",
+    });
+    const document = new JSDOM(html).window.document;
+    const weaponSection = [...document.querySelectorAll("section")].find((section) =>
+      section.querySelector("h2")?.textContent?.includes("PIVOT.Sections.Attack"),
+    );
+    const checkbox = weaponSection?.querySelector('label.pf-check input[name="system.equipped"]');
+
+    expect(checkbox?.getAttribute("type")).toBe("checkbox");
+    expect(checkbox?.hasAttribute("checked")).toBe(true);
+  });
+});
+
+describe("equipment item sheet", () => {
+  it("renders an Equipped checkbox next to Carried", () => {
+    const template = Handlebars.compile(
+      readFileSync(join(__dirname, "../../templates/items/item-sheet.hbs"), "utf8"),
+    );
+    const html = template({
+      ...prepareItemSheetContext({
+        name: "Ring of Protection",
+        type: "equipment",
+        system: { equipped: true, carried: true },
+      }),
+      rootId: "equipment-sheet",
+    });
+    const document = new JSDOM(html).window.document;
+    const equipmentSection = [...document.querySelectorAll("section")].find((section) =>
+      section.querySelector("h2")?.textContent?.includes("PIVOT.Sections.Inventory"),
+    );
+    const checkbox = equipmentSection?.querySelector(
+      'label.pf-check input[name="system.equipped"]',
+    );
+    const carried = equipmentSection?.querySelector('label.pf-check input[name="system.carried"]');
+
+    expect(checkbox?.getAttribute("type")).toBe("checkbox");
+    expect(checkbox?.hasAttribute("checked")).toBe(true);
+    expect(carried?.getAttribute("type")).toBe("checkbox");
+  });
+});
 describe("magic echelon field", () => {
   const template = Handlebars.compile(
     readFileSync(join(__dirname, "../../templates/items/item-sheet.hbs"), "utf8"),

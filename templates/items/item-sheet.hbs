@@ -78,6 +78,13 @@
             value="{{system.range.long}}"
             {{disabledAttr}}
           /></label>
+        <label class="pf-check"><input
+            name="system.equipped"
+            type="checkbox"
+            {{checked system.equipped}}
+            {{disabledAttr}}
+          />
+          <span>{{localize "PIVOT.Fields.Equipped"}}</span></label>
       </div>
     </section>
   {{/if}}
@@ -131,6 +138,13 @@
             {{disabledAttr}}
           />
           <span>{{localize "PIVOT.Fields.Carried"}}</span></label>
+        <label class="pf-check"><input
+            name="system.equipped"
+            type="checkbox"
+            {{checked system.equipped}}
+            {{disabledAttr}}
+          />
+          <span>{{localize "PIVOT.Fields.Equipped"}}</span></label>
       </div>
     </section>
   {{/if}}
