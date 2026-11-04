@@ -2,6 +2,9 @@ import type { AbilityKey } from "./rules/character-derived";
 
 export const SYSTEM_ID = "pivot-fantasy";
 
+/** Update options that mark a write as a Survival transaction or a world migration. */
+export const SURVIVAL_WRITE_OPTIONS = { [SYSTEM_ID]: { survivalWrite: true } } as const;
+
 export const abilities: Array<{ key: AbilityKey; label: string; short: string }> = [
   { key: "str", label: "Strength", short: "STR" },
   { key: "dex", label: "Dexterity", short: "DEX" },

@@ -128,27 +128,29 @@ describe("Academia and Crafting rows", () => {
         },
       },
       {
-        skillSpecializations: {
-          academia: [
-            {
-              name: "History",
-              ability: "int",
-              proficient: true,
-              deepening: 2,
-              expertise: true,
-              bonus: 3,
-            },
-          ],
-          crafting: [
-            {
-              name: "Glassblowing",
-              ability: "wis",
-              proficient: true,
-              deepening: 1,
-              expertise: false,
-              bonus: 4,
-            },
-          ],
+        system: {
+          skillSpecializations: {
+            academia: [
+              {
+                name: "History",
+                ability: "int",
+                proficient: true,
+                deepening: 2,
+                expertise: true,
+                bonus: 3,
+              },
+            ],
+            crafting: [
+              {
+                name: "Glassblowing",
+                ability: "wis",
+                proficient: true,
+                deepening: 1,
+                expertise: false,
+                bonus: 4,
+              },
+            ],
+          },
         },
       },
     );

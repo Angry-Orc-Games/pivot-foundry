@@ -1,4 +1,5 @@
-import { guardHpMaximum } from "./runtime/actor-guards";
+import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
+import { registerMpClampHooks } from "./runtime/mp-clamp";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
@@ -38,15 +39,21 @@ function hasNestedProperty(obj: unknown, path: string): boolean {
 export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): void {
   installHealthChatHook(runtime.Hooks);
   runtime.Hooks.on?.("preCreateActor", initializeSurvival);
+  runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
+  runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
+  runtime.Hooks.on?.("preUpdateActor", guardCharacterHpWrite);
+  registerMpClampHooks(runtime.Hooks);
 
   // Sync token status effects after HP or death state changes
   // Foundry passes nested changes object: {system: {attributes: {hp: {value}}}}
   runtime.Hooks.on?.("updateActor", (actor: unknown, changes: Record<string, unknown>) => {
     const hpChanged = hasNestedProperty(changes, "system.attributes.hp.value");
     const statusChanged = hasNestedProperty(changes, "system.attributes.deathSaves.status");
+    // A max change can make Conscious at 0 HP effectively Dying.
+    const maxChanged = hasNestedProperty(changes, "system.attributes.hp.max");
 
-    if (hpChanged || statusChanged) {
+    if (hpChanged || statusChanged || maxChanged) {
       const globals = globalThis as { game?: unknown };
       void updateTokenStatusEffects(
         actor as Parameters<typeof updateTokenStatusEffects>[0],
@@ -194,6 +201,35 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
       }
     }
   });
+}
+
+function linkCharacterPrototypeToken(
+  actor: {
+    type?: string;
+    updateSource?: (data: Record<string, unknown>) => unknown;
+  },
+  data?: unknown,
+): void {
+  if (actor.type !== "character" || !actor.updateSource) return;
+  if (creationSpecifiesActorLink(data)) return;
+  actor.updateSource({ "prototypeToken.actorLink": true });
+}
+
+function creationSpecifiesActorLink(data: unknown): boolean {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const utils = (
+    globalThis as {
+      foundry?: {
+        utils?: {
+          expandObject?: (object: object) => object;
+          hasProperty?: (object: object, key: string) => boolean;
+        };
+      };
+    }
+  ).foundry?.utils;
+  const expanded = utils?.expandObject?.(data) ?? data;
+  if (utils?.hasProperty) return utils.hasProperty(expanded, "prototypeToken.actorLink");
+  return hasNestedProperty(expanded, "prototypeToken.actorLink");
 }
 
 const pivotGlobals = globalThis as PivotGlobals & {

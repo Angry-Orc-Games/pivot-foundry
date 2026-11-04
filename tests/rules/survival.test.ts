@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { applyHealth, resolveDeathSave, type SurvivalState } from "../../src/rules/survival";
+import {
+  applyHealth,
+  correctSurvival,
+  effectiveSurvival,
+  resolveDeathSave,
+  type SurvivalState,
+} from "../../src/rules/survival";
 const state = (patch: Partial<SurvivalState> = {}): SurvivalState => ({
   hp: 10,
   max: 20,
@@ -63,6 +69,26 @@ describe("HP and survival", () => {
     for (const status of ["stable", "dead", "alive"] as const)
       expect(() => resolveDeathSave(state({ status }), 10)).toThrow();
   });
+  it("applies damage when HP was raised without clearing dying", () => {
+    expect(applyHealth(state({ hp: 10, temp: 0, status: "dying" }), "damage", 3)).toMatchObject({
+      hp: 7,
+      status: "alive",
+      successes: 0,
+      failures: 0,
+    });
+  });
+  it("lets a death save resolve once that character is damaged to 0 HP", () => {
+    const down = applyHealth(state({ hp: 10, temp: 0, status: "dying" }), "damage", 10);
+    expect(down).toMatchObject({ hp: 0, status: "dying", successes: 0, failures: 0 });
+    expect(resolveDeathSave(down, 9)).toMatchObject({ hp: 0, status: "dying", failures: 1 });
+  });
+  it("records a death save at 0 HP when status is still alive", () => {
+    expect(resolveDeathSave(state({ hp: 0, temp: 0, status: "alive" }), 9)).toMatchObject({
+      hp: 0,
+      status: "dying",
+      failures: 1,
+    });
+  });
 });
 it("preserves accumulated successes on damage while dying", () => {
   expect(applyHealth(state({ hp: 0, status: "dying", successes: 2 }), "damage", 1).successes).toBe(
@@ -71,4 +97,104 @@ it("preserves accumulated successes on damage while dying", () => {
 });
 it("grants first temporary HP even with keep selected", () => {
   expect(applyHealth(state({ temp: 0 }), "temp", 5, false, "keep").temp).toBe(5);
+});
+
+it("shows Conscious at full HP when Dying is stale, and does not add Exhaustion", () => {
+  const stored = state({ hp: 20, max: 20, status: "dying", successes: 2, failures: 1 });
+  const shown = effectiveSurvival(stored);
+  expect(shown).toEqual({
+    hp: 20,
+    max: 20,
+    temp: 5,
+    successes: 0,
+    failures: 0,
+    status: "alive",
+  });
+  expect(shown).not.toHaveProperty("exhaustion");
+  expect(stored).toMatchObject({ status: "dying", successes: 2, failures: 1 });
+});
+
+it("keeps a real Dying character at 0 HP, and Dead at full HP", () => {
+  expect(effectiveSurvival(state({ hp: 0, max: 20, status: "dying", failures: 1 }))).toMatchObject({
+    status: "dying",
+    failures: 1,
+  });
+  expect(effectiveSurvival(state({ hp: 20, max: 20, status: "dead" })).status).toBe("dead");
+  expect(effectiveSurvival(state({ hp: 8, max: 16, status: "stable" })).status).toBe("alive");
+});
+
+it("treats a Conscious Character at 0 HP as Dying with cleared counters", () => {
+  expect(effectiveSurvival(state({ hp: 0, max: 20, status: "alive", failures: 2 }))).toMatchObject({
+    status: "dying",
+    successes: 0,
+    failures: 0,
+  });
+  expect(effectiveSurvival(state({ hp: 0, max: 0, status: "alive" })).status).toBe("alive");
+  expect(effectiveSurvival(state({ hp: 0, max: 20, status: "unconfirmed" })).status).toBe(
+    "unconfirmed",
+  );
+});
+
+describe("Survival correction", () => {
+  const requested = { hp: 0, temp: 0, successes: 1, failures: 2, status: "dying" as const };
+
+  it("sets the requested state and keeps max HP", () => {
+    expect(correctSurvival({ current: state(), requested })).toEqual({ max: 20, ...requested });
+  });
+
+  it("clears counters when the GM stabilizes or restores HP", () => {
+    expect(
+      correctSurvival({ current: state(), requested: { ...requested, status: "stable" } }),
+    ).toMatchObject({ status: "stable", successes: 0, failures: 0 });
+    expect(
+      correctSurvival({
+        current: state(),
+        requested: { ...requested, hp: 4, status: "alive" },
+      }),
+    ).toMatchObject({ hp: 4, successes: 0, failures: 0 });
+  });
+
+  it("confirms a legacy Unconfirmed Character", () => {
+    expect(
+      correctSurvival({
+        current: state({ hp: 0, status: "unconfirmed" }),
+        requested: { ...requested, status: "stable" },
+      }).status,
+    ).toBe("stable");
+  });
+
+  it("rejects Unconfirmed, inconsistent, and out-of-range corrections", () => {
+    expect(() =>
+      correctSurvival({ current: state(), requested: { ...requested, status: "unconfirmed" } }),
+    ).toThrow(RangeError);
+    expect(() =>
+      correctSurvival({ current: state(), requested: { ...requested, hp: 5, status: "dying" } }),
+    ).toThrow(RangeError);
+    expect(() =>
+      correctSurvival({ current: state(), requested: { ...requested, hp: 21, status: "alive" } }),
+    ).toThrow(RangeError);
+    expect(() =>
+      correctSurvival({ current: state(), requested: { ...requested, failures: 4 } }),
+    ).toThrow(RangeError);
+  });
+
+  it("allows Dying at 0 HP while temporary HP remains", () => {
+    expect(
+      correctSurvival({
+        current: state(),
+        requested: { hp: 0, temp: 7, successes: 1, failures: 2, status: "dying" },
+      }),
+    ).toMatchObject({ status: "dying", hp: 0, temp: 7 });
+  });
+
+  it("refuses Dying above 0 HP with or without temporary HP", () => {
+    for (const temp of [0, 10]) {
+      expect(() =>
+        correctSurvival({
+          current: state(),
+          requested: { hp: 3, temp, successes: 0, failures: 0, status: "dying" },
+        }),
+      ).toThrow(RangeError);
+    }
+  });
 });

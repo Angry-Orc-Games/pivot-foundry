@@ -21,6 +21,7 @@ export const EXIT = {
   identity: 6,
   tests: 7,
   unsafe: 8,
+  setup: 9,
   timeout: 10,
 };
 
@@ -38,7 +39,7 @@ export function loadVersions(root = repoRoot) {
 }
 
 export function pinnedImageRef(versions) {
-  return `${versions.container.image}:${versions.container.tag}@${versions.container.digest}`;
+  return `${versions.container.image}:${versions.foundryVersion}@${versions.container.digest}`;
 }
 
 export function parseEnv(contents) {
@@ -167,6 +168,7 @@ export function createFoundryPaths({
     distDir: processEnv.PIVOT_FOUNDRY_DIST_DIR
       ? resolve(processEnv.PIVOT_FOUNDRY_DIST_DIR)
       : join(root, DIST_DIR_NAME),
+    containerCacheDir: join(instanceRoot, "container-cache"),
     foundryData: persistentData,
     instanceRoot,
     runtimeFile: join(instanceRoot, "runtime.json"),

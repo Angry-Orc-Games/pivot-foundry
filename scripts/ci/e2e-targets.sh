@@ -4,6 +4,7 @@ set -euo pipefail
 repo=${E2E_REPOSITORY:?}
 event=${E2E_EVENT:?}
 ref=${E2E_REF:-}
+pr=${E2E_PR:-}
 api=${GITHUB_API_URL:-https://api.github.com}
 token=${GITHUB_TOKEN:?}
 
@@ -55,8 +56,38 @@ emit() {
   fi
 }
 
+if [[ -n $pr && -n $ref ]]; then
+  fail "Pass a pull request number or a ref, not both."
+fi
+
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
+
+if [[ -n $pr ]]; then
+  if [[ $event != "workflow_dispatch" ]]; then
+    fail "A pull request target is only accepted from workflow_dispatch."
+  fi
+  if [[ ! $pr =~ ^[1-9][0-9]*$ ]]; then
+    fail "workflow_dispatch pr must be a pull request number."
+  fi
+  if ! api_get "$api/repos/$repo/pulls/$pr" "$workdir/pr.json"; then
+    fail "Could not read pull request ${pr} in ${repo}, so Foundry secrets stay unused."
+  fi
+  state=$(jq -r '.state // empty' "$workdir/pr.json")
+  full=$(jq -r '.head.repo.full_name // empty' "$workdir/pr.json")
+  sha=$(jq -r '.head.sha // empty' "$workdir/pr.json")
+  if [[ $state != open ]]; then
+    fail "Refusing pull request ${pr}. It is ${state:-unavailable}, so Foundry secrets stay unused."
+  fi
+  if [[ -z $full || $full != "$repo" ]]; then
+    fail "Refusing pull request ${pr}. Head repository ${full:-unknown} is not ${repo}, so Foundry secrets stay unused."
+  fi
+  if ! is_sha "$sha"; then
+    fail "Pull request ${pr} did not return a head SHA, so Foundry secrets stay unused."
+  fi
+  emit "$(jq -nc --arg sha "$sha" --arg name "pr-$pr" '[{sha:$sha,name:$name}]')"
+  exit 0
+fi
 
 if [[ $event == "workflow_dispatch" && -n $ref ]]; then
   if ! is_sha "$ref"; then

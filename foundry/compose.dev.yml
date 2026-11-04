@@ -9,6 +9,7 @@ services:
       - type: bind
         source: ${PIVOT_REPO_ROOT}/dist
         target: /data/Data/systems/pivot-fantasy/dist
+        read_only: true
       - type: bind
         source: ${PIVOT_REPO_ROOT}/lang
         target: /data/Data/systems/pivot-fantasy/lang
