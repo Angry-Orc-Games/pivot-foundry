@@ -292,13 +292,23 @@ it("sets base speed only when the stored value is still 10", async () => {
     log: (message) => logs.push(message),
   });
 
-  expect(halfling.updates).toEqual([{ "system.attributes.speed.value": 7 }]);
-  expect(dwarf.updates).toEqual([{ "system.attributes.speed.value": 8 }]);
-  expect(smallHumanoid.updates).toEqual([{ "system.attributes.speed.value": 7 }]);
-  expect(large.updates).toEqual([{ "system.attributes.speed.value": 12 }]);
+  expect(halfling.updates).toEqual([
+    { "system.attributes.speed.value": 7, "system.speciesSpeedVersion": 1 },
+  ]);
+  expect(dwarf.updates).toEqual([
+    { "system.attributes.speed.value": 8, "system.speciesSpeedVersion": 1 },
+  ]);
+  expect(smallHumanoid.updates).toEqual([
+    { "system.attributes.speed.value": 7, "system.speciesSpeedVersion": 1 },
+  ]);
+  expect(large.updates).toEqual([
+    { "system.attributes.speed.value": 12, "system.speciesSpeedVersion": 1 },
+  ]);
   expect(human.updates).toEqual([]);
-  expect(custom.updates).toEqual([]);
-  expect(zero.updates).toEqual([]);
+  expect(custom.updates).toEqual([{ "system.speciesSpeedVersion": 1 }]);
+  expect(custom.speedValue()).toBe(12);
+  expect(zero.updates).toEqual([{ "system.speciesSpeedVersion": 1 }]);
+  expect(zero.speedValue()).toBe(0);
   expect(missing.updates).toEqual([]);
   expect(unknown.updates).toEqual([]);
   expect(npc.updates).toEqual([]);
@@ -322,6 +332,10 @@ it("sets base speed only when the stored value is still 10", async () => {
 
   expect(halfling.updates).toHaveLength(1);
   expect(dwarf.updates).toHaveLength(1);
+  expect(custom.updates).toHaveLength(1);
+  expect(custom.speedValue()).toBe(12);
+  expect(zero.updates).toHaveLength(1);
+  expect(zero.speedValue()).toBe(0);
   expect(logs).toEqual(['Smaug: unknown species "Dragon"; base speed left at 10.']);
 });
 

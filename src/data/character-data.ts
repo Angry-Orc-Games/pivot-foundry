@@ -103,6 +103,12 @@ export function createPivotCharacterDataModel(foundry: FoundryRuntime): TypeData
     static defineSchema(): Record<string, DataField> {
       return {
         survivalVersion: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
+        speciesSpeedVersion: numberField(fields, {
+          required: true,
+          integer: true,
+          min: 0,
+          initial: 0,
+        }),
         schemaVersion: numberField(fields, {
           required: true,
           integer: true,
