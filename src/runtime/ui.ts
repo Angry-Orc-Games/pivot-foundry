@@ -31,7 +31,7 @@ export interface RuntimeGlobals {
   Roll?: new (formula: string, data?: Record<string, unknown>) => RuntimeRoll;
   ChatMessage?: {
     create(data: Record<string, unknown>): Promise<unknown>;
-    applyMode?(data: Record<string, unknown>, mode: string): unknown;
+    applyMode?(data: Record<string, unknown>, mode?: string): Record<string, unknown>;
     applyRollMode?(data: Record<string, unknown>, mode: string): unknown;
   };
   ui?: { notifications?: { warn(message: string): void } };
@@ -45,6 +45,34 @@ export function warn(key: string): void {
 export interface PromptOptions {
   localizeTitlesAndButtons?: boolean;
   cancelLabel?: string;
+}
+
+const DIALOG_FOCUSABLE =
+  "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
+
+interface DialogNode {
+  focus?: () => void;
+  querySelector(selector: string): DialogNode | null;
+}
+
+interface RenderedDialog {
+  bringToFront?: () => void;
+  element?: DialogNode | null;
+}
+
+function focusIn(root: DialogNode | null | undefined): boolean {
+  const target = root?.querySelector(DIALOG_FOCUSABLE);
+  if (!target?.focus) return false;
+  target.focus();
+  return true;
+}
+
+export function presentRenderedDialog(_event: unknown, dialog: RenderedDialog): void {
+  dialog.bringToFront?.();
+  const element = dialog.element;
+  if (!element) return;
+  if (focusIn(element.querySelector(".window-content"))) return;
+  focusIn(element);
 }
 
 export async function prompt<T>(
@@ -74,6 +102,7 @@ export async function prompt<T>(
       },
       buttons: [{ action: "cancel", label: cancelLabel, callback: () => null }],
       rejectClose: false,
+      render: presentRenderedDialog,
     })) as T | null;
   } catch {
     return null;
@@ -113,6 +142,6 @@ export function applyChatMessageMode(data: Record<string, unknown>, mode: string
 export async function createChat(data: Record<string, unknown>): Promise<unknown> {
   const Chat = runtime().ChatMessage;
   if (!Chat) throw new Error("Chat unavailable");
-  applyChatMessageMode(data, "roll");
-  return Chat.create(data);
+  const prepared = Chat.applyMode?.(data) ?? data;
+  return Chat.create(prepared);
 }

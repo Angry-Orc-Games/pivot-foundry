@@ -73,7 +73,7 @@ describe("tracker Roll Initiative", () => {
 });
 
 describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
-  it("calls static create bound to the class and honors roll mode", async () => {
+  it("calls static create bound to the class and honors message mode", async () => {
     const order: string[] = [];
     class BaseChatMessage {
       id?: string;
@@ -98,7 +98,7 @@ describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
     vi.stubGlobal("ChatMessage", ChatMessageV14);
     vi.stubGlobal("game", {
       settings: {
-        get: (_scope: string, key: string) => (key === "rollMode" ? "blindroll" : undefined),
+        get: (_scope: string, key: string) => (key === "messageMode" ? "blind" : undefined),
       },
       modules: { get: (id: string) => (id === "dice-so-nice" ? { active: true } : undefined) },
       dice3d: {
@@ -150,6 +150,6 @@ describe("tracker Roll Initiative with v14-shaped ChatMessage class", () => {
     expect(
       (combat as { updateEmbeddedDocuments: ReturnType<typeof vi.fn> }).updateEmbeddedDocuments,
     ).toHaveBeenCalledWith("Combatant", [{ _id: "c1", initiative: 12 }]);
-    expect(toMessage.mock.calls[0]?.[1]).toEqual({ rollMode: "blindroll", create: false });
+    expect(toMessage.mock.calls[0]?.[1]).toEqual({ messageMode: "blind", create: false });
   });
 });

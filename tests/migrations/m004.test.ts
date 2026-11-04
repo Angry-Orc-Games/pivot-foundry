@@ -1,453 +1,398 @@
 import { describe, expect, it } from "vitest";
 
-import { SYSTEM_ID } from "../../src/config";
-import { initializeEquippedMarker, planWeaponEquippedMigration } from "../../src/migrations/m004";
-import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
-import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
+import {
+  runWorldMigrations,
+  type MigratableDocument,
+  type WorldMigrationGame,
+} from "../../src/migrations/world-migrations";
 
-const M004_FLAG = `flags.${SYSTEM_ID}.m004`;
+interface StoredActor {
+  system: Record<string, unknown>;
+  prototypeToken?: { actorLink?: unknown };
+}
 
-const strengthEffect = { type: "abilityScoreBonus", ability: "str", amount: 2 };
+function settled(hp: Record<string, unknown>): Record<string, unknown> {
+  return { schemaVersion: 2, survivalVersion: 1, attributes: { hp } };
+}
 
-describe("initializeEquippedMarker", () => {
-  it("marks a new weapon or equipment item and leaves equipped alone", () => {
-    const updates: Record<string, unknown>[] = [];
-    const updateSource = (data: Record<string, unknown>) => {
-      updates.push(data);
-    };
-    initializeEquippedMarker({ type: "weapon", updateSource });
-    initializeEquippedMarker({ type: "equipment", updateSource });
-    initializeEquippedMarker({ type: "armour", updateSource });
-    initializeEquippedMarker({
-      type: "weapon",
-      flags: { [SYSTEM_ID]: { m004: true } },
-      updateSource,
-    });
-    expect(updates).toEqual([{ [M004_FLAG]: true }, { [M004_FLAG]: true }]);
+function createActor(
+  name: string,
+  system: Record<string, unknown>,
+  extras: { id?: string; type?: string; prototypeToken?: { actorLink?: unknown } } = {},
+): MigratableDocument & { updates: Record<string, unknown>[]; stored: StoredActor } {
+  const stored: StoredActor = {
+    system: structuredClone(system),
+    ...(extras.prototypeToken ? { prototypeToken: structuredClone(extras.prototypeToken) } : {}),
+  };
+  const updates: Record<string, unknown>[] = [];
+  return {
+    id: extras.id,
+    name,
+    type: extras.type,
+    updates,
+    stored,
+    toObject: () => structuredClone(stored),
+    update: async (data) => {
+      updates.push(structuredClone(data));
+      applyUpdate(stored, data);
+    },
+  };
+}
+
+function applyUpdate(stored: StoredActor, data: Record<string, unknown>): void {
+  const root = stored as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(data)) {
+    const parts = key.split(".");
+    let target = root;
+    for (let index = 0; index < parts.length - 1; index += 1) {
+      const part = parts[index] ?? "";
+      const next = target[part];
+      if (typeof next !== "object" || next === null || Array.isArray(next)) target[part] = {};
+      target = target[part] as Record<string, unknown>;
+    }
+    const leaf = parts[parts.length - 1] ?? "";
+    target[leaf] = value;
+  }
+}
+
+function isPlain(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function deepMerge(
+  base: Record<string, unknown>,
+  over: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = structuredClone(base);
+  for (const [key, value] of Object.entries(over)) {
+    const current = result[key];
+    if (isPlain(current) && isPlain(value)) result[key] = deepMerge(current, value);
+    else result[key] = structuredClone(value);
+  }
+  return result;
+}
+
+function createMissingDelta(baseName: string, delta: null | undefined) {
+  const base = createActor(baseName, settled({ value: 14, max: null }), {
+    id: `${baseName}-id`,
+    type: "character",
   });
-});
+  const writes: Record<string, unknown>[] = [];
+  const synthetic = {
+    id: `${baseName}-token`,
+    name: `${baseName} Token`,
+    type: "character" as const,
+    updates: writes,
+    toObject: () => ({ system: structuredClone(base.stored.system) }),
+    update: async (data: Record<string, unknown>) => {
+      writes.push(structuredClone(data));
+    },
+  };
+  const token = {
+    actorLink: false as const,
+    actorId: base.id,
+    actor: synthetic,
+    ...(delta === null ? { delta: null } : {}),
+  };
+  return { base, synthetic, token };
+}
 
-describe("planWeaponEquippedMigration", () => {
-  it("equips a weapon that has effects and no equipped key", () => {
-    expect(
-      planWeaponEquippedMigration(
-        { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [strengthEffect] },
-        "weapon",
-      ),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": true, [M004_FLAG]: true },
-    });
-  });
+function createBaseAndDelta(
+  baseName: string,
+  baseSystem: Record<string, unknown>,
+  deltaSystem: Record<string, unknown>,
+  type = "character",
+) {
+  const base = createActor(baseName, baseSystem, { id: `${baseName}-id`, type });
+  const deltaStored: StoredActor = { system: structuredClone(deltaSystem) };
+  const deltaWrites: Record<string, unknown>[] = [];
+  const synthetic = {
+    id: `${baseName}-token`,
+    name: `${baseName} Token`,
+    type,
+    updates: deltaWrites,
+    toObject: () => ({ system: deepMerge(base.stored.system, deltaStored.system) }),
+    update: async (data: Record<string, unknown>) => {
+      deltaWrites.push(structuredClone(data));
+      applyUpdate(deltaStored, data);
+    },
+  };
+  const delta = {
+    name: `${baseName} Delta`,
+    toObject: () => structuredClone(deltaStored),
+  };
+  const token = {
+    actorLink: false as const,
+    actorId: base.id,
+    actor: synthetic,
+    delta,
+  };
+  return { base, synthetic, deltaStored, token };
+}
 
-  it("leaves a weapon without effects unequipped when the key is missing", () => {
-    expect(
-      planWeaponEquippedMigration({ schemaVersion: CURRENT_SCHEMA_VERSION, effects: [] }, "weapon"),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": false, [M004_FLAG]: true },
-    });
-    expect(
-      planWeaponEquippedMigration({ schemaVersion: CURRENT_SCHEMA_VERSION }, "weapon"),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": false, [M004_FLAG]: true },
-    });
-    expect(
-      planWeaponEquippedMigration(
-        { schemaVersion: CURRENT_SCHEMA_VERSION, effects: "yes" },
-        "weapon",
-      ),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": false, [M004_FLAG]: true },
-    });
-  });
+const leftUnlinked = (name: string) =>
+  `Left ${name} unlinked. This placed scene token keeps its own HP delta.`;
 
-  it("equips an effect weapon whose stored false is only the schema default, and keeps a marked choice", () => {
-    expect(
-      planWeaponEquippedMigration(
-        {
-          schemaVersion: CURRENT_SCHEMA_VERSION,
-          effects: [strengthEffect],
-          equipped: false,
-        },
-        "weapon",
-      ),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": true, [M004_FLAG]: true },
-    });
-    expect(
-      planWeaponEquippedMigration(
-        {
-          schemaVersion: CURRENT_SCHEMA_VERSION,
-          effects: [strengthEffect],
-          equipped: false,
-        },
-        "weapon",
-        { [SYSTEM_ID]: { m004: true } },
-      ),
-    ).toEqual({ ok: true, changed: false });
-    expect(
-      planWeaponEquippedMigration(
-        { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [], equipped: true },
-        "weapon",
-      ),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { [M004_FLAG]: true },
-    });
-  });
+function unlinkLocalize(key: string): string {
+  return key === "PIVOT.Migration.TokenLeftUnlinked"
+    ? "Left {name} unlinked. This placed scene token keeps its own HP delta."
+    : key;
+}
 
-  it("is idempotent once the M004 marker is stored", () => {
-    const stored = { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [strengthEffect] };
-    const first = planWeaponEquippedMigration(stored, "weapon");
-    expect(first).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": true, [M004_FLAG]: true },
-    });
-
-    const second = planWeaponEquippedMigration({ ...stored, equipped: true }, "weapon", {
-      [SYSTEM_ID]: { m004: true },
-    });
-    expect(second).toEqual({ ok: true, changed: false });
-  });
-
-  it("equips carried equipment that has effects and no M004 marker", () => {
-    expect(
-      planWeaponEquippedMigration(
-        {
-          schemaVersion: CURRENT_SCHEMA_VERSION,
-          effects: [strengthEffect],
-          equipped: false,
-          carried: true,
-        },
-        "equipment",
-      ),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { "system.equipped": true, [M004_FLAG]: true },
-    });
-  });
-
-  it("marks equipment without effects and leaves it unequipped", () => {
-    expect(
-      planWeaponEquippedMigration(
-        {
-          schemaVersion: CURRENT_SCHEMA_VERSION,
-          effects: [],
-          equipped: false,
-          carried: true,
-        },
-        "equipment",
-      ),
-    ).toEqual({
-      ok: true,
-      changed: true,
-      update: { [M004_FLAG]: true },
-    });
-  });
-
-  it("does not re-equip equipment after the M004 marker is set", () => {
-    expect(
-      planWeaponEquippedMigration(
-        {
-          schemaVersion: CURRENT_SCHEMA_VERSION,
-          effects: [strengthEffect],
-          equipped: false,
-          carried: true,
-        },
-        "equipment",
-        { [SYSTEM_ID]: { m004: true } },
-      ),
-    ).toEqual({ ok: true, changed: false });
-  });
-
-  it("ignores items that are not weapons", () => {
-    expect(
-      planWeaponEquippedMigration(
-        { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [strengthEffect] },
-        "armour",
-      ),
-    ).toEqual({ ok: true, changed: false });
-    expect(
-      planWeaponEquippedMigration({ schemaVersion: CURRENT_SCHEMA_VERSION, effects: [] }),
-    ).toEqual({ ok: true, changed: false });
-  });
-});
-
-describe("M004 world migration", () => {
-  it("logs each weapon change for an embedded item and a world item, then changes nothing on rerun", async () => {
-    const flameTongue = persistingItem("Flame Tongue", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-    });
-    const dagger = persistingItem("Dagger", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [],
-    });
-    const worldSword = persistingItem("World Sword", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-    });
-    const actor: MigratableDocument = {
-      name: "Arwen",
+describe("M004 HP max and prototype link", () => {
+  it("repairs a blank, non-numeric, or too-small HP max on a base actor", async () => {
+    const blank = createActor("Blank", settled({ value: 14, max: null }), { type: "character" });
+    const text = createActor("Text", settled({ value: 9, max: "nope" }), { type: "character" });
+    const fractional = createActor("Fractional", settled({ value: 4, max: 1.5 }), {
       type: "character",
-      toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
-      }),
-      update: async () => undefined,
-      items: [flameTongue, dagger],
-    };
-    const logs: string[] = [];
-    const notifications: string[] = [];
-    const dependencies = {
+    });
+    const negative = createActor("Negative", settled({ value: 3, max: -1 }), { type: "character" });
+    const tooSmall = createActor("TooSmall", settled({ value: 11, max: 2 }), { type: "character" });
+
+    await runWorldMigrations({
       game: {
         user: { isGM: true },
-        actors: [actor],
-        items: [worldSword],
+        actors: [blank, text, fractional, negative, tooSmall],
+        items: [],
       },
-      log: (message: string) => logs.push(message),
-      notify: (_level: "info" | "warn" | "error", message: string) => notifications.push(message),
-    };
+    });
 
-    const first = await runWorldMigrations(dependencies);
-
-    expect(first).toEqual({ skipped: false, updated: 3, failed: 0 });
-    expect(flameTongue.stored.equipped).toBe(true);
-    expect(dagger.stored.equipped).toBe(false);
-    expect(worldSword.stored.equipped).toBe(true);
-    expect(logs).toEqual([
-      "M004: equipped weapon 'World Sword' so its bonuses keep applying",
-      "M004: equipped weapon 'Flame Tongue' on 'Arwen' so its bonuses keep applying",
-      "M004: set weapon 'Dagger' on 'Arwen' unequipped because it has no effect bonuses",
-      "PIVOT.Migration.Complete",
-    ]);
-    expect(notifications).toEqual(expect.arrayContaining(logs));
-
-    logs.length = 0;
-    notifications.length = 0;
-    const second = await runWorldMigrations(dependencies);
-
-    expect(second).toEqual({ skipped: false, updated: 0, failed: 0 });
-    expect(logs).toEqual([]);
-    expect(flameTongue.stored.equipped).toBe(true);
-    expect(dagger.stored.equipped).toBe(false);
+    expect(blank.updates).toEqual([{ "system.attributes.hp.max": 14 }]);
+    expect(text.updates).toEqual([{ "system.attributes.hp.max": 9 }]);
+    expect(fractional.updates).toEqual([{ "system.attributes.hp.max": 4 }]);
+    expect(negative.updates).toEqual([{ "system.attributes.hp.max": 3 }]);
+    expect(tooSmall.updates).toEqual([{ "system.attributes.hp.max": 11 }]);
   });
 
-  it("equips a weapon whose equipped false comes only from the schema default", async () => {
-    const raw: Record<string, unknown> = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-    };
-    let prepared: Record<string, unknown> = { ...raw, equipped: false };
-    const weapon: MigratableDocument = {
-      name: "Flame Tongue",
-      type: "weapon",
-      _source: { system: raw },
-      toObject: () => ({ system: prepared }),
-      update: async (data) => {
-        if ("system.equipped" in data)
-          prepared = { ...prepared, equipped: data["system.equipped"] };
+  it("repairs a bad HP max on an unlinked token delta and logs the token left unlinked", async () => {
+    const { base, synthetic, token } = createBaseAndDelta(
+      "Scout",
+      settled({ value: 10, max: 20 }),
+      {
+        attributes: { hp: { value: 7, max: null } },
       },
-    };
-
-    const report = await runWorldMigrations({
-      game: { user: { isGM: true }, actors: [], items: [weapon] },
-    });
-
-    expect(report).toEqual({ skipped: false, updated: 1, failed: 0 });
-    expect(prepared.equipped).toBe(true);
-  });
-
-  it("equips carried equipment with effects once, then leaves a later unequip alone", async () => {
-    const ring = persistingEquipment("Ring of Protection", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-      equipped: false,
-      carried: true,
-    });
-    const rope = persistingEquipment("Rope", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [],
-      equipped: false,
-      carried: true,
-    });
-    const actor: MigratableDocument = {
-      name: "Arwen",
-      type: "character",
-      toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
-      }),
-      update: async () => undefined,
-      items: [ring, rope],
-    };
+    );
     const logs: string[] = [];
-    const dependencies = {
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+        i18n: { localize: unlinkLocalize },
+      } as WorldMigrationGame,
+      log: (message) => logs.push(message),
+    });
+
+    expect(synthetic.updates).toEqual([{ "system.attributes.hp.max": 7 }]);
+    expect(JSON.stringify(synthetic.updates)).not.toMatch(/actorLink/);
+    expect(logs).toContain(leftUnlinked("Scout Token"));
+  });
+
+  it("raises HP max when current HP is above max and keeps the current HP", async () => {
+    const actor = createActor("Over", settled({ value: 15, max: 6 }), { type: "character" });
+
+    await runWorldMigrations({
       game: { user: { isGM: true }, actors: [actor], items: [] },
-      log: (message: string) => logs.push(message),
-      notify: () => undefined,
-    };
+    });
 
-    const first = await runWorldMigrations(dependencies);
+    expect(actor.updates).toEqual([{ "system.attributes.hp.max": 15 }]);
+    expect(actor.stored.system).toMatchObject({ attributes: { hp: { value: 15, max: 15 } } });
+  });
 
-    expect(first).toEqual({ skipped: false, updated: 2, failed: 0 });
-    expect(ring.stored.equipped).toBe(true);
-    expect(ring.marked).toBe(true);
-    expect(rope.stored.equipped).toBe(false);
-    expect(rope.marked).toBe(true);
-    expect(rope.updates).toEqual([{ [M004_FLAG]: true }]);
-    expect(logs).toEqual([
-      "M004: equipped equipment 'Ring of Protection' on 'Arwen' so its bonuses keep applying",
-      "PIVOT.Migration.Complete",
+  it("links an unlinked player-character prototype token", async () => {
+    const actor = createActor("Hera", settled({ value: 10, max: 20 }), {
+      type: "character",
+      prototypeToken: { actorLink: false },
+    });
+
+    await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [actor], items: [] },
+    });
+
+    expect(actor.updates).toEqual([{ "prototypeToken.actorLink": true }]);
+    expect(actor.stored.prototypeToken).toEqual({ actorLink: true });
+  });
+
+  it("does not change an NPC actorLink", async () => {
+    const clean = createActor(
+      "Gonk",
+      { schemaVersion: 2, attributes: { hp: { value: 8, max: 8 } } },
+      {
+        type: "npc",
+        prototypeToken: { actorLink: false },
+      },
+    );
+    const hurt = createActor(
+      "Bruised",
+      { schemaVersion: 2, attributes: { hp: { value: 9, max: null } } },
+      { type: "npc", prototypeToken: { actorLink: false } },
+    );
+    const logs: string[] = [];
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [clean, hurt],
+        items: [],
+        scenes: [{ tokens: [{ actorLink: false, actor: clean }] }],
+      },
+      log: (message) => logs.push(message),
+    });
+
+    expect(clean.updates).toEqual([]);
+    expect(hurt.updates).toEqual([{ "system.attributes.hp.max": 9 }]);
+    expect(JSON.stringify(clean.updates)).not.toMatch(/actorLink/);
+    expect(JSON.stringify(hurt.updates)).not.toMatch(/actorLink/);
+    expect(clean.stored.prototypeToken).toEqual({ actorLink: false });
+    expect(hurt.stored.prototypeToken).toEqual({ actorLink: false });
+    expect(logs.join("\n")).not.toMatch(/Gonk|Bruised/);
+  });
+
+  it("changes nothing on the second run", async () => {
+    const actor = createActor("Again", settled({ value: 12, max: null }), {
+      type: "character",
+      prototypeToken: { actorLink: false },
+    });
+    const game = { user: { isGM: true }, actors: [actor], items: [] };
+
+    await runWorldMigrations({ game });
+    expect(actor.updates).toEqual([
+      { "system.attributes.hp.max": 12, "prototypeToken.actorLink": true },
     ]);
 
-    logs.length = 0;
-    const second = await runWorldMigrations(dependencies);
+    actor.updates.length = 0;
+    const second = await runWorldMigrations({ game });
+
     expect(second).toEqual({ skipped: false, updated: 0, failed: 0 });
-    expect(logs).toEqual([]);
-
-    ring.setEquipped(false);
-    const third = await runWorldMigrations(dependencies);
-    expect(third).toEqual({ skipped: false, updated: 0, failed: 0 });
-    expect(ring.stored.equipped).toBe(false);
-    expect(logs).toEqual([]);
+    expect(actor.updates).toEqual([]);
+    expect(actor.stored.prototypeToken).toEqual({ actorLink: true });
+    expect(actor.stored.system).toMatchObject({ attributes: { hp: { value: 12, max: 12 } } });
   });
 
-  it("keeps equipment unequipped after the user turns it off on a later run", async () => {
-    const cloak = persistingEquipment("Cloak of Protection", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-      equipped: true,
-      carried: true,
+  it("does not copy a base-only bad HP max into an unlinked token delta", async () => {
+    const { base, synthetic, token } = createBaseAndDelta(
+      "Hero",
+      settled({ value: 10, max: null }),
+      {},
+    );
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+      } as WorldMigrationGame,
     });
-    const actor: MigratableDocument = {
-      name: "Arwen",
-      type: "character",
-      toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
-      }),
-      update: async () => undefined,
-      items: [cloak],
-    };
-    const dependencies = {
-      game: { user: { isGM: true }, actors: [actor], items: [] },
-    };
 
-    await runWorldMigrations(dependencies);
-    cloak.setEquipped(false);
-    await runWorldMigrations(dependencies);
-
-    expect(cloak.stored.equipped).toBe(false);
+    expect(base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(synthetic.updates).toEqual([]);
   });
 
-  it("leaves a weapon created after M004 unequipped on the next ready pass", async () => {
-    const items: MigratableDocument[] = [];
-    const actor: MigratableDocument = {
-      name: "Arwen",
-      type: "character",
-      toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
-      }),
-      update: async () => undefined,
-      items,
-    };
-    const dependencies = {
-      game: { user: { isGM: true }, actors: [actor], items: [] },
-    };
+  it("does not write a base HP max onto a token whose delta is null", async () => {
+    const { base, synthetic, token } = createMissingDelta("Lazy", null);
 
-    await runWorldMigrations(dependencies);
-
-    const sword = persistingItem("Longsword", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-      equipped: false,
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+      } as WorldMigrationGame,
     });
-    const ring = persistingEquipment("Ring of Protection", {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      effects: [strengthEffect],
-      equipped: false,
-      carried: true,
+
+    expect(base.updates).toEqual([{ "system.attributes.hp.max": 14 }]);
+    expect(synthetic.updates).toEqual([]);
+  });
+
+  it("does not write a base HP max onto a token whose delta is missing", async () => {
+    const { base, synthetic, token } = createMissingDelta("Absent", undefined);
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [base],
+        items: [],
+        scenes: [{ tokens: [token] }],
+      } as WorldMigrationGame,
     });
-    initializeEquippedMarker(sword);
-    initializeEquippedMarker(ring);
-    items.push(sword, ring);
 
-    await runWorldMigrations(dependencies);
+    expect(base.updates).toEqual([{ "system.attributes.hp.max": 14 }]);
+    expect(synthetic.updates).toEqual([]);
+  });
 
-    expect(sword.stored.equipped).toBe(false);
-    expect(ring.stored.equipped).toBe(false);
+  it("writes a token delta HP max only from the delta's own data", async () => {
+    const badMax = createBaseAndDelta("BadMax", settled({ value: 10, max: 20 }), {
+      attributes: { hp: { value: 4, max: null } },
+    });
+    const above = createBaseAndDelta("Above", settled({ value: 10, max: null }), {
+      attributes: { hp: { value: 18 } },
+    });
+    const below = createBaseAndDelta("Below", settled({ value: 10, max: null }), {
+      attributes: { hp: { value: 4 } },
+    });
+
+    await runWorldMigrations({
+      game: {
+        user: { isGM: true },
+        actors: [badMax.base, above.base, below.base],
+        items: [],
+        scenes: [{ tokens: [badMax.token, above.token, below.token] }],
+      } as WorldMigrationGame,
+    });
+
+    expect(badMax.base.updates).toEqual([]);
+    expect(badMax.synthetic.updates).toEqual([{ "system.attributes.hp.max": 4 }]);
+    expect(above.base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(above.synthetic.updates).toEqual([{ "system.attributes.hp.max": 18 }]);
+    expect(below.base.updates).toEqual([{ "system.attributes.hp.max": 10 }]);
+    expect(below.synthetic.updates).toEqual([]);
+  });
+
+  it("logs an unlinked character token only when this run wrote it", async () => {
+    const healthy = createActor("Healthy", settled({ value: 8, max: 8 }), { type: "character" });
+    const scout = createBaseAndDelta("Scout", settled({ value: 10, max: 20 }), {
+      attributes: { hp: { value: 7, max: null } },
+    });
+    const logs: string[] = [];
+    const game = {
+      user: { isGM: true },
+      actors: [scout.base],
+      items: [],
+      scenes: [
+        {
+          tokens: [{ actorLink: false, actor: healthy }, scout.token],
+        },
+      ],
+      i18n: { localize: unlinkLocalize },
+    } as WorldMigrationGame;
+
+    await runWorldMigrations({ game, log: (message) => logs.push(message) });
+
+    expect(healthy.updates).toEqual([]);
+    expect(logs).not.toContain(leftUnlinked("Healthy"));
+    expect(scout.synthetic.updates).toEqual([{ "system.attributes.hp.max": 7 }]);
+    expect(logs).toContain(leftUnlinked("Scout Token"));
+
+    logs.length = 0;
+    scout.synthetic.updates.length = 0;
+    await runWorldMigrations({ game, log: (message) => logs.push(message) });
+
+    expect(scout.synthetic.updates).toEqual([]);
+    expect(logs).not.toContain(leftUnlinked("Scout Token"));
+  });
+
+  it("skips HP max repair when current HP is not a safe non-negative integer", async () => {
+    const actors = [null, -1, Number.NaN, "12", 1.5].map((value, index) =>
+      createActor(`BadHp${index}`, settled({ value, max: null }), { type: "character" }),
+    );
+
+    await runWorldMigrations({
+      game: { user: { isGM: true }, actors, items: [] },
+    });
+
+    for (const actor of actors) expect(actor.updates).toEqual([]);
   });
 });
-
-function persistingEquipment(name: string, initial: Record<string, unknown>) {
-  let stored = { ...initial };
-  let marked = false;
-  const updates: Record<string, unknown>[] = [];
-  const document = {
-    name,
-    type: "equipment" as const,
-    updates,
-    toObject: () => ({
-      system: stored,
-      flags: marked ? { [SYSTEM_ID]: { m004: true } } : {},
-    }),
-    update: async (data: Record<string, unknown>) => {
-      updates.push(data);
-      if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
-      if (data[M004_FLAG] === true) marked = true;
-    },
-    updateSource(data: Record<string, unknown>) {
-      if (data[M004_FLAG] === true) marked = true;
-    },
-    get flags() {
-      return marked ? { [SYSTEM_ID]: { m004: true } } : {};
-    },
-    setEquipped(value: boolean) {
-      stored = { ...stored, equipped: value };
-    },
-    get stored() {
-      return stored;
-    },
-    get marked() {
-      return marked;
-    },
-  };
-  return document;
-}
-
-function persistingItem(name: string, initial: Record<string, unknown>) {
-  let stored = { ...initial };
-  let marked = false;
-  const document = {
-    name,
-    type: "weapon",
-    toObject: () => ({
-      system: stored,
-      flags: marked ? { [SYSTEM_ID]: { m004: true } } : {},
-    }),
-    update: async (data: Record<string, unknown>) => {
-      if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
-      if (data[M004_FLAG] === true) marked = true;
-    },
-    updateSource(data: Record<string, unknown>) {
-      if (data[M004_FLAG] === true) marked = true;
-    },
-    get flags() {
-      return marked ? { [SYSTEM_ID]: { m004: true } } : {};
-    },
-    get stored() {
-      return stored;
-    },
-  };
-  return document;
-}

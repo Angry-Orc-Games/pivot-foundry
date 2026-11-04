@@ -3,6 +3,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   LEGACY_SCHEMA_VERSION,
   SCHEMA_MIGRATION_ID,
+  SHEET_V2_SCHEMA_VERSION,
 } from "../rules/schema-version";
 
 export { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION, SCHEMA_MIGRATION_ID };
@@ -32,7 +33,7 @@ function planDocumentMigration(storedSystem: unknown, kind: "actor" | "item"): M
   if (version === "invalid") {
     return { ok: false, error: "schemaVersion is not a finite integer >= 0" };
   }
-  if (version > CURRENT_SCHEMA_VERSION) {
+  if (version > CURRENT_SCHEMA_VERSION && version !== SHEET_V2_SCHEMA_VERSION) {
     return {
       ok: false,
       error: `schemaVersion ${version} is newer than supported version ${CURRENT_SCHEMA_VERSION}`,
@@ -44,7 +45,7 @@ function planDocumentMigration(storedSystem: unknown, kind: "actor" | "item"): M
     if (!effectsResult.ok) return effectsResult;
   }
 
-  if (version === CURRENT_SCHEMA_VERSION) {
+  if (version === CURRENT_SCHEMA_VERSION || version === SHEET_V2_SCHEMA_VERSION) {
     return { ok: true, changed: false };
   }
 

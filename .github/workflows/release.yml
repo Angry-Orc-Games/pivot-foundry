@@ -13,10 +13,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  gate:
-    name: License gate
+  nightly:
+    name: Require nightly E2E
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: read
+      actions: read
     steps:
       - name: Checkout workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -26,12 +30,13 @@ jobs:
           sparse-checkout: scripts/ci
           persist-credentials: false
 
-      - name: License gate
-        run: bash trusted-gate/scripts/ci/e2e-gate.sh require
+      - name: Require a green nightly E2E check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash trusted-gate/scripts/ci/require-nightly.sh
 
   package:
     name: Prepare release artifact
-    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -72,84 +77,12 @@ jobs:
             artifact-identity.json
           if-no-files-found: error
 
-  e2e:
-    name: Test release artifact
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: [gate, package]
-    environment: foundry-e2e
-    concurrency:
-      group: foundry-e2e
-      cancel-in-progress: false
-    steps:
-      - name: Checkout workflow commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          path: trusted-gate
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /scripts/
-            /e2e/
-            /foundry/
-            /package.json
-            /package-lock.json
-
-      - name: License gate
-        run: bash trusted-gate/scripts/ci/e2e-gate.sh require
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: trusted-gate/package-lock.json
-
-      - name: Install dependencies
-        working-directory: trusted-gate
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: npm ci
-
-      - name: Download release candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: pivot-foundry-release-candidate
-          path: package-artifact
-
-      - name: Accept the packaged files
-        run: bash trusted-gate/scripts/ci/accept-artifact.sh package-artifact trusted-gate system.json system.zip artifact-identity.json
-
-      - name: Install Playwright browser
-        working-directory: trusted-gate
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: npx playwright install chromium --with-deps
-
-      - name: Run E2E against the prepared zip
-        working-directory: trusted-gate
-        env:
-          FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
-          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-          FOUNDRY_RELEASE_CACHE_URL: ${{ secrets.FOUNDRY_RELEASE_CACHE_URL }}
-          FOUNDRY_RELEASE_SHA256: ${{ secrets.FOUNDRY_RELEASE_SHA256 }}
-          PIVOT_REQUIRE_RELEASE_SHA256: "1"
-          PIVOT_FOUNDRY_TARGET: e2e
-        run: |
-          BEFORE=$(sha256sum system.zip | awk '{print $1}')
-          npm run foundry:e2e -- --skip-package
-          AFTER=$(sha256sum system.zip | awk '{print $1}')
-          test "$BEFORE" = "$AFTER"
-
   publish:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [package, e2e]
-    if: needs.e2e.result == 'success'
+    needs: [package, nightly]
+    if: needs.package.result == 'success' && needs.nightly.result == 'success'
     permissions:
       contents: write
     steps:

@@ -29,9 +29,8 @@ services:
         source: ${PIVOT_FOUNDRY_DATA_DIR}
         target: /data
       - type: bind
-        source: ${PIVOT_FOUNDRY_DIST_DIR}
+        source: ${PIVOT_FOUNDRY_CONTAINER_CACHE}
         target: /opt/foundry-dist
-        read_only: true
     labels:
       com.angryorcgames.pivot.owned: "true"
       com.angryorcgames.pivot.role: ${PIVOT_FOUNDRY_ROLE}

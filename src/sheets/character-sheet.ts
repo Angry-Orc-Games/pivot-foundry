@@ -1,5 +1,4 @@
-import { readSurvival } from "../runtime/health";
-import { reconcileSurvival } from "../rules/survival";
+import { readSurvival } from "../runtime/survival-transaction";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
@@ -16,7 +15,8 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
-import { applyChatMessageMode } from "../runtime/ui";
+import { applyChatMessageMode, presentRenderedDialog } from "../runtime/ui";
+import { effectiveSurvival } from "../rules/survival";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -34,7 +34,9 @@ import {
   applyAttackCrit,
   d20PoolFormula,
   dicePoolForRollMode,
-  isRollMode,
+  parseRollMode,
+  ROLL_MODES,
+  type DicePoolResolution,
   type RollMode,
   selectKeptD20,
 } from "../rules/d20-roll";
@@ -80,7 +82,6 @@ export const ROLL_MODE_LABEL_KEYS: Record<RollMode, string> = {
   normal: "PIVOT.RollMode.Normal",
   advantage: "PIVOT.RollMode.Advantage",
   disadvantage: "PIVOT.RollMode.Disadvantage",
-  superAdvantage: "PIVOT.RollMode.SuperAdvantage",
 };
 
 export type D20RollKind = "ability" | "save" | "skill" | "initiative" | "weaponAttack";
@@ -122,6 +123,8 @@ export interface CharacterSheetContext {
   poolPercent: number;
   deathSaveSuccessPips: boolean[];
   deathSaveFailurePips: boolean[];
+  deathSaveSuccesses: number;
+  deathSaveFailures: number;
   isGM: boolean;
   system: RecordValue;
   speciesLabel: string;
@@ -421,7 +424,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = reconcileSurvival(readSurvival(actor));
+  const survival = effectiveSurvival(readSurvival(actor));
 
   // Helper to format signed numbers
   const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));
@@ -485,6 +488,8 @@ export function prepareCharacterSheetContext(
     poolPercent: fillPercent(numberAt(system, ["resources", "pool", "value"], 0), derived.pool.max),
     deathSaveSuccessPips: deathSavePips(survival.successes),
     deathSaveFailurePips: deathSavePips(survival.failures),
+    deathSaveSuccesses: survival.successes,
+    deathSaveFailures: survival.failures,
     isGM:
       (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
         ?.isGM === true,
@@ -560,11 +565,7 @@ export function prepareCharacterSheetContext(
           disabledAttr: disabledAttr as "" | "disabled",
         };
       })
-      .sort((a, b) => {
-        // Proficient first, then alphabetical
-        if (a.proficient !== b.proficient) return a.proficient ? -1 : 1;
-        return a.label.localeCompare(b.label);
-      }),
+      .sort((a, b) => a.label.localeCompare(b.label)),
     items: {
       weapons: withDisabledAttr(weapons, disabledAttr).map((item) => ({
         ...item,
@@ -685,14 +686,12 @@ export function resolveSheetRoll(
 }
 
 export function buildRollModeDialogContent(localize: (key: string) => string): string {
-  const options = (["normal", "advantage", "disadvantage", "superAdvantage"] as const)
-    .map((mode, index) => {
-      const checked = index === 0 ? " checked" : "";
-      return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
-        localize(ROLL_MODE_LABEL_KEYS[mode]),
-      )}</label>`;
-    })
-    .join("");
+  const options = ROLL_MODES.map((mode) => {
+    const checked = mode === "normal" ? " checked" : "";
+    return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
+      localize(ROLL_MODE_LABEL_KEYS[mode]),
+    )}</label>`;
+  }).join("");
   return `<fieldset class="pf-roll-mode-dialog"><legend>${escapeHtml(
     localize("PIVOT.RollDialog.Title"),
   )}</legend>${options}</fieldset>`;
@@ -756,7 +755,7 @@ export async function rollInitiativeWithDiceAnimation(options: {
   roll: {
     toMessage: (
       data: Record<string, unknown>,
-      options?: { rollMode?: string; create?: boolean },
+      options?: { messageMode?: string; create?: boolean },
     ) => Promise<unknown>;
   };
   total: number;
@@ -767,17 +766,16 @@ export async function rollInitiativeWithDiceAnimation(options: {
 }): Promise<void> {
   const { actor, roll, total, flavor, combat, notify, localize } = options;
 
-  // Get roll mode from game settings (defaults to "roll" = public)
   const game = globalThis as typeof globalThis & {
     game?: { settings?: { get?: (scope: string, key: string) => unknown } };
   };
-  const rawMode = game.game?.settings?.get?.("core", "rollMode");
-  const rollMode = typeof rawMode === "string" ? rawMode : "roll";
+  const rawMode = game.game?.settings?.get?.("core", "messageMode");
+  const messageMode = typeof rawMode === "string" ? rawMode : "public";
 
-  // Build message data only (create:false); roll mode is applied by toMessage.
+  // create:false so toMessage applies visibility and we create the one message Dice So Nice waits on.
   const chatData = (await roll.toMessage(
     { speaker: speakerForActor(actor), flavor, flags: { "core.initiativeRoll": true } },
-    { rollMode, create: false },
+    { messageMode, create: false },
   )) as Record<string, unknown>;
 
   const ChatMessage = (
@@ -893,16 +891,131 @@ function getSheetDocument(sheet: object): ActorLike {
 }
 
 async function submitDocumentForm(
-  this: { document?: { update?: (data: Record<string, unknown>) => Promise<unknown> } },
+  this: {
+    document?: {
+      _source?: unknown;
+      toObject?: () => unknown;
+      update?: (data: Record<string, unknown>) => Promise<unknown>;
+    };
+  },
   _event: Event,
   _form: HTMLFormElement,
   formData: { object?: Record<string, unknown> },
 ): Promise<unknown> {
-  const data = normalizeSheetSubmitData(formData.object ?? {});
-  return this.document?.update?.(data);
+  const submitted = expandObject(
+    normalizeSheetSubmitData(formData.object ?? {}, documentSource(this.document)),
+  );
+  const changed = diffSubmitAgainstSource(this.document, submitted);
+  if (Object.keys(changed).length === 0) return undefined;
+  return this.document?.update?.(changed);
 }
 
-export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<string, unknown> {
+function expandObject(data: Record<string, unknown>): Record<string, unknown> {
+  const expand = foundryUtils()?.expandObject;
+  if (expand) {
+    const expanded = expand(data);
+    return isDataRecord(expanded) ? expanded : {};
+  }
+  const expanded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    setDeep(expanded, key, isDataRecord(value) ? expandObject(value) : value);
+  }
+  return expanded;
+}
+
+function setDeep(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".");
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (!isDataRecord(next)) current[part] = {};
+    current = current[part] as Record<string, unknown>;
+  }
+  const leaf = parts.at(-1);
+  if (leaf) current[leaf] = value;
+}
+
+function foundryUtils():
+  | {
+      diffObject?: (original: unknown, other: unknown) => unknown;
+      expandObject?: (data: Record<string, unknown>) => unknown;
+    }
+  | undefined {
+  return (
+    globalThis as {
+      foundry?: {
+        utils?: {
+          diffObject?: (original: unknown, other: unknown) => unknown;
+          expandObject?: (data: Record<string, unknown>) => unknown;
+        };
+      };
+    }
+  ).foundry?.utils;
+}
+
+function diffSubmitAgainstSource(
+  document: { _source?: unknown; toObject?: () => unknown } | undefined,
+  submitted: Record<string, unknown>,
+): Record<string, unknown> {
+  const source = documentSource(document);
+  const utils = foundryUtils();
+  const diff = utils?.diffObject
+    ? utils.diffObject(source, submitted)
+    : diffObject(source, submitted);
+  return isDataRecord(diff) ? diff : {};
+}
+
+function documentSource(
+  document:
+    | {
+        _source?: unknown;
+        toObject?: () => unknown;
+      }
+    | undefined,
+): Record<string, unknown> {
+  if (isDataRecord(document?._source)) return document._source;
+  if (typeof document?.toObject !== "function") return {};
+  try {
+    const value = document.toObject();
+    return isDataRecord(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function diffObject(original: unknown, other: unknown): Record<string, unknown> {
+  if (!isDataRecord(other)) return {};
+  const base = isDataRecord(original) ? original : {};
+  const diff: Record<string, unknown> = {};
+  for (const key of Object.keys(other)) {
+    const value = other[key];
+    const previous = base[key];
+    if (isDataRecord(value)) {
+      const nested = diffObject(previous, value);
+      if (Object.keys(nested).length > 0) diff[key] = nested;
+      continue;
+    }
+    if (Array.isArray(value) || Array.isArray(previous)) {
+      if (!sameValue(previous, value)) diff[key] = value;
+      continue;
+    }
+    if (previous !== value) diff[key] = value;
+  }
+  return diff;
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function isDataRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function normalizeSheetSubmitData(
+  data: Record<string, unknown>,
+  source: Record<string, unknown> = {},
+): Record<string, unknown> {
   const normalized = { ...data };
   const languagesPath = ["system", "identity", "languagesText"];
   const instrumentsPath = ["system", "proficiencies", "instrumentsText"];
@@ -938,7 +1051,11 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       academiaPath,
       ["system", "skillSpecializations", "academia"],
-      specializationEntries(splitList(academia), "int"),
+      specializationEntries(
+        splitList(academia),
+        "int",
+        storedSpecializationEntries(source, "academia"),
+      ),
     );
     deleteSubmitPath(normalized, academiaPath);
   }
@@ -948,7 +1065,11 @@ export function normalizeSheetSubmitData(data: Record<string, unknown>): Record<
       normalized,
       craftingPath,
       ["system", "skillSpecializations", "crafting"],
-      specializationEntries(splitList(crafting), "int"),
+      specializationEntries(
+        splitList(crafting),
+        "int",
+        storedSpecializationEntries(source, "crafting"),
+      ),
     );
     deleteSubmitPath(normalized, craftingPath);
   }
@@ -1034,10 +1155,7 @@ async function rollAction(
  * Initiative formula with real d20 terms so Dice So Nice animates every rolled die.
  * Keep modifiers mirror selectKeptD20: highest -> kh1, lowest -> kl1, single -> plain.
  */
-export function initiativeRollFormula(
-  resolution: { dieCount: number; pick: "single" | "highest" | "lowest" },
-  modifier: number,
-): string {
+export function initiativeRollFormula(resolution: DicePoolResolution, modifier: number): string {
   const keep = resolution.pick === "highest" ? "kh1" : resolution.pick === "lowest" ? "kl1" : "";
   return `${d20PoolFormula(resolution.dieCount)}${keep}${formatSigned(modifier)}`;
 }
@@ -1048,7 +1166,7 @@ type InitiativeRoll = {
   terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
   toMessage: (
     data: Record<string, unknown>,
-    options?: { rollMode?: string; create?: boolean },
+    options?: { messageMode?: string; create?: boolean },
   ) => Promise<unknown>;
 };
 
@@ -1230,18 +1348,44 @@ function specializationNamesAt(source: RecordValue, path: string[]): string[] {
   });
 }
 
+function storedSpecializationEntries(
+  source: Record<string, unknown>,
+  group: "academia" | "crafting",
+): Array<Record<string, unknown>> {
+  const value = readPath(source, ["system", "skillSpecializations", group]);
+  if (!Array.isArray(value)) return [];
+  return value.filter(isDataRecord);
+}
+
+function specializationMatchKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 function specializationEntries(
   names: string[],
   ability: AbilityKey,
+  existing: Array<Record<string, unknown>> = [],
 ): Array<Record<string, unknown>> {
-  return names.map((name) => ({
-    name,
-    ability,
-    proficient: true,
-    deepening: 0,
-    expertise: false,
-    bonus: 0,
-  }));
+  const remainingByKey = new Map<string, Array<Record<string, unknown>>>();
+  for (const entry of existing) {
+    if (typeof entry.name !== "string") continue;
+    const key = specializationMatchKey(entry.name);
+    const queue = remainingByKey.get(key);
+    if (queue) queue.push(entry);
+    else remainingByKey.set(key, [entry]);
+  }
+  return names.map((name) => {
+    const stored = remainingByKey.get(specializationMatchKey(name))?.shift();
+    if (stored) return { ...stored, name };
+    return {
+      name,
+      ability,
+      proficient: true,
+      deepening: 0,
+      expertise: false,
+      bonus: 0,
+    };
+  });
 }
 
 function withDisabledAttr<T extends ItemLike>(
@@ -1345,8 +1489,8 @@ function getRollMode(): string {
       };
     };
   };
-  const mode = globals.game?.settings?.get?.("core", "rollMode");
-  return typeof mode === "string" ? mode : "roll";
+  const mode = globals.game?.settings?.get?.("core", "messageMode");
+  return typeof mode === "string" ? mode : "public";
 }
 
 function getRollConstructor():
@@ -1395,7 +1539,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
         callback: (_event: unknown, button: { form?: HTMLFormElement }) => {
           const selected = button.form?.querySelector("input[name='mode']:checked");
           const value = selected && "value" in selected ? String(selected.value) : "normal";
-          return isRollMode(value) ? value : "normal";
+          return parseRollMode(value) ?? "normal";
         },
       },
       buttons: [
@@ -1406,8 +1550,9 @@ export async function promptRollMode(): Promise<RollMode | null> {
         },
       ],
       rejectClose: false,
+      render: presentRenderedDialog,
     });
-    return isRollMode(result) ? result : null;
+    return parseRollMode(result);
   } catch {
     return null;
   }

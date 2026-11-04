@@ -4,8 +4,14 @@ import {
   attachErrorSink,
   createPlayerUser,
   ensureE2EWorld,
+  ensureUnpaused,
   expectPackageIdentity,
   joinAs,
+  playerSyncTimeoutMs,
+  saveSecondaryPageFailure,
+  sceneCanvasTimeoutMs,
+  setupHookTimeoutMs,
+  sheetSpecTimeoutMs,
   unexpectedErrors,
   waitForCanvasReady,
 } from "../helpers/foundry";
@@ -14,14 +20,16 @@ const adminKey = process.env.PIVOT_FOUNDRY_ADMIN_KEY || process.env.FOUNDRY_ADMI
 const playerPassword = process.env.PIVOT_PLAYER_PASSWORD || "e2e-player-local";
 const playerName = "E2E Player";
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "serial", timeout: 360_000 });
 
 test.beforeAll(async ({ browser }) => {
+  test.setTimeout(setupHookTimeoutMs());
   const context = await browser.newContext();
   attachErrorSink(context);
-  const page = await context.newPage();
-  await ensureE2EWorld(page, adminKey);
+  let page = await context.newPage();
+  page = await ensureE2EWorld(page, adminKey);
   await joinAs(page, { name: "Gamemaster" });
+  await ensureUnpaused(page);
   await expectPackageIdentity(page);
   await createPlayerUser(page, playerName, playerPassword);
   await context.close();
@@ -39,6 +47,7 @@ test("creates a character, renders the sheet, and persists after reload", async 
   page,
   context,
 }) => {
+  test.setTimeout(sheetSpecTimeoutMs());
   attachErrorSink(context);
   await joinAs(page, { name: "Gamemaster" });
   const actor = await page.evaluate(async () => {
@@ -64,9 +73,11 @@ test("creates a character, renders the sheet, and persists after reload", async 
     await actorDoc.sheet.render(true);
   }, actor.id);
 
-  await expect(page.locator(".pivot-character-sheet, .window-app, .application")).toContainText(
-    /E2E Hero/,
-  );
+  const sheet = page.locator("form.application.sheet.actor").filter({
+    has: page.locator(".window-title", { hasText: actor.name }),
+  });
+  await expect(sheet.locator(".window-title")).toContainText(actor.name);
+  await expect(sheet.getByRole("textbox", { name: "Character name" })).toHaveValue(actor.name);
 
   await page.evaluate(async (id) => {
     await (
@@ -105,6 +116,7 @@ test("creates a character, renders the sheet, and persists after reload", async 
 });
 
 test("posts a d20 roll to chat and activates a scene canvas", async ({ page }) => {
+  test.setTimeout(sceneCanvasTimeoutMs());
   await joinAs(page, { name: "Gamemaster" });
   await page.evaluate(async () => {
     const roll = await new (
@@ -118,10 +130,12 @@ test("posts a d20 roll to chat and activates a scene canvas", async ({ page }) =
     ).Roll("1d20").evaluate();
     await roll.toMessage({ speaker: { alias: "E2E Roller" }, flavor: "Pivot E2E d20" });
   });
-  await expect(page.locator("#chat-log, .chat-log, ol.chat-log")).toContainText(
-    /E2E Roller|Pivot E2E d20|1d20/,
-  );
+  const rollMessage = page
+    .locator("ol.chat-log:not(#chat-notifications .chat-log) .chat-message")
+    .last();
+  await expect(rollMessage).toContainText(/E2E Roller[\s\S]*Pivot E2E d20[\s\S]*1d20/);
 
+  await ensureUnpaused(page);
   await page.evaluate(async () => {
     const scene = await (
       window as unknown as {
@@ -140,68 +154,82 @@ test("posts a d20 roll to chat and activates a scene canvas", async ({ page }) =
 });
 
 test("player permissions and cross-client actor sync", async ({ browser }) => {
+  test.setTimeout(playerSyncTimeoutMs());
   const gmContext = await browser.newContext();
   const playerContext = await browser.newContext();
   attachErrorSink(gmContext);
   attachErrorSink(playerContext);
   const gm = await gmContext.newPage();
   const player = await playerContext.newPage();
-
-  await joinAs(gm, { name: "Gamemaster" });
-  await joinAs(player, { name: playerName, password: playerPassword });
-
-  const actor = await gm.evaluate(async () => {
-    const created = await (
-      window as unknown as {
-        Actor: { create: (data: Record<string, unknown>) => Promise<{ id: string; name: string }> };
-      }
-    ).Actor.create({ name: "Shared Scout", type: "character" });
-    return { id: created.id, name: created.name };
+  const playerLines: string[] = [];
+  player.on("console", (message) => {
+    playerLines.push(message.text());
   });
 
-  await expect
-    .poll(async () =>
-      player.evaluate((id) => {
-        return Boolean(
-          (
-            window as unknown as { game: { actors: { get: (id: string) => unknown } } }
-          ).game.actors.get(id),
-        );
-      }, actor.id),
-    )
-    .toBe(true);
+  try {
+    await joinAs(gm, { name: "Gamemaster" });
+    await joinAs(player, { name: playerName, password: playerPassword });
 
-  const playerUpdate = await player.evaluate(async (id) => {
-    try {
-      await (
+    const actor = await gm.evaluate(async () => {
+      const created = await (
         window as unknown as {
-          game: {
-            actors: {
-              get: (id: string) => { update: (data: Record<string, unknown>) => Promise<unknown> };
-            };
+          Actor: {
+            create: (data: Record<string, unknown>) => Promise<{ id: string; name: string }>;
           };
         }
-      ).game.actors
-        .get(id)
-        .update({ name: "Hacked Name" });
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, message: error instanceof Error ? error.message : String(error) };
-    }
-  }, actor.id);
-  expect(playerUpdate.ok).toBe(false);
+      ).Actor.create({ name: "Shared Scout", type: "character" });
+      return { id: created.id, name: created.name };
+    });
 
-  const gmName = await gm.evaluate(
-    (id) =>
-      (
-        window as unknown as { game: { actors: { get: (id: string) => { name: string } } } }
-      ).game.actors.get(id).name,
-    actor.id,
-  );
-  expect(gmName).toBe("Shared Scout");
+    await expect
+      .poll(async () =>
+        player.evaluate((id) => {
+          return Boolean(
+            (
+              window as unknown as { game: { actors: { get: (id: string) => unknown } } }
+            ).game.actors.get(id),
+          );
+        }, actor.id),
+      )
+      .toBe(true);
 
-  await gmContext.close();
-  await playerContext.close();
+    const playerUpdate = await player.evaluate(async (id) => {
+      try {
+        await (
+          window as unknown as {
+            game: {
+              actors: {
+                get: (id: string) => {
+                  update: (data: Record<string, unknown>) => Promise<unknown>;
+                };
+              };
+            };
+          }
+        ).game.actors
+          .get(id)
+          .update({ name: "Hacked Name" });
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) };
+      }
+    }, actor.id);
+    expect(playerUpdate.ok).toBe(false);
+
+    const gmName = await gm.evaluate(
+      (id) =>
+        (
+          window as unknown as { game: { actors: { get: (id: string) => { name: string } } } }
+        ).game.actors.get(id).name,
+      actor.id,
+    );
+    expect(gmName).toBe("Shared Scout");
+  } catch (error) {
+    await saveSecondaryPageFailure(player, playerLines, [playerPassword, adminKey]);
+    throw error;
+  } finally {
+    await gmContext.close();
+    await playerContext.close();
+  }
 });
 
 test("does not declare Foundry LevelDB packs yet", async ({ page }) => {

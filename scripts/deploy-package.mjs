@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { EXIT, assertSafeTarget, repoRoot } from "./foundry-env.mjs";
 import { fileSha256 } from "./artifact-identity.mjs";
+import { preflightScript } from "./deploy-preflight.mjs";
 
 const target = process.argv[2] || process.env.PIVOT_DEPLOY_TARGET;
 const identityPath = process.argv[3] || join(repoRoot, "artifact-identity.json");
@@ -81,16 +82,75 @@ if (key) {
   writeFileSync(keyFile, `${key.endsWith("\n") ? key : `${key}\n`}`, { mode: 0o600 });
 }
 
-const ssh = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"];
+// scp and ssh share the same options: a fresh CI runner has no known_hosts, so scp must also accept
+// a new host key instead of failing with "Host key verification failed".
+// ConnectTimeout bounds an unreachable (blackholed) host; without it ssh hangs until the job timeout.
+// ServerAlive* ends a session whose server stops answering after the connection was made.
+const connectTimeout = sshConnectTimeout(process.env.PIVOT_DEPLOY_SSH_CONNECT_TIMEOUT);
+const sshOptions = [
+  "-o",
+  "BatchMode=yes",
+  "-o",
+  "StrictHostKeyChecking=accept-new",
+  "-o",
+  `ConnectTimeout=${connectTimeout}`,
+  "-o",
+  "ServerAliveInterval=15",
+  "-o",
+  "ServerAliveCountMax=3",
+];
+const ssh = ["ssh", ...sshOptions];
 if (key) ssh.push("-i", keyFile);
 const remote = `${user}@${host}`;
 const stamp = new Date().toISOString().replaceAll(/[:.]/g, "");
 const backup = `${backupDir}/pivot-fantasy-${stamp}`;
+// A unique name per run: a fixed /tmp path can be left behind by another user and then cannot be overwritten.
+const remoteZip = `/tmp/pivot-fantasy-system-${stamp}.zip`;
 
+let unreachable = false;
 try {
+  try {
+    execFileSync(ssh[0], [...ssh.slice(1), remote, "sh", "-s"], {
+      input: preflightScript({ targetDir, backupDir }),
+      stdio: ["pipe", "inherit", "inherit"],
+    });
+  } catch (error) {
+    // ssh exits 255 for its own errors (no route, timeout, refused, auth); the preflight exits 1.
+    if (error?.status !== 255) throw error;
+    unreachable = true;
+  }
+  if (!unreachable) deploy();
+} finally {
+  if (key) {
+    try {
+      writeFileSync(keyFile, "");
+    } catch {
+      // The key file lives in the runner tmpdir and is emptied even if unlink fails.
+    }
+  }
+}
+
+if (unreachable) {
+  console.error(
+    `Deploy failed: cannot reach ${host} over ssh (no connection within ${connectTimeout}s, or ssh refused it). Nothing was uploaded.`,
+  );
+  process.exit(EXIT.runtime);
+}
+
+identity[target] = {
+  result: "deployed",
+  sha256,
+  publicUrl,
+  at: new Date().toISOString(),
+  commit: identity.commit,
+};
+writeFileSync(identityPath, `${JSON.stringify(identity, null, 2)}\n`);
+console.log(`Deployed ${identity.packageVersion} (${sha256}) to ${target}. Backup ${backup}.`);
+
+function deploy() {
   execFileSync(
     "scp",
-    [...(key ? ["-i", keyFile] : []), zipPath, `${remote}:/tmp/pivot-fantasy-system.zip`],
+    [...sshOptions, ...(key ? ["-i", keyFile] : []), zipPath, `${remote}:${remoteZip}`],
     {
       stdio: "inherit",
     },
@@ -105,32 +165,21 @@ try {
         `mkdir -p ${shellQuote(backupDir)}`,
         `if [ -d ${shellQuote(targetDir)} ]; then mv ${shellQuote(targetDir)} ${shellQuote(backup)}; fi`,
         `mkdir -p ${shellQuote(targetDir)}`,
-        `unzip -q -o /tmp/pivot-fantasy-system.zip -d ${shellQuote(targetDir)}`,
+        `unzip -q -o ${shellQuote(remoteZip)} -d ${shellQuote(targetDir)}`,
+        `rm -f ${shellQuote(remoteZip)}`,
         `test -f ${shellQuote(`${targetDir}/system.json`)}`,
         `systemctl restart ${shellQuote(service)}`,
       ].join(" && "),
     ],
     { stdio: "inherit" },
   );
-} finally {
-  if (key) {
-    try {
-      writeFileSync(keyFile, "");
-    } catch {
-      // The key file lives in the runner tmpdir and is emptied even if unlink fails.
-    }
-  }
 }
 
-identity[target] = {
-  result: "deployed",
-  sha256,
-  publicUrl,
-  at: new Date().toISOString(),
-  commit: identity.commit,
-};
-writeFileSync(identityPath, `${JSON.stringify(identity, null, 2)}\n`);
-console.log(`Deployed ${identity.packageVersion} (${sha256}) to ${target}. Backup ${backup}.`);
+// Seconds; tests shorten it. Anything that is not a whole number from 1 to 30 falls back to 15.
+function sshConnectTimeout(raw) {
+  const seconds = Number(raw);
+  return Number.isInteger(seconds) && seconds >= 1 && seconds <= 30 ? seconds : 15;
+}
 
 function requiredSecret(name) {
   return process.env[name] || "";

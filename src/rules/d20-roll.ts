@@ -1,9 +1,7 @@
-export interface DicePoolResolution {
-  dieCount: number;
-  pick: "highest" | "lowest" | "single";
-}
+export type DicePoolResolution =
+  { dieCount: 1; pick: "single" } | { dieCount: 2; pick: "highest" | "lowest" };
 
-export const ROLL_MODES = ["normal", "advantage", "disadvantage", "superAdvantage"] as const;
+export const ROLL_MODES = ["normal", "advantage", "disadvantage"] as const;
 
 export type RollMode = (typeof ROLL_MODES)[number];
 
@@ -14,13 +12,12 @@ const ROLL_MODE_SOURCES: Record<
   normal: [0, 0],
   advantage: [1, 0],
   disadvantage: [0, 1],
-  superAdvantage: [2, 0],
 };
 
-/**
- * Resolves d20 count and kept result for Advantage, Disadvantage, and
- * Super-Advantage sources, rulebook line 236-263.
- */
+const RETIRED_ROLL_MODES: ReadonlyMap<string, RollMode> = new Map([
+  ["superAdvantage", "advantage"],
+]);
+
 export function resolveDicePool(
   advantageSources: number,
   disadvantageSources: number,
@@ -53,11 +50,7 @@ export function resolveDicePool(
     return { dieCount: 1, pick: "single" };
   }
 
-  if (advantageSources > 1) {
-    return { dieCount: advantageSources, pick: "highest" };
-  }
-
-  if (advantageSources === 1) {
+  if (advantageSources > 0) {
     return { dieCount: 2, pick: "highest" };
   }
 
@@ -77,8 +70,14 @@ export function applyAttackCrit(naturalD20Result: number): "hit" | "miss" | null
   return null;
 }
 
-export function isRollMode(value: unknown): value is RollMode {
+function isRollMode(value: unknown): value is RollMode {
   return typeof value === "string" && (ROLL_MODES as readonly string[]).includes(value);
+}
+
+export function parseRollMode(value: unknown): RollMode | null {
+  if (isRollMode(value)) return value;
+  if (typeof value !== "string") return null;
+  return RETIRED_ROLL_MODES.get(value) ?? null;
 }
 
 export function dicePoolForRollMode(mode: RollMode): DicePoolResolution {
@@ -118,9 +117,9 @@ export function selectKeptD20(
   return naturalResults[0] ?? 0;
 }
 
-export function d20PoolFormula(dieCount: number): string {
-  if (!Number.isInteger(dieCount) || dieCount < 1) {
-    throw new RangeError(`d20PoolFormula: dieCount must be an integer >= 1 (got ${dieCount})`);
+export function d20PoolFormula(dieCount: DicePoolResolution["dieCount"]): string {
+  if (dieCount !== 1 && dieCount !== 2) {
+    throw new RangeError(`d20PoolFormula: dieCount must be 1 or 2 (got ${dieCount})`);
   }
 
   return `${dieCount}d20`;
