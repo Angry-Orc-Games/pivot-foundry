@@ -186,13 +186,17 @@ type CountedEffect = EffectRule | { source: "gear"; effect: EffectRule };
 
 const gearItemTypes = new Set(["weapon", "armour", "equipment"]);
 
-type GearStat = { bestBonus: number; penalties: number[]; sample: EffectRule };
+export interface AbilityScoreSource {
+  ability: AbilityKey;
+  name: string;
+  amount: number;
+}
 
 export function aggregateCharacterEffects(
   effects: readonly CountedEffect[],
 ): CharacterEffectSummary {
   const summary = emptyCharacterEffectSummary();
-  const gearStats = new Map<string, GearStat>();
+  const gearGroups = new Map<string, EffectRule[]>();
 
   for (const counted of effects) {
     const fromGear = isGearCounted(counted);
@@ -203,24 +207,20 @@ export function aggregateCharacterEffects(
       continue;
     }
     if (fromGear) {
-      const amount = numericAmount(effect);
-      const stat = gearStats.get(key) ?? { bestBonus: 0, penalties: [], sample: effect };
-      if (amount < 0) stat.penalties.push(amount);
-      else if (amount > stat.bestBonus) {
-        stat.bestBonus = amount;
-        stat.sample = effect;
-      }
-      gearStats.set(key, stat);
+      const group = gearGroups.get(key) ?? [];
+      group.push(effect);
+      gearGroups.set(key, group);
       continue;
     }
     addNumericEffect(summary, effect);
   }
 
-  for (const stat of gearStats.values()) {
-    if (!hasAmount(stat.sample)) continue;
+  for (const group of gearGroups.values()) {
+    const combined = combineGear(group, numericAmount);
+    if (!combined.sample || !hasAmount(combined.sample)) continue;
     addNumericEffect(summary, {
-      ...stat.sample,
-      amount: gearStatTotal(stat.bestBonus, stat.penalties),
+      ...combined.sample,
+      amount: combined.total,
     });
   }
   return summary;
@@ -241,21 +241,97 @@ export function collectEmbeddedItemEffects(
   items: readonly { type?: unknown; system?: unknown }[],
 ): CountedEffect[] {
   const effects: CountedEffect[] = [];
-
   for (const item of items) {
-    if (!item || typeof item !== "object") continue;
-    const system = item.system;
-    if (!isPlainObject(system) || !Array.isArray(system.effects)) continue;
-    const gear = typeof item.type === "string" && gearItemTypes.has(item.type);
-    if (gear && system.equipped !== true) continue;
-    for (const entry of system.effects) {
-      const parsed = parseStoredEffect(entry);
-      if (!parsed) continue;
-      effects.push(gear ? { source: "gear", effect: parsed } : parsed);
+    const counted = countedItemEffects(item);
+    if (!counted) continue;
+    for (const effect of counted.effects) {
+      effects.push(counted.gear ? { source: "gear", effect } : effect);
+    }
+  }
+  return effects;
+}
+
+export function abilityScoreSources(
+  items: readonly { name?: unknown; type?: unknown; system?: unknown }[],
+): AbilityScoreSource[] {
+  const tagged: Array<AbilityScoreSource & { gear: boolean }> = [];
+  for (const item of items) {
+    const counted = countedItemEffects(item);
+    if (!counted) continue;
+    const name = typeof item.name === "string" && item.name ? item.name : "Item";
+    for (const effect of counted.effects) {
+      if (effect.type !== "abilityScoreBonus") continue;
+      tagged.push({ ability: effect.ability, name, amount: effect.amount, gear: counted.gear });
     }
   }
 
-  return effects;
+  const gearByAbility = new Map<AbilityKey, Array<AbilityScoreSource & { gear: boolean }>>();
+  for (const source of tagged) {
+    if (!source.gear) continue;
+    const group = gearByAbility.get(source.ability) ?? [];
+    group.push(source);
+    gearByAbility.set(source.ability, group);
+  }
+
+  const kept = new Set<AbilityScoreSource>();
+  for (const group of gearByAbility.values()) {
+    for (const source of combineGear(group, (source) => source.amount).sources) kept.add(source);
+  }
+
+  return tagged
+    .filter((source) => !source.gear || kept.has(source))
+    .map(({ ability, name, amount }) => ({ ability, name, amount }));
+}
+
+function countedItemEffects(item: { type?: unknown; system?: unknown } | null | undefined):
+  | { gear: boolean; effects: EffectRule[] }
+  | undefined {
+  if (!item || typeof item !== "object") return undefined;
+  const system = item.system;
+  if (!isPlainObject(system) || !Array.isArray(system.effects)) return undefined;
+  const gear = typeof item.type === "string" && gearItemTypes.has(item.type);
+  if (gear && system.equipped !== true) return undefined;
+  const effects: EffectRule[] = [];
+  for (const entry of system.effects) {
+    const parsed = parseStoredEffect(entry);
+    if (parsed) effects.push(parsed);
+  }
+  return { gear, effects };
+}
+
+function pickGear<T>(
+  entries: readonly T[],
+  amountOf: (entry: T) => number,
+): { best?: T; penalties: T[] } {
+  let best: T | undefined;
+  let bestAmount = 0;
+  const penalties: T[] = [];
+  for (const entry of entries) {
+    const amount = amountOf(entry);
+    if (amount < 0) penalties.push(entry);
+    else if (amount > bestAmount) {
+      best = entry;
+      bestAmount = amount;
+    }
+  }
+  return { best: bestAmount > 0 ? best : undefined, penalties };
+}
+
+function combineGear<T>(
+  entries: readonly T[],
+  amountOf: (entry: T) => number,
+): { total: number; sources: T[]; sample?: T } {
+  const picked = pickGear(entries, amountOf);
+  const bestBonus = picked.best ? amountOf(picked.best) : 0;
+  const penalties = picked.penalties.map(amountOf);
+  const sources = entries.filter(
+    (entry) => entry === picked.best || picked.penalties.includes(entry),
+  );
+  return {
+    total: gearStatTotal(bestBonus, penalties),
+    sources,
+    sample: picked.best ?? picked.penalties[0] ?? entries[0],
+  };
 }
 
 function isGearCounted(value: CountedEffect): value is { source: "gear"; effect: EffectRule } {
