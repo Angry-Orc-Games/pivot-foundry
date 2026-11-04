@@ -136,6 +136,25 @@ it("does not overwrite a Pool change made during the rest", async () => {
   expect(warn).toHaveBeenCalledWith("PIVOT.Rest.StateChanged");
 });
 
+it("does not overwrite a Pool maximum changed during the rest", async () => {
+  const { actor, warn } = setup(10, "alive", []);
+  vi.stubGlobal("foundry", {
+    applications: {
+      api: {
+        DialogV2: {
+          prompt: async () => {
+            (actor.system.progression as { level: number }).level = 5;
+            return { safeAndComfortable: true };
+          },
+        },
+      },
+    },
+  });
+  await longRestDialog(actor);
+  expect(actor.writes).toEqual([]);
+  expect(warn).toHaveBeenCalledWith("PIVOT.Rest.StateChanged");
+});
+
 it("closes the progress dialog when the hit die cannot be rolled", async () => {
   const { actor, warn } = setup(10, "alive", [{ poolSpendsRaw: "1", inDanger: false }]);
   (actor.system.attributes as { hitDie: string }).hitDie = "d1";

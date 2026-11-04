@@ -5,6 +5,10 @@ There are two layers:
 1. **Repository checks** — lint, format, types, Vitest, build, audit. No Foundry license.
 2. **Browser acceptance** — Playwright/Chromium against a real Foundry v14 server that installed the packaged `system.zip`.
 
+## Reading a failed Join
+
+Foundry's markup changes between builds (14.367 turned the user `<select>` into a text field) and is only visible in a live run. A failed `joinAs` appends `Join screen controls: ...`, the opening tags of the inputs, selects and buttons on the page, to its error. Password values are dropped. Read that line before changing a selector.
+
 ## Repository checks
 
 From the repository root, on Node 20 or 22:

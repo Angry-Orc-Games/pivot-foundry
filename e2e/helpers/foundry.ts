@@ -771,18 +771,37 @@ export async function joinAs(
             has: page.getByRole("heading", { name: "Join Game Session", exact: true }),
           })
           .first();
+        // Foundry 14.367 replaced the user <select> on the Join screen with a text field
+        // ("Select User"). Older builds still have the combobox, so use whichever the page has.
+        const userText = form.getByRole("textbox", { name: "Select User" }).first();
         const user = form.getByRole("combobox").first();
-        const choose = () =>
-          user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        // count() does not wait, so first wait for whichever control the form renders.
+        await userText
+          .or(user)
+          .first()
+          .waitFor({ state: "visible", timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        const hasTextUser = (await userText.count()) > 0;
+        const choose = async () => {
+          if (hasTextUser) {
+            // Foundry 14.367: the user is typed into <input name="username">, and is only
+            // pre-filled in a browser that has joined before. fillSecret is the harness's
+            // way to enter a variable without recording it (see foundry-secret-actions.test).
+            if ((await userText.inputValue()) !== name) await fillSecret(userText, name);
+            return;
+          }
+          await user.selectOption({ label: name }, { timeout: ADMIN_SCREEN_TIMEOUT_MS });
+        };
         await choose();
         if (password) {
           const field = form.locator('input[type="password"]');
           if ((await field.count()) > 0) await fillSecret(field.first(), password);
           await choose();
         }
-        const selected = await user.evaluate(
-          (element: HTMLSelectElement) => element.selectedOptions[0]?.label ?? "",
-        );
+        const selected = hasTextUser
+          ? await userText.inputValue()
+          : await user.evaluate(
+              (element: HTMLSelectElement) => element.selectedOptions[0]?.label ?? "",
+            );
         await expect(selected).toBe(name);
         await form
           .getByRole("button", { name: "Join Game Session", exact: true })
@@ -794,7 +813,30 @@ export async function joinAs(
     releaseFailureShots(page);
   } catch (error) {
     await clearPasswordFields(page);
+    if (error instanceof Error) {
+      const controls = await describeFormControls(page);
+      if (controls) error.message += `\nJoin screen controls: ${controls}`;
+    }
     throw error;
+  }
+}
+
+// Foundry's markup changes between builds and is only visible in a live run, so a failed step reports it.
+// Opening tags only, and password values are dropped, so nothing secret reaches the log.
+async function describeFormControls(page: Page): Promise<string> {
+  try {
+    const tags = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("input, select, button"))
+        .slice(0, 20)
+        .map((element) => {
+          const copy = element.cloneNode(false) as HTMLElement;
+          if (copy.getAttribute("type") === "password") copy.removeAttribute("value");
+          return copy.outerHTML;
+        }),
+    );
+    return Array.isArray(tags) ? tags.join(" ") : "";
+  } catch {
+    return "";
   }
 }
 

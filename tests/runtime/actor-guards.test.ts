@@ -144,6 +144,34 @@ it("rejects Character survival writes that are not Survival transactions", () =>
   ).toBe(false);
 });
 
+it("rejects Character survival writes submitted under a shallower or mixed-depth key", () => {
+  const actor = {
+    type: "character",
+    system: {
+      attributes: {
+        hp: { value: 0, max: 20, temp: 0 },
+        deathSaves: { status: "dying", successes: 0, failures: 0 },
+      },
+    },
+  };
+  const bypasses: Array<Record<string, unknown>> = [
+    { "system.attributes": { hp: { value: 5 } } },
+    { "system.attributes": { deathSaves: { status: "stable" } } },
+    { system: { "attributes.hp.value": 5 } },
+    { system: { "attributes.hp": { temp: 3 } } },
+    { system: { attributes: { "hp.value": 5 } } },
+    { system: { attributes: { "deathSaves.status": "stable" } } },
+    { "system.attributes.deathSaves.-=status": null },
+    { system: { attributes: { deathSaves: { "-=status": null } } } },
+    { "system.attributes.hp.-=temp": null },
+    { "system.attributes.-=hp": null },
+    { system: { attributes: { hp: null } } },
+  ];
+  for (const changes of bypasses) {
+    expect(guardCharacterHpWrite(actor, changes), JSON.stringify(changes)).toBe(false);
+  }
+});
+
 it("allows marked writes, unchanged values, max edits, and NPCs", () => {
   const actor = {
     type: "character",
@@ -174,6 +202,15 @@ it("lets a lowered Character max clamp HP through both guards", () => {
   const raised = { "system.attributes.hp.max": 8, "system.attributes.hp.value": 4 };
   expect(guardHpMaximum(actor, raised)).toBeUndefined();
   expect(guardCharacterHpWrite(actor, raised)).toBe(false);
+});
+
+it("lets a lowered max clamp HP through when submitted under a mixed-depth key", () => {
+  const actor = {
+    type: "character",
+    system: { attributes: { hp: { value: 12, max: 20 }, deathSaves: { status: "alive" } } },
+  };
+  const lowered = { system: { attributes: { "hp.max": 8, "hp.value": 8 } } };
+  expect(guardCharacterHpWrite(actor, lowered)).toBeUndefined();
 });
 
 it("stores the max when a flat, nested, or grouped value is set above it", () => {
