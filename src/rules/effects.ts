@@ -185,6 +185,7 @@ export function parseStoredEffect(value: unknown): EffectRule | null {
 type CountedEffect = EffectRule | { source: "gear"; effect: EffectRule };
 
 const gearItemTypes = new Set(["weapon", "armour", "equipment"]);
+const sameKeyWarned = new WeakSet<object>();
 
 export interface AbilityScoreSource {
   ability: AbilityKey;
@@ -283,20 +284,66 @@ export function abilityScoreSources(
     .map(({ ability, name, amount }) => ({ ability, name, amount }));
 }
 
-function countedItemEffects(item: { type?: unknown; system?: unknown } | null | undefined):
+function countedItemEffects(
+  item: { name?: unknown; type?: unknown; system?: unknown } | null | undefined,
+):
   | { gear: boolean; effects: EffectRule[] }
   | undefined {
   if (!item || typeof item !== "object") return undefined;
   const system = item.system;
   if (!isPlainObject(system) || !Array.isArray(system.effects)) return undefined;
   const gear = typeof item.type === "string" && gearItemTypes.has(item.type);
-  if (gear && system.equipped !== true) return undefined;
   const effects: EffectRule[] = [];
   for (const entry of system.effects) {
     const parsed = parseStoredEffect(entry);
     if (parsed) effects.push(parsed);
   }
-  return { gear, effects };
+  if (effects.length === 0) return undefined;
+  const collapsed = collapseSameKeyEffects(item, effects, itemLabel(item));
+  if (gear && system.equipped !== true) return undefined;
+  return { gear, effects: collapsed };
+}
+
+function itemLabel(item: { name?: unknown }): string {
+  return typeof item.name === "string" && item.name ? item.name : "Item";
+}
+
+function collapseSameKeyEffects(
+  item: object,
+  effects: readonly EffectRule[],
+  itemName: string,
+): EffectRule[] {
+  const groups = new Map<string, EffectRule[]>();
+  const order: string[] = [];
+  const rest: EffectRule[] = [];
+  let duplicated = false;
+  for (const effect of effects) {
+    const key = numericEffectKey(effect);
+    if (key === null) {
+      rest.push(effect);
+      continue;
+    }
+    const group = groups.get(key);
+    if (!group) {
+      groups.set(key, [effect]);
+      order.push(key);
+      continue;
+    }
+    group.push(effect);
+    duplicated = true;
+  }
+  if (duplicated && !sameKeyWarned.has(item)) {
+    sameKeyWarned.add(item);
+    console.warn(
+      `Pivot Fantasy: ${itemName} lists more than one effect for the same stat. Only the best bonus and every penalty count.`,
+    );
+  }
+  const collapsed = [...rest];
+  for (const key of order) {
+    const group = groups.get(key) ?? [];
+    collapsed.push(...(group.length < 2 ? group : combineGear(group, numericAmount).sources));
+  }
+  return collapsed;
 }
 
 function pickGear<T>(
