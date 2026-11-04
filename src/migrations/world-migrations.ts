@@ -293,7 +293,16 @@ export function planAllActorMigrations(
 }
 
 function actorForMpClamp(actor: MigratableDocument): MigratableDocument {
-  return { ...actor, items: listDocuments(actor.items).map(itemForMpClamp) };
+  const toObject = actor.toObject;
+  return {
+    name: actor.name,
+    type: actor.type,
+    system: actor.system,
+    _source: actor._source,
+    flags: actor.flags,
+    toObject: typeof toObject === "function" ? () => toObject.call(actor) : undefined,
+    items: listDocuments(actor.items).map(itemForMpClamp),
+  };
 }
 
 function itemForMpClamp(item: MigratableDocument): MigratableDocument {
