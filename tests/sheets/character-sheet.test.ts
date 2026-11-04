@@ -178,6 +178,50 @@ describe("prepareCharacterSheetContext", () => {
     expect(baseline.skillRows.find((row) => row.id === "perception")?.ability).toBe("Wis");
   });
 
+  it("lists only the ability bonuses the score total counts", () => {
+    const actor = sampleActor();
+    const withGear = {
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "sword-1",
+          name: "Longsword",
+          type: "weapon",
+          system: {
+            equipped: true,
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 2 }],
+          },
+        },
+        {
+          id: "sword-2",
+          name: "Shortsword",
+          type: "weapon",
+          system: {
+            equipped: true,
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 2 }],
+          },
+        },
+        {
+          id: "cloak-1",
+          name: "Cloak",
+          type: "equipment",
+          system: {
+            equipped: false,
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 4 }],
+          },
+        },
+      ],
+    };
+
+    const context = prepareCharacterSheetContext(withGear);
+    const strength = context.abilityRows.find((row) => row.key === "str");
+
+    expect(strength?.score).toBe(16);
+    expect(strength?.mod).toBe("+4");
+    expect(context.scoreSourceText).toBe("Score sources. Str: base 16, Longsword +2.");
+  });
+
   it("lists body modifications apart from traits", () => {
     const actor = sampleActor();
     const withMods = {
