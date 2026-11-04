@@ -1,6 +1,6 @@
 # Damage, Healing, and Survival
 
-Use the Character sheet’s existing Core tab. Set maximum HP before play. Current HP and death-save counters are managed by the survival controls.
+Use the Character sheet’s existing Core tab. Set maximum HP before play. Current HP and death-save counters are managed by the survival controls. Direct edits to a Character’s current HP, Temporary HP, or death saves, such as the token HUD bar, are refused; lowering maximum HP still lowers current HP to match.
 
 ## Roll and Apply
 
@@ -22,7 +22,7 @@ Choose **Temporary HP**, enter the amount, and review the recipients. When an ex
 
 At zero HP, use **Roll Death Save** when the displayed state is Dying. Choose the existing d20 roll mode when relevant; no ability modifier is added. A result of 10 or more succeeds, a natural 1 adds two failures, and a natural 20 restores 1 HP. Three successes stabilize and reset counters; three failures mean death.
 
-Stable and dead characters cannot make further death saves. Damage at zero HP and massive damage apply their survival consequences. Actual healing resets counters; healing never resurrects the dead.
+A Character recorded as Conscious at 0 HP is shown and treated as Dying. Stable and dead characters cannot make further death saves. Damage at zero HP and massive damage apply their survival consequences. Actual healing resets counters; healing never resurrects the dead.
 
 The GM’s **Survival Correction / Stabilize** control handles stabilization after an externally resolved Medicine check and explicit corrections. Legacy zero-HP characters display **GM confirmation required** until the GM chooses the appropriate state. Migration preserves their existing HP and counters.
 

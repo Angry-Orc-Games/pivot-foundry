@@ -1,4 +1,4 @@
-import { correctCreatedHp, guardHpMaximum } from "./runtime/actor-guards";
+import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
 import { initializeSurvival } from "./migrations/m002";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
@@ -41,14 +41,17 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
   runtime.Hooks.on?.("preCreateActor", linkCharacterPrototypeToken);
   runtime.Hooks.on?.("preCreateActor", correctCreatedHp);
   runtime.Hooks.on?.("preUpdateActor", guardHpMaximum);
+  runtime.Hooks.on?.("preUpdateActor", guardCharacterHpWrite);
 
   // Sync token status effects after HP or death state changes
   // Foundry passes nested changes object: {system: {attributes: {hp: {value}}}}
   runtime.Hooks.on?.("updateActor", (actor: unknown, changes: Record<string, unknown>) => {
     const hpChanged = hasNestedProperty(changes, "system.attributes.hp.value");
     const statusChanged = hasNestedProperty(changes, "system.attributes.deathSaves.status");
+    // A max change can make Conscious at 0 HP effectively Dying.
+    const maxChanged = hasNestedProperty(changes, "system.attributes.hp.max");
 
-    if (hpChanged || statusChanged) {
+    if (hpChanged || statusChanged || maxChanged) {
       const globals = globalThis as { game?: unknown };
       void updateTokenStatusEffects(
         actor as Parameters<typeof updateTokenStatusEffects>[0],

@@ -1,5 +1,4 @@
-import { readSurvival } from "../runtime/health";
-import { reconcileSurvival } from "../rules/survival";
+import { readSurvival } from "../runtime/survival-transaction";
 import { clearTempHpDialog, correctSurvivalDialog, deathSaveDialog } from "../runtime/death-saves";
 import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
@@ -17,6 +16,7 @@ import {
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
 import { applyChatMessageMode } from "../runtime/ui";
+import { effectiveSurvival } from "../rules/survival";
 import {
   type AbilityKey,
   calculateAttackSummary,
@@ -122,6 +122,8 @@ export interface CharacterSheetContext {
   poolPercent: number;
   deathSaveSuccessPips: boolean[];
   deathSaveFailurePips: boolean[];
+  deathSaveSuccesses: number;
+  deathSaveFailures: number;
   isGM: boolean;
   system: RecordValue;
   speciesLabel: string;
@@ -421,7 +423,7 @@ export function prepareCharacterSheetContext(
   const abilityMods = Object.fromEntries(
     abilities.map(({ key }) => [key, derived.abilities[key].mod]),
   ) as Record<AbilityKey, number>;
-  const survival = reconcileSurvival(readSurvival(actor));
+  const survival = effectiveSurvival(readSurvival(actor));
 
   // Helper to format signed numbers
   const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));
@@ -485,6 +487,8 @@ export function prepareCharacterSheetContext(
     poolPercent: fillPercent(numberAt(system, ["resources", "pool", "value"], 0), derived.pool.max),
     deathSaveSuccessPips: deathSavePips(survival.successes),
     deathSaveFailurePips: deathSavePips(survival.failures),
+    deathSaveSuccesses: survival.successes,
+    deathSaveFailures: survival.failures,
     isGM:
       (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
         ?.isGM === true,

@@ -12,7 +12,13 @@ export type HealthKind = "damage" | "healing" | "temp";
 export function validAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
-export function reconcileSurvival(source: SurvivalState): SurvivalState {
+/**
+ * Effective survival state: align a stale HP / status pair before it is shown or changed.
+ * Dying or Stable above 0 HP is leftover from a heal that did not clear status, so the
+ * Character is Conscious with cleared counters; Conscious at 0 HP (with a max) is Dying.
+ * This does not add Exhaustion: that level belongs to the heal that already raised HP.
+ */
+export function effectiveSurvival(source: SurvivalState): SurvivalState {
   if (source.hp > 0 && (source.status === "dying" || source.status === "stable")) {
     return { ...source, status: "alive", successes: 0, failures: 0 };
   }
@@ -43,7 +49,7 @@ export function applyHealth(
   critical = false,
   tempChoice?: "keep" | "replace",
 ): SurvivalState {
-  const source = reconcileSurvival(raw);
+  const source = effectiveSurvival(raw);
   validateSurvival(source);
   if (
     !validAmount(amount) ||
@@ -86,7 +92,7 @@ export function applyHealth(
   return s;
 }
 export function resolveDeathSave(raw: SurvivalState, natural: number): SurvivalState {
-  const source = reconcileSurvival(raw);
+  const source = effectiveSurvival(raw);
   validateSurvival(source);
   if (
     source.max < 1 ||
@@ -108,4 +114,29 @@ export function resolveDeathSave(raw: SurvivalState, natural: number): SurvivalS
     s.failures = 0;
   }
   return s;
+}
+export interface SurvivalCorrection {
+  current: SurvivalState;
+  requested: Pick<SurvivalState, "hp" | "temp" | "successes" | "failures" | "status">;
+}
+/** Dying or Stable was requested while HP is still above 0. Temporary HP is not HP. */
+export class DyingAboveZeroError extends RangeError {
+  constructor() {
+    super("Dying and Stable need 0 HP");
+  }
+}
+/**
+ * Survival correction: the GM sets the Survival state outright. The GM must choose a
+ * confirmed status, and a Stable or Conscious Character keeps no death-save counters.
+ * Dying or Stable above 0 HP is refused; temporary HP does not count as HP.
+ */
+export function correctSurvival({ current, requested }: SurvivalCorrection): SurvivalState {
+  if (requested.status === "unconfirmed")
+    throw new RangeError(`status must be confirmed by the correction (got ${requested.status})`);
+  if (requested.hp > 0 && (requested.status === "dying" || requested.status === "stable"))
+    throw new DyingAboveZeroError();
+  const next = { ...current, ...requested };
+  validateSurvival(next);
+  if (next.status === "stable" || next.hp > 0) return { ...next, successes: 0, failures: 0 };
+  return next;
 }

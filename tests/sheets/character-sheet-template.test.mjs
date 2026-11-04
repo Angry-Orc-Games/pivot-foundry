@@ -121,6 +121,38 @@ describe("character sheet template structure", () => {
     expect(template.indexOf("<h3>Magic</h3>")).toBeLessThan(template.indexOf("<h3>Traits</h3>"));
   });
 
+  it("labels death-save pips with the displayed counters", () => {
+    const sheet = Handlebars.compile(
+      readFileSync(resolve(process.cwd(), "templates/actors/character/sheet.hbs"), "utf-8"),
+    );
+    const labelsFor = (hp, status, successes, failures) => {
+      const context = prepareCharacterSheetContext({
+        name: "Hera",
+        type: "character",
+        system: {
+          attributes: {
+            hp: { value: hp, max: 16, temp: 0 },
+            deathSaves: { status, successes, failures },
+          },
+        },
+        items: [],
+      });
+      const document = new JSDOM(sheet(context)).window.document;
+      return [...document.querySelectorAll(".pf-death-saves [role='img']")].map((element) =>
+        element.getAttribute("aria-label"),
+      );
+    };
+
+    expect(labelsFor(16, "dying", 2, 1)).toEqual([
+      "PIVOT.Fields.Successes: 0",
+      "PIVOT.Fields.Failures: 0",
+    ]);
+    expect(labelsFor(0, "dying", 2, 1)).toEqual([
+      "PIVOT.Fields.Successes: 2",
+      "PIVOT.Fields.Failures: 1",
+    ]);
+  });
+
   it("sheet partial has two-column print layout", () => {
     const templatePath = resolve(process.cwd(), "templates/actors/character/sheet.hbs");
     const template = readFileSync(templatePath, "utf-8");

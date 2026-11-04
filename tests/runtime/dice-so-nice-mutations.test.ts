@@ -279,7 +279,7 @@ describe("Dice So Nice wait timeout", () => {
 });
 
 describe("Death save ordering", () => {
-  it("creates chat then waits then updates actor", async () => {
+  it("updates actor, then creates chat, then waits for dice", async () => {
     const callOrder: string[] = [];
 
     vi.stubGlobal("ChatMessage", {
@@ -333,7 +333,7 @@ describe("Death save ordering", () => {
 
     await deathSaveDialog(actor);
 
-    expect(callOrder).toEqual(["chat", "dice3d", "update"]);
+    expect(callOrder).toEqual(["update", "chat", "dice3d"]);
   });
 
   it("attaches roll with dice to death save chat message", async () => {
@@ -454,7 +454,7 @@ describe("Death save ordering", () => {
 });
 
 describe("Short rest ordering", () => {
-  it("creates chat then waits then updates actor", async () => {
+  it("updates survival state, then creates chat, then waits for dice", async () => {
     const callOrder: string[] = [];
 
     vi.stubGlobal("ChatMessage", {
@@ -499,6 +499,8 @@ describe("Short rest ordering", () => {
     });
 
     const actor = {
+      uuid: "Actor.short-rest-order",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
@@ -506,6 +508,7 @@ describe("Short rest ordering", () => {
         attributes: {
           hp: { value: 8, max: 20, temp: 0 },
           hitDie: "d8",
+          deathSaves: { status: "alive", successes: 0, failures: 0 },
         },
         resources: { pool: { value: 2, maxBonus: 0 } },
         progression: { level: 3 },
@@ -521,7 +524,7 @@ describe("Short rest ordering", () => {
 
     await shortRestDialog(actor);
 
-    expect(callOrder).toEqual(["chat", "dice3d", "update"]);
+    expect(callOrder).toEqual(["update", "chat", "dice3d"]);
   });
 
   it("attaches rolls with dice to short rest chat message", async () => {
@@ -566,6 +569,8 @@ describe("Short rest ordering", () => {
     });
 
     const actor = {
+      uuid: "Actor.short-rest-rolls",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
@@ -573,6 +578,7 @@ describe("Short rest ordering", () => {
         attributes: {
           hp: { value: 8, max: 20, temp: 0 },
           hitDie: "d8",
+          deathSaves: { status: "alive", successes: 0, failures: 0 },
         },
         resources: { pool: { value: 2, maxBonus: 0 } },
         progression: { level: 3 },
@@ -624,11 +630,17 @@ describe("Short Rest cancel is a clean no-op", () => {
     });
 
     const actor = {
+      uuid: "Actor.short-rest-cancel-fields",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
         abilities: { con: { score: 12 } },
-        attributes: { hp: { value: 8, max: 20, temp: 0 }, hitDie: "d8" },
+        attributes: {
+          hp: { value: 8, max: 20, temp: 0 },
+          hitDie: "d8",
+          deathSaves: { status: "alive", successes: 0, failures: 0 },
+        },
         resources: { pool: { value: 2, maxBonus: 0 } },
         progression: { level: 3 },
         skills: {},
@@ -663,11 +675,17 @@ describe("Short Rest cancel is a clean no-op", () => {
     });
 
     const actor = {
+      uuid: "Actor.short-rest-cancel-string",
+      isOwner: true,
       name: "Hero",
       type: "character",
       system: {
         abilities: { con: { score: 12 } },
-        attributes: { hp: { value: 8, max: 20, temp: 0 }, hitDie: "d8" },
+        attributes: {
+          hp: { value: 8, max: 20, temp: 0 },
+          hitDie: "d8",
+          deathSaves: { status: "alive", successes: 0, failures: 0 },
+        },
         resources: { pool: { value: 2, maxBonus: 0 } },
         progression: { level: 3 },
         skills: {},
