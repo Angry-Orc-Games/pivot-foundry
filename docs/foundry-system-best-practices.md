@@ -1,6 +1,6 @@
 # Foundry System Development Best Practices (v14)
 
-Researched 2026-11-01 for Foundry VTT v14 (build 14.361; API reference pages report 14.368 Stable). Primary sources only: official Foundry articles, release notes, the v14 API reference, and the official `foundryvtt-cli` repo. Every claim carries its source URL; all were accessed 2026-11-01.
+Researched 2026-11-01 for Foundry VTT v14 (build 14.367; API reference pages report 14.368 Stable). Primary sources only: official Foundry articles, release notes, the v14 API reference, and the official `foundryvtt-cli` repo. Every claim carries its source URL; all were accessed 2026-11-01.
 
 ## Summary
 
@@ -121,7 +121,7 @@ Source: https://foundryvtt.com/api/v14/classes/foundry.dice.Roll.html unless not
 
 Observed from `system.json` and `src/` (no files edited):
 
-- Manifest: `compatibility.minimum` "14", `verified` "14.368" (above the pinned build 14.361; fine as long as it was actually tested, per 14.361 install dialog). There is no `relationships`, `socket`, or `flags`, which matches the minimal-surface approach. `packs` is empty; if content packs ship, add entries with `name/label/system/type` and compile with `@foundryvtt/foundryvtt-cli` (the repo uses `scripts/build-content-packs.mjs`; confirm it uses CLI or equivalent LevelDB output).
+- Manifest: `compatibility.minimum` "14", `verified` "14.368" (above the pinned build 14.367; fine as long as it was actually tested, per 14.361 install dialog). There is no `relationships`, `socket`, or `flags`, which matches the minimal-surface approach. `packs` is empty; if content packs ship, add entries with `name/label/system/type` and compile with `@foundryvtt/foundryvtt-cli` (the repo uses `scripts/build-content-packs.mjs`; confirm it uses CLI or equivalent LevelDB output).
 - Data layer: `src/data/*-data.ts` and `src/migrations/` follow the TypeDataModel + migration approach. Consider `static migrateData` / `LOCALIZATION_PREFIXES` for field labels where not already done, and confirm `-=` / `==` keys in `updateSource` calls (`src/pivot.ts`, `src/migrations/m002.ts`) are not used, since they are deprecated in v14.
 - Rolls: `src/runtime/combat-document.ts` handles both `messageMode` and legacy `rollMode` (via `messageModeFromRollMode`); aligned with the v14 deprecation of `_mapLegacyRollMode`. Keep prefer `messageMode`.
 - Survival writes use a transaction pattern; Foundry hooks are not awaited and cannot cancel from async handlers, so enforce guards in `_preUpdate`/`_preUpdateOperation` rather than async hooks (matches `src/runtime/actor-guards.ts` direction).

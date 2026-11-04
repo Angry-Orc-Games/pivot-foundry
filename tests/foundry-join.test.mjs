@@ -61,6 +61,10 @@ function v14JoinPage() {
         async count() {
           return 0;
         },
+        or() {
+          return this;
+        },
+        async waitFor() {},
       };
     },
     getByRole(role, options = {}) {
@@ -72,6 +76,13 @@ function v14JoinPage() {
         first() {
           return this;
         },
+        async count() {
+          return 0;
+        },
+        or() {
+          return this;
+        },
+        async waitFor() {},
         async isVisible() {
           return false;
         },
@@ -93,6 +104,10 @@ function v14JoinPage() {
         async count() {
           return 0;
         },
+        or() {
+          return this;
+        },
+        async waitFor() {},
       };
     },
     getByRole(role) {
@@ -111,6 +126,13 @@ function v14JoinPage() {
         first() {
           return this;
         },
+        async count() {
+          return 0;
+        },
+        or() {
+          return this;
+        },
+        async waitFor() {},
         async isVisible() {
           return false;
         },
@@ -144,6 +166,10 @@ function v14JoinPage() {
         async count() {
           return 0;
         },
+        or() {
+          return this;
+        },
+        async waitFor() {},
       };
     },
     getByRole(role, options = {}) {
@@ -174,6 +200,13 @@ function v14JoinPage() {
         first() {
           return this;
         },
+        async count() {
+          return 0;
+        },
+        or() {
+          return this;
+        },
+        async waitFor() {},
         async isVisible() {
           return false;
         },

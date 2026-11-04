@@ -90,7 +90,7 @@ describe("writable Foundry release cache", () => {
     const root = mkdtempSync(join(tmpdir(), "pivot-cache-again-"));
     const distDir = join(root, "dist");
     const cacheDir = join(root, "cache");
-    const zipName = "foundryvtt-14.361.zip";
+    const zipName = "foundryvtt-14.367.zip";
     const source = join(distDir, zipName);
     const dest = join(cacheDir, zipName);
     mkdirSync(distDir, { recursive: true });

@@ -92,7 +92,11 @@ After CI succeeds for a push to `main` in this repository, `deploy-staging.yml` 
 
 Reset only a designated local/E2E world. The staging job does not wipe other server data. After smoke passes, the job posts a commit status `pivot-staging-artifact` only when `artifact-identity.json` `commit` equals the CI commit (`github.event.workflow_run.head_sha`, or `github.sha` on a manual dispatch). The description is `sha256:` plus the `system.zip` digest, and the target URL is that Actions run. A later staging run of the same commit replaces that status.
 
-Keep the staging Foundry **runtime** on 14.361 (or the same verified build as production). Upgrading Foundry on the server is a separate operation from deploying this game system.
+Keep the build Foundry **runtime** on the same version as production (14.367). Upgrading Foundry on the server is a separate operation from deploying this game system.
+
+Before uploading, `scripts/deploy-preflight.mjs` runs over SSH and checks that the deploy user can write the target dir, its parent, the backup dir and `/tmp`, and that `unzip` exists. It reports every problem at once and stops before the upload. It cannot test the `systemctl restart` permission without restarting the service.
+
+Every ssh and scp call uses `ConnectTimeout=15` (override with `PIVOT_DEPLOY_SSH_CONNECT_TIMEOUT`, 1 to 30 seconds) and `ServerAliveInterval=15`. If the host cannot be reached, the deploy stops with `cannot reach <host>`, exit code 5, and uploads nothing.
 
 ## Production
 
