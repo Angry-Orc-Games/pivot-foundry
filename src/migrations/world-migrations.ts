@@ -176,15 +176,8 @@ export function readStoredSystem(document: MigratableDocument): unknown {
 }
 
 function readStoredFlags(document: MigratableDocument): unknown {
-  if (typeof document.toObject === "function") {
-    try {
-      const object = document.toObject();
-      if (object && typeof object === "object" && "flags" in object) return object.flags;
-    } catch {
-      // Fall through to the document flag bag.
-    }
-  }
-
+  const object = callToObject(document);
+  if (isRecord(object) && "flags" in object) return object.flags;
   return document.flags;
 }
 
