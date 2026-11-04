@@ -433,6 +433,70 @@ describe("same-stat effects on one item", () => {
   });
 });
 
+describe("items with no known type count as gear", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function strengthTotal(items: readonly { name?: string; type?: unknown; system?: unknown }[]) {
+    return aggregateCharacterEffects(collectEmbeddedItemEffects(items)).abilityScoreBonuses.str;
+  }
+
+  function strengthBonus(amount: number): EffectRule {
+    return { type: "abilityScoreBonus", ability: "str", amount };
+  }
+
+  it("ignores an untyped item that is not equipped and warns once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const item = { name: "Loose Gem", system: { effects: [strengthBonus(2)] } };
+
+    expect(strengthTotal([item])).toBe(0);
+    expect(abilityScoreSources([item])).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the best bonus when two equipped untyped items share a stat", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const low = {
+      name: "Loose Gem",
+      system: { equipped: true, effects: [strengthBonus(2)] },
+    };
+    const high = {
+      name: "Other Gem",
+      system: { equipped: true, effects: [strengthBonus(3)] },
+    };
+
+    expect(strengthTotal([low, high])).toBe(3);
+    expect(abilityScoreSources([low, high])).toEqual([
+      { ability: "str", name: "Other Gem", amount: 3 },
+    ]);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats an unknown type string like a missing type", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const unequipped = {
+      name: "Relic",
+      type: "relic",
+      system: { effects: [strengthBonus(2)] },
+    };
+
+    expect(strengthTotal([unequipped])).toBe(0);
+    expect(abilityScoreSources([unequipped])).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    const equipped = {
+      name: "Relic",
+      type: "relic",
+      system: { equipped: true, effects: [strengthBonus(2)] },
+    };
+    expect(strengthTotal([equipped])).toBe(2);
+    expect(abilityScoreSources([equipped])).toEqual([
+      { ability: "str", name: "Relic", amount: 2 },
+    ]);
+  });
+});
+
 describe("describeEffectRule", () => {
   it("builds a read-only summary for item sheets", () => {
     expect(describeEffectRule({ type: "skillBonus", skill: "perception", amount: 2 })).toEqual({

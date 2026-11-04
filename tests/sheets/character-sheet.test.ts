@@ -247,6 +247,27 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.scoreSourceText).toBe("Score sources. Str: base 16, Giant Blood +1.");
   });
 
+  it("leaves an unequipped untyped bonus out of the score total and the sources line", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "gem-1",
+          name: "Loose Gem",
+          system: {
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 4 }],
+          },
+        },
+      ],
+    } as ActorLike);
+    const strength = context.abilityRows.find((row) => row.key === "str");
+
+    expect(strength?.mod).toBe("+3");
+    expect(context.scoreSourceText).toBe("");
+  });
+
   it("lists body modifications apart from traits", () => {
     const actor = sampleActor();
     const withMods = {
