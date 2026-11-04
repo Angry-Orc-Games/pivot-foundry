@@ -15,7 +15,7 @@ import {
 } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
-import { applyChatMessageMode } from "../runtime/ui";
+import { applyChatMessageMode, presentRenderedDialog } from "../runtime/ui";
 import { effectiveSurvival } from "../rules/survival";
 import {
   type AbilityKey,
@@ -1554,6 +1554,7 @@ export async function promptRollMode(): Promise<RollMode | null> {
         },
       ],
       rejectClose: false,
+      render: presentRenderedDialog,
     });
     return isRollMode(result) ? result : null;
   } catch {
