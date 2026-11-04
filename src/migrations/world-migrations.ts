@@ -8,6 +8,12 @@ import {
   SCHEMA_V2_MIGRATION_ID,
 } from "./m003";
 import {
+  coreReviewLine,
+  formatM006CoreReview,
+  MAGIC_ECHELON_MIGRATION_ID,
+  planMagicEchelonMigration,
+} from "./m006";
+import {
   planActorMigration,
   planItemMigration,
   SCHEMA_MIGRATION_ID,
@@ -80,11 +86,15 @@ export async function runWorldMigrations(
     actors.flatMap((actor) => (actor.id ? [[actor.id, actor] as const] : [])),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
+  const coreReview: string[] = [];
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
-    listDocuments(game.items).map((document) => ({
-      document,
-      plan: combineItemMigrations(readStoredSystem(document)),
-    }));
+    listDocuments(game.items).map((document) => {
+      const stored = readStoredSystem(document);
+      const raw = rawSystem(document);
+      const line = coreReviewLine(document, stored, undefined, raw);
+      if (line) coreReview.push(line);
+      return { document, plan: combineItemMigrations(stored, raw) };
+    });
   for (const actor of actors) {
     const mpClamp = planMpClampMigration(actor);
     planned.push({
@@ -95,8 +105,14 @@ export async function runWorldMigrations(
       ),
       notice: mpClamp.notice,
     });
-    for (const item of listDocuments(actor.items))
-      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
+    const actorName = actor.name ?? actor.id ?? "unknown";
+    for (const item of listDocuments(actor.items)) {
+      const stored = readStoredSystem(item);
+      const raw = rawSystem(item);
+      const line = coreReviewLine(item, stored, actorName, raw);
+      if (line) coreReview.push(line);
+      planned.push({ document: item, plan: combineItemMigrations(stored, raw) });
+    }
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
@@ -106,8 +122,19 @@ export async function runWorldMigrations(
       plan: mergeMigrationPlans(planUnlinkedToken(token, actorsById), mpClamp.plan),
       notice: mpClamp.notice,
     });
-    for (const item of listDocuments(token.actor.items))
-      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
+    const actorName = token.actor.name ?? token.actor.id ?? "unknown";
+    for (const item of listDocuments(token.actor.items)) {
+      const stored = readStoredSystem(item);
+      const raw = rawSystem(item);
+      const line = coreReviewLine(item, stored, actorName, raw);
+      if (line) coreReview.push(line);
+      planned.push({ document: item, plan: combineItemMigrations(stored, raw) });
+    }
+  }
+  if (coreReview.length > 0) {
+    const message = coreReviewMessage(coreReview, dependencies);
+    dependencies.notify?.("warn", message);
+    dependencies.log?.(message);
   }
   const wrote = new Set<MigratableDocument>();
   for (const entry of planned) {
@@ -136,7 +163,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -182,7 +209,10 @@ async function persistMigration(
   try {
     if (!document.update) throw new Error("Document cannot be updated");
     // Migrations may repair survival fields; they write as a trusted survival writer.
-    await document.update(plan.update, { ...SURVIVAL_WRITE_OPTIONS });
+    await document.update(plan.update, {
+      ...SURVIVAL_WRITE_OPTIONS,
+      ...(plan.diff === false ? { diff: false } : {}),
+    });
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -272,18 +302,28 @@ export function planAllActorMigrations(
   };
 }
 
-function combineItemMigrations(source: unknown): MigrationPlan {
+function rawSystem(document: MigratableDocument): object | undefined {
+  const system = document._source?.system;
+  if (typeof system === "object" && system !== null && !Array.isArray(system)) return system;
+  return undefined;
+}
+
+function combineItemMigrations(source: unknown, raw?: object): MigrationPlan {
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  const echelon = planMagicEchelonMigration(source, raw);
+  if (!echelon.ok) return echelon;
+  if (!first.changed && !second.changed && !echelon.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
+    ...(echelon.changed && echelon.diff === false ? { diff: false as const } : {}),
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
+      ...(echelon.changed ? echelon.update : {}),
     },
   };
 }
@@ -361,4 +401,13 @@ function callToObject(document: MigratableDocument): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function coreReviewMessage(
+  lines: readonly string[],
+  dependencies: WorldMigrationDependencies,
+): string {
+  const localized = formatMessage("PIVOT.Migration.M006CoreReview", {}, dependencies);
+  const instruction = localized === "PIVOT.Migration.M006CoreReview" ? undefined : localized;
+  return instruction ? [instruction, ...lines].join("\n") : formatM006CoreReview(lines);
 }
