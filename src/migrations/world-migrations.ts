@@ -1,6 +1,11 @@
 import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
 import { planMpClampMigration } from "./m005";
+import {
+  planWeaponEquippedMigration,
+  WEAPON_EQUIPPED_MIGRATION_ID,
+  weaponEquippedMigrationNotice,
+} from "./m007";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planSchemaV2ActorMigration,
@@ -20,7 +25,12 @@ export interface MigratableDocument {
   type?: string;
   system?: unknown;
   _source?: { system?: unknown; prototypeToken?: { actorLink?: unknown } };
-  toObject?: () => { system?: unknown; prototypeToken?: { actorLink?: unknown } };
+  toObject?: () => {
+    system?: unknown;
+    flags?: unknown;
+    prototypeToken?: { actorLink?: unknown };
+  };
+  flags?: unknown;
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   update?: (data: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>;
 }
@@ -81,10 +91,7 @@ export async function runWorldMigrations(
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
-    listDocuments(game.items).map((document) => ({
-      document,
-      plan: combineItemMigrations(readStoredSystem(document)),
-    }));
+    listDocuments(game.items).map((document) => itemMigrationEntry(document));
   for (const actor of actors) {
     const mpClamp = planMpClampMigration(actor);
     planned.push({
@@ -96,7 +103,7 @@ export async function runWorldMigrations(
       notice: mpClamp.notice,
     });
     for (const item of listDocuments(actor.items))
-      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
+      planned.push(itemMigrationEntry(item, actor.name));
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
@@ -107,7 +114,7 @@ export async function runWorldMigrations(
       notice: mpClamp.notice,
     });
     for (const item of listDocuments(token.actor.items))
-      planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
+      planned.push(itemMigrationEntry(item, token.actor.name));
   }
   const wrote = new Set<MigratableDocument>();
   for (const entry of planned) {
@@ -136,7 +143,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${WEAPON_EQUIPPED_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -166,6 +173,19 @@ export function readStoredSystem(document: MigratableDocument): unknown {
   }
 
   return document.system;
+}
+
+function readStoredFlags(document: MigratableDocument): unknown {
+  if (typeof document.toObject === "function") {
+    try {
+      const object = document.toObject();
+      if (object && typeof object === "object" && "flags" in object) return object.flags;
+    } catch {
+      // Fall through to the document flag bag.
+    }
+  }
+
+  return document.flags;
 }
 
 async function persistMigration(
@@ -272,20 +292,48 @@ export function planAllActorMigrations(
   };
 }
 
-function combineItemMigrations(source: unknown): MigrationPlan {
+function itemMigrationEntry(
+  document: MigratableDocument,
+  actorName?: string,
+): { document: MigratableDocument; plan: MigrationPlan; notice?: string } {
+  const plan = combineItemMigrations(document);
+  return { document, plan, notice: weaponEquippedNotice(document, plan, actorName) };
+}
+
+function combineItemMigrations(document: MigratableDocument): MigrationPlan {
+  const source = readStoredSystem(document);
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
+  const third = planWeaponEquippedMigration(source, document.type, readStoredFlags(document));
+  if (!third.ok) return third;
+  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
   return {
     ok: true,
     changed: true,
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
+      ...(third.changed ? third.update : {}),
     },
   };
+}
+
+function weaponEquippedNotice(
+  document: MigratableDocument,
+  plan: MigrationPlan,
+  actorName?: string,
+): string | undefined {
+  if (!plan.ok || !plan.changed || !("system.equipped" in plan.update)) return undefined;
+  const equipped = plan.update["system.equipped"] === true;
+  const itemType = document.type === "equipment" ? "equipment" : "weapon";
+  return weaponEquippedMigrationNotice(
+    document.name ?? document.id ?? "unknown",
+    actorName,
+    equipped,
+    itemType,
+  );
 }
 
 function planUnlinkedToken(
