@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import en from "../../lang/en.json";
+import { SURVIVAL_WRITE_OPTIONS } from "../../src/config";
 import { createPivotItemDataModels } from "../../src/data/item-data";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
@@ -156,7 +157,7 @@ describe("M006 magic echelon migration", () => {
     expect(reviews[0]).not.toContain("Already");
     expect(logs).toContain(reviews[0]);
     expect(numeric.updates).toEqual([{ "system.echelon": "1" }]);
-    expect(numeric.updateOptions).toEqual([{ diff: false }]);
+    expect(numeric.updateOptions).toEqual([{ ...SURVIVAL_WRITE_OPTIONS, diff: false }]);
     expect(textual.updates).toEqual([]);
 
     await runWorldMigrations({
