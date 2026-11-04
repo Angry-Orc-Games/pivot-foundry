@@ -185,7 +185,9 @@ export function parseStoredEffect(value: unknown): EffectRule | null {
 type CountedEffect = EffectRule | { source: "gear"; effect: EffectRule };
 
 const gearItemTypes = new Set(["weapon", "armour", "equipment"]);
+const alwaysOnItemTypes = new Set(["feature", "magicStream", "magicAbility"]);
 const sameKeyWarned = new WeakSet<object>();
+const unknownTypeWarned = new WeakSet<object>();
 
 export interface AbilityScoreSource {
   ability: AbilityKey;
@@ -286,22 +288,36 @@ export function abilityScoreSources(
 
 function countedItemEffects(
   item: { name?: unknown; type?: unknown; system?: unknown } | null | undefined,
-):
-  | { gear: boolean; effects: EffectRule[] }
-  | undefined {
+): { gear: boolean; effects: EffectRule[] } | undefined {
   if (!item || typeof item !== "object") return undefined;
   const system = item.system;
   if (!isPlainObject(system) || !Array.isArray(system.effects)) return undefined;
-  const gear = typeof item.type === "string" && gearItemTypes.has(item.type);
+  const gear = !isAlwaysOnItem(item.type);
   const effects: EffectRule[] = [];
   for (const entry of system.effects) {
     const parsed = parseStoredEffect(entry);
     if (parsed) effects.push(parsed);
   }
   if (effects.length === 0) return undefined;
+  warnUnknownItemType(item);
   const collapsed = collapseSameKeyEffects(item, effects, itemLabel(item));
   if (gear && system.equipped !== true) return undefined;
   return { gear, effects: collapsed };
+}
+
+function isAlwaysOnItem(type: unknown): boolean {
+  return typeof type === "string" && alwaysOnItemTypes.has(type);
+}
+
+function warnUnknownItemType(item: object & { name?: unknown; type?: unknown }): void {
+  const known =
+    typeof item.type === "string" &&
+    (gearItemTypes.has(item.type) || alwaysOnItemTypes.has(item.type));
+  if (known || unknownTypeWarned.has(item)) return;
+  unknownTypeWarned.add(item);
+  console.warn(
+    `Pivot Fantasy: ${itemLabel(item)} has no known item type. It counts as gear, and only while equipped.`,
+  );
 }
 
 function itemLabel(item: { name?: unknown }): string {

@@ -115,6 +115,7 @@ describe("collectEmbeddedItemEffects", () => {
     expect(
       collectEmbeddedItemEffects([
         {
+          type: "feature",
           system: {
             effects: [
               { type: "skillBonus", skill: "perception", amount: 2, ability: null, category: null },
@@ -491,9 +492,7 @@ describe("items with no known type count as gear", () => {
       system: { equipped: true, effects: [strengthBonus(2)] },
     };
     expect(strengthTotal([equipped])).toBe(2);
-    expect(abilityScoreSources([equipped])).toEqual([
-      { ability: "str", name: "Relic", amount: 2 },
-    ]);
+    expect(abilityScoreSources([equipped])).toEqual([{ ability: "str", name: "Relic", amount: 2 }]);
   });
 });
 
