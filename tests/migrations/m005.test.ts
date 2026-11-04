@@ -204,4 +204,34 @@ describe("M005 clamp current MP to derived max", () => {
     expect(report.failed).toBe(0);
     expect(arwen.updates).toEqual([{ "system.magic.mp.value": 14 }]);
   });
+
+  it("clamps stored MP when toObject is inherited from the actor prototype", async () => {
+    const source = character(
+      "Arwen",
+      { value: 20, maxBonus: 3 },
+      { items: [gearItem("Ring", 6, false)] },
+    );
+    const stored = source.toObject?.().system;
+    const prepared = structuredClone(stored) as { magic: { mp: { value: number } } };
+    prepared.magic.mp.value = 4;
+    const actor = Object.create({
+      toObject: () => ({ system: stored }),
+    }) as MigratableDocument & { updates: Record<string, unknown>[] };
+    actor.name = "Arwen";
+    actor.type = "character";
+    actor.system = prepared;
+    actor.items = source.items;
+    actor.updates = [];
+    actor.update = async (data) => {
+      actor.updates.push(data);
+    };
+
+    const report = await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [actor] },
+    });
+
+    expect(report.failed).toBe(0);
+    expect(Object.hasOwn(actor, "toObject")).toBe(false);
+    expect(actor.updates).toEqual([{ "system.magic.mp.value": 14 }]);
+  });
 });
