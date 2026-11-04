@@ -102,8 +102,8 @@
           {{/each}}
         </tbody>
       </table>
-      <div class="pf-small">Proficiency bonus is added when proficient. Exploding dice: natural max
-        re-rolls once.</div>
+      <div class="pf-small">Proficiency bonus is added when proficient.
+        {{localize "PIVOT.Rolls.ExplodingDice"}}</div>
 
       <h3>Feats</h3>
       <ul class="pf-list">
@@ -649,9 +649,7 @@
         <div
           class="pf-pips"
           role="img"
-          aria-label="{{localize
-            'PIVOT.Fields.Successes'
-          }}: {{system.attributes.deathSaves.successes}}"
+          aria-label="{{localize 'PIVOT.Fields.Successes'}}: {{deathSaveSuccesses}}"
         >
           {{#each deathSaveSuccessPips}}
             {{#if this}}
@@ -667,9 +665,7 @@
         <div
           class="pf-pips"
           role="img"
-          aria-label="{{localize
-            'PIVOT.Fields.Failures'
-          }}: {{system.attributes.deathSaves.failures}}"
+          aria-label="{{localize 'PIVOT.Fields.Failures'}}: {{deathSaveFailures}}"
         >
           {{#each deathSaveFailurePips}}
             {{#if this}}

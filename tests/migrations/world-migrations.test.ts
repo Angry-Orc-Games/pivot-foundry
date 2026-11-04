@@ -2,6 +2,47 @@ import { describe, expect, it } from "vitest";
 
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
+import { guardCharacterHpWrite } from "../../src/runtime/actor-guards";
+
+function characterAtSpeed(
+  name: string,
+  species: string,
+  speed: { value: number; bonus: number } | undefined,
+  type = "character",
+) {
+  const stored: Record<string, unknown> = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    survivalVersion: 1,
+    proficiencies: { weapons: { slings: false } },
+    identity: { speciesText: species },
+    attributes: {
+      hp: { value: 8, max: 8, temp: 0 },
+      deathSaves: { status: "alive", successes: 0, failures: 0 },
+      ...(speed ? { speed } : {}),
+    },
+  };
+  const updates: Record<string, unknown>[] = [];
+  return {
+    name,
+    type,
+    updates,
+    toObject: () => ({ system: structuredClone(stored) }),
+    update: async (data: Record<string, unknown>) => {
+      updates.push(structuredClone(data));
+      for (const [key, value] of Object.entries(data)) {
+        const path = key.split(".").filter((part) => part !== "system");
+        let cursor: Record<string, unknown> = stored;
+        for (const part of path.slice(0, -1)) {
+          const next = cursor[part];
+          if (!next || typeof next !== "object") cursor[part] = {};
+          cursor = cursor[part] as Record<string, unknown>;
+        }
+        const leaf = path[path.length - 1];
+        if (leaf) cursor[leaf] = value;
+      }
+    },
+  };
+}
 
 function createDocument(
   name: string,
@@ -112,6 +153,55 @@ describe("runWorldMigrations", () => {
     expect(report).toEqual({ skipped: false, updated: 0, failed: 0 });
     expect(item.updates).toEqual([]);
   });
+
+  it("migrates a sheet-v2 schemaVersion 2 character once and does not warn that it is newer than supported", async () => {
+    const stored: {
+      schemaVersion: number;
+      survivalVersion?: number;
+      attributes: {
+        hp: { value: number; max: number; temp?: number };
+        deathSaves?: { status: string };
+      };
+    } = {
+      schemaVersion: 2,
+      attributes: { hp: { value: 8, max: 12 } },
+    };
+    const actor = createDocument("Imported", stored, { type: "character" });
+    const messages: string[] = [];
+
+    const report = await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [actor], items: [] },
+      notify: (_level, message) => messages.push(message),
+      log: (message) => messages.push(String(message)),
+    });
+
+    expect(report).toEqual({ skipped: false, updated: 1, failed: 0 });
+    expect(messages.join("\n")).not.toMatch(/newer than supported/);
+    expect(actor.updates).toEqual([
+      {
+        "system.survivalVersion": 1,
+        "system.attributes.hp.temp": 0,
+        "system.attributes.deathSaves.status": "alive",
+        "system.proficiencies.weapons.slings": false,
+      },
+    ]);
+
+    stored.survivalVersion = 1;
+    (stored as Record<string, unknown>).proficiencies = { weapons: { slings: false } };
+    stored.attributes = {
+      hp: { value: 8, max: 12, temp: 0 },
+      deathSaves: { status: "alive" },
+    };
+    actor.updates.length = 0;
+    const second = await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [actor], items: [] },
+      notify: (_level, message) => messages.push(message),
+      log: (message) => messages.push(String(message)),
+    });
+    expect(second).toEqual({ skipped: false, updated: 0, failed: 0 });
+    expect(actor.updates).toEqual([]);
+    expect(messages.join("\n")).not.toMatch(/newer than supported/);
+  });
 });
 it("migrates unlinked scene actors separately and skips linked copies", async () => {
   const synthetic = createDocument(
@@ -173,4 +263,79 @@ it("plans synthetic state before writes and persists it after base changes", asy
     },
   });
   expect(order).toEqual(["base", "token"]);
+});
+
+it("sets base speed only when the stored value is still 10", async () => {
+  const logs: string[] = [];
+  const halfling = characterAtSpeed("Bram", "Halfling", { value: 10, bonus: 1 });
+  const dwarf = characterAtSpeed("Durin", "Dwarf", { value: 10, bonus: 0 });
+  const human = characterAtSpeed("Ada", "Human", { value: 10, bonus: 0 });
+  const smallHumanoid = characterAtSpeed("Pip", "Small Humanoid", { value: 10, bonus: 0 });
+  const large = characterAtSpeed("Brute", "Large Beast", { value: 10, bonus: 0 });
+  const custom = characterAtSpeed("Nim", "Gnome", { value: 12, bonus: 0 });
+  const zero = characterAtSpeed("Pebble", "Halfling", { value: 0, bonus: 0 });
+  const missing = characterAtSpeed("Blank", "Gnome", undefined);
+  const unknown = characterAtSpeed("Smaug", "Dragon", { value: 10, bonus: 0 });
+  const npc = characterAtSpeed("Guard", "Halfling", { value: 10, bonus: 0 }, "npc");
+
+  await runWorldMigrations({
+    game: {
+      user: { isGM: true },
+      actors: [halfling, dwarf, human, smallHumanoid, large, custom, zero, missing, unknown, npc],
+      items: [],
+    },
+    log: (message) => logs.push(message),
+  });
+
+  expect(halfling.updates).toEqual([{ "system.attributes.speed.value": 7 }]);
+  expect(dwarf.updates).toEqual([{ "system.attributes.speed.value": 8 }]);
+  expect(smallHumanoid.updates).toEqual([{ "system.attributes.speed.value": 7 }]);
+  expect(large.updates).toEqual([{ "system.attributes.speed.value": 12 }]);
+  expect(human.updates).toEqual([]);
+  expect(custom.updates).toEqual([]);
+  expect(zero.updates).toEqual([]);
+  expect(missing.updates).toEqual([]);
+  expect(unknown.updates).toEqual([]);
+  expect(npc.updates).toEqual([]);
+  expect(logs.filter((line) => !line.includes("PIVOT.Migration.Complete"))).toEqual([
+    "Bram: base speed 10 -> 7 (Halfling).",
+    "Durin: base speed 10 -> 8 (Dwarf).",
+    "Pip: base speed 10 -> 7 (Small Humanoid).",
+    "Brute: base speed 10 -> 12 (Large Beast).",
+    'Smaug: unknown species "Dragon"; base speed left at 10.',
+  ]);
+
+  logs.length = 0;
+  await runWorldMigrations({
+    game: {
+      user: { isGM: true },
+      actors: [halfling, dwarf, human, smallHumanoid, large, custom, zero, missing, unknown, npc],
+      items: [],
+    },
+    log: (message) => logs.push(message),
+  });
+
+  expect(halfling.updates).toHaveLength(1);
+  expect(dwarf.updates).toHaveLength(1);
+  expect(logs).toEqual(['Smaug: unknown species "Dragon"; base speed left at 10.']);
+});
+
+it("writes migrations as trusted survival writes so the Character guard admits them", async () => {
+  const writes: unknown[] = [];
+  const actor = createDocument(
+    "Hera",
+    { attributes: { hp: { value: 5, max: 20 } } },
+    {
+      type: "character",
+      update: async (data, options) => {
+        writes.push(guardCharacterHpWrite({ type: "character", system: {} }, data, options));
+      },
+    },
+  );
+  const report = await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [actor], items: [] },
+  });
+  expect(report.failed).toBe(0);
+  expect(writes.length).toBeGreaterThan(0);
+  expect(writes.every((result) => result === undefined)).toBe(true);
 });

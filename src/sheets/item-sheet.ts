@@ -1,11 +1,21 @@
 import { featureCategories, SYSTEM_ID } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
+import { type Echelon } from "../rules/echelon";
 import { describeEffectRule, parseStoredEffect, type EffectRule } from "../rules/effects";
 import {
   INVALID_CHOICE_LABEL,
   selectOptionRecord,
   type SelectBinding,
 } from "../rules/item-choices";
+
+const ECHELON_CHOICES: Record<Echelon, string> = {
+  core: "Core",
+  "1": "Echelon 1",
+  "2": "Echelon 2",
+  "3": "Echelon 3",
+  "4": "Echelon 4",
+  "5": "Echelon 5",
+};
 
 const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 
@@ -38,6 +48,7 @@ export interface ItemSheetContext {
   armourCategorySelect: SelectBinding;
   config: {
     featureCategories: typeof featureCategories;
+    echelonChoices: Record<Echelon, string>;
   };
 }
 
@@ -135,6 +146,7 @@ export function prepareItemSheetContext(
     ),
     config: {
       featureCategories,
+      echelonChoices: ECHELON_CHOICES,
     },
   };
 }

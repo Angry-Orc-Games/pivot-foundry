@@ -14,7 +14,7 @@ interface CombatantLike {
   getInitiativeRoll?: (formula: string) => Promise<{
     toMessage?: (
       data: Record<string, unknown>,
-      options?: { rollMode?: string; create?: boolean },
+      options?: { messageMode?: string; create?: boolean },
     ) => Promise<Record<string, unknown>>;
     total?: number;
     _evaluated?: boolean;
@@ -27,13 +27,54 @@ interface TurnLike {
   id?: string;
 }
 
+const V14_MESSAGE_MODES = new Set(["public", "gm", "blind", "self", "ic"]);
+
+const LEGACY_ROLL_TO_MESSAGE: Record<string, string> = {
+  publicroll: "public",
+  gmroll: "gm",
+  blindroll: "blind",
+  selfroll: "self",
+};
+
+const PRIVATE_MESSAGE_MODES = new Set(["gm", "blind", "self"]);
+
+function v14MessageMode(value: unknown): string | undefined {
+  return typeof value === "string" && V14_MESSAGE_MODES.has(value) ? value : undefined;
+}
+
+function messageModeFromRollMode(value: unknown): string | undefined {
+  const direct = v14MessageMode(value);
+  if (direct) return direct;
+  if (typeof value === "string" && Object.hasOwn(LEGACY_ROLL_TO_MESSAGE, value)) {
+    return LEGACY_ROLL_TO_MESSAGE[value];
+  }
+  return undefined;
+}
+
+function resolveMessageMode(
+  options: { messageMode?: unknown; messageOptions?: Record<string, unknown> },
+  setting: unknown,
+  hidden: boolean | undefined,
+): string {
+  const messageOptions = options.messageOptions;
+  const mode =
+    v14MessageMode(options.messageMode) ??
+    v14MessageMode(messageOptions?.messageMode) ??
+    messageModeFromRollMode(messageOptions?.rollMode) ??
+    v14MessageMode(setting) ??
+    "public";
+  // gm, blind, and self already limit who sees the roll. ic and public would not.
+  if (hidden && !PRIVATE_MESSAGE_MODES.has(mode)) return "gm";
+  return mode;
+}
+
 export function createPivotCombatClass(
   BaseCombat: TypeDataModelConstructor,
 ): TypeDataModelConstructor {
   class PivotCombat extends BaseCombat {
     /**
      * Roll initiative for one or more combatants.
-     * Override to create chat messages with proper roll mode and wait for Dice So Nice animations.
+     * Override to create chat messages with the chosen message visibility and wait for Dice So Nice animations.
      * Follows Foundry v14 Combat.rollInitiative semantics.
      */
     async rollInitiative(
@@ -41,6 +82,7 @@ export function createPivotCombatClass(
       options: {
         formula?: string;
         updateTurn?: boolean;
+        messageMode?: string;
         messageOptions?: Record<string, unknown>;
       } = {},
     ): Promise<unknown> {
@@ -54,15 +96,13 @@ export function createPivotCombatClass(
 
       const combatantList = Array.from(combatants);
 
-      // Get roll mode from settings
       const game = globalThis as typeof globalThis & {
         game?: {
           settings?: { get?: (scope: string, key: string) => unknown };
           i18n?: { format?: (key: string, data: Record<string, unknown>) => string };
         };
       };
-      const rawMode = game.game?.settings?.get?.("core", "rollMode");
-      const rollMode = typeof rawMode === "string" ? rawMode : "roll";
+      const rawMode = game.game?.settings?.get?.("core", "messageMode");
 
       // Get ChatMessage constructor
       const ChatMessage = (
@@ -118,26 +158,15 @@ export function createPivotCombatClass(
             name: combatant.actor.name ?? "Unknown",
           }) ?? `${combatant.actor.name ?? "Unknown"} rolls for Initiative!`;
 
-        // Compute effective roll mode: hidden combatant with 'roll' mode becomes 'gmroll'
-        // Honor messageOptions.rollMode if provided
-        const messageOptionsRollMode =
-          options.messageOptions && "rollMode" in options.messageOptions
-            ? options.messageOptions.rollMode
-            : undefined;
-        const baseRollMode =
-          typeof messageOptionsRollMode === "string" ? messageOptionsRollMode : rollMode;
-        const effectiveRollMode =
-          combatant.hidden && baseRollMode === "roll" ? "gmroll" : baseRollMode;
-
-        // Extract messageOptions without rollMode (will be passed separately to toMessage)
-        const messageOptionsWithoutRollMode = options.messageOptions
+        const effectiveMode = resolveMessageMode(options, rawMode, combatant.hidden);
+        const messageData = options.messageOptions
           ? Object.fromEntries(
-              Object.entries(options.messageOptions).filter(([key]) => key !== "rollMode"),
+              Object.entries(options.messageOptions).filter(
+                ([key]) => key !== "messageMode" && key !== "rollMode",
+              ),
             )
           : {};
 
-        // Build message data using roll.toMessage with core.initiativeRoll flag
-        // toMessage applies the roll mode itself
         let chatData: Record<string, unknown> = {};
         if (roll.toMessage) {
           chatData = await roll.toMessage(
@@ -145,9 +174,9 @@ export function createPivotCombatClass(
               speaker,
               flavor,
               flags: { "core.initiativeRoll": true },
-              ...messageOptionsWithoutRollMode,
+              ...messageData,
             },
-            { rollMode: effectiveRollMode, create: false },
+            { messageMode: effectiveMode, create: false },
           );
         }
 

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeArtifactIdentity } from "./artifact-identity.mjs";
@@ -18,17 +18,30 @@ import {
   assertOwned,
   collectDiagnostics,
   compose,
+  containerStartupProblem,
   inspectOwnership,
   installPackagedSystem,
+  prepareContainerCache,
+  prepareDataDir,
   pullImage,
   requireDocker,
+  readContainerLogs,
+  startedAnnouncement,
   waitForHttp,
+  waitForListening,
   writeComposeEnv,
   writeRuntime,
 } from "./foundry-compose.mjs";
 
 const HTTP_TIMEOUT_MS = 120_000;
 const PLAYWRIGHT_TIMEOUT_MS = 15 * 60 * 1000;
+
+export function e2eFailureExit(error, setupText = "") {
+  if (error?.code === "TIMEOUT") return EXIT.timeout;
+  if (error?.code === "STARTUP_FAILED" || error?.code === "DATA_DIR") return EXIT.runtime;
+  if (String(setupText).includes("FOUNDRY_E2E_ACCEPT_EULA")) return EXIT.setup;
+  return EXIT.tests;
+}
 
 export function assertLaunchWindow(root, options = {}) {
   execFileSync("bash", [join(root, "scripts/ci/e2e-gate.sh"), "require"], {
@@ -132,6 +145,8 @@ export async function runE2E(args = {}) {
       preserveConfig: false,
       world: "",
     });
+    prepareDataDir(paths.foundryData);
+    prepareContainerCache(paths);
     compose(paths, ["up", "-d", "--remove-orphans"]);
     started = true;
     const runtime = writeRuntime(paths, names, port);
@@ -144,7 +159,9 @@ export async function runE2E(args = {}) {
     process.env.PIVOT_PLAYER_PASSWORD = process.env.PIVOT_PLAYER_PASSWORD || "e2e-player-local";
 
     console.log(`Waiting for Foundry HTTP on ${runtime.baseUrl} (not used as readiness).`);
-    await waitForHttp(runtime.baseUrl, HTTP_TIMEOUT_MS);
+    await waitForHttp(runtime.baseUrl, HTTP_TIMEOUT_MS, {
+      inspect: () => containerStartupProblem(paths),
+    });
 
     const ownership = inspectOwnership(paths);
     if (!ownership.owned) {
@@ -152,7 +169,16 @@ export async function runE2E(args = {}) {
       return EXIT.identity;
     }
 
-    console.log(`Foundry started for E2E commit ${subject || identity.commit}.`);
+    const listeningLogs = await waitForListening(() => readContainerLogs(paths), HTTP_TIMEOUT_MS, {
+      inspect: () => containerStartupProblem(paths),
+    });
+    for (const line of startedAnnouncement(listeningLogs, subject || identity.commit)) {
+      console.log(line);
+    }
+
+    const setupMarker = join(paths.diagnosticsDir, "setup-failure.txt");
+    mkdirSync(paths.diagnosticsDir, { recursive: true });
+    process.env.PIVOT_E2E_SETUP_FAILURE = setupMarker;
 
     console.log("Running Playwright against the packaged system.");
     execFileSync("npx", ["playwright", "test", "--config", "e2e/playwright.config.ts"], {
@@ -174,7 +200,9 @@ export async function runE2E(args = {}) {
     console.log("Foundry E2E passed.");
     return EXIT.ok;
   } catch (error) {
-    const exitCode = error.code === "TIMEOUT" ? EXIT.timeout : EXIT.tests;
+    const marker = process.env.PIVOT_E2E_SETUP_FAILURE;
+    const setupText = marker && existsSync(marker) ? readFileSync(marker, "utf8") : "";
+    const exitCode = e2eFailureExit(error, setupText);
     console.error(error.message || error);
     try {
       collectDiagnostics(paths);

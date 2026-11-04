@@ -81,6 +81,13 @@
             value="{{system.range.long}}"
             {{disabledAttr}}
           /></label>
+        <label class="pf-check"><input
+            name="system.equipped"
+            type="checkbox"
+            {{checked system.equipped}}
+            {{disabledAttr}}
+          />
+          <span>{{localize "PIVOT.Fields.Equipped"}}</span></label>
       </div>
     </section>
   {{/if}}
@@ -141,6 +148,13 @@
             {{disabledAttr}}
           />
           <span>{{localize "PIVOT.Fields.Carried"}}</span></label>
+        <label class="pf-check"><input
+            name="system.equipped"
+            type="checkbox"
+            {{checked system.equipped}}
+            {{disabledAttr}}
+          />
+          <span>{{localize "PIVOT.Fields.Equipped"}}</span></label>
       </div>
     </section>
   {{/if}}
@@ -155,15 +169,10 @@
             value="{{system.stream}}"
             {{disabledAttr}}
           /></label>
-        <label><span>{{localize "PIVOT.Fields.Echelon"}}</span><input
+        <label><span>{{localize "PIVOT.Fields.Echelon"}}</span><select
             name="system.echelon"
-            type="number"
-            min="1"
-            max="5"
-            step="1"
-            value="{{system.echelon}}"
             {{disabledAttr}}
-          /></label>
+          >{{selectOptions config.echelonChoices selected=system.echelon}}</select></label>
         <label><span>{{localize "PIVOT.Fields.MPCost"}}</span><input
             name="system.mpCost"
             type="number"
@@ -198,15 +207,10 @@
             value="{{system.ability}}"
             {{disabledAttr}}
           /></label>
-        <label><span>{{localize "PIVOT.Fields.Echelon"}}</span><input
+        <label><span>{{localize "PIVOT.Fields.Echelon"}}</span><select
             name="system.echelon"
-            type="number"
-            min="1"
-            max="5"
-            step="1"
-            value="{{system.echelon}}"
             {{disabledAttr}}
-          /></label>
+          >{{selectOptions config.echelonChoices selected=system.echelon}}</select></label>
       </div>
     </section>
   {{/if}}

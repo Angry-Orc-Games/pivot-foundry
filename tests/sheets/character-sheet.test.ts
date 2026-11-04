@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
+import Handlebars from "handlebars";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { FoundryRuntime } from "../../src/foundry-runtime";
 import {
   applyInitiativeRollToCombat,
   buildD20ChatFlavor,
@@ -11,6 +16,7 @@ import {
   normalizeSheetSubmitData,
   POOL_VALUE_PATH,
   prepareCharacterSheetContext,
+  promptRollMode,
   resolveSheetRoll,
   type ActorLike,
 } from "../../src/sheets/character-sheet";
@@ -190,6 +196,96 @@ describe("prepareCharacterSheetContext", () => {
     expect(baseline.skillRows.find((row) => row.id === "perception")?.ability).toBe("Wis");
   });
 
+  it("lists only the ability bonuses the score total counts", () => {
+    const actor = sampleActor();
+    const withGear = {
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "sword-1",
+          name: "Longsword",
+          type: "weapon",
+          system: {
+            equipped: true,
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 2 }],
+          },
+        },
+        {
+          id: "sword-2",
+          name: "Shortsword",
+          type: "weapon",
+          system: {
+            equipped: true,
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 2 }],
+          },
+        },
+        {
+          id: "cloak-1",
+          name: "Cloak",
+          type: "equipment",
+          system: {
+            equipped: false,
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 4 }],
+          },
+        },
+      ],
+    };
+
+    const context = prepareCharacterSheetContext(withGear);
+    const strength = context.abilityRows.find((row) => row.key === "str");
+
+    expect(strength?.score).toBe(16);
+    expect(strength?.mod).toBe("+4");
+    expect(context.scoreSourceText).toBe("Score sources. Str: base 16, Longsword +2.");
+  });
+
+  it("shows the one strength bonus a feature keeps when it lists that bonus twice", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "feat-1",
+          name: "Giant Blood",
+          type: "feature",
+          system: {
+            effects: [
+              { type: "abilityScoreBonus", ability: "str", amount: 1 },
+              { type: "abilityScoreBonus", ability: "str", amount: 1 },
+            ],
+          },
+        },
+      ],
+    });
+    const strength = context.abilityRows.find((row) => row.key === "str");
+
+    expect(strength?.mod).toBe("+3");
+    expect(context.scoreSourceText).toBe("Score sources. Str: base 16, Giant Blood +1.");
+  });
+
+  it("leaves an unequipped untyped bonus out of the score total and the sources line", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "gem-1",
+          name: "Loose Gem",
+          system: {
+            effects: [{ type: "abilityScoreBonus", ability: "str", amount: 4 }],
+          },
+        },
+      ],
+    } as ActorLike);
+    const strength = context.abilityRows.find((row) => row.key === "str");
+
+    expect(strength?.mod).toBe("+3");
+    expect(context.scoreSourceText).toBe("");
+  });
+
   it("lists body modifications apart from traits", () => {
     const actor = sampleActor();
     const withMods = {
@@ -262,6 +358,8 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.poolPercent).toBe(20);
     expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
     expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+    expect(context.deathSaveSuccesses).toBe(0);
+    expect(context.deathSaveFailures).toBe(0);
   });
 
   it("shows alive after prepare when stored HP is positive and status is dying", () => {
@@ -280,6 +378,31 @@ describe("prepareCharacterSheetContext", () => {
 
     expect(context.survivalStatus).toBe("alive");
     expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
+    expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
+    expect(context.deathSaveFailurePips).toEqual([false, false, false]);
+    expect(context.deathSaveSuccesses).toBe(0);
+    expect(context.deathSaveFailures).toBe(0);
+  });
+
+  it("shows Conscious on the sheet when HP is full and Dying is stale", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 16, max: 16, temp: 2 },
+          deathSaves: { status: "dying", successes: 1, failures: 1 },
+        },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("alive");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.alive");
+    expect(context.hpPercent).toBe(100);
+    expect(context.deathSaveSuccesses).toBe(0);
+    expect(context.deathSaveFailures).toBe(0);
     expect(context.deathSaveSuccessPips).toEqual([false, false, false]);
     expect(context.deathSaveFailurePips).toEqual([false, false, false]);
   });
@@ -303,6 +426,28 @@ describe("prepareCharacterSheetContext", () => {
     expect(statusFor(0, "stable")).toBe("stable");
     expect(statusFor(10, "dead")).toBe("dead");
     expect(statusFor(0, "dead")).toBe("dead");
+  });
+
+  it("still shows Dying and its counters at 0 HP", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      system: {
+        ...actor.system,
+        attributes: {
+          ...(actor.system.attributes as Record<string, unknown>),
+          hp: { value: 0, max: 16, temp: 0 },
+          deathSaves: { status: "dying", successes: 2, failures: 1 },
+        },
+      },
+    });
+
+    expect(context.survivalStatus).toBe("dying");
+    expect(context.survivalLabel).toBe("PIVOT.Survival.dying");
+    expect(context.deathSaveSuccessPips).toEqual([true, true, false]);
+    expect(context.deathSaveFailurePips).toEqual([true, false, false]);
+    expect(context.deathSaveSuccesses).toBe(2);
+    expect(context.deathSaveFailures).toBe(1);
   });
 });
 
@@ -379,13 +524,12 @@ describe("sheet interaction helpers", () => {
     });
   });
 
-  it("builds a roll-mode dialog with four labeled choices and Normal selected", () => {
+  it("builds a roll-mode dialog with Normal, Advantage, and Disadvantage", () => {
     const content = buildRollModeDialogContent((key) => key);
+    const values = [...content.matchAll(/value="([^"]+)"/g)].map((match) => match[1]);
+    expect(values).toEqual(["normal", "advantage", "disadvantage"]);
     expect(content).toContain('value="normal" checked');
-    expect(content).toContain('value="advantage"');
-    expect(content).toContain('value="disadvantage"');
-    expect(content).toContain('value="superAdvantage"');
-    expect(content).toContain("PIVOT.RollMode.Normal");
+    expect(content).not.toContain("superAdvantage");
   });
 
   it("builds chat flavor from kept die, modifier, and attack natural results", () => {
@@ -648,6 +792,33 @@ describe("sheet interaction helpers", () => {
   });
 });
 
+describe("promptRollMode", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads a legacy superAdvantage dialog result as advantage", async () => {
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "superAdvantage") } } },
+    });
+    await expect(promptRollMode()).resolves.toBe("advantage");
+  });
+
+  it("treats a null dialog result as cancel", async () => {
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => null) } } },
+    });
+    await expect(promptRollMode()).resolves.toBeNull();
+  });
+
+  it("treats an unparseable dialog result as cancel", async () => {
+    vi.stubGlobal("foundry", {
+      applications: { api: { DialogV2: { prompt: vi.fn(async () => "nope") } } },
+    });
+    await expect(promptRollMode()).resolves.toBeNull();
+  });
+});
+
 describe("D20 roll attachments for Dice So Nice!", () => {
   it("attaches pool roll with dice to ChatMessage.create", async () => {
     const chatCreate = vi.fn(async (data: Record<string, unknown>) => ({
@@ -900,3 +1071,436 @@ describe("character sheet edit toggle", () => {
     expect(stillLocked.disabledAttr).toBe("disabled");
   });
 });
+
+function actorWithPrimaries(
+  primaries: Array<"str" | "dex" | "con" | "int" | "wis" | "cha">,
+  options: {
+    level?: number;
+    magic?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+    feat?: string;
+  } = {},
+): ActorLike {
+  const scores = { str: 16, dex: 14, con: 14, int: 12, wis: 12, cha: 10 };
+  return {
+    name: "Grawl",
+    type: "character",
+    system: {
+      progression: { level: options.level ?? 5 },
+      abilities: Object.fromEntries(
+        (Object.keys(scores) as Array<keyof typeof scores>).map((key) => [
+          key,
+          { score: scores[key], primary: primaries.includes(key) },
+        ]),
+      ),
+      skills: {
+        athletics: { ability: "str", proficient: true, deepening: 0, expertise: false, bonus: 0 },
+      },
+      magic: { awakened: options.magic !== undefined, ability: options.magic ?? null },
+    },
+    items: options.feat
+      ? [{ id: "feat-1", name: options.feat, type: "feature", system: { category: "feat" } }]
+      : [],
+  };
+}
+
+describe("primary abilities", () => {
+  it("caps primary abilities at two and requires the magic ability to be primary", () => {
+    const three = prepareCharacterSheetContext(actorWithPrimaries(["str", "dex", "con"]));
+    expect(three.primaryWarnings).toEqual([
+      "More than 2 Primary abilities. The cap is 2, or 3 with Adapt or Die at level 3 or higher.",
+    ]);
+    Handlebars.registerHelper("checked", (value: unknown) => (value ? "checked" : ""));
+    Handlebars.registerHelper("localize", (key: unknown) => String(key));
+    const html = Handlebars.compile(
+      readFileSync(join(__dirname, "../../templates/actors/character/vitals.hbs"), "utf8"),
+    )(three);
+    expect(html).toContain("More than 2 Primary abilities");
+    expect(html).toContain("pf-primary-warning");
+    expect(three.abilityRows.filter((row) => row.primary)).toHaveLength(3);
+    expect(three.derived.saves.str).toBe(
+      three.derived.abilities.str.mod + three.derived.proficiencyBonus,
+    );
+    expect(three.derived.saves.int).toBe(three.derived.abilities.int.mod);
+    expect(three.derived.skills.athletics?.total).toBe(
+      three.derived.abilities.str.mod + three.derived.proficiencyBonus,
+    );
+
+    const adaptedActor = actorWithPrimaries(["str", "dex", "int"], {
+      level: 3,
+      feat: "Adapt or Die",
+      magic: "int",
+    });
+    const allowed = prepareCharacterSheetContext(adaptedActor);
+    expect(allowed.primaryWarnings).toEqual([]);
+    expect(allowed.abilityRows.filter((row) => row.primary)).toHaveLength(3);
+
+    const early = prepareCharacterSheetContext(
+      actorWithPrimaries(["str", "dex", "int"], { level: 2, feat: "Adapt or Die", magic: "int" }),
+    );
+    expect(early.primaryWarnings).toEqual([
+      "More than 2 Primary abilities. The cap is 2, or 3 with Adapt or Die at level 3 or higher.",
+    ]);
+
+    const fourth = prepareCharacterSheetContext(
+      actorWithPrimaries(["str", "dex", "con", "int"], {
+        level: 6,
+        feat: "Adapt or Die",
+        magic: "int",
+      }),
+    );
+    expect(fourth.primaryWarnings).toEqual([
+      "More than 3 Primary abilities. Adapt or Die allows only one extra Primary.",
+    ]);
+
+    const magicNotPrimary = prepareCharacterSheetContext(
+      actorWithPrimaries(["str", "dex"], { magic: "wis" }),
+    );
+    expect(magicNotPrimary.primaryWarnings).toEqual(["Magic ability must be a Primary ability."]);
+
+    const physicalMagic = prepareCharacterSheetContext(
+      actorWithPrimaries(["dex", "con"], { magic: "str" }),
+    );
+    expect(physicalMagic.primaryWarnings).toEqual([
+      "Magic ability must be Intelligence, Wisdom, or Charisma.",
+      "Magic ability must be a Primary ability.",
+    ]);
+
+    const kept = normalizeSheetSubmitData({
+      "system.abilities.str.primary": true,
+      "system.abilities.dex.primary": true,
+      "system.abilities.con.primary": true,
+    });
+    expect(kept).toMatchObject({
+      "system.abilities.str.primary": true,
+      "system.abilities.dex.primary": true,
+      "system.abilities.con.primary": true,
+    });
+  });
+});
+
+describe("character sheet submit", () => {
+  it("writes only fields that differ from the actor source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        name: "Hera",
+        "system.progression.level": 5,
+        "system.attributes.hp.max": 28,
+      },
+    });
+
+    expect(updates).toEqual([{ system: { progression: { level: 5 } } }]);
+  });
+
+  it("does not write a second sheet's unchanged fields over the shared source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        name: "Renamed Hera",
+        "system.progression.level": 4,
+        "system.attributes.hp.max": 28,
+      },
+    });
+
+    expect(updates).toEqual([{ name: "Renamed Hera" }]);
+  });
+
+  it("skips update when the form matches the actor source", async () => {
+    const { sheet, updates } = worldActorSheet();
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        name: "Hera",
+        "system.progression.level": 4,
+        "system.attributes.hp.max": 28,
+      },
+    });
+
+    expect(updates).toEqual([]);
+  });
+
+  it("keeps stored specialization fields when academia or crafting text changes", async () => {
+    const academia = [
+      specializationEntry("History", {
+        ability: "wis",
+        proficient: false,
+        deepening: 3,
+        expertise: true,
+        bonus: 2,
+      }),
+      specializationEntry("Theology", { deepening: 1, bonus: 4 }),
+    ];
+    const crafting = [
+      specializationEntry("Smithing", {
+        ability: "dex",
+        deepening: 2,
+        expertise: true,
+        bonus: 5,
+      }),
+    ];
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: { academia, crafting },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History, Arcana",
+        "system.skillSpecializations.craftingText": "Smithing, Alchemy",
+      },
+    });
+
+    expect(updates).toEqual([
+      {
+        system: {
+          skillSpecializations: {
+            academia: [academia[0], specializationEntry("Arcana")],
+            crafting: [crafting[0], specializationEntry("Alchemy")],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("does not write academia or crafting when the submitted names match the source", async () => {
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [
+          specializationEntry("History", {
+            ability: "wis",
+            proficient: false,
+            deepening: 3,
+            expertise: true,
+            bonus: 2,
+          }),
+          specializationEntry("Theology", { deepening: 1, bonus: 4 }),
+        ],
+        crafting: [
+          specializationEntry("Smithing", {
+            ability: "dex",
+            deepening: 2,
+            expertise: true,
+            bonus: 5,
+          }),
+        ],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History, Theology",
+        "system.skillSpecializations.craftingText": "Smithing",
+      },
+    });
+
+    expect(updates).toEqual([]);
+  });
+
+  it("keeps stored specialization fields when only the name casing changes", async () => {
+    const history = {
+      ability: "wis",
+      proficient: false,
+      deepening: 3,
+      expertise: true,
+      bonus: 2,
+    };
+    const smithing = {
+      ability: "dex",
+      deepening: 2,
+      expertise: true,
+      bonus: 5,
+    };
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [specializationEntry("History", history)],
+        crafting: [specializationEntry("Smithing", smithing)],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "history",
+        "system.skillSpecializations.craftingText": "smithing",
+      },
+    });
+
+    expect(updates).toEqual([
+      {
+        system: {
+          skillSpecializations: {
+            academia: [specializationEntry("history", history)],
+            crafting: [specializationEntry("smithing", smithing)],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("matches a stored specialization name that has stray spaces", async () => {
+    const history = {
+      ability: "wis",
+      proficient: false,
+      deepening: 3,
+      expertise: true,
+      bonus: 2,
+    };
+    const smithing = {
+      ability: "dex",
+      deepening: 2,
+      expertise: true,
+      bonus: 5,
+    };
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [specializationEntry("History ", history)],
+        crafting: [specializationEntry("Smithing ", smithing)],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History",
+        "system.skillSpecializations.craftingText": "Smithing",
+      },
+    });
+
+    expect(updates).toEqual([
+      {
+        system: {
+          skillSpecializations: {
+            academia: [specializationEntry("History", history)],
+            crafting: [specializationEntry("Smithing", smithing)],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("keeps differing duplicate specialization entries in list order", async () => {
+    const { sheet, updates } = worldActorSheet({
+      skillSpecializations: {
+        academia: [
+          specializationEntry("History", { deepening: 3, expertise: true, bonus: 2 }),
+          specializationEntry("History", { deepening: 1, bonus: 4, proficient: false }),
+        ],
+        crafting: [
+          specializationEntry("Smithing", { ability: "dex", deepening: 2, expertise: true }),
+          specializationEntry("Smithing", { ability: "str", bonus: 1, proficient: false }),
+        ],
+      },
+    });
+
+    await sheetClass().DEFAULT_OPTIONS.form.handler.call(sheet, click(), {} as HTMLFormElement, {
+      object: {
+        "system.skillSpecializations.academiaText": "History, History",
+        "system.skillSpecializations.craftingText": "Smithing, Smithing",
+      },
+    });
+
+    expect(updates).toEqual([]);
+  });
+});
+
+function specializationEntry(
+  name: string,
+  fields: {
+    ability?: string;
+    proficient?: boolean;
+    deepening?: number;
+    expertise?: boolean;
+    bonus?: number;
+  } = {},
+): Record<string, unknown> {
+  return {
+    name,
+    ability: "int",
+    proficient: true,
+    deepening: 0,
+    expertise: false,
+    bonus: 0,
+    ...fields,
+  };
+}
+
+function worldActorSheet(extraSystem: Record<string, unknown> = {}) {
+  const updates: Record<string, unknown>[] = [];
+  const storedSystem = {
+    progression: { level: 4 },
+    attributes: { hp: { value: 12, max: 28 } },
+    ...structuredClone(extraSystem),
+  };
+  const document = {
+    name: "Hera",
+    type: "character",
+    token: null,
+    system: {
+      ...structuredClone(storedSystem),
+      initiative: 3,
+    },
+    _source: {
+      name: "Hera",
+      system: storedSystem,
+    },
+    async update(data: Record<string, unknown>) {
+      updates.push(structuredClone(data));
+    },
+  };
+  const sheet = Object.assign(Object.create(sheetClass().prototype), { document });
+  return { sheet, updates };
+}
+
+function click() {
+  return { preventDefault() {} } as PointerEvent;
+}
+
+function sheetClass() {
+  return createPivotCharacterSheetClass(sheetFoundry()) as unknown as {
+    prototype: object;
+    DEFAULT_OPTIONS: {
+      form: {
+        handler: (
+          this: object,
+          event: Event,
+          form: HTMLFormElement,
+          formData: { object?: Record<string, unknown> },
+        ) => Promise<unknown>;
+      };
+    };
+  };
+}
+
+function sheetFoundry(): FoundryRuntime {
+  class ActorSheetV2 {
+    readonly kind = "actor";
+  }
+  class ItemSheetV2 {
+    readonly kind = "item";
+  }
+  class TypeDataModel {
+    readonly kind = "model";
+  }
+  class NumberField {
+    readonly kind = "number";
+  }
+  class StringField {
+    readonly kind = "string";
+  }
+  class BooleanField {
+    readonly kind = "boolean";
+  }
+  class SchemaField {
+    readonly kind = "schema";
+  }
+  class ArrayField {
+    readonly kind = "array";
+  }
+  return {
+    abstract: { TypeDataModel },
+    data: {
+      fields: { NumberField, StringField, BooleanField, SchemaField, ArrayField },
+    },
+    applications: {
+      api: { HandlebarsApplicationMixin: (base) => base },
+      apps: { DocumentSheetConfig: { registerSheet() {} } },
+      sheets: { ActorSheetV2, ItemSheetV2 },
+    },
+  };
+}

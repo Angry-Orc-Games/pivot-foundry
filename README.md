@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/ci.yml?query=branch%3Amain)
 [![Release](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml/badge.svg)](https://github.com/Angry-Orc-Games/pivot-foundry/actions/workflows/release.yml)
-![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14.361-blue)
+![Foundry VTT](https://img.shields.io/badge/Foundry%20VTT-v14.367-blue)
 ![Node](https://img.shields.io/badge/Node-20%2F22%20verify%20%7C%2024%20Foundry%20container-339933)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Lint](https://img.shields.io/badge/lint-ESLint-4b32c3)
@@ -28,7 +28,7 @@ Implemented:
 - Item sheet registration for those Pivot item types
 - Data-backed identity, progression, abilities, HP, Pool, skills, proficiencies, currency, magic, notes, attacks, armour, and inventory fields
 - Derived character math for ability modifiers, proficiency, saves, skills, passive perception, Pool max, MP max, AC, initiative, carried weight, and weapon BTH/BTD
-- Pivot d20 roll modes (Normal, Advantage, Disadvantage, Super-Advantage) with kept-die chat results
+- Pivot d20 roll modes (Normal, Advantage, and Disadvantage) with kept-die chat results. Any number of advantage sources rolls two d20s and keeps the highest.
 - Weapon attack chat that reports automatic hit on a kept natural 20 and automatic miss on a kept natural 1
 - Bounded Pool spend/recovery against derived Pool max, plus Recover Pool (Long Rest)
 - Initiative rolls that update a unique existing Foundry combatant in the active combat
@@ -55,7 +55,7 @@ Not implemented yet:
 - Node.js 20 or 22 for repository checks (`npm run verify`)
 - Docker Engine + Compose v2 for the Foundry v14 runtime
 - npm
-- A licensed Foundry Virtual Tabletop **14.361** Node.js zip (cached privately; never committed)
+- A licensed Foundry Virtual Tabletop **14.367** Node.js zip (cached privately; never committed)
 - Playwright Chromium for browser acceptance tests (`npx playwright install chromium`)
 
 Version pins live in [`foundry/versions.json`](foundry/versions.json). The Foundry process uses Node 24 inside the pinned Felddy container.
@@ -94,13 +94,13 @@ First-time setup (repository root):
 
 ```sh
 cp .env.foundry.local.example .env.foundry.local
-# set FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, and a 14.361 Node.js zip source
+# set FOUNDRY_ADMIN_KEY, FOUNDRY_LICENSE_KEY, and a 14.367 Node.js zip source
 npm run build
 npm run foundry:check-env
 npm run foundry:up
 ```
 
-Foundry is at <http://127.0.0.1:30000> on loopback only. Put the licensed zip in `foundry-dist/` as `foundryvtt-14.361.zip` (preferred) or use `FOUNDRY_RELEASE_ARCHIVE` / a private cache URL. A Foundry timed URL works once and expires in about five minutes.
+Foundry is at <http://127.0.0.1:30000> on loopback only. Put the licensed zip in `foundry-dist/` as `foundryvtt-14.367.zip` (preferred) or use `FOUNDRY_RELEASE_ARCHIVE` / a private cache URL. A Foundry timed URL works once and expires in about five minutes.
 
 ```sh
 npm run foundry:status
@@ -175,7 +175,7 @@ PR CI (no Foundry secrets) → trusted Foundry E2E → merge to main
 - Every PR: lint, format, types, unit tests, build, package validation
 - Same-repository PRs: isolated Foundry E2E with narrowly scoped secrets
 - External forks: CI only; review the exact commit, then `workflow_dispatch` Foundry E2E
-- Release tags: prepare the versioned manifest, test that exact zip, publish only after E2E
+- Release tags: prepare the versioned manifest and publish only when that commit has a green Foundry E2E (nightly) check
 
 See [docs/deployment.md](docs/deployment.md) for Environments, required checks, and remaining GitHub settings. Dependabot still opens weekly npm and Actions update PRs.
 
@@ -188,7 +188,7 @@ Releases are produced by pushing a version tag that matches `v*`, for example `v
 3. Validates the tag as a semantic version prefixed with `v`
 4. Updates the release copy of `system.json` to the tag version
 5. Builds and validates `system.zip`
-6. Uploads `system.json` and `system.zip` to the GitHub release
+6. Publishes `system.json`, `system.zip`, and `artifact-identity.json` only when that commit's Foundry E2E (nightly) check is green
 
 Foundry installs use the manifest URL in `system.json`:
 
