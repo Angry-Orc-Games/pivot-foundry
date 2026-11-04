@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { calculateCharacterDerived } from "../../src/rules/character-derived";
 import {
+  abilityScoreSources,
   aggregateCharacterEffects,
   collectEmbeddedItemEffects,
   describeEffectRule,
@@ -346,6 +347,89 @@ describe("gear bonuses count only while equipped", () => {
     expect(summary.weaponProficiencies.bows).toBe(false);
     expect(summary.shieldProficiency).toBe(true);
     expect(summary.armourProficiencies.light).toBe(true);
+  });
+});
+
+describe("same-stat effects on one item", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function strengthEffects(amounts: readonly number[]): EffectRule[] {
+    return amounts.map((amount) => ({ type: "abilityScoreBonus", ability: "str", amount }));
+  }
+
+  function strengthTotal(items: readonly { type?: string; system?: unknown; name?: string }[]) {
+    return aggregateCharacterEffects(collectEmbeddedItemEffects(items)).abilityScoreBonuses.str;
+  }
+
+  it("keeps the best strength bonus on one gear item and warns once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const item = {
+      name: "Belt",
+      type: "equipment",
+      system: { equipped: true, effects: strengthEffects([1, 2]) },
+    };
+
+    expect(strengthTotal([item])).toBe(2);
+    expect(abilityScoreSources([item])).toEqual([{ ability: "str", name: "Belt", amount: 2 }]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps one strength bonus when a feature lists it twice and warns once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const item = {
+      name: "Giant Blood",
+      type: "feature",
+      system: { effects: strengthEffects([1, 1]) },
+    };
+
+    expect(strengthTotal([item])).toBe(1);
+    expect(abilityScoreSources([item])).toEqual([
+      { ability: "str", name: "Giant Blood", amount: 1 },
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a bonus and every penalty from the same item and warns once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const item = {
+      name: "Cursed Belt",
+      type: "equipment",
+      system: { equipped: true, effects: strengthEffects([2, -1]) },
+    };
+
+    expect(strengthTotal([item])).toBe(1);
+    expect(abilityScoreSources([item])).toEqual([
+      { ability: "str", name: "Cursed Belt", amount: 2 },
+      { ability: "str", name: "Cursed Belt", amount: -1 },
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns once when one item repeats two different stats", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const item = {
+      name: "Odd Feat",
+      type: "feature",
+      system: {
+        effects: [
+          { type: "abilityScoreBonus", ability: "str", amount: 1 },
+          { type: "abilityScoreBonus", ability: "str", amount: 2 },
+          { type: "abilityScoreBonus", ability: "dex", amount: 1 },
+          { type: "abilityScoreBonus", ability: "dex", amount: 3 },
+        ],
+      },
+    };
+    const summary = aggregateCharacterEffects(collectEmbeddedItemEffects([item]));
+
+    expect(summary.abilityScoreBonuses.str).toBe(2);
+    expect(summary.abilityScoreBonuses.dex).toBe(3);
+    expect(abilityScoreSources([item])).toEqual([
+      { ability: "str", name: "Odd Feat", amount: 2 },
+      { ability: "dex", name: "Odd Feat", amount: 3 },
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
 

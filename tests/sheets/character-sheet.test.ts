@@ -222,6 +222,31 @@ describe("prepareCharacterSheetContext", () => {
     expect(context.scoreSourceText).toBe("Score sources. Str: base 16, Longsword +2.");
   });
 
+  it("shows the one strength bonus a feature keeps when it lists that bonus twice", () => {
+    const actor = sampleActor();
+    const context = prepareCharacterSheetContext({
+      ...actor,
+      items: [
+        ...(Array.isArray(actor.items) ? actor.items : []),
+        {
+          id: "feat-1",
+          name: "Giant Blood",
+          type: "feature",
+          system: {
+            effects: [
+              { type: "abilityScoreBonus", ability: "str", amount: 1 },
+              { type: "abilityScoreBonus", ability: "str", amount: 1 },
+            ],
+          },
+        },
+      ],
+    });
+    const strength = context.abilityRows.find((row) => row.key === "str");
+
+    expect(strength?.mod).toBe("+3");
+    expect(context.scoreSourceText).toBe("Score sources. Str: base 16, Giant Blood +1.");
+  });
+
   it("lists body modifications apart from traits", () => {
     const actor = sampleActor();
     const withMods = {
