@@ -1,5 +1,6 @@
 import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
+import { planMpClampMigration } from "./m005";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planSchemaV2ActorMigration,
@@ -86,19 +87,23 @@ export async function runWorldMigrations(
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const coreReview: string[] = [];
-  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan }> = listDocuments(
-    game.items,
-  ).map((document) => {
-    const stored = readStoredSystem(document);
-    const raw = rawSystem(document);
-    const line = coreReviewLine(document, stored, undefined, raw);
-    if (line) coreReview.push(line);
-    return { document, plan: combineItemMigrations(stored, raw) };
-  });
+  const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
+    listDocuments(game.items).map((document) => {
+      const stored = readStoredSystem(document);
+      const raw = rawSystem(document);
+      const line = coreReviewLine(document, stored, undefined, raw);
+      if (line) coreReview.push(line);
+      return { document, plan: combineItemMigrations(stored, raw) };
+    });
   for (const actor of actors) {
+    const mpClamp = planMpClampMigration(actor);
     planned.push({
       document: actor,
-      plan: planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
+      plan: mergeMigrationPlans(
+        planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
+        mpClamp.plan,
+      ),
+      notice: mpClamp.notice,
     });
     const actorName = actor.name ?? actor.id ?? "unknown";
     for (const item of listDocuments(actor.items)) {
@@ -111,9 +116,11 @@ export async function runWorldMigrations(
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
+    const mpClamp = planMpClampMigration(token.actor);
     planned.push({
       document: token.actor,
-      plan: planUnlinkedToken(token, actorsById),
+      plan: mergeMigrationPlans(planUnlinkedToken(token, actorsById), mpClamp.plan),
+      notice: mpClamp.notice,
     });
     const actorName = token.actor.name ?? token.actor.id ?? "unknown";
     for (const item of listDocuments(token.actor.items)) {
@@ -135,6 +142,10 @@ export async function runWorldMigrations(
     if (result.updated > 0) wrote.add(entry.document);
     updated += result.updated;
     failed += result.failed;
+    if (result.updated > 0 && entry.notice) {
+      dependencies.notify?.("info", entry.notice);
+      dependencies.log?.(entry.notice);
+    }
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || token.actor?.type !== "character") continue;
@@ -152,7 +163,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / ${MAGIC_ECHELON_MIGRATION_ID}`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
