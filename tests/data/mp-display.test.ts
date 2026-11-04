@@ -99,7 +99,7 @@ describe("displayed current MP", () => {
     };
     Object.assign(withItem, awakenedMagic(20));
     withItem.parent = {
-      items: [{ system: { effects: [{ type: "mpMaxBonus", amount: 3 }] } }],
+      items: [{ type: "feature", system: { effects: [{ type: "mpMaxBonus", amount: 3 }] } }],
     };
     withItem.prepareDerivedData();
     expect(withItem.magic.mp.value).toBe(8);
