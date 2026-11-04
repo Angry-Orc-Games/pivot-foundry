@@ -159,11 +159,13 @@ jobs:
           URL="${PIVOT_PRODUCTION_MANIFEST_URL:-https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json}"
           export WANT="${PIVOT_PACKAGE_VERSION:?}"
           for _ in $(seq 1 36); do
+            # /api/status answers once the server is up. Its "active" flag only says a world is
+            # launched, which says nothing about this deploy, so it is not required.
             if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
               let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
                 if (!d.trim()) process.exit(1);
                 const s = JSON.parse(d);
-                process.exit(s.active === true ? 0 : 1);
+                process.exit(typeof s.version === "string" ? 0 : 1);
               });'; then
               if curl -fsS --max-time 10 "$URL" | node -e '
                 let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
