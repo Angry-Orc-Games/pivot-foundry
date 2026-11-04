@@ -28,9 +28,9 @@ import {
   type WeaponProficiencyMap,
 } from "../rules/character-derived";
 import {
+  abilityScoreSources,
   aggregateCharacterEffects,
   collectEmbeddedItemEffects,
-  parseStoredEffect,
 } from "../rules/effects";
 import {
   applyAttackCrit,
@@ -311,17 +311,11 @@ function formatScoreSources(
   abilitySources: Record<AbilityKey, { score: number }>,
 ): string {
   const grouped = new Map<AbilityKey, string[]>();
-  for (const item of itemList) {
-    const effects = item.system?.effects;
-    if (!Array.isArray(effects)) continue;
-    for (const entry of effects) {
-      const parsed = parseStoredEffect(entry);
-      if (!parsed || parsed.type !== "abilityScoreBonus") continue;
-      const notes = grouped.get(parsed.ability) ?? [];
-      const sign = parsed.amount >= 0 ? `+${parsed.amount}` : String(parsed.amount);
-      notes.push(`${item.name} ${sign}`);
-      grouped.set(parsed.ability, notes);
-    }
+  for (const source of abilityScoreSources(itemList)) {
+    const notes = grouped.get(source.ability) ?? [];
+    const sign = source.amount >= 0 ? `+${source.amount}` : String(source.amount);
+    notes.push(`${source.name} ${sign}`);
+    grouped.set(source.ability, notes);
   }
   const parts = abilities.flatMap(({ key }) => {
     const sources = grouped.get(key);

@@ -28,7 +28,10 @@ export function planMpClampMigration(document: StoredDocument): MpClampPlan {
   const stored = readStoredSystem(document);
   const current = readMpValue(stored);
   if (current === undefined) return unchanged;
-  const items = listItems(document).map((item) => ({ system: readStoredSystem(item) }));
+  const items = listItems(document).map((item) => ({
+    type: item.type,
+    system: readStoredSystem(item),
+  }));
   const max = characterMpMaximum(stored, items);
   if (!(current > max)) return unchanged;
   const clamped = clampMp(current, max);

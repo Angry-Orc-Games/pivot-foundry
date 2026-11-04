@@ -127,7 +127,7 @@ describe("clampStoredMp", () => {
     const actor = {
       type: "character",
       system: awakenedMagic(8),
-      items: [{ system: { effects: [{ type: "mpMaxBonus", amount: 3 }] } }],
+      items: [{ type: "feature", system: { effects: [{ type: "mpMaxBonus", amount: 3 }] } }],
       update: (data: Record<string, unknown>) => {
         updates.push(data);
       },
@@ -147,7 +147,12 @@ describe("clampStoredMp", () => {
     const actor = {
       type: "character",
       system: awakenedMagic(9),
-      items: [{ system: { effects: [{ type: "abilityScoreBonus", ability: "int", amount: 4 }] } }],
+      items: [
+        {
+          type: "feature",
+          system: { effects: [{ type: "abilityScoreBonus", ability: "int", amount: 4 }] },
+        },
+      ],
       update: (data: Record<string, unknown>) => {
         updates.push(data);
       },
@@ -167,7 +172,7 @@ describe("clampStoredMp", () => {
     const actor = {
       type: "character",
       system: awakenedMagic(4),
-      items: [{ system: { effects: [{ type: "mpMaxBonus", amount: 3 }] } }],
+      items: [{ type: "feature", system: { effects: [{ type: "mpMaxBonus", amount: 3 }] } }],
       update: (data: Record<string, unknown>) => {
         updates.push(data);
       },

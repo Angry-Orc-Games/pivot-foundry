@@ -65,6 +65,7 @@ const allowedSystemKeys: Record<PivotItemType, Set<string>> = {
     "weight",
     "quantity",
     "carried",
+    "equipped",
   ]),
   armour: new Set([
     ...sharedSystemKeys,

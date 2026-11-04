@@ -1,6 +1,11 @@
 import { SURVIVAL_WRITE_OPTIONS } from "../config";
 import { HP_LINK_MIGRATION_ID, planHpLinkMigration, planTokenDeltaHp } from "./m004";
 import { planMpClampMigration } from "./m005";
+import {
+  planWeaponEquippedMigration,
+  WEAPON_EQUIPPED_MIGRATION_ID,
+  weaponEquippedMigrationNotice,
+} from "./m008";
 import { planSpeciesSpeedMigration } from "./m007";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
@@ -27,7 +32,12 @@ export interface MigratableDocument {
   type?: string;
   system?: unknown;
   _source?: { system?: unknown; prototypeToken?: { actorLink?: unknown } };
-  toObject?: () => { system?: unknown; prototypeToken?: { actorLink?: unknown } };
+  toObject?: () => {
+    system?: unknown;
+    flags?: unknown;
+    prototypeToken?: { actorLink?: unknown };
+  };
+  flags?: unknown;
   items?: Iterable<MigratableDocument> | { contents: Iterable<MigratableDocument> };
   update?: (data: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>;
 }
@@ -89,15 +99,9 @@ export async function runWorldMigrations(
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
   const coreReview: string[] = [];
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
-    listDocuments(game.items).map((document) => {
-      const stored = readStoredSystem(document);
-      const raw = rawSystem(document);
-      const line = coreReviewLine(document, stored, undefined, raw);
-      if (line) coreReview.push(line);
-      return { document, plan: combineItemMigrations(stored, raw) };
-    });
+    listDocuments(game.items).map((document) => itemMigrationEntry(document, coreReview));
   for (const actor of actors) {
-    const mpClamp = planMpClampMigration(actor);
+    const mpClamp = planMpClampMigration(actorForMpClamp(actor));
     planned.push({
       document: actor,
       plan: mergeMigrationPlans(
@@ -106,31 +110,19 @@ export async function runWorldMigrations(
       ),
       notice: mpClamp.notice,
     });
-    const actorName = actor.name ?? actor.id ?? "unknown";
-    for (const item of listDocuments(actor.items)) {
-      const stored = readStoredSystem(item);
-      const raw = rawSystem(item);
-      const line = coreReviewLine(item, stored, actorName, raw);
-      if (line) coreReview.push(line);
-      planned.push({ document: item, plan: combineItemMigrations(stored, raw) });
-    }
+    for (const item of listDocuments(actor.items))
+      planned.push(itemMigrationEntry(item, coreReview, actor.name));
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
-    const mpClamp = planMpClampMigration(token.actor);
+    const mpClamp = planMpClampMigration(actorForMpClamp(token.actor));
     planned.push({
       document: token.actor,
       plan: mergeMigrationPlans(planUnlinkedToken(token, actorsById), mpClamp.plan),
       notice: mpClamp.notice,
     });
-    const actorName = token.actor.name ?? token.actor.id ?? "unknown";
-    for (const item of listDocuments(token.actor.items)) {
-      const stored = readStoredSystem(item);
-      const raw = rawSystem(item);
-      const line = coreReviewLine(item, stored, actorName, raw);
-      if (line) coreReview.push(line);
-      planned.push({ document: item, plan: combineItemMigrations(stored, raw) });
-    }
+    for (const item of listDocuments(token.actor.items))
+      planned.push(itemMigrationEntry(item, coreReview, token.actor.name));
   }
   if (coreReview.length > 0) {
     const message = coreReviewMessage(coreReview, dependencies);
@@ -164,7 +156,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID} / M007`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID} / M007 / ${WEAPON_EQUIPPED_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -194,6 +186,12 @@ export function readStoredSystem(document: MigratableDocument): unknown {
   }
 
   return document.system;
+}
+
+function readStoredFlags(document: MigratableDocument): unknown {
+  const object = callToObject(document);
+  if (isRecord(object) && "flags" in object) return object.flags;
+  return document.flags;
 }
 
 async function persistMigration(
@@ -314,20 +312,67 @@ export function planAllActorMigrations(
   };
 }
 
+function actorForMpClamp(actor: MigratableDocument): MigratableDocument {
+  const toObject = actor.toObject;
+  return {
+    name: actor.name,
+    type: actor.type,
+    system: actor.system,
+    _source: actor._source,
+    flags: actor.flags,
+    toObject: typeof toObject === "function" ? () => toObject.call(actor) : undefined,
+    items: listDocuments(actor.items).map(itemForMpClamp),
+  };
+}
+
+function itemForMpClamp(item: MigratableDocument): MigratableDocument {
+  const stored = readStoredSystem(item);
+  const plan = planWeaponEquippedMigration(stored, item.type, readStoredFlags(item));
+  if (!plan.ok || !plan.changed || plan.update["system.equipped"] !== true) return item;
+  const system = isRecord(stored) ? { ...stored, equipped: true } : { equipped: true };
+  return {
+    type: item.type,
+    system,
+    toObject: () => ({ system }),
+  };
+}
+
+function itemMigrationEntry(
+  document: MigratableDocument,
+  coreReview: string[],
+  actorName?: string,
+): { document: MigratableDocument; plan: MigrationPlan; notice?: string } {
+  const line = coreReviewLine(
+    document,
+    readStoredSystem(document),
+    actorName ?? undefined,
+    rawSystem(document),
+  );
+  if (line) coreReview.push(line);
+  const plan = combineItemMigrations(document);
+  return { document, plan, notice: weaponEquippedNotice(document, plan, actorName) };
+}
+
 function rawSystem(document: MigratableDocument): object | undefined {
   const system = document._source?.system;
   if (typeof system === "object" && system !== null && !Array.isArray(system)) return system;
   return undefined;
 }
 
-function combineItemMigrations(source: unknown, raw?: object): MigrationPlan {
+function combineItemMigrations(document: MigratableDocument): MigrationPlan {
+  const source = readStoredSystem(document);
+  const raw = rawSystem(document);
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
+  const third = planWeaponEquippedMigration(source, document.type, readStoredFlags(document));
+  if (!third.ok) return third;
   const echelon = planMagicEchelonMigration(source, raw);
   if (!echelon.ok) return echelon;
-  if (!first.changed && !second.changed && !echelon.changed) return { ok: true, changed: false };
+  if (!first.changed && !second.changed && !third.changed && !echelon.changed) {
+    return { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
@@ -335,9 +380,26 @@ function combineItemMigrations(source: unknown, raw?: object): MigrationPlan {
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
+      ...(third.changed ? third.update : {}),
       ...(echelon.changed ? echelon.update : {}),
     },
   };
+}
+
+function weaponEquippedNotice(
+  document: MigratableDocument,
+  plan: MigrationPlan,
+  actorName?: string,
+): string | undefined {
+  if (!plan.ok || !plan.changed || !("system.equipped" in plan.update)) return undefined;
+  const equipped = plan.update["system.equipped"] === true;
+  const itemType = document.type === "equipment" ? "equipment" : "weapon";
+  return weaponEquippedMigrationNotice(
+    document.name ?? document.id ?? "unknown",
+    actorName,
+    equipped,
+    itemType,
+  );
 }
 
 function planUnlinkedToken(
