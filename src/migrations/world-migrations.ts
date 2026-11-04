@@ -5,13 +5,20 @@ import {
   planWeaponEquippedMigration,
   WEAPON_EQUIPPED_MIGRATION_ID,
   weaponEquippedMigrationNotice,
-} from "./m007";
+} from "./m008";
+import { planSpeciesSpeedMigration } from "./m007";
 import { planSurvivalMigration, SURVIVAL_MIGRATION_ID } from "./m002";
 import {
   planSchemaV2ActorMigration,
   planSchemaV2ItemMigration,
   SCHEMA_V2_MIGRATION_ID,
 } from "./m003";
+import {
+  coreReviewLine,
+  formatM006CoreReview,
+  MAGIC_ECHELON_MIGRATION_ID,
+  planMagicEchelonMigration,
+} from "./m006";
 import {
   planActorMigration,
   planItemMigration,
@@ -90,8 +97,9 @@ export async function runWorldMigrations(
     actors.flatMap((actor) => (actor.id ? [[actor.id, actor] as const] : [])),
   );
   // Snapshot every migration before writes so base Actor updates cannot hide token deltas.
+  const coreReview: string[] = [];
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
-    listDocuments(game.items).map((document) => itemMigrationEntry(document));
+    listDocuments(game.items).map((document) => itemMigrationEntry(document, coreReview));
   for (const actor of actors) {
     const mpClamp = planMpClampMigration(actorForMpClamp(actor));
     planned.push({
@@ -103,7 +111,7 @@ export async function runWorldMigrations(
       notice: mpClamp.notice,
     });
     for (const item of listDocuments(actor.items))
-      planned.push(itemMigrationEntry(item, actor.name));
+      planned.push(itemMigrationEntry(item, coreReview, actor.name));
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
@@ -114,7 +122,12 @@ export async function runWorldMigrations(
       notice: mpClamp.notice,
     });
     for (const item of listDocuments(token.actor.items))
-      planned.push(itemMigrationEntry(item, token.actor.name));
+      planned.push(itemMigrationEntry(item, coreReview, token.actor.name));
+  }
+  if (coreReview.length > 0) {
+    const message = coreReviewMessage(coreReview, dependencies);
+    dependencies.notify?.("warn", message);
+    dependencies.log?.(message);
   }
   const wrote = new Set<MigratableDocument>();
   for (const entry of planned) {
@@ -143,7 +156,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${WEAPON_EQUIPPED_MIGRATION_ID}`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID} / M007 / ${WEAPON_EQUIPPED_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -190,12 +203,18 @@ async function persistMigration(
     reportFailure(document, plan.error, dependencies);
     return { updated: 0, failed: 1 };
   }
+  if (plan.log) {
+    dependencies.log?.(`${document.name ?? document.id ?? "unknown"}: ${plan.log}`);
+  }
   if (!plan.changed) return { updated: 0, failed: 0 };
 
   try {
     if (!document.update) throw new Error("Document cannot be updated");
     // Migrations may repair survival fields; they write as a trusted survival writer.
-    await document.update(plan.update, { ...SURVIVAL_WRITE_OPTIONS });
+    await document.update(plan.update, {
+      ...SURVIVAL_WRITE_OPTIONS,
+      ...(plan.diff === false ? { diff: false } : {}),
+    });
     return { updated: 1, failed: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -270,8 +289,14 @@ export function planAllActorMigrations(
           actorLink: prototype?.actorLink,
         });
   if (!hp.ok) return hp;
-  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed) {
-    return { ok: true, changed: false };
+  const speed = character
+    ? planSpeciesSpeedMigration(source)
+    : ({ ok: true, changed: false } as const);
+  if (!speed.ok) return speed;
+  const plans: MigrationPlan[] = [first, survival, schemaV2, hp, speed];
+  const log = plans.flatMap((plan) => (plan.ok && plan.log ? [plan.log] : [])).join("\n");
+  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed && !speed.changed) {
+    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
   }
   return {
     ok: true,
@@ -281,7 +306,9 @@ export function planAllActorMigrations(
       ...(survival.changed ? survival.update : {}),
       ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
+      ...(speed.changed ? speed.update : {}),
     },
+    ...(log ? { log } : {}),
   };
 }
 
@@ -312,28 +339,49 @@ function itemForMpClamp(item: MigratableDocument): MigratableDocument {
 
 function itemMigrationEntry(
   document: MigratableDocument,
+  coreReview: string[],
   actorName?: string,
 ): { document: MigratableDocument; plan: MigrationPlan; notice?: string } {
+  const line = coreReviewLine(
+    document,
+    readStoredSystem(document),
+    actorName ?? undefined,
+    rawSystem(document),
+  );
+  if (line) coreReview.push(line);
   const plan = combineItemMigrations(document);
   return { document, plan, notice: weaponEquippedNotice(document, plan, actorName) };
 }
 
+function rawSystem(document: MigratableDocument): object | undefined {
+  const system = document._source?.system;
+  if (typeof system === "object" && system !== null && !Array.isArray(system)) return system;
+  return undefined;
+}
+
 function combineItemMigrations(document: MigratableDocument): MigrationPlan {
   const source = readStoredSystem(document);
+  const raw = rawSystem(document);
   const first = planItemMigration(source);
   if (!first.ok) return first;
   const second = planSchemaV2ItemMigration(source);
   if (!second.ok) return second;
   const third = planWeaponEquippedMigration(source, document.type, readStoredFlags(document));
   if (!third.ok) return third;
-  if (!first.changed && !second.changed && !third.changed) return { ok: true, changed: false };
+  const echelon = planMagicEchelonMigration(source, raw);
+  if (!echelon.ok) return echelon;
+  if (!first.changed && !second.changed && !third.changed && !echelon.changed) {
+    return { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
+    ...(echelon.changed && echelon.diff === false ? { diff: false as const } : {}),
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
       ...(third.changed ? third.update : {}),
+      ...(echelon.changed ? echelon.update : {}),
     },
   };
 }
@@ -377,7 +425,10 @@ function planUnlinkedToken(
 function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): MigrationPlan {
   if (!left.ok) return left;
   if (!right.ok) return right;
-  if (!left.changed && !right.changed) return { ok: true, changed: false };
+  const log = [left.log, right.log].filter(Boolean).join("\n");
+  if (!left.changed && !right.changed) {
+    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
+  }
   return {
     ok: true,
     changed: true,
@@ -385,6 +436,7 @@ function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): Migrati
       ...(left.changed ? left.update : {}),
       ...(right.changed ? right.update : {}),
     },
+    ...(log ? { log } : {}),
   };
 }
 
@@ -427,4 +479,13 @@ function callToObject(document: MigratableDocument): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function coreReviewMessage(
+  lines: readonly string[],
+  dependencies: WorldMigrationDependencies,
+): string {
+  const localized = formatMessage("PIVOT.Migration.M006CoreReview", {}, dependencies);
+  const instruction = localized === "PIVOT.Migration.M006CoreReview" ? undefined : localized;
+  return instruction ? [instruction, ...lines].join("\n") : formatM006CoreReview(lines);
 }

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { SYSTEM_ID } from "../../src/config";
-import { initializeEquippedMarker, planWeaponEquippedMigration } from "../../src/migrations/m007";
+import { initializeEquippedMarker, planWeaponEquippedMigration } from "../../src/migrations/m008";
 import { runWorldMigrations, type MigratableDocument } from "../../src/migrations/world-migrations";
 import { CURRENT_SCHEMA_VERSION } from "../../src/rules/schema-version";
 
-const M007_FLAG = `flags.${SYSTEM_ID}.m007`;
+const M008_FLAG = `flags.${SYSTEM_ID}.m008`;
 
 const strengthEffect = { type: "abilityScoreBonus", ability: "str", amount: 2 };
 
@@ -20,10 +20,10 @@ describe("initializeEquippedMarker", () => {
     initializeEquippedMarker({ type: "armour", updateSource });
     initializeEquippedMarker({
       type: "weapon",
-      flags: { [SYSTEM_ID]: { m007: true } },
+      flags: { [SYSTEM_ID]: { m008: true } },
       updateSource,
     });
-    expect(updates).toEqual([{ [M007_FLAG]: true }, { [M007_FLAG]: true }]);
+    expect(updates).toEqual([{ [M008_FLAG]: true }, { [M008_FLAG]: true }]);
   });
 });
 
@@ -37,7 +37,7 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": true, [M007_FLAG]: true },
+      update: { "system.equipped": true, [M008_FLAG]: true },
     });
   });
 
@@ -47,14 +47,14 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": false, [M007_FLAG]: true },
+      update: { "system.equipped": false, [M008_FLAG]: true },
     });
     expect(
       planWeaponEquippedMigration({ schemaVersion: CURRENT_SCHEMA_VERSION }, "weapon"),
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": false, [M007_FLAG]: true },
+      update: { "system.equipped": false, [M008_FLAG]: true },
     });
     expect(
       planWeaponEquippedMigration(
@@ -64,7 +64,7 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": false, [M007_FLAG]: true },
+      update: { "system.equipped": false, [M008_FLAG]: true },
     });
   });
 
@@ -81,7 +81,7 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": true, [M007_FLAG]: true },
+      update: { "system.equipped": true, [M008_FLAG]: true },
     });
     expect(
       planWeaponEquippedMigration(
@@ -91,7 +91,7 @@ describe("planWeaponEquippedMigration", () => {
           equipped: false,
         },
         "weapon",
-        { [SYSTEM_ID]: { m007: true } },
+        { [SYSTEM_ID]: { m008: true } },
       ),
     ).toEqual({ ok: true, changed: false });
     expect(
@@ -102,26 +102,26 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { [M007_FLAG]: true },
+      update: { [M008_FLAG]: true },
     });
   });
 
-  it("is idempotent once the M007 marker is stored", () => {
+  it("is idempotent once the M008 marker is stored", () => {
     const stored = { schemaVersion: CURRENT_SCHEMA_VERSION, effects: [strengthEffect] };
     const first = planWeaponEquippedMigration(stored, "weapon");
     expect(first).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": true, [M007_FLAG]: true },
+      update: { "system.equipped": true, [M008_FLAG]: true },
     });
 
     const second = planWeaponEquippedMigration({ ...stored, equipped: true }, "weapon", {
-      [SYSTEM_ID]: { m007: true },
+      [SYSTEM_ID]: { m008: true },
     });
     expect(second).toEqual({ ok: true, changed: false });
   });
 
-  it("equips carried equipment that has effects and no M007 marker", () => {
+  it("equips carried equipment that has effects and no M008 marker", () => {
     expect(
       planWeaponEquippedMigration(
         {
@@ -135,7 +135,7 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { "system.equipped": true, [M007_FLAG]: true },
+      update: { "system.equipped": true, [M008_FLAG]: true },
     });
   });
 
@@ -153,11 +153,11 @@ describe("planWeaponEquippedMigration", () => {
     ).toEqual({
       ok: true,
       changed: true,
-      update: { [M007_FLAG]: true },
+      update: { [M008_FLAG]: true },
     });
   });
 
-  it("does not re-equip equipment after the M007 marker is set", () => {
+  it("does not re-equip equipment after the M008 marker is set", () => {
     expect(
       planWeaponEquippedMigration(
         {
@@ -167,7 +167,7 @@ describe("planWeaponEquippedMigration", () => {
           carried: true,
         },
         "equipment",
-        { [SYSTEM_ID]: { m007: true } },
+        { [SYSTEM_ID]: { m008: true } },
       ),
     ).toEqual({ ok: true, changed: false });
   });
@@ -185,7 +185,7 @@ describe("planWeaponEquippedMigration", () => {
   });
 });
 
-describe("M007 world migration", () => {
+describe("M008 world migration", () => {
   it("logs each weapon change for an embedded item and a world item, then changes nothing on rerun", async () => {
     const flameTongue = persistingItem("Flame Tongue", {
       schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -227,9 +227,9 @@ describe("M007 world migration", () => {
     expect(dagger.stored.equipped).toBe(false);
     expect(worldSword.stored.equipped).toBe(true);
     expect(logs).toEqual([
-      "M007: equipped weapon 'World Sword' so its bonuses keep applying",
-      "M007: equipped weapon 'Flame Tongue' on 'Arwen' so its bonuses keep applying",
-      "M007: set weapon 'Dagger' on 'Arwen' unequipped because it has no effect bonuses",
+      "M008: equipped weapon 'World Sword' so its bonuses keep applying",
+      "M008: equipped weapon 'Flame Tongue' on 'Arwen' so its bonuses keep applying",
+      "M008: set weapon 'Dagger' on 'Arwen' unequipped because it has no effect bonuses",
       "PIVOT.Migration.Complete",
     ]);
     expect(notifications).toEqual(expect.arrayContaining(logs));
@@ -305,9 +305,9 @@ describe("M007 world migration", () => {
     expect(ring.marked).toBe(true);
     expect(rope.stored.equipped).toBe(false);
     expect(rope.marked).toBe(true);
-    expect(rope.updates).toEqual([{ [M007_FLAG]: true }]);
+    expect(rope.updates).toEqual([{ [M008_FLAG]: true }]);
     expect(logs).toEqual([
-      "M007: equipped equipment 'Ring of Protection' on 'Arwen' so its bonuses keep applying",
+      "M008: equipped equipment 'Ring of Protection' on 'Arwen' so its bonuses keep applying",
       "PIVOT.Migration.Complete",
     ]);
 
@@ -350,7 +350,7 @@ describe("M007 world migration", () => {
     expect(cloak.stored.equipped).toBe(false);
   });
 
-  it("leaves a weapon created after M007 unequipped on the next ready pass", async () => {
+  it("leaves a weapon created after M008 unequipped on the next ready pass", async () => {
     const items: MigratableDocument[] = [];
     const actor: MigratableDocument = {
       name: "Arwen",
@@ -399,18 +399,18 @@ function persistingEquipment(name: string, initial: Record<string, unknown>) {
     updates,
     toObject: () => ({
       system: stored,
-      flags: marked ? { [SYSTEM_ID]: { m007: true } } : {},
+      flags: marked ? { [SYSTEM_ID]: { m008: true } } : {},
     }),
     update: async (data: Record<string, unknown>) => {
       updates.push(data);
       if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
-      if (data[M007_FLAG] === true) marked = true;
+      if (data[M008_FLAG] === true) marked = true;
     },
     updateSource(data: Record<string, unknown>) {
-      if (data[M007_FLAG] === true) marked = true;
+      if (data[M008_FLAG] === true) marked = true;
     },
     get flags() {
-      return marked ? { [SYSTEM_ID]: { m007: true } } : {};
+      return marked ? { [SYSTEM_ID]: { m008: true } } : {};
     },
     setEquipped(value: boolean) {
       stored = { ...stored, equipped: value };
@@ -433,17 +433,17 @@ function persistingItem(name: string, initial: Record<string, unknown>) {
     type: "weapon",
     toObject: () => ({
       system: stored,
-      flags: marked ? { [SYSTEM_ID]: { m007: true } } : {},
+      flags: marked ? { [SYSTEM_ID]: { m008: true } } : {},
     }),
     update: async (data: Record<string, unknown>) => {
       if ("system.equipped" in data) stored = { ...stored, equipped: data["system.equipped"] };
-      if (data[M007_FLAG] === true) marked = true;
+      if (data[M008_FLAG] === true) marked = true;
     },
     updateSource(data: Record<string, unknown>) {
-      if (data[M007_FLAG] === true) marked = true;
+      if (data[M008_FLAG] === true) marked = true;
     },
     get flags() {
-      return marked ? { [SYSTEM_ID]: { m007: true } } : {};
+      return marked ? { [SYSTEM_ID]: { m008: true } } : {};
     },
     get stored() {
       return stored;

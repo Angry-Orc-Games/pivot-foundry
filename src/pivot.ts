@@ -1,7 +1,7 @@
 import { correctCreatedHp, guardCharacterHpWrite, guardHpMaximum } from "./runtime/actor-guards";
 import { registerMpClampHooks } from "./runtime/mp-clamp";
 import { initializeSurvival } from "./migrations/m002";
-import { initializeEquippedMarker } from "./migrations/m007";
+import { initializeEquippedMarker } from "./migrations/m008";
 import { installHealthChatHook } from "./runtime/health-dialog";
 import {
   updateTokenStatusEffects,

@@ -232,7 +232,7 @@ describe("registerPivotFantasySystem", () => {
         updates.push(data);
       },
     });
-    expect(updates).toEqual([{ "flags.pivot-fantasy.m007": true }]);
+    expect(updates).toEqual([{ "flags.pivot-fantasy.m008": true }]);
   });
 
   it("links the prototype token of a new character and leaves other types alone", () => {
