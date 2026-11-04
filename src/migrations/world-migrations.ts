@@ -93,7 +93,7 @@ export async function runWorldMigrations(
   const planned: Array<{ document: MigratableDocument; plan: MigrationPlan; notice?: string }> =
     listDocuments(game.items).map((document) => itemMigrationEntry(document));
   for (const actor of actors) {
-    const mpClamp = planMpClampMigration(actor);
+    const mpClamp = planMpClampMigration(actorForMpClamp(actor));
     planned.push({
       document: actor,
       plan: mergeMigrationPlans(
@@ -107,7 +107,7 @@ export async function runWorldMigrations(
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
-    const mpClamp = planMpClampMigration(token.actor);
+    const mpClamp = planMpClampMigration(actorForMpClamp(token.actor));
     planned.push({
       document: token.actor,
       plan: mergeMigrationPlans(planUnlinkedToken(token, actorsById), mpClamp.plan),
@@ -289,6 +289,22 @@ export function planAllActorMigrations(
       ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
     },
+  };
+}
+
+function actorForMpClamp(actor: MigratableDocument): MigratableDocument {
+  return { ...actor, items: listDocuments(actor.items).map(itemForMpClamp) };
+}
+
+function itemForMpClamp(item: MigratableDocument): MigratableDocument {
+  const stored = readStoredSystem(item);
+  const plan = planWeaponEquippedMigration(stored, item.type, readStoredFlags(item));
+  if (!plan.ok || !plan.changed || plan.update["system.equipped"] !== true) return item;
+  const system = isRecord(stored) ? { ...stored, equipped: true } : { equipped: true };
+  return {
+    type: item.type,
+    system,
+    toObject: () => ({ system }),
   };
 }
 
