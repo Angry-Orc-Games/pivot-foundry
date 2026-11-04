@@ -58,6 +58,21 @@ function bonusItem(amount: number): MigratableDocument {
   };
 }
 
+function gearItem(name: string, amount: number, equipped: boolean): MigratableDocument {
+  const system = {
+    schemaVersion: 2,
+    equipped,
+    effects: [{ type: "mpMaxBonus", amount }],
+  };
+  return {
+    name,
+    type: "equipment",
+    system,
+    toObject: () => ({ system }),
+    update: async () => {},
+  };
+}
+
 describe("M005 clamp current MP to derived max", () => {
   it("clamps stored MP above max and logs the change", async () => {
     const arwen = character("Arwen", { value: 12, maxBonus: 3 });
@@ -123,5 +138,35 @@ describe("M005 clamp current MP to derived max", () => {
 
     expect(token.updates).toEqual([{ "system.magic.mp.value": 8 }]);
     expect(linked.updates).toEqual([]);
+  });
+
+  it("still clamps MP when unequipped gear carries an mpMaxBonus", async () => {
+    const arwen = character(
+      "Arwen",
+      { value: 12, maxBonus: 3 },
+      { items: [gearItem("Ring", 20, false)] },
+    );
+
+    const report = await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [arwen] },
+    });
+
+    expect(report.failed).toBe(0);
+    expect(arwen.updates).toEqual([{ "system.magic.mp.value": 8 }]);
+  });
+
+  it("clamps MP to the highest equipped mpMaxBonus instead of stacking copies", async () => {
+    const arwen = character(
+      "Arwen",
+      { value: 16, maxBonus: 0 },
+      { items: [gearItem("Ring", 6, true), gearItem("Amulet", 6, true)] },
+    );
+
+    const report = await runWorldMigrations({
+      game: { user: { isGM: true }, actors: [arwen] },
+    });
+
+    expect(report.failed).toBe(0);
+    expect(arwen.updates).toEqual([{ "system.magic.mp.value": 11 }]);
   });
 });
