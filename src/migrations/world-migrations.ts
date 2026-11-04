@@ -89,7 +89,7 @@ export async function runWorldMigrations(
     const mpClamp = planMpClampMigration(actor);
     planned.push({
       document: actor,
-      plan: combinePlans(
+      plan: mergeMigrationPlans(
         planAllActorMigrations(readStoredSystem(actor), actor.type, prototypeLink(actor, true)),
         mpClamp.plan,
       ),
@@ -100,9 +100,11 @@ export async function runWorldMigrations(
   }
   for (const token of sceneTokens) {
     if (token.actorLink !== false || !token.actor) continue;
+    const mpClamp = planMpClampMigration(token.actor);
     planned.push({
       document: token.actor,
-      plan: planUnlinkedToken(token, actorsById),
+      plan: mergeMigrationPlans(planUnlinkedToken(token, actorsById), mpClamp.plan),
+      notice: mpClamp.notice,
     });
     for (const item of listDocuments(token.actor.items))
       planned.push({ document: item, plan: combineItemMigrations(readStoredSystem(item)) });
@@ -266,20 +268,6 @@ export function planAllActorMigrations(
       ...(survival.changed ? survival.update : {}),
       ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
-    },
-  };
-}
-
-function combinePlans(first: MigrationPlan, second: MigrationPlan): MigrationPlan {
-  if (!first.ok) return first;
-  if (!second.ok) return second;
-  if (!first.changed && !second.changed) return { ok: true, changed: false };
-  return {
-    ok: true,
-    changed: true,
-    update: {
-      ...(first.changed ? first.update : {}),
-      ...(second.changed ? second.update : {}),
     },
   };
 }
