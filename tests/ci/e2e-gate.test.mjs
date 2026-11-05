@@ -522,6 +522,7 @@ describe("workflows that start Foundry", () => {
     expect(staging).toContain("accept-artifact.sh");
     expect(staging).toContain("path: package-artifact");
     expect(staging).toContain("working-directory: trusted-gate");
+    expect(staging).toContain("uses: $/.github/actions/trusted-gate-checkout");
     // The deploy restarts the build server, so it waits for the nightly E2E instead of overlapping it.
     expect(staging).toContain("group: foundry-e2e");
     expect(staging).toContain("cancel-in-progress: false");
@@ -542,7 +543,7 @@ describe("workflows that start Foundry", () => {
 
     expect(promote).toContain("path: package-artifact");
     expect(promote).toContain("accept-artifact.sh");
-    expect(promote).toContain("persist-credentials: false");
+    expect(promote).toContain("uses: $/.github/actions/trusted-gate-checkout");
     expect(promote.indexOf("accept-artifact.sh")).toBeLessThan(
       promote.indexOf("deploy-package.mjs"),
     );
@@ -597,7 +598,7 @@ describe("workflows that start Foundry", () => {
     expect(nightlyE2eJob).not.toContain("path: under-test");
     expect(nightlyE2eJob).not.toContain("ref: ${{ matrix.target.sha }}");
     expect(nightlyE2eJob).toContain("working-directory: trusted-gate");
-    expect(nightlyE2eJob).toContain("sparse-checkout-cone-mode: false");
+    expect(nightlyE2eJob).toContain("uses: $/.github/actions/trusted-gate-checkout");
     expect(nightlyE2eJob).toContain("name: e2e-package-");
     expect(nightlyE2eJob).toContain("path: package-artifact");
     expect(nightlyE2eJob).toContain("Accept only the system zip");

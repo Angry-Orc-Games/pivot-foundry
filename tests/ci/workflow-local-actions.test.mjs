@@ -14,12 +14,12 @@ async function workflows() {
   );
 }
 
+const localActionUses = /uses: (?:\$\/|\.\/(?:trusted-gate\/)?)(\.github\/actions\/[\w-]+)/g;
+
 describe("local composite actions", () => {
   it("resolve to an action.yml that exists in the repository", async () => {
     for (const { name, text } of await workflows()) {
-      for (const match of text.matchAll(
-        /uses: \.\/(?:trusted-gate\/)?(\.github\/actions\/[\w-]+)/g,
-      )) {
+      for (const match of text.matchAll(localActionUses)) {
         await expect(
           access(join(root, match[1], "action.yml")),
           `${name}: ${match[1]}`,
@@ -28,11 +28,34 @@ describe("local composite actions", () => {
     }
   });
 
-  it("are only called from trusted-gate when its sparse checkout includes them", async () => {
+  it("call trusted-gate composites only after trusted-gate-checkout", async () => {
     for (const { name, text } of await workflows()) {
       if (!text.includes("uses: ./trusted-gate/.github/actions/")) continue;
-      expect(text, name).toMatch(/sparse-checkout: \|[\s\S]*?\n\s+\/\.github\/actions\/\n/);
+      expect(text, name).toContain("uses: $/.github/actions/trusted-gate-checkout");
     }
+  });
+
+  it("keeps the trusted-gate sparse list only in trusted-gate-checkout", async () => {
+    const action = await readFile(
+      join(root, ".github", "actions", "trusted-gate-checkout", "action.yml"),
+      "utf8",
+    );
+    expect(action).toContain("persist-credentials: false");
+    expect(action).toContain("sparse-checkout-cone-mode: false");
+    expect(action).toMatch(
+      /sparse-checkout: \|\n(?:\s+\/(?:\.github\/actions\/|scripts\/|e2e\/|foundry\/|package\.json|package-lock\.json)\n){6}/,
+    );
+    expect(action).toContain("/.github/actions/");
+    expect(action).not.toMatch(/persist-credentials:\s*true/);
+
+    for (const { name, text } of await workflows()) {
+      expect(text, name).not.toMatch(/sparse-checkout: \|[\s\S]*?\/\.github\/actions\//);
+    }
+  });
+
+  it("tells actionlint to accept the $/ trusted-gate-checkout ref", async () => {
+    const config = await readFile(join(root, ".github", "actionlint.yaml"), "utf8");
+    expect(config).toContain(String.raw`\$/\.github/actions/trusted-gate-checkout`);
   });
 
   it("make callers choose the Node version", async () => {

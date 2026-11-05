@@ -167,15 +167,17 @@ Future gameplay implementation should keep deterministic rules code in `src/rule
 ## CI/CD
 
 ```text
-PR CI (no Foundry secrets) → trusted Foundry E2E → merge to main
-  → build-server deploy + smoke (https://build.angryorcgames.com)
-  → approved production promotion (https://foundry.angryorcgames.com)
+PR Verify (no Foundry secrets) → merge to main
+  → staging (CI system package → https://build.angryorcgames.com)
+  → nightly Foundry E2E (license window)
+  → promote (staging-accepted package → https://foundry.angryorcgames.com)
 ```
 
-- Every PR: lint, format, types, unit tests, build, package validation
-- Same-repository PRs: isolated Foundry E2E with narrowly scoped secrets
-- External forks: CI only; review the exact commit, then `workflow_dispatch` Foundry E2E
-- Release tags: prepare the versioned manifest and publish only when that commit has a green Foundry E2E (nightly) check
+- Every PR and `main` push: required checks `Verify` and `Node 20 compatibility`
+- Staging: a `main` push deploys the CI system package to the build server and smokes it
+- Foundry E2E: nightly in the license window for `main` and same-repo PRs labeled `e2e-nightly`. Write-access `workflow_dispatch` is on-demand E2E, not nightly
+- Forks: `Verify` only
+- Release tags: publish a GitHub Release when that commit has a green nightly; a Release does not deploy hosts
 
 See [docs/deployment.md](docs/deployment.md) for Environments, required checks, and remaining GitHub settings. Dependabot still opens weekly npm and Actions update PRs.
 

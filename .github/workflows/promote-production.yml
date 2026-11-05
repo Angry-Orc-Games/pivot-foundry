@@ -32,20 +32,8 @@ jobs:
       PIVOT_E2E_DESTRUCTIVE: "0"
       PIVOT_ALLOW_PRODUCTION_DEPLOY: "1"
     steps:
-      - name: Checkout workflow commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          path: trusted-gate
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /.github/actions/
-            /scripts/
-            /e2e/
-            /foundry/
-            /package.json
-            /package-lock.json
+      - name: Checkout trusted-gate
+        uses: $/.github/actions/trusted-gate-checkout
 
       - name: Setup Node and install dependencies
         uses: ./trusted-gate/.github/actions/setup-node-deps
