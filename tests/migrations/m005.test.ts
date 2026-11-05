@@ -15,6 +15,7 @@ function character(
     schemaVersion: 2,
     survivalVersion: 1,
     progression: { level: 1 },
+    proficiencies: { weapons: { slings: false } },
     abilities: {
       str: { score: 10 },
       dex: { score: 10 },

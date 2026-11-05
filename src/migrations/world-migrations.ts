@@ -20,9 +20,15 @@ import {
   planMagicEchelonMigration,
 } from "./m006";
 import {
+  FIELD_MIGRATION_ID,
+  planSlingsProficiencyMigration,
+  planWeaponFieldItemMigration,
+} from "./m009";
+import {
   planActorMigration,
   planItemMigration,
   SCHEMA_MIGRATION_ID,
+  type MigrationNotice,
   type MigrationPlan,
 } from "./m001";
 
@@ -156,7 +162,7 @@ export async function runWorldMigrations(
     const summary = formatMessage(
       "PIVOT.Migration.Complete",
       {
-        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID} / M007 / ${WEAPON_EQUIPPED_MIGRATION_ID}`,
+        id: `${SCHEMA_MIGRATION_ID} / ${SURVIVAL_MIGRATION_ID} / ${SCHEMA_V2_MIGRATION_ID} / ${HP_LINK_MIGRATION_ID} / M005 / ${MAGIC_ECHELON_MIGRATION_ID} / M007 / ${WEAPON_EQUIPPED_MIGRATION_ID} / ${FIELD_MIGRATION_ID}`,
         updated: String(updated),
         failed: String(failed),
       },
@@ -203,6 +209,7 @@ async function persistMigration(
     reportFailure(document, plan.error, dependencies);
     return { updated: 0, failed: 1 };
   }
+  reportNotices(document, plan.notices, dependencies);
   if (plan.log) {
     dependencies.log?.(`${document.name ?? document.id ?? "unknown"}: ${plan.log}`);
   }
@@ -220,6 +227,22 @@ async function persistMigration(
     const message = error instanceof Error ? error.message : String(error);
     reportFailure(document, message, dependencies);
     return { updated: 0, failed: 1 };
+  }
+}
+
+function reportNotices(
+  document: MigratableDocument,
+  notices: readonly MigrationNotice[] | undefined,
+  dependencies: WorldMigrationDependencies,
+): void {
+  if (!notices?.length) return;
+  const name = document.name ?? document.id ?? "unknown";
+  for (const notice of notices) {
+    const data: Record<string, string> = { name, field: notice.field, from: notice.from };
+    if (notice.to !== undefined) data.to = notice.to;
+    const message = formatMessage(notice.key, data, dependencies);
+    dependencies.notify?.("warn", message);
+    dependencies.log?.(message);
   }
 }
 
@@ -293,20 +316,27 @@ export function planAllActorMigrations(
     ? planSpeciesSpeedMigration(source)
     : ({ ok: true, changed: false } as const);
   if (!speed.ok) return speed;
-  const plans: MigrationPlan[] = [first, survival, schemaV2, hp, speed];
+  const slings = character
+    ? planSlingsProficiencyMigration(source)
+    : ({ ok: true, changed: false } as const);
+  if (!slings.ok) return slings;
+  const plans: MigrationPlan[] = [first, survival, schemaV2, hp, speed, slings];
   const log = plans.flatMap((plan) => (plan.ok && plan.log ? [plan.log] : [])).join("\n");
-  if (!first.changed && !survival.changed && !schemaV2.changed && !hp.changed && !speed.changed) {
-    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
+  const notices = collectNotices(plans);
+  if (!plans.some((plan) => plan.ok && plan.changed)) {
+    return changedFalse(log, notices);
   }
   return {
     ok: true,
     changed: true,
+    ...(notices.length > 0 ? { notices } : {}),
     update: {
       ...(first.changed ? first.update : {}),
       ...(survival.changed ? survival.update : {}),
       ...(schemaV2.changed ? schemaV2.update : {}),
       ...(hp.changed ? hp.update : {}),
       ...(speed.changed ? speed.update : {}),
+      ...(slings.changed ? slings.update : {}),
     },
     ...(log ? { log } : {}),
   };
@@ -370,18 +400,23 @@ function combineItemMigrations(document: MigratableDocument): MigrationPlan {
   if (!third.ok) return third;
   const echelon = planMagicEchelonMigration(source, raw);
   if (!echelon.ok) return echelon;
-  if (!first.changed && !second.changed && !third.changed && !echelon.changed) {
-    return { ok: true, changed: false };
+  const fields = planWeaponFieldItemMigration(source, document.type);
+  if (!fields.ok) return fields;
+  const notices = collectNotices([first, second, third, echelon, fields]);
+  if (!first.changed && !second.changed && !third.changed && !echelon.changed && !fields.changed) {
+    return changedFalse("", notices);
   }
   return {
     ok: true,
     changed: true,
+    ...(notices.length > 0 ? { notices } : {}),
     ...(echelon.changed && echelon.diff === false ? { diff: false as const } : {}),
     update: {
       ...(first.changed ? first.update : {}),
       ...(second.changed ? second.update : {}),
       ...(third.changed ? third.update : {}),
       ...(echelon.changed ? echelon.update : {}),
+      ...(fields.changed ? fields.update : {}),
     },
   };
 }
@@ -426,9 +461,8 @@ function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): Migrati
   if (!left.ok) return left;
   if (!right.ok) return right;
   const log = [left.log, right.log].filter(Boolean).join("\n");
-  if (!left.changed && !right.changed) {
-    return log ? { ok: true, changed: false, log } : { ok: true, changed: false };
-  }
+  const notices = collectNotices([left, right]);
+  if (!left.changed && !right.changed) return changedFalse(log, notices);
   return {
     ok: true,
     changed: true,
@@ -436,6 +470,20 @@ function mergeMigrationPlans(left: MigrationPlan, right: MigrationPlan): Migrati
       ...(left.changed ? left.update : {}),
       ...(right.changed ? right.update : {}),
     },
+    ...(notices.length > 0 ? { notices } : {}),
+    ...(log ? { log } : {}),
+  };
+}
+
+function collectNotices(plans: readonly MigrationPlan[]): MigrationNotice[] {
+  return plans.flatMap((plan) => (plan.ok && plan.notices ? [...plan.notices] : []));
+}
+
+function changedFalse(log: string, notices: readonly MigrationNotice[]): MigrationPlan {
+  return {
+    ok: true,
+    changed: false,
+    ...(notices.length > 0 ? { notices } : {}),
     ...(log ? { log } : {}),
   };
 }

@@ -203,7 +203,11 @@ describe("M008 world migration", () => {
       name: "Arwen",
       type: "character",
       toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+        system: {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          survivalVersion: 1,
+          proficiencies: { weapons: { slings: false } },
+        },
       }),
       update: async () => undefined,
       items: [flameTongue, dagger],
@@ -286,7 +290,11 @@ describe("M008 world migration", () => {
       name: "Arwen",
       type: "character",
       toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+        system: {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          survivalVersion: 1,
+          proficiencies: { weapons: { slings: false } },
+        },
       }),
       update: async () => undefined,
       items: [ring, rope],
@@ -334,7 +342,11 @@ describe("M008 world migration", () => {
       name: "Arwen",
       type: "character",
       toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+        system: {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          survivalVersion: 1,
+          proficiencies: { weapons: { slings: false } },
+        },
       }),
       update: async () => undefined,
       items: [cloak],
@@ -356,7 +368,11 @@ describe("M008 world migration", () => {
       name: "Arwen",
       type: "character",
       toObject: () => ({
-        system: { schemaVersion: CURRENT_SCHEMA_VERSION, survivalVersion: 1 },
+        system: {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          survivalVersion: 1,
+          proficiencies: { weapons: { slings: false } },
+        },
       }),
       update: async () => undefined,
       items,

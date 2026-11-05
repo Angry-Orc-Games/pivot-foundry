@@ -1,3 +1,4 @@
+import { isAttackAbilityId } from "./item-choices";
 import { bonusStackMode, selectKeyedAcBonuses, stackIdenticalBonuses } from "./ac-stacking";
 import { abilityModifier, proficiencyBonusForLevel } from "./modifiers";
 import { baseSpeedForSpecies, unknownSpeciesSpeedMessage } from "./species-speed";
@@ -27,7 +28,7 @@ export type SkillSourceMap = Record<string, SkillSource>;
 
 export interface ArmourSource {
   name: string;
-  category: "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural";
+  category: string;
   acBonus: number;
   equipped: boolean;
   stackKey?: string;
@@ -45,8 +46,8 @@ export type WeaponProficiencyMap = Partial<Record<string, boolean>>;
 
 export interface WeaponAttackSource {
   category: string;
-  attackAbility: AbilityKey;
-  damageAbility: AbilityKey | null;
+  attackAbility: string;
+  damageAbility: string | null;
   attackBonus: number;
   damageBonus: number;
   damageFormula: string;
@@ -391,12 +392,16 @@ export function calculateAttackSummary({
   weapon: WeaponAttackSource;
 }): AttackSummary {
   const proficient = Boolean(weaponProficiencies[weapon.category]);
+  const attackModifier = isAttackAbilityId(weapon.attackAbility)
+    ? abilityModifiers[weapon.attackAbility]
+    : 0;
+  const damageModifier =
+    weapon.damageAbility === "str" || weapon.damageAbility === "dex"
+      ? abilityModifiers[weapon.damageAbility]
+      : 0;
   return {
-    bth:
-      abilityModifiers[weapon.attackAbility] +
-      (proficient ? proficiencyBonus : 0) +
-      weapon.attackBonus,
-    btd: (weapon.damageAbility ? abilityModifiers[weapon.damageAbility] : 0) + weapon.damageBonus,
+    bth: attackModifier + (proficient ? proficiencyBonus : 0) + weapon.attackBonus,
+    btd: damageModifier + weapon.damageBonus,
     damageFormula: weapon.damageFormula,
     range: weapon.range,
     proficient,

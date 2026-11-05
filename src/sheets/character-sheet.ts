@@ -4,15 +4,7 @@ import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
 import { waitForDiceSoNiceAnimation } from "../runtime/dice-so-nice";
-import {
-  abilities,
-  armourCategories,
-  canonicalSkills,
-  featureCategories,
-  hitDice,
-  SYSTEM_ID,
-  weaponCategories,
-} from "../config";
+import { abilities, canonicalSkills, featureCategories, hitDice, SYSTEM_ID } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
 import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
 import { craftingAbility } from "../rules/part7-skills";
@@ -27,6 +19,7 @@ import {
   type SkillSourceMap,
   type WeaponProficiencyMap,
 } from "../rules/character-derived";
+import { weaponCategories, type WeaponCategoryId } from "../rules/item-choices";
 import {
   abilityScoreSources,
   aggregateCharacterEffects,
@@ -139,6 +132,13 @@ export interface CharacterSheetContext {
     armour: string;
     shields: string;
   };
+  weaponTrainingRows: Array<{
+    id: WeaponCategoryId;
+    label: string;
+    path: string;
+    proficient: boolean;
+    disabledAttr: "" | "disabled";
+  }>;
   magicStreamsText: string;
   scoreSourceText: string;
   form: {
@@ -155,8 +155,6 @@ export interface CharacterSheetContext {
     skills: typeof canonicalSkills;
     hitDice: typeof hitDice;
     hitDiceChoices: Record<string, string>;
-    weaponCategories: typeof weaponCategories;
-    armourCategories: typeof armourCategories;
     featureCategories: typeof featureCategories;
   };
   derived: ReturnType<typeof calculateCharacterDerived>;
@@ -405,7 +403,7 @@ export function prepareCharacterSheetContext(
       })),
       armour: armour.map((item) => ({
         name: item.name,
-        category: armourCategoryAt(item.system, ["category"]),
+        category: stringAt(item.system, ["category"], ""),
         acBonus: numberAt(item.system, ["acBonus"], 0),
         equipped: booleanAt(item.system, ["equipped"], false),
         ...(stringAt(item.system, ["acStackKey"], "")
@@ -467,17 +465,17 @@ export function prepareCharacterSheetContext(
   // Calculate Con modifier for HP footnote
   const conMod = formatSigned(derived.abilities.con.mod);
 
-  // Build proficiency text
   const weaponProfs = derived.proficiencies.weapons;
-  const weaponProfList: string[] = [];
-  if (weaponProfs.bows) weaponProfList.push("Bows");
-  if (weaponProfs.crossbows) weaponProfList.push("Crossbows");
-  if (weaponProfs.thrown) weaponProfList.push("Thrown");
-  if (weaponProfs.meleeLight) weaponProfList.push("Melee Light");
-  if (weaponProfs.meleeMedium) weaponProfList.push("Melee Medium");
-  if (weaponProfs.meleeHeavy) weaponProfList.push("Melee Heavy");
-  if (weaponProfs.meleeTwoHandedHeavy) weaponProfList.push("Melee Two-Handed");
-  if (weaponProfs.improvised) weaponProfList.push("Improvised");
+  const weaponProfList = weaponCategories
+    .filter((entry) => weaponProfs[entry.id])
+    .map((entry) => entry.label);
+  const weaponTrainingRows = weaponCategories.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    path: `system.proficiencies.weapons.${entry.id}`,
+    proficient: booleanAt(system, ["proficiencies", "weapons", entry.id], false),
+    disabledAttr: disabledAttr as "" | "disabled",
+  }));
 
   const armourProfs = derived.proficiencies.armour;
   const armourProfList: string[] = [];
@@ -535,6 +533,7 @@ export function prepareCharacterSheetContext(
       armour: armourProfList.join(", ") || "None",
       shields: shieldProf,
     },
+    weaponTrainingRows,
     magicStreamsText,
     scoreSourceText: formatScoreSources(itemList, abilitySources),
     form: {
@@ -551,8 +550,6 @@ export function prepareCharacterSheetContext(
       skills: canonicalSkills,
       hitDice,
       hitDiceChoices: Object.fromEntries(hitDice.map((die) => [die, die])),
-      weaponCategories,
-      armourCategories,
       featureCategories,
     },
     derived,
@@ -630,8 +627,8 @@ export function prepareCharacterSheetContext(
           weaponProficiencies: derived.proficiencies.weapons,
           weapon: {
             category: stringAt(item.system, ["category"], "meleeLight"),
-            attackAbility: abilityAt(item.system, ["attack", "ability"], "str"),
-            damageAbility: nullableAbilityAt(item.system, ["damage", "ability"]),
+            attackAbility: stringAt(item.system, ["attack", "ability"], "str"),
+            damageAbility: stringOrNullAt(item.system, ["damage", "ability"]),
             attackBonus: numberAt(item.system, ["attack", "bonus"], 0),
             damageBonus: numberAt(item.system, ["damage", "bonus"], 0),
             damageFormula: stringAt(item.system, ["damage", "formula"], "1d4"),
@@ -1369,6 +1366,15 @@ function stringAt(source: RecordValue, path: string[], fallback: string): string
   return typeof current === "string" ? current : fallback;
 }
 
+function stringOrNullAt(source: RecordValue, path: string[]): string | null {
+  let current: unknown = source;
+  for (const part of path) {
+    if (!isRecord(current)) return null;
+    current = current[part];
+  }
+  return typeof current === "string" ? current : null;
+}
+
 function booleanAt(source: RecordValue, path: string[], fallback: boolean): boolean {
   let current: unknown = source;
   for (const part of path) {
@@ -1539,16 +1545,6 @@ function nullableAbilityAt(source: RecordValue, path: string[]): AbilityKey | nu
 
 function magicAbility(system: RecordValue): AbilityKey {
   return nullableAbilityAt(system, ["magic", "ability"]) ?? "int";
-}
-
-function armourCategoryAt(
-  source: RecordValue,
-  path: string[],
-): "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural" {
-  const value = stringAt(source, path, "other");
-  return ["light", "medium", "heavy", "shield", "helmet", "other", "natural"].includes(value)
-    ? (value as "light" | "medium" | "heavy" | "shield" | "helmet" | "other" | "natural")
-    : "other";
 }
 
 function passiveModeAt(source: RecordValue, path: string[]): PassivePerceptionMode {

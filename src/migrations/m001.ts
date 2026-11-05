@@ -8,12 +8,20 @@ import {
 
 export { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION, SCHEMA_MIGRATION_ID };
 
+export interface MigrationNotice {
+  key: "PIVOT.Migration.FieldRepaired" | "PIVOT.Migration.FieldInvalid";
+  field: string;
+  from: string;
+  to?: string;
+}
+
 export type MigrationPlan =
-  | { ok: true; changed: false; log?: string }
+  | { ok: true; changed: false; notices?: readonly MigrationNotice[]; log?: string }
   | {
       ok: true;
       changed: true;
       update: Record<string, unknown>;
+      notices?: readonly MigrationNotice[];
       diff?: false;
       log?: string;
     }

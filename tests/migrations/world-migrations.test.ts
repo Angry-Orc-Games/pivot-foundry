@@ -13,6 +13,7 @@ function characterAtSpeed(
   const stored: Record<string, unknown> = {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     survivalVersion: 1,
+    proficiencies: { weapons: { slings: false } },
     identity: { speciesText: species },
     attributes: {
       hp: { value: 8, max: 8, temp: 0 },
@@ -103,6 +104,7 @@ describe("runWorldMigrations", () => {
         "system.survivalVersion": 1,
         "system.attributes.hp.temp": 0,
         "system.attributes.deathSaves.status": "unconfirmed",
+        "system.proficiencies.weapons.slings": false,
       },
     ]);
     expect(embeddedItem.updates).toEqual([
@@ -180,10 +182,12 @@ describe("runWorldMigrations", () => {
         "system.survivalVersion": 1,
         "system.attributes.hp.temp": 0,
         "system.attributes.deathSaves.status": "alive",
+        "system.proficiencies.weapons.slings": false,
       },
     ]);
 
     stored.survivalVersion = 1;
+    (stored as Record<string, unknown>).proficiencies = { weapons: { slings: false } };
     stored.attributes = {
       hp: { value: 8, max: 12, temp: 0 },
       deathSaves: { status: "alive" },

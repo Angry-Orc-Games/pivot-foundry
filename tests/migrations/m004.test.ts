@@ -12,7 +12,12 @@ interface StoredActor {
 }
 
 function settled(hp: Record<string, unknown>): Record<string, unknown> {
-  return { schemaVersion: 2, survivalVersion: 1, attributes: { hp } };
+  return {
+    schemaVersion: 2,
+    survivalVersion: 1,
+    proficiencies: { weapons: { slings: false } },
+    attributes: { hp },
+  };
 }
 
 function createActor(
