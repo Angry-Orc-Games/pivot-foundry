@@ -16,6 +16,10 @@ if [[ $runner == "$system" ]]; then
   exit 1
 fi
 
+# /.npmrc, /postcss.config.*, and /.env* match the transfer root, like the
+# rules above. .npmrc and .env* are repeated without the slash so a copy
+# in a subdirectory is denied too. postcss.config.* stays root-anchored:
+# Vite and PostCSS load that file from the project root.
 rsync -a --delete \
   --exclude '/scripts/' \
   --exclude '/e2e/' \
@@ -31,4 +35,9 @@ rsync -a --delete \
   --exclude '/eslint.config.js' \
   --exclude '/tsconfig.json' \
   --exclude '/tsconfig.*.json' \
+  --exclude '/.npmrc' \
+  --exclude '.npmrc' \
+  --exclude '/postcss.config.*' \
+  --exclude '/.env*' \
+  --exclude '.env*' \
   "$system"/ "$runner"/
