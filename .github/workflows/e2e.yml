@@ -138,23 +138,9 @@ jobs:
         id: recheck
         run: bash scripts/ci/e2e-gate.sh license
 
-      - name: Setup Node
+      - name: Setup Node and install trusted dependencies
         if: steps.recheck.outputs.ok == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install trusted dependencies
-        if: steps.recheck.outputs.ok == 'true'
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-          ACTIONS_RUNTIME_TOKEN: ""
-          ACTIONS_RUNTIME_URL: ""
-          ACTIONS_RESULTS_URL: ""
-          ACTIONS_CACHE_URL: ""
-        run: npm ci
+        uses: ./.github/actions/setup-node-deps
 
       - name: Checkout system under test
         if: steps.recheck.outputs.ok == 'true'
@@ -244,6 +230,7 @@ jobs:
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /.github/actions/
             /scripts/
             /e2e/
             /foundry/
@@ -270,21 +257,11 @@ jobs:
           HAVE_SHA: ${{ secrets.FOUNDRY_DIST_SHA256 != '' }}
         run: bash trusted-gate/scripts/ci/e2e-gate.sh secrets
 
-      - name: Setup Node
+      - name: Setup Node and install trusted dependencies
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: ./trusted-gate/.github/actions/setup-node-deps
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: trusted-gate/package-lock.json
-
-      - name: Install trusted dependencies
-        if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
-        working-directory: trusted-gate
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: npm ci
+          working-directory: trusted-gate
 
       - name: Install Playwright browser
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'

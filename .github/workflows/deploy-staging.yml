@@ -42,6 +42,7 @@ jobs:
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /.github/actions/
             /scripts/
             /e2e/
             /foundry/
@@ -56,33 +57,12 @@ jobs:
           HAVE_FOUNDRY_DEPLOY_TARGET_DIR: ${{ vars.FOUNDRY_DEPLOY_TARGET_DIR != '' }}
           HAVE_FOUNDRY_DEPLOY_BACKUP_DIR: ${{ vars.FOUNDRY_DEPLOY_BACKUP_DIR != '' }}
           HAVE_FOUNDRY_DEPLOY_SERVICE: ${{ vars.FOUNDRY_DEPLOY_SERVICE != '' }}
-        run: |
-          # Fail fast with the names (never values) of missing build environment secrets and variables.
-          missing=""
-          for name in FOUNDRY_DEPLOY_SSH_HOST FOUNDRY_DEPLOY_SSH_USER FOUNDRY_DEPLOY_SSH_KEY \
-                      FOUNDRY_DEPLOY_TARGET_DIR FOUNDRY_DEPLOY_BACKUP_DIR FOUNDRY_DEPLOY_SERVICE; do
-            var="HAVE_${name}"
-            if [ "${!var}" != "true" ]; then missing="${missing} ${name}"; fi
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Missing secrets/variables on GitHub Environment 'build':${missing}. See docs/deployment.md."
-            exit 3
-          fi
-          echo "All required staging secrets are configured."
+        run: bash trusted-gate/scripts/ci/check-deploy-config.sh build
 
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - name: Setup Node and install dependencies
+        uses: ./trusted-gate/.github/actions/setup-node-deps
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: trusted-gate/package-lock.json
-
-      - name: Install dependencies
-        working-directory: trusted-gate
-        env:
-          GITHUB_TOKEN: ""
-          GH_TOKEN: ""
-        run: npm ci
+          working-directory: trusted-gate
 
       - name: Download CI package artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -103,14 +83,7 @@ jobs:
 
       - name: Verify artifact identity
         working-directory: trusted-gate
-        run: node --input-type=module -e '
-          import { readFileSync } from "node:fs";
-          import { fileSha256 } from "./scripts/artifact-identity.mjs";
-          const identity = JSON.parse(readFileSync("artifact-identity.json","utf8"));
-          const sha = fileSha256("system.zip");
-          if (identity.artifact?.sha256 !== sha) { console.error("Checksum mismatch"); process.exit(6); }
-          console.log("Staging will deploy", identity.commit, sha);
-          '
+        run: node scripts/ci/verify-artifact-identity.mjs
 
       - name: Install Playwright browser
         working-directory: trusted-gate
@@ -132,22 +105,7 @@ jobs:
         run: node scripts/deploy-package.mjs staging
 
       - name: Wait for the build server to come back after restart
-        run: |
-          set -o pipefail
-          for _ in $(seq 1 36); do
-            if curl -fsS --max-time 10 "$PIVOT_FOUNDRY_BASE_URL/api/status" | node -e '
-              let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => {
-                if (!d.trim()) process.exit(1);
-                const s = JSON.parse(d);
-                process.exit(typeof s.version === "string" ? 0 : 1);
-              });'; then
-              echo "Build server is up."
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "::error::Build server did not answer /api/status within 180s after deploy."
-          exit 1
+        run: bash trusted-gate/scripts/ci/wait-for-foundry.sh "Build server"
 
       - name: External staging smoke
         env:
