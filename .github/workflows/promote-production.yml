@@ -50,6 +50,7 @@ jobs:
       - name: Setup Node and install dependencies
         uses: ./trusted-gate/.github/actions/setup-node-deps
         with:
+          node-version: "20"
           working-directory: trusted-gate
 
       - name: Verify the staging run
@@ -123,7 +124,7 @@ jobs:
           PIVOT_PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
           PIVOT_PRODUCTION_MANIFEST_URL: ${{ secrets.PIVOT_PRODUCTION_MANIFEST_URL }}
         run: |
-          URL="${PIVOT_PRODUCTION_MANIFEST_URL:-https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json}"
+          URL="${PIVOT_PRODUCTION_MANIFEST_URL:-$PIVOT_FOUNDRY_BASE_URL/systems/pivot-fantasy/system.json}"
           bash trusted-gate/scripts/ci/wait-for-foundry.sh Production "$URL" "${PIVOT_PACKAGE_VERSION:?}"
 
       - name: Non-destructive production health check

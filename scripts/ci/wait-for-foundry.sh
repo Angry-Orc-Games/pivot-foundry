@@ -15,6 +15,11 @@ base=${PIVOT_FOUNDRY_BASE_URL:?PIVOT_FOUNDRY_BASE_URL is required}
 attempts=${PIVOT_WAIT_ATTEMPTS:-36}
 interval=${PIVOT_WAIT_INTERVAL:-5}
 
+command -v jq >/dev/null || {
+  echo "::error::jq is required." >&2
+  exit 2
+}
+
 if [ -n "$manifest_url" ] && [ -z "$want" ]; then
   echo "::error::An expected version is required with a manifest URL." >&2
   exit 2

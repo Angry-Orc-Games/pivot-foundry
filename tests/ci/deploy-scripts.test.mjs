@@ -175,6 +175,6 @@ describe("check-production-compat.mjs", () => {
   it("fails when the production manifest cannot be read", async () => {
     const result = await run({ version: "1.1.0" }, {});
     expect(result.status).toBe(1);
-    expect(result.out).toContain("Could not read the production manifest.");
+    expect(result.out).toContain("Could not read the production manifest: HTTP 404");
   });
 });

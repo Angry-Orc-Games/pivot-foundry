@@ -10,6 +10,11 @@ version=1.7.12
 sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
 archive="actionlint_${version}_linux_amd64.tar.gz"
 
+if [ "$(uname -s)-$(uname -m)" != "Linux-x86_64" ]; then
+  echo "lint-workflows.sh pins the linux amd64 actionlint build; run it on a Linux x86_64 host or in CI." >&2
+  exit 2
+fi
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

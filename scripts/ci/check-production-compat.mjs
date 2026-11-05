@@ -4,16 +4,28 @@
 import { readFileSync } from "node:fs";
 
 const MAX_FOUNDRY_MAJOR = 14;
-const DEFAULT_URL = "https://foundry.angryorcgames.com/systems/pivot-fantasy/system.json";
-const url = process.env.PIVOT_PRODUCTION_MANIFEST_URL || DEFAULT_URL;
+// Same fallback as the wait step in promote-production.yml: the job's PIVOT_FOUNDRY_BASE_URL.
+const base = process.env.PIVOT_FOUNDRY_BASE_URL;
+const url =
+  process.env.PIVOT_PRODUCTION_MANIFEST_URL ||
+  (base ? `${base}/systems/pivot-fantasy/system.json` : undefined);
+if (!url) {
+  console.error("::error::Set PIVOT_PRODUCTION_MANIFEST_URL or PIVOT_FOUNDRY_BASE_URL.");
+  process.exit(1);
+}
 
 let data;
 try {
-  const response = await fetch(url, { signal: globalThis.AbortSignal.timeout(30_000) });
+  const response = await fetch(url, {
+    redirect: "error",
+    signal: globalThis.AbortSignal.timeout(30_000),
+  });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   data = await response.text();
-} catch {
-  console.error("::error::Could not read the production manifest.");
+} catch (error) {
+  console.error(
+    `::error::Could not read the production manifest: ${error.cause?.message ?? error.message}`,
+  );
   process.exit(1);
 }
 if (!data.trim()) {

@@ -5,9 +5,8 @@ description: >-
 
 inputs:
   node-version:
-    description: Node major version.
-    required: false
-    default: "20"
+    description: Node major version. Callers pass it so a runtime change is always visible in the workflow.
+    required: true
   working-directory:
     description: Directory that holds package.json and package-lock.json.
     required: false

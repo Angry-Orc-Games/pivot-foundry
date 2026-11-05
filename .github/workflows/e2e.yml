@@ -141,6 +141,8 @@ jobs:
       - name: Setup Node and install trusted dependencies
         if: steps.recheck.outputs.ok == 'true'
         uses: ./.github/actions/setup-node-deps
+        with:
+          node-version: "20"
 
       - name: Checkout system under test
         if: steps.recheck.outputs.ok == 'true'
@@ -261,6 +263,7 @@ jobs:
         if: steps.recheck.outputs.ok == 'true' && steps.creds.outputs.available == 'true'
         uses: ./trusted-gate/.github/actions/setup-node-deps
         with:
+          node-version: "20"
           working-directory: trusted-gate
 
       - name: Install Playwright browser
