@@ -46,14 +46,10 @@ jobs:
           ref: refs/tags/${{ github.ref_name }}
           persist-credentials: false
 
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - name: Setup Node and install dependencies
+        uses: ./.github/actions/setup-node-deps
         with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
+          node-version: "20"
 
       - name: Verify
         run: npm run verify

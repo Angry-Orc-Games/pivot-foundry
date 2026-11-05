@@ -648,7 +648,7 @@ describe("workflows that start Foundry", () => {
     expect(staging).toContain("steps.package-version.outputs.version");
     expect(staging).toContain("record-staging-sha.sh");
     expect(staging).toContain("statuses: write");
-    expect(staging).toContain("set -o pipefail");
+    expect(staging).toContain("wait-for-foundry.sh");
     expect(promote).toContain("promote-source.sh run");
     expect(promote).toContain("promote-source.sh bytes");
     expect(promote.indexOf("promote-source.sh run")).toBeLessThan(
@@ -657,9 +657,18 @@ describe("workflows that start Foundry", () => {
     expect(promote.indexOf("promote-source.sh bytes")).toBeLessThan(
       promote.indexOf("deploy-package.mjs"),
     );
-    expect(promote.indexOf("deploy-package.mjs")).toBeLessThan(promote.indexOf("/api/status"));
-    expect(promote.indexOf("/api/status")).toBeLessThan(promote.indexOf("test:e2e:production"));
-    expect(promote).toContain("set -o pipefail");
+    expect(promote.indexOf("deploy-package.mjs")).toBeLessThan(
+      promote.indexOf("wait-for-foundry.sh"),
+    );
+    expect(promote.indexOf("wait-for-foundry.sh")).toBeLessThan(
+      promote.indexOf("test:e2e:production"),
+    );
+    const waitScript = await readFile(
+      fileURLToPath(new URL("../../scripts/ci/wait-for-foundry.sh", import.meta.url)),
+      "utf8",
+    );
+    expect(waitScript).toContain("set -euo pipefail");
+    expect(waitScript).toContain("/api/status");
     expect(promote).toContain("PIVOT_STAGING_ARTIFACT_SHA256");
     expect(promote).not.toContain("identity.staging");
     expect(promote).not.toContain('JSON.parse(data || "{}")');
