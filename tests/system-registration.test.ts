@@ -5,6 +5,7 @@ import { createPivotCharacterDataModel } from "../src/data/character-data";
 import { createPivotNpcDataModel } from "../src/data/npc-data";
 import { createPivotItemDataModels } from "../src/data/item-data";
 import { registerPivotFantasySystem } from "../src/pivot";
+import { CURRENT_SCHEMA_VERSION } from "../src/rules/schema-version";
 
 type FieldRecord = {
   kind?: string;
@@ -234,7 +235,7 @@ describe("registerPivotFantasySystem", () => {
     const updateSource = vi.fn();
     const character = {
       type: "character",
-      system: { survivalVersion: 1 },
+      system: { survivalVersion: 1, schemaVersion: CURRENT_SCHEMA_VERSION },
       token: null,
       updateSource,
     };
@@ -242,7 +243,13 @@ describe("registerPivotFantasySystem", () => {
     expect(updateSource).toHaveBeenCalledWith({ "prototypeToken.actorLink": true });
 
     updateSource.mockClear();
-    for (const listener of listeners) listener({ type: "npc", updateSource });
+    for (const listener of listeners) {
+      listener({
+        type: "npc",
+        system: { schemaVersion: CURRENT_SCHEMA_VERSION },
+        updateSource,
+      });
+    }
     expect(updateSource).not.toHaveBeenCalled();
 
     updateSource.mockClear();
@@ -346,7 +353,7 @@ function runPreCreateActor(data: unknown): ReturnType<typeof vi.fn> {
   const updateSource = vi.fn();
   const character = {
     type: "character",
-    system: { survivalVersion: 1 },
+    system: { survivalVersion: 1, schemaVersion: CURRENT_SCHEMA_VERSION },
     token: null,
     updateSource,
   };
@@ -450,7 +457,7 @@ function importedActor(hp: { value: unknown; max: unknown }, type = "character")
     updateSource,
     actor: {
       type,
-      system: { survivalVersion: 1, attributes: { hp } },
+      system: { survivalVersion: 1, schemaVersion: CURRENT_SCHEMA_VERSION, attributes: { hp } },
       updateSource,
     },
   };

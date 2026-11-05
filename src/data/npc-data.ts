@@ -1,4 +1,4 @@
-import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
+import { LEGACY_SCHEMA_VERSION } from "../rules/schema-version";
 import {
   type DataField,
   type FoundryRuntime,
@@ -34,7 +34,7 @@ export function createPivotNpcDataModel(foundry: FoundryRuntime): TypeDataModelW
           required: true,
           integer: true,
           min: 0,
-          initial: CURRENT_SCHEMA_VERSION,
+          initial: LEGACY_SCHEMA_VERSION,
         }),
         tier: stringField(fields, {
           required: true,
