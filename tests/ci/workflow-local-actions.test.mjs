@@ -45,3 +45,36 @@ describe("local composite actions", () => {
     }
   });
 });
+
+describe("scripts/ci paths used by workflow jobs", () => {
+  function jobsOf(text) {
+    const jobs = text.slice(text.indexOf("\njobs:\n") + 1).split(/\n {2}(?=[\w-]+:\n)/);
+    return jobs.slice(1);
+  }
+
+  it("exist in the repository", async () => {
+    for (const { name, text } of await workflows()) {
+      for (const match of text.matchAll(/scripts\/ci\/([\w.-]+\.(?:sh|mjs))/g)) {
+        await expect(
+          access(join(root, "scripts", "ci", match[1])),
+          `${name}: scripts/ci/${match[1]}`,
+        ).resolves.toBe(undefined);
+      }
+    }
+  });
+
+  it("sit in a job that checks them out", async () => {
+    for (const { name, text } of await workflows()) {
+      for (const job of jobsOf(text)) {
+        const jobName = job.split("\n")[0];
+        if (!/scripts\/ci\//.test(job)) continue;
+        expect(job, `${name} ${jobName}: needs a checkout`).toContain("uses: actions/checkout@");
+        for (const sparse of job.matchAll(/sparse-checkout: (\|\n(?: {12}.+\n)+|.+\n)/g)) {
+          expect(sparse[1], `${name} ${jobName}: sparse checkout`).toMatch(
+            /(?:^|\s)\/?scripts(?:\/ci)?\/?(?:\s|$)/,
+          );
+        }
+      }
+    }
+  });
+});
