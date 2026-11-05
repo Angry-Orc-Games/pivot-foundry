@@ -1,0 +1,6 @@
+# actionlint 1.7.12 does not know GitHub's `$/` self-repository action refs.
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/find-and-customize-actions
+paths:
+  .github/workflows/*.yml:
+    ignore:
+      - 'specifying action "\$/\.github/actions/trusted-gate-checkout" in invalid format because ref is missing'

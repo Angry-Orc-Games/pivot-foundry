@@ -34,20 +34,8 @@ jobs:
       PIVOT_FOUNDRY_BASE_URL: https://build.angryorcgames.com
       PIVOT_E2E_DESTRUCTIVE: "0"
     steps:
-      - name: Checkout workflow commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          path: trusted-gate
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /.github/actions/
-            /scripts/
-            /e2e/
-            /foundry/
-            /package.json
-            /package-lock.json
+      - name: Checkout trusted-gate
+        uses: $/.github/actions/trusted-gate-checkout
 
       - name: Check required staging secrets
         env:

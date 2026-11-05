@@ -1,0 +1,32 @@
+name: Check out trusted-gate
+description: >-
+  Sparse-checkout of the workflow commit into a trusted-gate tree: local composites, scripts,
+  the E2E harness, Foundry pins, and lockfiles. Credentials are never persisted.
+
+inputs:
+  path:
+    description: Directory for the trusted-gate tree.
+    required: false
+    default: trusted-gate
+  ref:
+    description: Git ref to check out. Defaults to the workflow commit.
+    required: false
+    default: ${{ github.sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check out trusted-gate
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        ref: ${{ inputs.ref }}
+        path: ${{ inputs.path }}
+        persist-credentials: false
+        sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          /.github/actions/
+          /scripts/
+          /e2e/
+          /foundry/
+          /package.json
+          /package-lock.json
