@@ -5,9 +5,35 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # Majors are omitted here so each major stays its own pull request.
+      # vite is excluded because its updates change build output and stay manual.
+      npm-production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - vite
+      # vitest and @vitest/coverage-v8 are both development dependencies, so this
+      # group keeps their versions together (see #71).
+      npm-development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - vite
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
