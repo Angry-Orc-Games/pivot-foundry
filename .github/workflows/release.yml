@@ -51,6 +51,9 @@ jobs:
         with:
           node-version: "20"
 
+      # Deliberately repeats CI: this is the only full verify on Node 20 (CI's Node 20 job runs
+      # typecheck and tests only) and the only `npm audit` at tag time, so a new advisory can
+      # block a release. Replacing it with a "CI is green" gate was considered and rejected.
       - name: Verify
         run: npm run verify
 

@@ -21,6 +21,8 @@ npm run package:system
 
 `npm run verify` does not start Foundry and does not prove browser behavior.
 
+Editing `.github/workflows/`? Read the workflow-structure paragraph in [deployment.md](deployment.md#implemented-github-workflows) first: `tests/ci/*` pin workflow text, and job names are branch-protection checks.
+
 ## Packaged E2E
 
 `npm run foundry:e2e` is the complete lifecycle used locally, on Cloud Agents, and in trusted GitHub Actions:
