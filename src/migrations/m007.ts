@@ -2,14 +2,18 @@ import { baseSpeedForSpecies } from "../rules/species-speed";
 import type { MigrationPlan } from "./m001";
 
 export const SPECIES_SPEED_MIGRATION_ID = "M007";
+export const SPECIES_SPEED_VERSION = 1;
 
 export function planSpeciesSpeedMigration(storedSystem: unknown): MigrationPlan {
   if (!isPlainObject(storedSystem)) return { ok: true, changed: false };
+  if (storedSystem.speciesSpeedVersion === SPECIES_SPEED_VERSION) {
+    return { ok: true, changed: false };
+  }
   const attributes = storedSystem.attributes;
   if (!isPlainObject(attributes) || !isPlainObject(attributes.speed)) {
     return { ok: true, changed: false };
   }
-  if (!Object.hasOwn(attributes.speed, "value") || attributes.speed.value !== 10) {
+  if (!Object.hasOwn(attributes.speed, "value")) {
     return { ok: true, changed: false };
   }
 
@@ -21,6 +25,14 @@ export function planSpeciesSpeedMigration(storedSystem: unknown): MigrationPlan 
   if (!species) return { ok: true, changed: false };
 
   const base = baseSpeedForSpecies(species);
+  if (attributes.speed.value !== 10) {
+    if (base === null || base === 10) return { ok: true, changed: false };
+    return {
+      ok: true,
+      changed: true,
+      update: { "system.speciesSpeedVersion": SPECIES_SPEED_VERSION },
+    };
+  }
   if (base === null) {
     return {
       ok: true,
@@ -32,7 +44,10 @@ export function planSpeciesSpeedMigration(storedSystem: unknown): MigrationPlan 
   return {
     ok: true,
     changed: true,
-    update: { "system.attributes.speed.value": base },
+    update: {
+      "system.attributes.speed.value": base,
+      "system.speciesSpeedVersion": SPECIES_SPEED_VERSION,
+    },
     log: `base speed 10 -> ${base} (${species}).`,
   };
 }

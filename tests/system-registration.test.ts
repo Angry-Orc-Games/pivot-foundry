@@ -91,6 +91,10 @@ describe("PivotCharacterData", () => {
     const schema = CharacterData.defineSchema();
 
     expect(schema).toHaveProperty("schemaVersion");
+    expect(schema).toHaveProperty("speciesSpeedVersion");
+    expect(schema.speciesSpeedVersion).toMatchObject({
+      options: { required: true, integer: true, min: 0, initial: 0 },
+    });
     expect(schema).toHaveProperty("identity");
     expect(schema).toHaveProperty("progression");
     expect(schema).toHaveProperty("abilities");

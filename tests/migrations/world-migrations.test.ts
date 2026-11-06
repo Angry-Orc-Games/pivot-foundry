@@ -26,6 +26,15 @@ function characterAtSpeed(
     name,
     type,
     updates,
+    speedValue: () => {
+      const attributes = stored.attributes as { speed?: { value?: number } };
+      return attributes.speed?.value;
+    },
+    setSpeed: (value: number) => {
+      const attributes = stored.attributes as { speed?: { value: number } };
+      if (!attributes.speed) throw new Error(`${name} has no stored speed`);
+      attributes.speed.value = value;
+    },
     toObject: () => ({ system: structuredClone(stored) }),
     update: async (data: Record<string, unknown>) => {
       updates.push(structuredClone(data));
@@ -287,13 +296,23 @@ it("sets base speed only when the stored value is still 10", async () => {
     log: (message) => logs.push(message),
   });
 
-  expect(halfling.updates).toEqual([{ "system.attributes.speed.value": 7 }]);
-  expect(dwarf.updates).toEqual([{ "system.attributes.speed.value": 8 }]);
-  expect(smallHumanoid.updates).toEqual([{ "system.attributes.speed.value": 7 }]);
-  expect(large.updates).toEqual([{ "system.attributes.speed.value": 12 }]);
+  expect(halfling.updates).toEqual([
+    { "system.attributes.speed.value": 7, "system.speciesSpeedVersion": 1 },
+  ]);
+  expect(dwarf.updates).toEqual([
+    { "system.attributes.speed.value": 8, "system.speciesSpeedVersion": 1 },
+  ]);
+  expect(smallHumanoid.updates).toEqual([
+    { "system.attributes.speed.value": 7, "system.speciesSpeedVersion": 1 },
+  ]);
+  expect(large.updates).toEqual([
+    { "system.attributes.speed.value": 12, "system.speciesSpeedVersion": 1 },
+  ]);
   expect(human.updates).toEqual([]);
-  expect(custom.updates).toEqual([]);
-  expect(zero.updates).toEqual([]);
+  expect(custom.updates).toEqual([{ "system.speciesSpeedVersion": 1 }]);
+  expect(custom.speedValue()).toBe(12);
+  expect(zero.updates).toEqual([{ "system.speciesSpeedVersion": 1 }]);
+  expect(zero.speedValue()).toBe(0);
   expect(missing.updates).toEqual([]);
   expect(unknown.updates).toEqual([]);
   expect(npc.updates).toEqual([]);
@@ -317,7 +336,54 @@ it("sets base speed only when the stored value is still 10", async () => {
 
   expect(halfling.updates).toHaveLength(1);
   expect(dwarf.updates).toHaveLength(1);
+  expect(custom.updates).toHaveLength(1);
+  expect(custom.speedValue()).toBe(12);
+  expect(zero.updates).toHaveLength(1);
+  expect(zero.speedValue()).toBe(0);
   expect(logs).toEqual(['Smaug: unknown species "Dragon"; base speed left at 10.']);
+});
+
+it("leaves a hand-set speed of 10 in place on the next ready", async () => {
+  const dwarf = characterAtSpeed("Durin", "Dwarf", { value: 10, bonus: 0 });
+  await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [dwarf], items: [] },
+  });
+  expect(dwarf.speedValue()).toBe(8);
+
+  dwarf.setSpeed(10);
+  await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [dwarf], items: [] },
+  });
+
+  expect(dwarf.speedValue()).toBe(10);
+});
+
+it("gives a fresh unmigrated character its species speed once", async () => {
+  const halfling = characterAtSpeed("Bram", "Halfling", { value: 10, bonus: 0 });
+  await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [halfling], items: [] },
+  });
+  expect(halfling.speedValue()).toBe(7);
+
+  await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [halfling], items: [] },
+  });
+  expect(halfling.speedValue()).toBe(7);
+});
+
+it("keeps a later hand edit at 10 when species speed was already applied before the marker existed", async () => {
+  const dwarf = characterAtSpeed("Durin", "Dwarf", { value: 8, bonus: 0 });
+  await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [dwarf], items: [] },
+  });
+  expect(dwarf.speedValue()).toBe(8);
+
+  dwarf.setSpeed(10);
+  await runWorldMigrations({
+    game: { user: { isGM: true }, actors: [dwarf], items: [] },
+  });
+
+  expect(dwarf.speedValue()).toBe(10);
 });
 
 it("writes migrations as trusted survival writes so the Character guard admits them", async () => {
