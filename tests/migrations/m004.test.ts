@@ -12,7 +12,12 @@ interface StoredActor {
 }
 
 function settled(hp: Record<string, unknown>): Record<string, unknown> {
-  return { schemaVersion: 1, survivalVersion: 1, attributes: { hp } };
+  return {
+    schemaVersion: 2,
+    survivalVersion: 1,
+    proficiencies: { weapons: { slings: false } },
+    attributes: { hp },
+  };
 }
 
 function createActor(
@@ -218,7 +223,7 @@ describe("M004 HP max and prototype link", () => {
   it("does not change an NPC actorLink", async () => {
     const clean = createActor(
       "Gonk",
-      { schemaVersion: 1, attributes: { hp: { value: 8, max: 8 } } },
+      { schemaVersion: 2, attributes: { hp: { value: 8, max: 8 } } },
       {
         type: "npc",
         prototypeToken: { actorLink: false },
@@ -226,7 +231,7 @@ describe("M004 HP max and prototype link", () => {
     );
     const hurt = createActor(
       "Bruised",
-      { schemaVersion: 1, attributes: { hp: { value: 9, max: null } } },
+      { schemaVersion: 2, attributes: { hp: { value: 9, max: null } } },
       { type: "npc", prototypeToken: { actorLink: false } },
     );
     const logs: string[] = [];

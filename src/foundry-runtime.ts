@@ -54,6 +54,14 @@ export interface FoundryHooks {
       updateSource?: (data: Record<string, unknown>) => unknown;
     }) => void,
   ): void;
+  on?(
+    event: "preCreateItem",
+    callback: (item: {
+      type?: string;
+      flags?: unknown;
+      updateSource?: (data: Record<string, unknown>) => unknown;
+    }) => void,
+  ): void;
   on?(event: "createActor", callback: (actor: unknown) => void): void;
   on?(
     event: "preUpdateActor",
@@ -62,6 +70,7 @@ export interface FoundryHooks {
       changes: Record<string, unknown>,
     ) => false | undefined,
   ): void;
+  on?(event: "createItem" | "updateItem" | "deleteItem", callback: (item: unknown) => void): void;
   on?(
     event: "updateActor",
     callback: (actor: unknown, changes: Record<string, unknown>) => void,

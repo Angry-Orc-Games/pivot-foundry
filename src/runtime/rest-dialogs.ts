@@ -20,6 +20,7 @@ import {
 import { rollProgress } from "./roll-progress";
 import { prepareCharacterSheetContext } from "../sheets/character-sheet";
 import { createChat, escapeHtml, field, prompt, runtime } from "./ui";
+import { waitForDiceSoNiceAnimation } from "./dice-so-nice";
 
 interface RestContext {
   actor: ActorLike;
@@ -135,6 +136,7 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
   const maxSpends = ctx.poolCurrent;
   let poolSpends = 0;
   const diceResults: Array<{ faces: number; results: number[]; total: number }> = [];
+  const diceRolls: unknown[] = [];
   let mpRecovered = 0;
 
   const { outcome, before, after } = await runRest(actor, async (state) => {
@@ -162,7 +164,9 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
       { localizeTitlesAndButtons: false, cancelLabel: localizeRest("Cancel") },
     );
 
-    if (!inputs) return null;
+    // Cancel / dismiss must be a clean no-op (DialogV2 may return a string or partial object).
+    if (!inputs || typeof inputs !== "object") return null;
+    if (typeof inputs.poolSpendsRaw !== "string") return null;
 
     const spends = parsePoolSpends(inputs.poolSpendsRaw, maxSpends);
 
@@ -180,6 +184,7 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
 
     let poolRemaining = ctx.poolCurrent;
     let totalHealed = 0;
+    diceRolls.length = 0;
 
     const progress = rollProgress();
     try {
@@ -206,6 +211,7 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
           async (faces) => {
             const die = new Roll(`1d${faces}`);
             await progress.wait(die.evaluate());
+            diceRolls.push(die);
             if (die.total === undefined) throw new Error("Incomplete");
             return die.total;
           },
@@ -267,9 +273,11 @@ async function runShortRest(actor: ActorLike, ctx: RestContext): Promise<void> {
     .join(" • ");
 
   try {
-    await createChat({
+    const message = await createChat({
       content: `<p><strong>${summary}</strong></p><p><em>${escapeHtml(diceChains)}</em></p>`,
+      rolls: diceRolls,
     });
+    await waitForDiceSoNiceAnimation(message);
   } catch {
     warnRest("ChatFailed");
   }

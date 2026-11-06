@@ -57,7 +57,7 @@ export function installHealthChatHook(hooks: {
   ) => unknown;
 }): void {
   hooks.on?.("renderChatMessageHTML", (message, html) => {
-    const button = html.querySelector<HTMLButtonElement>("[data-pivot-apply]");
+    const button = html.querySelector<HTMLButtonElement>("[data-pf-apply]");
     if (!button) return;
     if (!readDamagePayload(message) || !message.id) {
       button.remove();
@@ -99,7 +99,7 @@ export async function previewHealth(
     `<p>${localize("ManualReductions")}</p>
  <label>${localize("Amount")} <input name="amount" type="number" min="0" step="1" value="${amount}" ${gm ? "" : "readonly"}></label>
  <p>${localize(kind === "damage" ? "Damage" : kind === "healing" ? "Healing" : "Temp")}</p>
- ${actors.map((actor, index) => targetPreviewRow(actor, index, actor === self)).join("")}
+ ${actors.map((actor, index) => targetPreviewRow(actor, index, actor === self, { kind, amount, critical })).join("")}
  ${kind === "temp" ? `<label>${localize("TempChoice")} <select name="tempChoice"><option value="keep">${localize("Keep")}</option><option value="replace">${localize("Replace")}</option></select></label>` : ""}`,
     (form) => ({
       amount: Number(field(form, "amount")),
@@ -181,11 +181,30 @@ export function messagePayloadUnchanged(id: string, expected: DamagePayload): bo
   );
 }
 
-export function targetPreviewRow(actor: SurvivalActor, index: number, checked: boolean): string {
+export function targetPreviewRow(
+  actor: SurvivalActor,
+  index: number,
+  checked: boolean,
+  pending?: { kind: HealthKind; amount: number; critical?: boolean },
+): string {
   const name = escapeHtml(healthTargetLabel(actor));
   if (actor.isOwner !== true)
     return `<label><input type="checkbox" disabled>${name} — ${escapeHtml(localize("denied"))}</label>`;
-  const state = effectiveSurvival(readSurvival(actor));
+  const current = effectiveSurvival(readSurvival(actor));
+  let state = current;
+  if (pending && validAmount(pending.amount)) {
+    try {
+      state = applyHealth(
+        current,
+        pending.kind,
+        pending.amount,
+        pending.critical ?? false,
+        pending.kind === "temp" ? "keep" : undefined,
+      );
+    } catch {
+      state = current;
+    }
+  }
   return `<label><input type="checkbox" name="target" value="${index}" ${checked ? "checked" : ""}>${name} — HP ${state.hp}/${state.max}, ${localize("Temp")} ${state.temp} (${escapeHtml(localize(state.status))})</label>`;
 }
 

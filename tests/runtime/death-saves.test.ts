@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import en from "../../lang/en.json";
 import {
   clearTempHpDialog,
   correctSurvivalDialog,
@@ -47,6 +48,32 @@ it("writes natural20 recovery once even when chat reporting fails", async () => 
   await deathSaveDialog(actor);
   expect(actor.writes).toHaveLength(1);
   expect(readSurvival(actor)).toMatchObject({ hp: 1, status: "alive" });
+});
+it("writes the death save before posting its card, with the roll attached", async () => {
+  const actor = setup();
+  rollNatural(20);
+  const atPost: Array<{ status: string; rolls: unknown }> = [];
+  vi.stubGlobal("ChatMessage", {
+    create: vi.fn(async (data: { rolls?: unknown[] }) => {
+      atPost.push({ status: readSurvival(actor).status, rolls: data.rolls?.length });
+    }),
+  });
+  await deathSaveDialog(actor);
+  expect(atPost).toEqual([{ status: "alive", rolls: 1 }]);
+});
+it("posts no death-save card and warns when the write fails", async () => {
+  const actor = setup();
+  const seen = captureWarnings();
+  rollNatural(20);
+  const create = vi.fn(async () => {});
+  vi.stubGlobal("ChatMessage", { create });
+  actor.update = async () => {
+    throw Error("write");
+  };
+  await deathSaveDialog(actor);
+  expect(create).not.toHaveBeenCalled();
+  expect(seen).toEqual(["DeathFailed"]);
+  expect(readSurvival(actor)).toMatchObject({ hp: 0, status: "dying" });
 });
 it("rechecks ownership after the roll", async () => {
   const actor = setup();
@@ -109,11 +136,29 @@ it("lets the GM stabilize a Dying Character and clears the counters", async () =
 it("warns and writes nothing for an inconsistent correction", async () => {
   vi.stubGlobal("game", { user: { isGM: true } });
   const seen = captureWarnings();
-  const actor = inMemoryCharacter({ hp: 0, status: "dying" });
-  dialogReturns({ hp: 5, temp: 0, successes: 0, failures: 0, status: "dying" });
+  const actor = inMemoryCharacter({ hp: 5, status: "alive" });
+  dialogReturns({ hp: 5, temp: 2, successes: 0, failures: 0, status: "dead" });
   await correctSurvivalDialog(actor);
   expect(seen).toEqual(["ApplyFailed"]);
   expect(actor.writes).toEqual([]);
+  expect(readSurvival(actor)).toMatchObject({ hp: 5, status: "alive" });
+});
+
+it("refuses Dying or Stable above 0 HP and tells the GM why, whatever the temporary HP", async () => {
+  const notice = "Dying and Stable need 0 HP. Set HP to 0 first, or choose Conscious.";
+  for (const status of ["dying", "stable"] as const) {
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      i18n: { localize: (key: string) => (en as Record<string, string>)[key] ?? key },
+    });
+    const seen = captureWarnings();
+    const actor = inMemoryCharacter({ hp: 5, temp: 4, status: "alive" });
+    dialogReturns({ hp: 5, temp: 9, successes: 1, failures: 1, status });
+    await correctSurvivalDialog(actor);
+    expect(seen, status).toEqual([notice]);
+    expect(actor.writes, status).toEqual([]);
+    expect(readSurvival(actor), status).toMatchObject({ hp: 5, temp: 4, status: "alive" });
+  }
 });
 
 it("does not open a correction for a player", async () => {
