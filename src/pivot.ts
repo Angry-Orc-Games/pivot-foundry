@@ -167,7 +167,7 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
     console.log("Pivot Fantasy | Initialized character sheet system");
   });
 
-  runtime.Hooks.once("ready", () => {
+  runtime.Hooks.once("ready", async () => {
     const globals = globalThis as typeof globalThis & {
       game?: WorldMigrationGame;
       ui?: {
@@ -179,15 +179,21 @@ export function registerPivotFantasySystem(runtime: PivotRegistrationRuntime): v
       };
     };
 
-    void runWorldMigrations({
-      game: globals.game,
-      notify: (level, message) => {
-        globals.ui?.notifications?.[level]?.(message);
-      },
-      log: (message, ...details) => {
-        console.warn(message, ...details);
-      },
-    });
+    // Finish migrating before syncing token icons, so the sync reads migrated data and the
+    // migration's own writes cannot land after it.
+    try {
+      await runWorldMigrations({
+        game: globals.game,
+        notify: (level, message) => {
+          globals.ui?.notifications?.[level]?.(message);
+        },
+        log: (message, ...details) => {
+          console.warn(message, ...details);
+        },
+      });
+    } catch (error) {
+      console.error("Pivot Fantasy | World migrations failed", error);
+    }
 
     // Sync effects for all existing characters on world load
     // This ensures dying/dead actors already in the world show the right icons

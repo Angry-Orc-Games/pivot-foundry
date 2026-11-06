@@ -235,6 +235,63 @@ describe("registerPivotFantasySystem", () => {
     expect(updates).toEqual([{ "flags.pivot-fantasy.m008": true }]);
   });
 
+  it("waits for world migrations to finish before syncing token status effects on ready", async () => {
+    const { foundry } = createMockFoundry();
+    const hooks = new Map<string, () => unknown>();
+    const order: string[] = [];
+    let finishMigration: () => void = () => undefined;
+    const migrationWrite = new Promise<void>((resolve) => {
+      finishMigration = resolve;
+    });
+    const character = {
+      type: "character",
+      update: async () => {
+        order.push("migrate");
+        await migrationWrite;
+        order.push("migrated");
+      },
+    };
+    const globals = globalThis as { game?: unknown };
+    const previousGame = globals.game;
+    globals.game = {
+      user: { isGM: true },
+      items: [],
+      scenes: [],
+      actors: [character],
+    };
+
+    try {
+      registerPivotFantasySystem({
+        Hooks: {
+          on() {},
+          once(event, callback) {
+            hooks.set(event, callback);
+          },
+        },
+        CONFIG: { Actor: { dataModels: {}, trackableAttributes: {} }, Item: { dataModels: {} } },
+        foundry,
+      });
+      const ready = hooks.get("ready");
+      const statusSync = vi
+        .spyOn(await import("../src/runtime/status-effects"), "updateTokenStatusEffects")
+        .mockImplementation(async () => {
+          order.push("sync");
+        });
+
+      const running = Promise.resolve(ready?.());
+      await Promise.resolve();
+      expect(order).not.toContain("sync");
+      finishMigration();
+      await running;
+      statusSync.mockRestore();
+    } finally {
+      globals.game = previousGame;
+    }
+
+    const sync = order.indexOf("sync");
+    expect(sync).toBeGreaterThan(order.indexOf("migrated"));
+  });
+
   it("links the prototype token of a new character and leaves other types alone", () => {
     const { foundry } = createMockFoundry();
     const listeners: Array<

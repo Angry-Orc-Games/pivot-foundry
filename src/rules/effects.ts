@@ -1,4 +1,4 @@
-import { abilities, canonicalSkills } from "../config";
+import { abilities, canonicalSkills, SYSTEM_ID } from "../config";
 import { type AbilityKey, abilityKeys, type DerivedEffectBonuses } from "./character-derived";
 import {
   emptyWeaponTraining,
@@ -237,7 +237,7 @@ function hasAmount(effect: EffectRule): effect is Extract<EffectRule, { amount: 
 }
 
 export function collectEmbeddedItemEffects(
-  items: readonly { type?: unknown; system?: unknown }[],
+  items: readonly { type?: unknown; system?: unknown; flags?: unknown }[],
 ): CountedEffect[] {
   const effects: CountedEffect[] = [];
   for (const item of items) {
@@ -251,7 +251,7 @@ export function collectEmbeddedItemEffects(
 }
 
 export function abilityScoreSources(
-  items: readonly { name?: unknown; type?: unknown; system?: unknown }[],
+  items: readonly { name?: unknown; type?: unknown; system?: unknown; flags?: unknown }[],
 ): AbilityScoreSource[] {
   const tagged: Array<AbilityScoreSource & { gear: boolean }> = [];
   for (const item of items) {
@@ -283,7 +283,7 @@ export function abilityScoreSources(
 }
 
 function countedItemEffects(
-  item: { name?: unknown; type?: unknown; system?: unknown } | null | undefined,
+  item: { name?: unknown; type?: unknown; system?: unknown; flags?: unknown } | null | undefined,
 ): { gear: boolean; effects: EffectRule[] } | undefined {
   if (!item || typeof item !== "object") return undefined;
   const system = item.system;
@@ -297,8 +297,26 @@ function countedItemEffects(
   if (effects.length === 0) return undefined;
   warnUnknownItemType(item);
   const collapsed = collapseSameKeyEffects(item, effects, itemLabel(item));
-  if (gear && system.equipped !== true) return undefined;
+  if (gear && system.equipped !== true && !isUnmigratedGear(item)) return undefined;
   return { gear, effects: collapsed };
+}
+
+/**
+ * Weapons and equipment that predate the equipped switch have no M008 marker and read as
+ * unequipped through the schema default. M008 equips such gear when it has effects, so count it
+ * as equipped until that migration has written, otherwise bonuses vanish (and live MP is clamped
+ * to the lower maximum) between load and the GM's migration finishing.
+ */
+function isUnmigratedGear(item: { type?: unknown; flags?: unknown }): boolean {
+  if (item.type !== "weapon" && item.type !== "equipment") return false;
+  const flags = item.flags;
+  if (typeof flags !== "object" || flags === null) return false;
+  const scope = (flags as Record<string, unknown>)[SYSTEM_ID];
+  return !(
+    typeof scope === "object" &&
+    scope !== null &&
+    (scope as { m008?: unknown }).m008 === true
+  );
 }
 
 function isAlwaysOnItem(type: unknown): boolean {
