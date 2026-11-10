@@ -207,7 +207,9 @@ describe("gear bonuses count only while equipped", () => {
     return { type, system: { equipped, effects, ...extra } };
   }
 
-  function strengthTotal(items: readonly { type?: string; system?: unknown }[]): number {
+  function strengthTotal(
+    items: readonly { type?: string; system?: unknown; flags?: unknown }[],
+  ): number {
     return aggregateCharacterEffects(collectEmbeddedItemEffects(items)).abilityScoreBonuses.str;
   }
 
@@ -218,6 +220,22 @@ describe("gear bonuses count only while equipped", () => {
       2,
     );
     expect(strengthTotal([embedded("equipment", true, [strengthBonus])])).toBe(2);
+  });
+
+  it("counts a weapon or equipment with effects and no M008 marker until the migration has run", () => {
+    const unmarked = (type: string) => ({ ...embedded(type, false, [strengthBonus]), flags: {} });
+    expect(strengthTotal([unmarked("weapon")])).toBe(2);
+    expect(strengthTotal([unmarked("equipment")])).toBe(2);
+    // Armour was already switchable before M008, so its stored value is trusted.
+    expect(strengthTotal([unmarked("armour")])).toBe(0);
+  });
+
+  it("trusts the stored equipped value once M008 has marked the item", () => {
+    const marked = {
+      ...embedded("weapon", false, [strengthBonus]),
+      flags: { "pivot-fantasy": { m008: true } },
+    };
+    expect(strengthTotal([marked])).toBe(0);
   });
 
   it("ignores the same ability bonus on an unequipped weapon, armour, shield, and equipment item", () => {
