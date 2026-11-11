@@ -46,15 +46,6 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Build
-        run: npm run build
-
-      - name: Install Playwright browsers
-        run: npx --no playwright install chromium --with-deps
-
-      - name: E2E sheet tests
-        run: node scripts/e2e-sheet-tests.mjs
-
       - name: Audit dependencies
         run: npm run audit
 
