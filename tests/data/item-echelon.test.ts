@@ -13,6 +13,9 @@ type EchelonField = {
 
 class BaseTypeDataModel {
   readonly parent?: unknown;
+  static migrateData(source: Record<string, unknown>): Record<string, unknown> {
+    return { ...source, baseMigrated: true };
+  }
 }
 
 function foundry() {
@@ -41,7 +44,7 @@ function foundry() {
     abstract: { TypeDataModel: BaseTypeDataModel },
     data: { fields: { NumberField, StringField, BooleanField, SchemaField, ArrayField } },
     applications: {
-      api: { HandlebarsApplicationMixin: (base: typeof BaseTypeDataModel) => base },
+      api: { HandlebarsApplicationMixin: (base: unknown) => base as typeof BaseTypeDataModel },
       apps: { DocumentSheetConfig: { registerSheet: () => undefined } },
       sheets: {
         ActorSheetV2: class {
@@ -89,7 +92,8 @@ describe("magic echelon data model", () => {
       expect(migrateData({ echelon: 1 })).toMatchObject({ echelon: "1" });
       expect(migrateData({ echelon: 0 })).toMatchObject({ echelon: "core" });
       expect(migrateData({ echelon: "Core" })).toMatchObject({ echelon: "core" });
-      expect(migrateData({ echelon: "2" })).toEqual({ echelon: "2" });
+      expect(migrateData({ echelon: 1 })).toMatchObject({ baseMigrated: true });
+      expect(migrateData({ echelon: "2" })).toEqual({ echelon: "2", baseMigrated: true });
     }
   });
 });

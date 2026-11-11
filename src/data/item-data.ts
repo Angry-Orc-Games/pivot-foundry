@@ -27,6 +27,9 @@ export type PivotItemDataModels = Record<
 
 export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDataModels {
   const fields = foundry.data.fields;
+  const BaseModel = foundry.abstract.TypeDataModel as unknown as {
+    migrateData(source: Record<string, unknown>): Record<string, unknown>;
+  };
 
   class PivotWeaponData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
@@ -113,7 +116,8 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     }
 
     static migrateData(source: Record<string, unknown>): Record<string, unknown> {
-      return migrateEchelonSource(source);
+      // Keep the base migration so nested field migrateSource (effects, etc.) still runs.
+      return BaseModel.migrateData(migrateEchelonSource(source));
     }
   }
 
@@ -130,7 +134,8 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     }
 
     static migrateData(source: Record<string, unknown>): Record<string, unknown> {
-      return migrateEchelonSource(source);
+      // Keep the base migration so nested field migrateSource (effects, etc.) still runs.
+      return BaseModel.migrateData(migrateEchelonSource(source));
     }
   }
 
