@@ -172,6 +172,9 @@ describe("M006 magic echelon migration", () => {
 
 class MigrationTypeDataModel {
   readonly parent?: unknown;
+  static migrateData(source: Record<string, unknown>): Record<string, unknown> {
+    return source;
+  }
 }
 
 function migrationFoundry() {
@@ -199,7 +202,7 @@ function migrationFoundry() {
     abstract: { TypeDataModel: MigrationTypeDataModel },
     data: { fields: { NumberField, StringField, BooleanField, SchemaField, ArrayField } },
     applications: {
-      api: { HandlebarsApplicationMixin: (base: typeof MigrationTypeDataModel) => base },
+      api: { HandlebarsApplicationMixin: (base: unknown) => base as typeof MigrationTypeDataModel },
       apps: { DocumentSheetConfig: { registerSheet: () => undefined } },
       sheets: {
         ActorSheetV2: class {
