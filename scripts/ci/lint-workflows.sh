@@ -3,7 +3,8 @@
 #
 # Usage: lint-workflows.sh
 #
-# Shellcheck integration is off so the result does not depend on which shellcheck the host has.
+# actionlint also runs shellcheck over `run:` blocks when shellcheck is on PATH (ubuntu runners have it);
+# without it that part is skipped silently, so install shellcheck locally for the same coverage as CI.
 set -euo pipefail
 
 version=1.7.12
@@ -23,4 +24,4 @@ curl -fsSL -o "$work/$archive" \
 echo "${sha256}  ${work}/${archive}" | sha256sum -c -
 tar -xzf "$work/$archive" -C "$work" actionlint
 
-"$work/actionlint" -shellcheck= -color
+"$work/actionlint" -color
