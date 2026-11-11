@@ -1,0 +1,83 @@
+{{! Character sheet header: name + tagline left, species/background/tier right }}
+<header class="pf-hdr pf-print pf-print-wrap pf-print-top">
+  <div class="pf-hdr-id">
+    {{#if editable}}
+      <h1><input
+          class="pf-inline pf-name"
+          name="name"
+          type="text"
+          value="{{actor.name}}"
+          aria-label="{{localize 'PIVOT.Fields.CharacterName'}}"
+          {{disabledAttr}}
+        /></h1>
+      <input
+        class="pf-inline pf-tagline"
+        name="system.identity.concept"
+        type="text"
+        value="{{system.identity.concept}}"
+        placeholder="{{localize 'PIVOT.Fields.Concept'}}"
+        {{disabledAttr}}
+      />
+    {{else}}
+      <h1 class="pf-name-view">{{actor.name}}</h1>
+      {{#if system.identity.concept}}
+        <div class="pf-tagline-view">{{system.identity.concept}}</div>
+      {{/if}}
+    {{/if}}
+  </div>
+  <div class="pf-hdr-meta">
+    {{#if speciesLabel}}
+      <div><b>{{speciesLabel}}</b>{{#if backgroundLabel}},
+          <b>{{backgroundLabel}}</b>{{/if}}{{#if tierLabel}}
+          ({{tierLabel}}){{/if}}</div>
+    {{else}}
+      {{#if backgroundLabel}}
+        <div><b>{{backgroundLabel}}</b>{{#if tierLabel}}
+            ({{tierLabel}}){{/if}}</div>
+      {{else}}
+        {{#if tierLabel}}<div>({{tierLabel}})</div>{{/if}}
+      {{/if}}
+    {{/if}}
+    <div class="pf-small">Pivot: Fantasy, level
+      {{#if editable}}
+        <input
+          class="pf-inline pf-num"
+          name="system.progression.level"
+          type="number"
+          min="1"
+          step="1"
+          value="{{system.progression.level}}"
+          {{disabledAttr}}
+        />
+        · XP
+        <input
+          class="pf-inline pf-num"
+          name="system.progression.xp"
+          type="number"
+          min="0"
+          step="1"
+          value="{{system.progression.xp}}"
+          {{disabledAttr}}
+        />{{#if system.identity.focus}}
+          · Focus:
+          {{system.identity.focus}}{{/if}}
+      {{else}}
+        <strong>{{system.progression.level}}</strong>
+        · XP
+        <strong>{{system.progression.xp}}</strong>{{#if system.identity.focus}}
+          · Focus:
+          {{system.identity.focus}}{{/if}}
+      {{/if}}
+    </div>
+  </div>
+  <div class="pf-hdr-actions">
+    <button
+      type="button"
+      data-action="toggleEditMode"
+      class="pf-edit-toggle"
+      aria-label="{{localize 'PIVOT.Actions.ToggleEditMode'}}"
+    >{{#if editable}}{{localize "PIVOT.Actions.ViewMode"}}{{else}}{{localize
+          "PIVOT.Actions.EditMode"
+        }}{{/if}}</button>
+  </div>
+</header>

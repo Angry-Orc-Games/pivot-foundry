@@ -32,6 +32,7 @@ export interface RuntimeGlobals {
   ChatMessage?: {
     create(data: Record<string, unknown>): Promise<unknown>;
     applyMode?(data: Record<string, unknown>, mode?: string): Record<string, unknown>;
+    applyRollMode?(data: Record<string, unknown>, mode: string): unknown;
   };
   ui?: { notifications?: { warn(message: string): void } };
 }
@@ -44,6 +45,34 @@ export function warn(key: string): void {
 export interface PromptOptions {
   localizeTitlesAndButtons?: boolean;
   cancelLabel?: string;
+}
+
+const DIALOG_FOCUSABLE =
+  "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
+
+interface DialogNode {
+  focus?: () => void;
+  querySelector(selector: string): DialogNode | null;
+}
+
+interface RenderedDialog {
+  bringToFront?: () => void;
+  element?: DialogNode | null;
+}
+
+function focusIn(root: DialogNode | null | undefined): boolean {
+  const target = root?.querySelector(DIALOG_FOCUSABLE);
+  if (!target?.focus) return false;
+  target.focus();
+  return true;
+}
+
+export function presentRenderedDialog(_event: unknown, dialog: RenderedDialog): void {
+  dialog.bringToFront?.();
+  const element = dialog.element;
+  if (!element) return;
+  if (focusIn(element.querySelector(".window-content"))) return;
+  focusIn(element);
 }
 
 export async function prompt<T>(
@@ -64,6 +93,7 @@ export async function prompt<T>(
   try {
     return (await dialog.prompt({
       window: { title: windowTitle },
+      classes: ["pivot-fantasy", "pf-sheet"],
       content,
       ok: {
         label: okLabel,
@@ -72,6 +102,7 @@ export async function prompt<T>(
       },
       buttons: [{ action: "cancel", label: cancelLabel, callback: () => null }],
       rejectClose: false,
+      render: presentRenderedDialog,
     })) as T | null;
   } catch {
     return null;
@@ -79,6 +110,33 @@ export async function prompt<T>(
 }
 export function field(form: HTMLFormElement, name: string): string {
   return String(new FormData(form).get(name) ?? "");
+}
+
+const ROLL_MODE_TO_MESSAGE_MODE: Record<string, string> = {
+  roll: "public",
+  publicroll: "public",
+  gmroll: "gm",
+  blindroll: "blind",
+  selfroll: "self",
+  public: "public",
+  gm: "gm",
+  blind: "blind",
+  self: "self",
+};
+
+/** Map legacy core rollMode values to Foundry v14 ChatMessage mode keys. */
+export function toMessageMode(mode: string): string {
+  return ROLL_MODE_TO_MESSAGE_MODE[mode] ?? mode;
+}
+
+export function applyChatMessageMode(data: Record<string, unknown>, mode: string): void {
+  const Chat = runtime().ChatMessage;
+  if (!Chat) return;
+  if (Chat.applyMode) {
+    Chat.applyMode(data, toMessageMode(mode));
+    return;
+  }
+  Chat.applyRollMode?.(data, mode);
 }
 
 export async function createChat(data: Record<string, unknown>): Promise<unknown> {
