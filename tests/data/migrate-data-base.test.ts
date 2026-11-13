@@ -11,6 +11,7 @@ import type { FoundryRuntime } from "../../src/foundry-runtime";
  * the base. The base here stamps a sentinel to prove it ran.
  */
 class BaseTypeDataModel {
+  readonly parent?: unknown;
   static migrateData(source: Record<string, unknown>): Record<string, unknown> {
     return { ...source, baseMigrated: true };
   }
@@ -39,11 +40,12 @@ type MigratableModel = { migrateData?: (source: Record<string, unknown>) => unkn
 
 function models(): Array<[string, MigratableModel]> {
   const runtime = foundry();
-  return [
+  const all: Array<[string, unknown]> = [
     ...Object.entries(createPivotItemDataModels(runtime)),
     ["character", createPivotCharacterDataModel(runtime)],
     ["npc", createPivotNpcDataModel(runtime)],
   ];
+  return all as Array<[string, MigratableModel]>;
 }
 
 describe("data model migrateData", () => {
