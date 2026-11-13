@@ -28,7 +28,7 @@ Implemented:
 - Item sheet registration for those Pivot item types
 - Data-backed identity, progression, abilities, HP, Pool, skills, proficiencies, currency, magic, notes, attacks, armour, and inventory fields
 - Derived character math for ability modifiers, proficiency, saves, skills, passive perception, Pool max, MP max, AC, initiative, carried weight, and weapon BTH/BTD
-- Pivot d20 roll modes (Normal, Advantage, Disadvantage, Super-Advantage) with kept-die chat results
+- Pivot d20 roll modes (Normal, Advantage, and Disadvantage) with kept-die chat results. Any number of advantage sources rolls two d20s and keeps the highest.
 - Weapon attack chat that reports automatic hit on a kept natural 20 and automatic miss on a kept natural 1
 - Bounded Pool spend/recovery against derived Pool max, plus Recover Pool (Long Rest)
 - Initiative rolls that update a unique existing Foundry combatant in the active combat

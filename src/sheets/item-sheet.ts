@@ -1,6 +1,21 @@
-import { armourCategories, featureCategories, SYSTEM_ID, weaponCategories } from "../config";
+import { featureCategories, SYSTEM_ID } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
+import { type Echelon } from "../rules/echelon";
 import { describeEffectRule, parseStoredEffect, type EffectRule } from "../rules/effects";
+import {
+  INVALID_CHOICE_LABEL,
+  selectOptionRecord,
+  type SelectBinding,
+} from "../rules/item-choices";
+
+const ECHELON_CHOICES: Record<Echelon, string> = {
+  core: "Core",
+  "1": "Echelon 1",
+  "2": "Echelon 2",
+  "3": "Echelon 3",
+  "4": "Echelon 4",
+  "5": "Echelon 5",
+};
 
 const ITEM_TEMPLATE = `systems/${SYSTEM_ID}/templates/items/item-sheet.hbs`;
 
@@ -26,10 +41,14 @@ export interface ItemSheetContext {
   isMagicStream: boolean;
   isMagicAbility: boolean;
   effects: ItemSheetEffectRow[];
+  weaponCategorySelect: SelectBinding;
+  attackAbilitySelect: SelectBinding;
+  damageAbilitySelect: SelectBinding;
+  damageTypeSelect: SelectBinding;
+  armourCategorySelect: SelectBinding;
   config: {
-    weaponCategories: typeof weaponCategories;
-    armourCategories: typeof armourCategories;
     featureCategories: typeof featureCategories;
+    echelonChoices: Record<Echelon, string>;
   };
 }
 
@@ -88,9 +107,10 @@ export function prepareItemSheetContext(
   editable = true,
 ): ItemSheetContext {
   const disabledAttr = editable ? "" : "disabled";
+  const system = document.system ?? {};
   return {
     item: document,
-    system: document.system ?? {},
+    system,
     disabledAttr,
     isWeapon: document.type === "weapon",
     isArmour: document.type === "armour",
@@ -98,13 +118,46 @@ export function prepareItemSheetContext(
     isFeature: document.type === "feature",
     isMagicStream: document.type === "magicStream",
     isMagicAbility: document.type === "magicAbility",
-    effects: readOnlyEffectRows(document.system),
+    effects: readOnlyEffectRows(system),
+    weaponCategorySelect: selectOptionRecord(
+      "weaponCategory",
+      system.category,
+      INVALID_CHOICE_LABEL,
+    ),
+    attackAbilitySelect: selectOptionRecord(
+      "attackAbility",
+      nestedValue(system, ["attack", "ability"]),
+      INVALID_CHOICE_LABEL,
+    ),
+    damageAbilitySelect: selectOptionRecord(
+      "damageAbility",
+      nestedValue(system, ["damage", "ability"]),
+      INVALID_CHOICE_LABEL,
+    ),
+    damageTypeSelect: selectOptionRecord(
+      "damageType",
+      nestedValue(system, ["damage", "type"]),
+      INVALID_CHOICE_LABEL,
+    ),
+    armourCategorySelect: selectOptionRecord(
+      "armourCategory",
+      system.category,
+      INVALID_CHOICE_LABEL,
+    ),
     config: {
-      weaponCategories,
-      armourCategories,
       featureCategories,
+      echelonChoices: ECHELON_CHOICES,
     },
   };
+}
+
+function nestedValue(source: Record<string, unknown>, path: string[]): unknown {
+  let current: unknown = source;
+  for (const part of path) {
+    if (typeof current !== "object" || current === null || Array.isArray(current)) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
 }
 
 function readOnlyEffectRows(system: Record<string, unknown>): ItemSheetEffectRow[] {

@@ -5,7 +5,7 @@
     "type": "feature",
     "img": "icons/svg/eye.svg",
     "system": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "effects": [
         {
           "type": "skillBonus",
@@ -15,7 +15,12 @@
       ],
       "notes": "Example content fixture for the UC-008 pipeline. Not published Pivot catalog content.",
       "category": "feat",
-      "source": "UC-008 fixture"
+      "source": "UC-008 fixture",
+      "cost": {
+        "pool": 0,
+        "mp": 0,
+        "bp": 0
+      }
     },
     "flags": {
       "pivot-fantasy": {

@@ -8,6 +8,12 @@ import {
   stringField,
   type TypeDataModelConstructor,
 } from "../foundry-runtime";
+import {
+  ECHELON_VALUES,
+  migrateStoredEchelon,
+  normalizeEchelon,
+  rememberLegacyEchelon,
+} from "../rules/echelon";
 import { CURRENT_SCHEMA_VERSION } from "../rules/schema-version";
 
 type TypeDataModelWithSchema = TypeDataModelConstructor & {
@@ -21,6 +27,9 @@ export type PivotItemDataModels = Record<
 
 export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDataModels {
   const fields = foundry.data.fields;
+  const BaseModel = foundry.abstract.TypeDataModel as unknown as {
+    migrateData(source: Record<string, unknown>): Record<string, unknown>;
+  };
 
   class PivotWeaponData extends foundry.abstract.TypeDataModel {
     static defineSchema(): Record<string, DataField> {
@@ -43,6 +52,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
         weight: numberField(fields, { required: true, min: 0, initial: 0 }),
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         carried: booleanField(fields, { required: true, initial: true }),
+        equipped: booleanField(fields, { required: true, initial: false }),
         notes: stringField(fields, { required: true, initial: "" }),
       });
     }
@@ -53,6 +63,9 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
       return withItemInfrastructure(fields, {
         category: stringField(fields, { required: true, initial: "light" }),
         acBonus: numberField(fields, { required: true, integer: true, initial: 1 }),
+        acStackKey: stringField(fields, { required: true, initial: "" }),
+        naturalMode: stringField(fields, { required: true, initial: "" }),
+        bodyLimit: stringField(fields, { required: true, initial: "" }),
         equipped: booleanField(fields, { required: true, initial: false }),
         weight: numberField(fields, { required: true, min: 0, initial: 0 }),
         quantity: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
@@ -82,6 +95,7 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
         cost: schemaField(fields, {
           pool: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
           mp: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
+          bp: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
         }),
         uses: schemaField(fields, {
           value: numberField(fields, { required: true, integer: true, min: 0, initial: 0 }),
@@ -96,9 +110,14 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     static defineSchema(): Record<string, DataField> {
       return withItemInfrastructure(fields, {
         ability: stringField(fields, { required: true, initial: "int" }),
-        echelon: numberField(fields, { required: true, integer: true, min: 1, max: 5, initial: 1 }),
+        echelon: echelonField(fields),
         notes: stringField(fields, { required: true, initial: "" }),
       });
+    }
+
+    static migrateData(source: Record<string, unknown>): Record<string, unknown> {
+      // Keep the base migration so nested field migrateSource (effects, etc.) still runs.
+      return BaseModel.migrateData(migrateEchelonSource(source));
     }
   }
 
@@ -106,12 +125,17 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     static defineSchema(): Record<string, DataField> {
       return withItemInfrastructure(fields, {
         stream: stringField(fields, { required: true, initial: "" }),
-        echelon: numberField(fields, { required: true, integer: true, min: 1, max: 5, initial: 1 }),
+        echelon: echelonField(fields),
         mpCost: numberField(fields, { required: true, integer: true, min: 0, initial: 1 }),
         roll: stringField(fields, { required: true, initial: "" }),
         damage: stringField(fields, { required: true, initial: "" }),
         notes: stringField(fields, { required: true, initial: "" }),
       });
+    }
+
+    static migrateData(source: Record<string, unknown>): Record<string, unknown> {
+      // Keep the base migration so nested field migrateSource (effects, etc.) still runs.
+      return BaseModel.migrateData(migrateEchelonSource(source));
     }
   }
 
@@ -123,6 +147,26 @@ export function createPivotItemDataModels(foundry: FoundryRuntime): PivotItemDat
     magicStream: PivotMagicStreamData,
     magicAbility: PivotMagicAbilityData,
   };
+}
+
+function echelonField(fields: FoundryRuntime["data"]["fields"]): DataField {
+  return stringField(fields, {
+    required: true,
+    blank: false,
+    initial: "core",
+    choices: [...ECHELON_VALUES],
+    validate: (value: unknown) => normalizeEchelon(value) !== undefined,
+  });
+}
+
+function migrateEchelonSource(source: Record<string, unknown>): Record<string, unknown> {
+  if (!("echelon" in source)) return source;
+  const original = source.echelon;
+  const next = migrateStoredEchelon(original);
+  if (next === original) return source;
+  rememberLegacyEchelon(source, original);
+  source.echelon = next;
+  return source;
 }
 
 function withItemInfrastructure(

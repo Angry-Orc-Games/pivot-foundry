@@ -4,9 +4,14 @@
   "type": "feature",
   "img": "icons/svg/eye.svg",
   "system": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "category": "feat",
     "source": "UC-008 fixture",
+    "cost": {
+      "pool": 0,
+      "mp": 0,
+      "bp": 0
+    },
     "notes": "Example content fixture for the UC-008 pipeline. Not published Pivot catalog content.",
     "effects": [
       {

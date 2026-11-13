@@ -4,17 +4,12 @@ import { tempHpDialog } from "../runtime/health-dialog";
 import { damageRollDialog } from "../runtime/damage-roll";
 import { longRestDialog, shortRestDialog } from "../runtime/rest-dialogs";
 import { waitForDiceSoNiceAnimation } from "../runtime/dice-so-nice";
-import {
-  abilities,
-  armourCategories,
-  canonicalSkills,
-  featureCategories,
-  hitDice,
-  SYSTEM_ID,
-  weaponCategories,
-} from "../config";
+import { abilities, canonicalSkills, featureCategories, hitDice, SYSTEM_ID } from "../config";
 import type { FoundryRuntime, TypeDataModelConstructor } from "../foundry-runtime";
-import { selectInitiativeCombatant } from "../rules/combat";
+import { resolveActiveCombat, selectInitiativeCombatant } from "../rules/combat";
+import { craftingAbility } from "../rules/part7-skills";
+import { primaryAbilityWarnings } from "../rules/primary-abilities";
+import { applyChatMessageMode, presentRenderedDialog } from "../runtime/ui";
 import { effectiveSurvival } from "../rules/survival";
 import {
   type AbilityKey,
@@ -24,12 +19,19 @@ import {
   type SkillSourceMap,
   type WeaponProficiencyMap,
 } from "../rules/character-derived";
-import { aggregateCharacterEffects, collectEmbeddedItemEffects } from "../rules/effects";
+import { weaponCategories, type WeaponCategoryId } from "../rules/item-choices";
+import {
+  abilityScoreSources,
+  aggregateCharacterEffects,
+  collectEmbeddedItemEffects,
+} from "../rules/effects";
 import {
   applyAttackCrit,
   d20PoolFormula,
   dicePoolForRollMode,
-  isRollMode,
+  parseRollMode,
+  ROLL_MODES,
+  type DicePoolResolution,
   type RollMode,
   selectKeptD20,
 } from "../rules/d20-roll";
@@ -39,7 +41,7 @@ import {
   spendBoundedResource,
 } from "../rules/resources";
 
-const CHARACTER_TEMPLATE = `systems/${SYSTEM_ID}/templates/actors/character-sheet.hbs`;
+const SYSTEM_TEMPLATES_BASE = `systems/${SYSTEM_ID}/templates/actors/character`;
 
 type RecordValue = Record<string, unknown>;
 
@@ -75,7 +77,6 @@ export const ROLL_MODE_LABEL_KEYS: Record<RollMode, string> = {
   normal: "PIVOT.RollMode.Normal",
   advantage: "PIVOT.RollMode.Advantage",
   disadvantage: "PIVOT.RollMode.Disadvantage",
-  superAdvantage: "PIVOT.RollMode.SuperAdvantage",
 };
 
 export type D20RollKind = "ability" | "save" | "skill" | "initiative" | "weaponAttack";
@@ -103,6 +104,9 @@ export interface CombatantLike {
 }
 
 export interface CombatLike {
+  id?: string;
+  active?: boolean;
+  isActive?: boolean;
   combatants?: Iterable<CombatantLike> | { contents: CombatantLike[] };
 }
 
@@ -118,6 +122,25 @@ export interface CharacterSheetContext {
   deathSaveFailures: number;
   isGM: boolean;
   system: RecordValue;
+  speciesLabel: string;
+  backgroundLabel: string;
+  tierLabel: string;
+  conMod: string;
+  primaryWarnings: string[];
+  proficiencyText: {
+    weapons: string;
+    armour: string;
+    shields: string;
+  };
+  weaponTrainingRows: Array<{
+    id: WeaponCategoryId;
+    label: string;
+    path: string;
+    proficient: boolean;
+    disabledAttr: "" | "disabled";
+  }>;
+  magicStreamsText: string;
+  scoreSourceText: string;
   form: {
     languagesText: string;
     instrumentsText: string;
@@ -132,11 +155,10 @@ export interface CharacterSheetContext {
     skills: typeof canonicalSkills;
     hitDice: typeof hitDice;
     hitDiceChoices: Record<string, string>;
-    weaponCategories: typeof weaponCategories;
-    armourCategories: typeof armourCategories;
     featureCategories: typeof featureCategories;
   };
   derived: ReturnType<typeof calculateCharacterDerived>;
+  initiativeText: string;
   abilityRows: Array<{
     key: AbilityKey;
     label: string;
@@ -145,8 +167,9 @@ export interface CharacterSheetContext {
     primaryPath: string;
     score: number;
     primary: boolean;
-    mod: number;
-    save: number;
+    mod: string;
+    save: string;
+    abilityClass: string;
     disabledAttr: "" | "disabled";
   }>;
   skillRows: Array<{
@@ -162,7 +185,7 @@ export interface CharacterSheetContext {
     deepening: number;
     expertise: boolean;
     bonus: number;
-    total: number;
+    total: string;
     disabledAttr: "" | "disabled";
   }>;
   items: {
@@ -175,6 +198,10 @@ export interface CharacterSheetContext {
     armour: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     equipment: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     features: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    feats: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    flaws: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    traits: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
+    bodyModifications: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicStreams: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
     magicAbilities: Array<ItemLike & { disabledAttr: "" | "disabled" }>;
   };
@@ -186,9 +213,11 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
   );
 
   class PivotCharacterSheet extends BaseSheet {
+    editorOpen: boolean | undefined;
+
     static DEFAULT_OPTIONS = {
-      classes: [SYSTEM_ID, "sheet", "actor", "character"],
-      position: { width: 960, height: 760 },
+      classes: ["pivot-fantasy", "pf-sheet", SYSTEM_ID, "sheet", "actor", "character"],
+      position: { width: 820, height: 760 },
       tag: "form",
       window: {
         title: "PIVOT.Sheets.Character.Title",
@@ -200,6 +229,13 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
       },
       actions: {
         roll: rollAction,
+        toggleEditMode: function (this: {
+          editorOpen?: boolean;
+          render: (force?: boolean) => void;
+        }) {
+          this.editorOpen = this.editorOpen === false;
+          this.render();
+        },
         survivalRoll: async function (this: { document: ActorLike }) {
           await damageRollDialog(this.document);
         },
@@ -230,36 +266,65 @@ export function createPivotCharacterSheetClass(foundry: FoundryRuntime): TypeDat
     };
 
     static PARTS = {
-      form: {
-        template: CHARACTER_TEMPLATE,
+      header: {
+        template: `${SYSTEM_TEMPLATES_BASE}/header.hbs`,
       },
-    };
-
-    static TABS = {
-      primary: {
-        tabs: [
-          { id: "core", label: "PIVOT.Tabs.Core" },
-          { id: "skills", label: "PIVOT.Tabs.Skills" },
-          { id: "combat", label: "PIVOT.Tabs.Combat" },
-          { id: "equipment", label: "PIVOT.Tabs.Equipment" },
-          { id: "magic", label: "PIVOT.Tabs.Magic" },
-          { id: "features", label: "PIVOT.Tabs.Features" },
-        ],
-        initial: "core",
+      vitals: {
+        template: `${SYSTEM_TEMPLATES_BASE}/vitals.hbs`,
+      },
+      sheet: {
+        template: `${SYSTEM_TEMPLATES_BASE}/sheet.hbs`,
       },
     };
 
     async _prepareContext(options: Record<string, unknown>): Promise<Record<string, unknown>> {
       const parentContext = await callOptionalSuper(this, "_prepareContext", options);
       const actor = getSheetDocument(this);
+      const showEditor = sheetShowsEditor(parentContext.editable !== false, this.editorOpen);
       return {
         ...parentContext,
-        ...prepareCharacterSheetContext(actor, parentContext.editable !== false),
+        ...prepareCharacterSheetContext(actor, showEditor),
       };
     }
   }
 
   return PivotCharacterSheet;
+}
+
+const ABILITY_PRINT_CODE: Record<AbilityKey, string> = {
+  str: "Str",
+  dex: "Dex",
+  con: "Con",
+  int: "Int",
+  wis: "Wis",
+  cha: "Cha",
+};
+
+function abilityPrintCode(key: string): string {
+  return ABILITY_PRINT_CODE[key as AbilityKey] ?? key;
+}
+
+function formatScoreSources(
+  itemList: ItemLike[],
+  abilitySources: Record<AbilityKey, { score: number }>,
+): string {
+  const grouped = new Map<AbilityKey, string[]>();
+  for (const source of abilityScoreSources(itemList)) {
+    const notes = grouped.get(source.ability) ?? [];
+    const sign = source.amount >= 0 ? `+${source.amount}` : String(source.amount);
+    notes.push(`${source.name} ${sign}`);
+    grouped.set(source.ability, notes);
+  }
+  const parts = abilities.flatMap(({ key }) => {
+    const sources = grouped.get(key);
+    if (!sources?.length) return [];
+    return [`${abilityPrintCode(key)}: base ${abilitySources[key].score}, ${sources.join(", ")}`];
+  });
+  return parts.length > 0 ? `Score sources. ${parts.join("; ")}.` : "";
+}
+
+export function sheetShowsEditor(ownerCanEdit: boolean, editorOpen: boolean | undefined): boolean {
+  return ownerCanEdit && editorOpen !== false;
 }
 
 export function prepareCharacterSheetContext(
@@ -307,6 +372,19 @@ export function prepareCharacterSheetContext(
       ];
     }),
   ) as SkillSourceMap;
+  if (skillSources.controlMagic) {
+    skillSources.controlMagic.ability = magicAbility(system);
+  }
+  const specializationSkills = readSpecializationSkills(system);
+  for (const entry of specializationSkills) {
+    skillSources[entry.id] = {
+      ability: entry.ability,
+      proficient: entry.proficient,
+      deepening: entry.deepening,
+      expertise: entry.expertise,
+      bonus: entry.bonus,
+    };
+  }
 
   const effectSummary = aggregateCharacterEffects(collectEmbeddedItemEffects(itemList));
   const derived = calculateCharacterDerived(
@@ -325,15 +403,25 @@ export function prepareCharacterSheetContext(
       })),
       armour: armour.map((item) => ({
         name: item.name,
-        category: armourCategoryAt(item.system, ["category"]),
+        category: stringAt(item.system, ["category"], ""),
         acBonus: numberAt(item.system, ["acBonus"], 0),
         equipped: booleanAt(item.system, ["equipped"], false),
+        ...(stringAt(item.system, ["acStackKey"], "")
+          ? { stackKey: stringAt(item.system, ["acStackKey"], "") }
+          : {}),
+        ...(stringAt(item.system, ["naturalMode"], "") === "higher"
+          ? { naturalMode: "higher" as const }
+          : {}),
+        ...(stringAt(item.system, ["bodyLimit"], "") === "light"
+          ? { bodyLimit: "light" as const }
+          : {}),
       })),
       manualArmourBonus: numberAt(system, ["attributes", "ac", "bonus"], 0),
       initiativeBonus: numberAt(system, ["attributes", "initiative", "bonus"], 0),
       passivePerceptionMode: passiveModeAt(system, ["attributes", "passivePerception", "mode"]),
       poolBonus: numberAt(system, ["resources", "pool", "maxBonus"], 0),
       mpBonus: numberAt(system, ["magic", "mp", "maxBonus"], 0),
+      species: stringAt(system, ["identity", "speciesText"], ""),
       speed: {
         value: numberAt(system, ["attributes", "speed", "value"], 10),
         bonus: numberAt(system, ["attributes", "speed", "bonus"], 0),
@@ -356,6 +444,71 @@ export function prepareCharacterSheetContext(
   ) as Record<AbilityKey, number>;
   const survival = effectiveSurvival(readSurvival(actor));
 
+  // Helper to format signed numbers
+  const formatSigned = (value: number): string => (value >= 0 ? `+${value}` : String(value));
+
+  // Extract species and background labels (from feature items or text fields)
+  const speciesCategoryItems = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "species",
+  );
+  const backgroundCategoryItems = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "background",
+  );
+  const speciesLabel =
+    speciesCategoryItems[0]?.name || stringAt(system, ["identity", "speciesText"], "");
+  const backgroundLabel =
+    backgroundCategoryItems[0]?.name || stringAt(system, ["identity", "backgroundText"], "");
+  // Read tier defensively (ticket 4 will add this field)
+  const tierNum = numberAt(system, ["identity", "backgroundTier"], 0);
+  const tierLabel = tierNum > 0 ? `Tier ${tierNum}` : "";
+
+  // Calculate Con modifier for HP footnote
+  const conMod = formatSigned(derived.abilities.con.mod);
+
+  const weaponProfs = derived.proficiencies.weapons;
+  const weaponProfList = weaponCategories
+    .filter((entry) => weaponProfs[entry.id])
+    .map((entry) => entry.label);
+  const weaponTrainingRows = weaponCategories.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    path: `system.proficiencies.weapons.${entry.id}`,
+    proficient: booleanAt(system, ["proficiencies", "weapons", entry.id], false),
+    disabledAttr: disabledAttr as "" | "disabled",
+  }));
+
+  const armourProfs = derived.proficiencies.armour;
+  const armourProfList: string[] = [];
+  if (armourProfs.light) armourProfList.push("Light");
+  if (armourProfs.medium) armourProfList.push("Medium");
+  if (armourProfs.heavy) armourProfList.push("Heavy");
+
+  const shieldProf = derived.proficiencies.shields ? "Yes" : "None";
+
+  // Split features by category
+  const feats = features.filter((item) => stringAt(item.system, ["category"], "") === "feat");
+  const flaws = features.filter((item) => stringAt(item.system, ["category"], "") === "flaw");
+  const bodyModifications = features.filter(
+    (item) => stringAt(item.system, ["category"], "") === "bodyModification",
+  );
+  const traits = features.filter((item) =>
+    ["species", "background", "other"].includes(stringAt(item.system, ["category"], "")),
+  );
+
+  // Magic streams text
+  const magicStreamsText = magicStreams.map((item) => item.name).join(", ");
+  const primaryWarnings = primaryAbilityWarnings({
+    primaries: abilities.flatMap(({ key }) => (abilitySources[key].primary ? [key] : [])),
+    magicAbility: nullableAbilityAt(system, ["magic", "ability"]),
+    level: numberAt(system, ["progression", "level"], 1),
+    hasAdaptOrDie: itemList.some(
+      (item) =>
+        item.type === "feature" &&
+        stringAt(item.system, ["category"], "") === "feat" &&
+        item.name.trim().toLowerCase() === "adapt or die",
+    ),
+  });
+
   return {
     actor,
     survivalLabel: `PIVOT.Survival.${survival.status}`,
@@ -370,6 +523,19 @@ export function prepareCharacterSheetContext(
       (globalThis as typeof globalThis & { game?: { user?: { isGM?: boolean } } }).game?.user
         ?.isGM === true,
     system,
+    speciesLabel,
+    backgroundLabel,
+    tierLabel,
+    conMod,
+    primaryWarnings,
+    proficiencyText: {
+      weapons: weaponProfList.join(", ") || "None",
+      armour: armourProfList.join(", ") || "None",
+      shields: shieldProf,
+    },
+    weaponTrainingRows,
+    magicStreamsText,
+    scoreSourceText: formatScoreSources(itemList, abilitySources),
     form: {
       languagesText: stringArrayAt(system, ["identity", "languages"]).join(", "),
       instrumentsText: stringArrayAt(system, ["proficiencies", "instruments"]).join(", "),
@@ -384,11 +550,10 @@ export function prepareCharacterSheetContext(
       skills: canonicalSkills,
       hitDice,
       hitDiceChoices: Object.fromEntries(hitDice.map((die) => [die, die])),
-      weaponCategories,
-      armourCategories,
       featureCategories,
     },
     derived,
+    initiativeText: formatSigned(derived.initiative),
     abilityRows: abilities.map(({ key, label, short }) => ({
       key,
       label,
@@ -397,38 +562,62 @@ export function prepareCharacterSheetContext(
       primaryPath: `system.abilities.${key}.primary`,
       score: abilitySources[key].score,
       primary: abilitySources[key].primary,
-      mod: derived.abilities[key].mod,
-      save: derived.saves[key],
+      mod: formatSigned(derived.abilities[key].mod),
+      save: formatSigned(derived.saves[key]),
+      abilityClass: abilitySources[key].primary ? "pf-ab pf-prime" : "pf-ab",
       disabledAttr,
     })),
-    skillRows: canonicalSkills.map((skill) => {
-      const source = skillSources[skill.id] ?? {
-        ability: "int",
-        proficient: false,
-        deepening: 0,
-        expertise: false,
-        bonus: 0,
-      };
-      const total = derived.skills[skill.id]?.total ?? 0;
-      return {
+    skillRows: [
+      ...canonicalSkills.map((skill) => ({
         id: skill.id,
         label: skill.label,
-        ability: source.ability.toUpperCase(),
+        source: skillSources[skill.id],
         abilityPath: `system.skills.${skill.id}.ability`,
         proficientPath: `system.skills.${skill.id}.proficient`,
         deepeningPath: `system.skills.${skill.id}.deepening`,
         expertisePath: `system.skills.${skill.id}.expertise`,
         bonusPath: `system.skills.${skill.id}.bonus`,
-        proficient: source.proficient,
-        deepening: source.deepening ?? 0,
-        expertise: source.expertise ?? false,
-        bonus: source.bonus ?? 0,
-        total,
-        disabledAttr,
-      };
-    }),
+      })),
+      ...specializationSkills.map((skill) => ({
+        id: skill.id,
+        label: skill.label,
+        source: skillSources[skill.id],
+        abilityPath: skill.abilityPath,
+        proficientPath: skill.proficientPath,
+        deepeningPath: skill.deepeningPath,
+        expertisePath: skill.expertisePath,
+        bonusPath: skill.bonusPath,
+      })),
+    ]
+      .map((skill) => {
+        const source = skill.source ?? {
+          ability: "int" as AbilityKey,
+          proficient: false,
+          deepening: 0,
+          expertise: false,
+          bonus: 0,
+        };
+        const total = derived.skills[skill.id]?.total ?? 0;
+        return {
+          id: skill.id,
+          label: skill.label,
+          ability: abilityPrintCode(source.ability),
+          abilityPath: skill.abilityPath,
+          proficientPath: skill.proficientPath,
+          deepeningPath: skill.deepeningPath,
+          expertisePath: skill.expertisePath,
+          bonusPath: skill.bonusPath,
+          proficient: source.proficient,
+          deepening: source.deepening ?? 0,
+          expertise: source.expertise ?? false,
+          bonus: source.bonus ?? 0,
+          total: formatSigned(total),
+          disabledAttr: disabledAttr as "" | "disabled",
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label)),
     items: {
-      weapons: weapons.map((item) => ({
+      weapons: withDisabledAttr(weapons, disabledAttr).map((item) => ({
         ...item,
         id: itemDocumentId(item),
         disabledAttr,
@@ -438,8 +627,8 @@ export function prepareCharacterSheetContext(
           weaponProficiencies: derived.proficiencies.weapons,
           weapon: {
             category: stringAt(item.system, ["category"], "meleeLight"),
-            attackAbility: abilityAt(item.system, ["attack", "ability"], "str"),
-            damageAbility: nullableAbilityAt(item.system, ["damage", "ability"]),
+            attackAbility: stringAt(item.system, ["attack", "ability"], "str"),
+            damageAbility: stringOrNullAt(item.system, ["damage", "ability"]),
             attackBonus: numberAt(item.system, ["attack", "bonus"], 0),
             damageBonus: numberAt(item.system, ["damage", "bonus"], 0),
             damageFormula: stringAt(item.system, ["damage", "formula"], "1d4"),
@@ -456,6 +645,10 @@ export function prepareCharacterSheetContext(
         disabledAttr,
       ),
       features: withDisabledAttr(features, disabledAttr),
+      feats: withDisabledAttr(feats, disabledAttr),
+      flaws: withDisabledAttr(flaws, disabledAttr),
+      traits: withDisabledAttr(traits, disabledAttr),
+      bodyModifications: withDisabledAttr(bodyModifications, disabledAttr),
       magicStreams: withDisabledAttr(magicStreams, disabledAttr),
       magicAbilities: withDisabledAttr(magicAbilities, disabledAttr),
     },
@@ -543,15 +736,13 @@ export function resolveSheetRoll(
 }
 
 export function buildRollModeDialogContent(localize: (key: string) => string): string {
-  const options = (["normal", "advantage", "disadvantage", "superAdvantage"] as const)
-    .map((mode, index) => {
-      const checked = index === 0 ? " checked" : "";
-      return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
-        localize(ROLL_MODE_LABEL_KEYS[mode]),
-      )}</label>`;
-    })
-    .join("");
-  return `<fieldset class="pivot-roll-mode-dialog"><legend>${escapeHtml(
+  const options = ROLL_MODES.map((mode) => {
+    const checked = mode === "normal" ? " checked" : "";
+    return `<label><input type="radio" name="mode" value="${mode}"${checked}> ${escapeHtml(
+      localize(ROLL_MODE_LABEL_KEYS[mode]),
+    )}</label>`;
+  }).join("");
+  return `<fieldset class="pf-roll-mode-dialog"><legend>${escapeHtml(
     localize("PIVOT.RollDialog.Title"),
   )}</legend>${options}</fieldset>`;
 }
@@ -724,7 +915,7 @@ export async function applyInitiativeRollToCombat(options: {
   return "updated";
 }
 
-export function createEmbeddedItemData(type: string): Record<string, unknown> {
+export function createEmbeddedItemData(type: string, category?: string): Record<string, unknown> {
   const nameByType: Record<string, string> = {
     weapon: "New Weapon",
     armour: "New Armour",
@@ -733,11 +924,13 @@ export function createEmbeddedItemData(type: string): Record<string, unknown> {
     magicStream: "New Magic Stream",
     magicAbility: "New Magic Ability",
   };
-
-  return {
-    name: nameByType[type] ?? "New Item",
+  const data: Record<string, unknown> = {
+    name:
+      type === "feature" && category === "other" ? "New Trait" : (nameByType[type] ?? "New Item"),
     type,
   };
+  if (category) data.system = { category };
+  return data;
 }
 
 function getSheetDocument(sheet: object): ActorLike {
@@ -910,8 +1103,9 @@ export function normalizeSheetSubmitData(
       ["system", "skillSpecializations", "academia"],
       specializationEntries(
         splitList(academia),
-        "int",
+        "academia",
         storedSpecializationEntries(source, "academia"),
+        readSubmitPath(normalized, ["system", "skillSpecializations", "academia"]),
       ),
     );
     deleteSubmitPath(normalized, academiaPath);
@@ -924,8 +1118,9 @@ export function normalizeSheetSubmitData(
       ["system", "skillSpecializations", "crafting"],
       specializationEntries(
         splitList(crafting),
-        "int",
+        "crafting",
         storedSpecializationEntries(source, "crafting"),
+        readSubmitPath(normalized, ["system", "skillSpecializations", "crafting"]),
       ),
     );
     deleteSubmitPath(normalized, craftingPath);
@@ -995,20 +1190,24 @@ async function rollAction(
   const resultRoll = new RollConstructor(`${kept}${formatSigned(request.modifier)}`);
   await resultRoll.evaluate();
 
-  await resultRoll.toMessage({
+  const ChatMessage = getChatMessageConstructor();
+  if (!ChatMessage) return;
+
+  const messageData = {
     speaker: speakerForActor(context.actor),
     flavor,
-  });
+    content: await resultRoll.render(),
+    rolls: [poolRoll],
+  };
+  applyRollMode(messageData, getRollMode());
+  await ChatMessage.create(messageData);
 }
 
 /**
  * Initiative formula with real d20 terms so Dice So Nice animates every rolled die.
  * Keep modifiers mirror selectKeptD20: highest -> kh1, lowest -> kl1, single -> plain.
  */
-export function initiativeRollFormula(
-  resolution: { dieCount: number; pick: "single" | "highest" | "lowest" },
-  modifier: number,
-): string {
+export function initiativeRollFormula(resolution: DicePoolResolution, modifier: number): string {
   const keep = resolution.pick === "highest" ? "kh1" : resolution.pick === "lowest" ? "kl1" : "";
   return `${d20PoolFormula(resolution.dieCount)}${keep}${formatSigned(modifier)}`;
 }
@@ -1103,7 +1302,7 @@ async function createItemAction(
   if (!type) return;
   const [item] =
     ((await (this.document ?? getSheetDocument(this)).createEmbeddedDocuments?.("Item", [
-      createEmbeddedItemData(type),
+      createEmbeddedItemData(type, target.dataset.category),
     ])) as ItemLike[] | undefined) ?? [];
   item?.sheet?.render?.(true);
 }
@@ -1167,6 +1366,15 @@ function stringAt(source: RecordValue, path: string[], fallback: string): string
   return typeof current === "string" ? current : fallback;
 }
 
+function stringOrNullAt(source: RecordValue, path: string[]): string | null {
+  let current: unknown = source;
+  for (const part of path) {
+    if (!isRecord(current)) return null;
+    current = current[part];
+  }
+  return typeof current === "string" ? current : null;
+}
+
 function booleanAt(source: RecordValue, path: string[], fallback: boolean): boolean {
   let current: unknown = source;
   for (const part of path) {
@@ -1216,8 +1424,9 @@ function specializationMatchKey(name: string): string {
 
 function specializationEntries(
   names: string[],
-  ability: AbilityKey,
+  group: "academia" | "crafting",
   existing: Array<Record<string, unknown>> = [],
+  formEntries: unknown = [],
 ): Array<Record<string, unknown>> {
   const remainingByKey = new Map<string, Array<Record<string, unknown>>>();
   for (const entry of existing) {
@@ -1227,18 +1436,90 @@ function specializationEntries(
     if (queue) queue.push(entry);
     else remainingByKey.set(key, [entry]);
   }
-  return names.map((name) => {
+  // Form rows line up with the stored rows only while the name list keeps its order.
+  const submitted = Array.isArray(formEntries) ? formEntries : [];
+  const sameOrder =
+    names.length === existing.length &&
+    names.every(
+      (name, index) =>
+        typeof existing[index]?.name === "string" &&
+        specializationMatchKey(existing[index].name) === specializationMatchKey(name),
+    );
+  return names.map((name, index) => {
     const stored = remainingByKey.get(specializationMatchKey(name))?.shift();
-    if (stored) return { ...stored, name };
-    return {
-      name,
-      ability,
-      proficient: true,
-      deepening: 0,
-      expertise: false,
-      bonus: 0,
-    };
+    const ability = group === "crafting" ? craftingAbility(name) : undefined;
+    const entry: Record<string, unknown> = stored
+      ? { ...stored, name, ...(ability ? { ability } : {}) }
+      : {
+          name,
+          ability: ability ?? "int",
+          proficient: true,
+          deepening: 0,
+          expertise: false,
+          bonus: 0,
+        };
+    const form = sameOrder ? submitted[index] : undefined;
+    if (!isDataRecord(form)) return entry;
+    if (typeof form.proficient === "boolean") entry.proficient = form.proficient;
+    if (typeof form.expertise === "boolean") entry.expertise = form.expertise;
+    if (typeof form.deepening === "number" && Number.isFinite(form.deepening)) {
+      entry.deepening = form.deepening;
+    }
+    if (typeof form.bonus === "number" && Number.isFinite(form.bonus)) entry.bonus = form.bonus;
+    return entry;
   });
+}
+
+function readSpecializationSkills(system: RecordValue): Array<{
+  id: string;
+  label: string;
+  ability: AbilityKey;
+  proficient: boolean;
+  deepening: number;
+  expertise: boolean;
+  bonus: number;
+  abilityPath: string;
+  proficientPath: string;
+  deepeningPath: string;
+  expertisePath: string;
+  bonusPath: string;
+}> {
+  return (["academia", "crafting"] as const).flatMap((group) => {
+    const entries = specializationRecords(system, ["skillSpecializations", group]);
+    return entries.flatMap((entry, index) => {
+      const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      if (!name) return [];
+      const storedAbility = isAbilityKey(entry.ability) ? entry.ability : "int";
+      const ability = group === "academia" ? "int" : (craftingAbility(name) ?? storedAbility);
+      const base = `system.skillSpecializations.${group}.${index}`;
+      return [
+        {
+          id: `${group}:${name}`,
+          label: name,
+          ability,
+          proficient: entry.proficient !== false,
+          deepening: typeof entry.deepening === "number" ? entry.deepening : 0,
+          expertise: entry.expertise === true,
+          bonus: typeof entry.bonus === "number" ? entry.bonus : 0,
+          abilityPath: `${base}.ability`,
+          proficientPath: `${base}.proficient`,
+          deepeningPath: `${base}.deepening`,
+          expertisePath: `${base}.expertise`,
+          bonusPath: `${base}.bonus`,
+        },
+      ];
+    });
+  });
+}
+
+function specializationRecords(source: RecordValue, path: string[]): RecordValue[] {
+  let current: unknown = source;
+  for (const part of path) {
+    if (!isRecord(current)) return [];
+    current = current[part];
+  }
+  if (!Array.isArray(current)) return [];
+  return current.filter(isRecord);
 }
 
 function withDisabledAttr<T extends ItemLike>(
@@ -1264,16 +1545,6 @@ function nullableAbilityAt(source: RecordValue, path: string[]): AbilityKey | nu
 
 function magicAbility(system: RecordValue): AbilityKey {
   return nullableAbilityAt(system, ["magic", "ability"]) ?? "int";
-}
-
-function armourCategoryAt(
-  source: RecordValue,
-  path: string[],
-): "light" | "medium" | "heavy" | "shield" | "helmet" | "other" {
-  const value = stringAt(source, path, "other");
-  return ["light", "medium", "heavy", "shield", "helmet", "other"].includes(value)
-    ? (value as "light" | "medium" | "heavy" | "shield" | "helmet" | "other")
-    : "other";
 }
 
 function passiveModeAt(source: RecordValue, path: string[]): PassivePerceptionMode {
@@ -1302,14 +1573,55 @@ function getCombatants(combat: CombatLike): CombatantLike[] {
 }
 
 function getActiveCombat(): CombatLike | null {
-  const game = globalThis as typeof globalThis & { game?: { combat?: CombatLike | null } };
-  return game.game?.combat ?? null;
+  const game = globalThis as typeof globalThis & {
+    game?: {
+      combat?: CombatLike | null;
+      combats?: {
+        active?: CombatLike | null;
+        viewed?: CombatLike | null;
+        contents?: Iterable<CombatLike>;
+      };
+    };
+  };
+  return resolveActiveCombat(game.game) as CombatLike | null;
+}
+
+function getChatMessageConstructor():
+  | {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    }
+  | undefined {
+  const globals = globalThis as typeof globalThis & {
+    ChatMessage?: {
+      new (data: Record<string, unknown>): { id?: string };
+      create(data: Record<string, unknown>): Promise<{ id?: string }>;
+    };
+  };
+  return globals.ChatMessage;
+}
+
+function applyRollMode(messageData: Record<string, unknown>, rollMode?: string): void {
+  applyChatMessageMode(messageData, rollMode ?? getRollMode());
+}
+
+function getRollMode(): string {
+  const globals = globalThis as typeof globalThis & {
+    game?: {
+      settings?: {
+        get?: (scope: string, key: string) => unknown;
+      };
+    };
+  };
+  const mode = globals.game?.settings?.get?.("core", "messageMode");
+  return typeof mode === "string" ? mode : "public";
 }
 
 function getRollConstructor():
   | (new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     })
@@ -1318,6 +1630,7 @@ function getRollConstructor():
     Roll?: new (formula: string) => {
       evaluate(options?: Record<string, unknown>): Promise<unknown>;
       toMessage(message?: Record<string, unknown>): Promise<unknown>;
+      render(): Promise<string>;
       dice?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
       terms?: readonly { faces?: number; results?: readonly { result?: number }[] }[];
     };
@@ -1343,13 +1656,14 @@ export async function promptRollMode(): Promise<RollMode | null> {
   try {
     const result = await DialogV2.prompt({
       window: { title: localizeText("PIVOT.RollDialog.Title") },
+      classes: ["pivot-fantasy", "pf-sheet"],
       content: buildRollModeDialogContent(localizeText),
       ok: {
         label: localizeText("PIVOT.RollDialog.Roll"),
         callback: (_event: unknown, button: { form?: HTMLFormElement }) => {
           const selected = button.form?.querySelector("input[name='mode']:checked");
           const value = selected && "value" in selected ? String(selected.value) : "normal";
-          return isRollMode(value) ? value : "normal";
+          return parseRollMode(value) ?? "normal";
         },
       },
       buttons: [
@@ -1360,8 +1674,9 @@ export async function promptRollMode(): Promise<RollMode | null> {
         },
       ],
       rejectClose: false,
+      render: presentRenderedDialog,
     });
-    return isRollMode(result) ? result : null;
+    return parseRollMode(result);
   } catch {
     return null;
   }

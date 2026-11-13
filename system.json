@@ -27,7 +27,7 @@
     }
   ],
   "esmodules": ["dist/pivot.mjs"],
-  "styles": ["styles/pivot-fantasy.css"],
+  "styles": ["styles/pf-tokens.css", "styles/pivot-fantasy.css"],
   "languages": [
     {
       "lang": "en",

@@ -1,5 +1,13 @@
 import { itemTypes, SYSTEM_ID } from "../config";
+import { normalizeEchelon, type Echelon } from "./echelon";
 import { validateEffectRule, type EffectRule } from "./effects";
+import {
+  isArmourCategoryId,
+  isAttackAbilityId,
+  isDamageAbilityId,
+  isDamageTypeId,
+  isWeaponCategoryId,
+} from "./item-choices";
 import { CURRENT_SCHEMA_VERSION } from "./schema-version";
 
 export const CONTENT_PACK_ITEM_IMG = "icons/svg/item-bag.svg";
@@ -32,7 +40,7 @@ export interface ContentItemSystem {
   carried?: boolean;
   ability?: string;
   stream?: string;
-  echelon?: number;
+  echelon?: Echelon;
   mpCost?: number;
   roll?: string;
   damageFormula?: string;
@@ -64,11 +72,15 @@ const allowedSystemKeys: Record<PivotItemType, Set<string>> = {
     "weight",
     "quantity",
     "carried",
+    "equipped",
   ]),
   armour: new Set([
     ...sharedSystemKeys,
     "category",
     "acBonus",
+    "acStackKey",
+    "naturalMode",
+    "bodyLimit",
     "equipped",
     "weight",
     "quantity",
@@ -175,8 +187,16 @@ function validateItemSystem(value: unknown, type: PivotItemType): ContentItemSys
   };
 
   if (value.notes !== undefined) system.notes = requirePlainString(value.notes, "notes");
-  if (value.category !== undefined)
-    system.category = requirePlainString(value.category, "category");
+  if (value.category !== undefined) {
+    const category = requirePlainString(value.category, "category");
+    if (type === "weapon" && !isWeaponCategoryId(category)) {
+      throw new Error(`Unknown weapon category: ${category}`);
+    }
+    if (type === "armour" && !isArmourCategoryId(category)) {
+      throw new Error(`Unknown armour category: ${category}`);
+    }
+    system.category = category;
+  }
   if (value.source !== undefined) system.source = requirePlainString(value.source, "source");
   if (value.ability !== undefined) system.ability = requirePlainString(value.ability, "ability");
   if (value.stream !== undefined) system.stream = requirePlainString(value.stream, "stream");
@@ -190,7 +210,7 @@ function validateItemSystem(value: unknown, type: PivotItemType): ContentItemSys
   if (value.damage !== undefined && type === "weapon") system.damage = requireDamage(value.damage);
   if (value.range !== undefined) system.range = requireRange(value.range);
   if (value.acBonus !== undefined) system.acBonus = requireFiniteInteger(value.acBonus, "acBonus");
-  if (value.echelon !== undefined) system.echelon = requireFiniteInteger(value.echelon, "echelon");
+  if (value.echelon !== undefined) system.echelon = requireEchelon(value.echelon);
   if (value.mpCost !== undefined) system.mpCost = requireNonNegativeInteger(value.mpCost, "mpCost");
   if (value.quantity !== undefined) {
     system.quantity = requireNonNegativeInteger(value.quantity, "quantity");
@@ -239,12 +259,13 @@ function requirePlainString(value: unknown, field: string): string {
   return value;
 }
 
-function requireCost(value: unknown): { pool?: number; mp?: number } {
+function requireCost(value: unknown): { pool?: number; mp?: number; bp?: number } {
   if (!isPlainObject(value)) throw new Error("cost must be a plain object.");
-  assertAllowedKeys(value, new Set(["pool", "mp"]), "cost");
-  const cost: { pool?: number; mp?: number } = {};
+  assertAllowedKeys(value, new Set(["pool", "mp", "bp"]), "cost");
+  const cost: { pool?: number; mp?: number; bp?: number } = {};
   if (value.pool !== undefined) cost.pool = requireNonNegativeInteger(value.pool, "cost.pool");
   if (value.mp !== undefined) cost.mp = requireNonNegativeInteger(value.mp, "cost.mp");
+  if (value.bp !== undefined) cost.bp = requireNonNegativeInteger(value.bp, "cost.bp");
   return cost;
 }
 
@@ -261,8 +282,11 @@ function requireAttack(value: unknown): { ability?: string; bonus?: number } {
   if (!isPlainObject(value)) throw new Error("attack must be a plain object.");
   assertAllowedKeys(value, new Set(["ability", "bonus"]), "attack");
   const attack: { ability?: string; bonus?: number } = {};
-  if (value.ability !== undefined)
-    attack.ability = requirePlainString(value.ability, "attack.ability");
+  if (value.ability !== undefined) {
+    const ability = requirePlainString(value.ability, "attack.ability");
+    if (!isAttackAbilityId(ability)) throw new Error(`Unknown attack ability: ${ability}`);
+    attack.ability = ability;
+  }
   if (value.bonus !== undefined) attack.bonus = requireFiniteInteger(value.bonus, "attack.bonus");
   return attack;
 }
@@ -284,10 +308,16 @@ function requireDamage(value: unknown): {
   if (value.formula !== undefined) {
     damage.formula = requirePlainString(value.formula, "damage.formula");
   }
-  if (value.type !== undefined) damage.type = requirePlainString(value.type, "damage.type");
+  if (value.type !== undefined) {
+    const damageType = requirePlainString(value.type, "damage.type");
+    if (!isDamageTypeId(damageType)) throw new Error(`Unknown damage type: ${damageType}`);
+    damage.type = damageType;
+  }
   if (value.ability === null) damage.ability = null;
   else if (value.ability !== undefined) {
-    damage.ability = requirePlainString(value.ability, "damage.ability");
+    const ability = requirePlainString(value.ability, "damage.ability");
+    if (!isDamageAbilityId(ability)) throw new Error(`Unknown damage ability: ${ability}`);
+    damage.ability = ability;
   }
   if (value.bonus !== undefined) damage.bonus = requireFiniteInteger(value.bonus, "damage.bonus");
   return damage;
@@ -302,6 +332,14 @@ function requireRange(value: unknown): { normal?: number; long?: number } {
   }
   if (value.long !== undefined) range.long = requireNonNegativeInteger(value.long, "range.long");
   return range;
+}
+
+function requireEchelon(value: unknown): Echelon {
+  const echelon = normalizeEchelon(value);
+  if (echelon === undefined) {
+    throw new Error("echelon must be Core or an integer from 1 to 5.");
+  }
+  return echelon;
 }
 
 function requireFiniteInteger(value: unknown, field: string): number {

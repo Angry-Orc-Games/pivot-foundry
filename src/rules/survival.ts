@@ -119,13 +119,22 @@ export interface SurvivalCorrection {
   current: SurvivalState;
   requested: Pick<SurvivalState, "hp" | "temp" | "successes" | "failures" | "status">;
 }
+/** Dying or Stable was requested while HP is still above 0. Temporary HP is not HP. */
+export class DyingAboveZeroError extends RangeError {
+  constructor() {
+    super("Dying and Stable need 0 HP");
+  }
+}
 /**
  * Survival correction: the GM sets the Survival state outright. The GM must choose a
  * confirmed status, and a Stable or Conscious Character keeps no death-save counters.
+ * Dying or Stable above 0 HP is refused; temporary HP does not count as HP.
  */
 export function correctSurvival({ current, requested }: SurvivalCorrection): SurvivalState {
   if (requested.status === "unconfirmed")
     throw new RangeError(`status must be confirmed by the correction (got ${requested.status})`);
+  if (requested.hp > 0 && (requested.status === "dying" || requested.status === "stable"))
+    throw new DyingAboveZeroError();
   const next = { ...current, ...requested };
   validateSurvival(next);
   if (next.status === "stable" || next.hp > 0) return { ...next, successes: 0, failures: 0 };
