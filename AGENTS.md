@@ -31,7 +31,7 @@ Read [CODING_STANDARDS.md](CODING_STANDARDS.md) before writing or reviewing code
 
 ## Brownfield Workflow
 
-- Read `README.md`, `docs/development.md`, `docs/architecture.md`, `docs/foundry-vtt-source.md`, `docs/rules-source.md`, and `docs/character-sheet-source.md` before feature work. Read `docs/deployment.md` before any deployment-related work. Read `docs/foundry-local-dev.md`, `docs/foundry-testing.md`, and `docs/foundry-cloud.md` before changing the Foundry runtime.
+- Read `README.md`, `docs/development.md`, `docs/architecture.md`, `docs/foundry-vtt-source.md`, `docs/rules-source.md`, and `docs/character-sheet-source.md` before feature work. Read `docs/deployment.md` before any deployment-related work. Read `docs/foundry-local-dev.md`, `docs/foundry-testing.md`, and `docs/foundry-cloud.md` before changing the Foundry runtime or reporting browser E2E results.
 - Preserve unrelated dirty work. If files are already modified, inspect and build on the current state rather than reverting it.
 - Prefer one worker for code edits. Use additional agents or reviewers for read-only mapping, testing, security review, and architecture review.
 - For runtime behavior, separate local repo success from Foundry acceptance. Report whether validation was local-only, CI-backed, or checked in Foundry / Playwright.

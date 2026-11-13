@@ -44,6 +44,8 @@ npx playwright install chromium
 npm run foundry:e2e
 ```
 
+Run `npm run foundry:doctor` first. If it reports `Missing .env.foundry.local` and no `FOUNDRY_*` variables are set, the E2E cannot run: report it as not run, not as passed, and say which evidence stands in (CI, nightly, or local-only).
+
 Missing credentials, a wrong Foundry version, a missing browser, or a world that is not this package fail with a non-zero exit code. The suite never attaches to an unrelated running server.
 
 Destructive fixture tests require `PIVOT_FOUNDRY_TARGET=e2e` (set by the command). They refuse `https://foundry.angryorcgames.com` and `PIVOT_FOUNDRY_TARGET=production`.
